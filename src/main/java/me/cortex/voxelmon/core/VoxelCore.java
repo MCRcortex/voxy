@@ -57,7 +57,7 @@ public class VoxelCore {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
-        this.world = new WorldEngine(new File("ethoslab.db"), 16, 5);//"hc9.db"//"storagefile.db"
+        this.world = new WorldEngine(new File("storagefile.db"), 5, 5);//"storagefile.db"//"ethoslab.db"
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
         this.renderGen = new RenderGenerationService(this.world, this.renderTracker,4);
