@@ -1,0 +1,97 @@
+#version 460
+#extension GL_ARB_gpu_shader_int64 : enable
+#import <voxelmon:lod/gl46/quad_format.glsl>
+#import <voxelmon:lod/gl46/bindings.glsl>
+
+//https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_16bit_storage.txt
+// adds support for uint8_t which can use for compact visibility buffer
+
+layout(local_size_x = 128, local_size_y = 1, local_size_x = 1) in;
+
+
+bool testFrustumPoint(vec4 plane, vec3 min, vec3 max) {
+    vec3 point = mix(max, min, lessThan(plane.xyz, vec3(0))) * plane.xyz;
+    return (point.x + point.y + point.z) >= -plane.w;
+}
+
+bool testFrustum(Frustum frust, vec3 min, vec3 max) {
+    return  testFrustumPoint(frust.planes[0], min, max) &&
+            testFrustumPoint(frust.planes[1], min, max) &&
+            testFrustumPoint(frust.planes[2], min, max) &&
+            testFrustumPoint(frust.planes[3], min, max) &&
+            testFrustumPoint(frust.planes[4], min, max) &&
+            testFrustumPoint(frust.planes[5], min, max);
+}
+
+
+
+uint extractDetail(SectionMeta section) {
+    return section.header.x>>28;
+}
+
+/*
+    uint  count;
+    uint  instanceCount;
+    uint  firstIndex;
+    int  baseVertex;
+    uint  baseInstance;
+    */
+ivec3 extractPosition(SectionMeta section) {
+    int y = ((int(section.header.x)<<4)>>24);
+    int x = (int(section.header.y)<<4)>>8;
+    int z = int((section.header.x&((1<<20)-1))<<4);
+    z |= int(section.header.y>>28);
+    z <<= 8;
+    z >>= 8;
+    return ivec3(x,y,z);
+}
+uint extractQuadStart(SectionMeta meta) {
+    return meta.header.z;
+}
+
+uint extractQuadCount(SectionMeta meta) {
+    return meta.header.w;
+}
+
+uint encodeLocalLodPos(uint detail, ivec3 pos) {
+    uvec3 detla = (pos - (baseSectionPos >> detail))&((1<<9)-1);
+    return (detail<<29)|(detla.x<<20)|(detla.y<<11)|(detla.z<<2);
+}
+
+void main() {
+    if (gl_GlobalInvocationID.x >= sectionCount) {
+        return;
+    }
+    SectionMeta meta = sectionData[gl_GlobalInvocationID.x];
+    uint detail = extractDetail(meta);
+    ivec3 ipos = extractPosition(meta);
+
+    //TODO: fixme; i dont think this is correct
+    vec3 cornerPos = vec3(((ipos<<detail)-baseSectionPos)<<5)-cameraSubPos;
+
+
+    bool shouldRender = testFrustum(frustum, cornerPos, cornerPos+vec3(1<<(detail+5)));
+
+    //This prevents overflow of the relative position encoder
+    if (shouldRender) {
+        shouldRender = !any(lessThan(ivec3(254), abs(ipos-(baseSectionPos>>detail))));
+    }
+
+    if (shouldRender) {
+        DrawCommand cmd;
+        cmd.count = extractQuadCount(meta) * 6;
+        cmd.instanceCount = 1;
+        cmd.firstIndex = 0;
+        cmd.baseVertex = int(extractQuadStart(meta))<<2;
+        cmd.baseInstance = encodeLocalLodPos(detail, ipos);
+        cmdBuffer[gl_GlobalInvocationID.x] = cmd;
+    } else {
+        DrawCommand cmd;
+        cmd.count = 0;
+        cmd.instanceCount = 0;
+        cmd.firstIndex = 0;
+        cmd.baseVertex = 0;
+        cmd.baseInstance = 0;
+        cmdBuffer[gl_GlobalInvocationID.x] = cmd;
+    }
+}

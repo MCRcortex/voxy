@@ -1,0 +1,56 @@
+struct Frustum {
+    vec4 planes[6];
+};
+
+layout(binding = 0, std140) uniform SceneUniform {
+    mat4 MVP;
+    ivec3 baseSectionPos;
+    int sectionCount;
+    Frustum frustum;
+    vec3 cameraSubPos;
+    int _padA;
+};
+
+struct State {
+    uint biomeTintMsk;
+    uint faceColours[6];
+};
+
+struct Biome {
+    uint foliage;
+    uint water;
+};
+
+struct SectionMeta {
+    uvec4 header;
+    uvec4 drawdata;
+};
+
+//TODO: see if making the stride 2*4*4 bytes or something cause you get that 16 byte write
+struct DrawCommand {
+    uint  count;
+    uint  instanceCount;
+    uint  firstIndex;
+    int  baseVertex;
+    uint  baseInstance;
+};
+
+layout(binding = 1, std430) readonly restrict buffer QuadBuffer {
+    Quad quadData[];
+};
+
+layout(binding = 2, std430) writeonly restrict buffer DrawBuffer {
+    DrawCommand cmdBuffer[];
+};
+
+layout(binding = 3, std430) readonly restrict buffer SectionBuffer {
+    SectionMeta sectionData[];
+};
+
+layout(binding = 4, std430) readonly restrict buffer StateBuffer {
+    State stateData[];
+};
+
+layout(binding = 5, std430) readonly restrict buffer BiomeBuffer {
+    Biome biomeData[];
+};

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "voxelmon",
+  "version": "${version}",
+  "name": "voxelmon",
+  "description": "",
+  "authors": [],
+  "contact": {
+  },
+  "license": "All-Rights-Reserved",
+  "icon": "assets/voxelmon/icon.png",
+  "environment": "client",
+  "entrypoints": {
+  },
+  "mixins": [
+    "voxelmon.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.14.22"
+  }
+}
