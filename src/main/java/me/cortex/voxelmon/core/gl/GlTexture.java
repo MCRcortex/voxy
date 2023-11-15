@@ -12,6 +12,10 @@ import static org.lwjgl.opengl.GL45C.glTextureStorage2D;
 public class GlTexture extends TrackedObject {
     final int id;
     private final int type;
+    public GlTexture() {
+        this(GL_TEXTURE_2D)
+    }
+
     public GlTexture(int type) {
         this.id = glCreateTextures(type);
         this.type = type;

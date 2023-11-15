@@ -1,10 +1,9 @@
 package me.cortex.voxelmon.core.gl;
 
 import me.cortex.voxelmon.core.util.TrackedObject;
+import org.lwjgl.opengl.GL30C;
 
-import static org.lwjgl.opengl.ARBFramebufferObject.*;
-import static org.lwjgl.opengl.GL45C.glCreateFramebuffers;
-import static org.lwjgl.opengl.GL45C.glNamedFramebufferTexture;
+import static org.lwjgl.opengl.GL45C.*;
 
 public class GlFramebuffer extends TrackedObject {
     public final int id;
@@ -21,5 +20,9 @@ public class GlFramebuffer extends TrackedObject {
     public void free() {
         super.free0();
         glDeleteFramebuffers(this.id);
+    }
+
+    public void verify() {
+        glCheckNamedFramebufferStatus(this.id, GL_FRAMEBUFFER);
     }
 }
