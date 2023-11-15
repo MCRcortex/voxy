@@ -8,7 +8,7 @@ layout(binding = 0, std140) uniform SceneUniform {
     int sectionCount;
     Frustum frustum;
     vec3 cameraSubPos;
-    int _padA;
+    uint frameId;
 };
 
 struct State {
@@ -35,6 +35,9 @@ struct DrawCommand {
     uint  baseInstance;
 };
 
+#ifndef Quad
+#define Quad ivec2
+#endif
 layout(binding = 1, std430) readonly restrict buffer QuadBuffer {
     Quad quadData[];
 };
@@ -53,4 +56,11 @@ layout(binding = 4, std430) readonly restrict buffer StateBuffer {
 
 layout(binding = 5, std430) readonly restrict buffer BiomeBuffer {
     Biome biomeData[];
+};
+
+#ifndef VISIBILITY_ACCESS
+#define VISIBILITY_ACCESS readonly
+#endif
+layout(binding = 6, std430) VISIBILITY_ACCESS restrict buffer VisibilityBuffer {
+    uint visibilityData[];
 };

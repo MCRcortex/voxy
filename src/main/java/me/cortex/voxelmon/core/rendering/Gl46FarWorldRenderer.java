@@ -40,6 +40,13 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
             .add(ShaderType.FRAGMENT, "voxelmon:lod/gl46/quads.frag")
             .compile();
 
+
+    //TODO: Note the cull shader needs a different element array since its rastering cubes not quads
+    private final Shader cullShader = Shader.make()
+            .add(ShaderType.VERTEX, "voxelmon:lod/gl46/cull/raster.vert")
+            .add(ShaderType.FRAGMENT, "voxelmon:lod/gl46/cull/raster.frag")
+            .compile();
+
     private final GlBuffer glCommandBuffer = new GlBuffer(100_000*5*4, 0);
 
     public Gl46FarWorldRenderer() {
@@ -111,6 +118,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         super.shutdown();
         this.commandGen.free();
         this.lodShader.free();
+        this.cullShader.free();
     }
 
     @Override

@@ -14,6 +14,6 @@ import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
 public class MixinClientChunkManager {
     @Inject(method = "unload", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/world/ClientChunkManager$ClientChunkMap;compareAndSet(ILnet/minecraft/world/chunk/WorldChunk;Lnet/minecraft/world/chunk/WorldChunk;)Lnet/minecraft/world/chunk/WorldChunk;", shift = At.Shift.BEFORE), locals = LocalCapture.CAPTURE_FAILHARD)
     private void injectUnload(ChunkPos pos, CallbackInfo ci, int index, WorldChunk worldChunk) {
-        //VoxelCore.INSTANCE.enqueueIngest(worldChunk);
+        VoxelCore.INSTANCE.enqueueIngest(worldChunk);
     }
 }
