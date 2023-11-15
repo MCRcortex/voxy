@@ -13,7 +13,7 @@ public class GlTexture extends TrackedObject {
     final int id;
     private final int type;
     public GlTexture() {
-        this(GL_TEXTURE_2D)
+        this(GL_TEXTURE_2D);
     }
 
     public GlTexture(int type) {
