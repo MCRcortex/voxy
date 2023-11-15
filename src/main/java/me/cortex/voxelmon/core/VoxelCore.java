@@ -57,7 +57,7 @@ public class VoxelCore {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
-        this.world = new WorldEngine(new File("ethoslab.db"), 16, 5);//"hc9.db"//"storagefile.db"
+        this.world = new WorldEngine(new File("storagefile.db"), 16, 5);//"hc9.db"//"storagefile.db"
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
         this.renderGen = new RenderGenerationService(this.world, this.renderTracker,4);
@@ -90,7 +90,7 @@ public class VoxelCore {
 
 
         //WorldImporter importer = new WorldImporter(this.world, MinecraftClient.getInstance().world);
-        //importer.importWorldAsyncStart(new File("saves/Etho's LP Ep550/region"));
+        //importer.importWorldAsyncStart(new File("saves/New World/region"));
 
         Set<Block> biomeTintableAllFaces = new HashSet<>(List.of(Blocks.OAK_LEAVES, Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES, Blocks.DARK_OAK_LEAVES, Blocks.VINE, Blocks.MANGROVE_LEAVES,
                 Blocks.TALL_GRASS, Blocks.LARGE_FERN));

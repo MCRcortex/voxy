@@ -78,11 +78,13 @@ public class WorldEngine {
     public void tryUnload(WorldSection section) {
         synchronized (this.loadedSectionCache[section.lvl]) {
             if (section.getRefCount() != 0) {
+                section.assertNotFree();
                 return;
             }
+
             //TODO: make a thing where it checks if the section is dirty, if it is, enqueue it for a save first and return
 
-            section.setFreed();
+            section.setFreed();//TODO: FIXME THIS IS SOMEHOW FAILING
             var removedSection = this.loadedSectionCache[section.lvl].remove(section.getKey());
             if (removedSection != section) {
                 throw new IllegalStateException("Removed section not the same as attempted to remove");
