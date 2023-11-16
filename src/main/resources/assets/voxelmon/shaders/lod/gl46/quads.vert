@@ -73,18 +73,27 @@ void main() {
     if (((stateInfo.biomeTintMsk>>6)&1) == 1) {
         colour *= vec4(0.247, 0.463, 0.894, 1);
     }
+
+    //Apply face tint
+    if (face == 0) {
+        colour.xyz *= vec3(0.75, 0.75, 0.75);
+    } else if (face != 1) {
+        colour.xyz *= vec3((float(face-2)/4)*0.25 + 0.75);
+    }
+
+
     //gl_Position = MVP * vec4(vec3(((cornerIdx)&1)+10,10,((cornerIdx>>1)&1)+10),1);
     //uint i = uint(quad>>32);
-    uint i = uint(gl_BaseInstance);
-    i ^= i>>16;
-    i *= 124128573;
-    i ^= i>>16;
-    i *= 4211346123;
-    i ^= i>>16;
-    i *= 462312435;
-    i ^= i>>16;
-    i *= 542354341;
-    i ^= i>>16;
+    //uint i = uint(gl_BaseInstance);
+    //i ^= i>>16;
+    //i *= 124128573;
+    //i ^= i>>16;
+    //i *= 4211346123;
+    //i ^= i>>16;
+    //i *= 462312435;
+    //i ^= i>>16;
+    //i *= 542354341;
+    //i ^= i>>16;
 
     //uint i = uint(lodLevel+12)*215387625;
     //colour *= vec4(vec3(float((uint(i)>>2)&7)/7,float((uint(i)>>5)&7)/7,float((uint(i)>>8)&7)/7)*0.7+0.3,1);

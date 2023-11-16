@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Semaphore;
 import java.util.function.Supplier;
 
+//TODO: Add a render cache
 public class RenderGenerationService {
     //TODO: make it accept either a section or section position and have a concurrent hashset to determine if
     // a section is in the build queue

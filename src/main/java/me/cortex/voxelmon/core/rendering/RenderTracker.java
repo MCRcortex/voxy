@@ -187,7 +187,7 @@ public class RenderTracker {
                 buildMask |= 1<<Direction.WEST.getId();
             }
             buildMask |= 1<<Direction.UP.getId();
-            buildMask |= ((1<<6)-1)^(1);
+            //buildMask |= ((1<<6)-1)^(1);
         }
         return buildMask;
     }

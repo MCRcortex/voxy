@@ -10,7 +10,7 @@ import static org.lwjgl.opengl.GL45C.glCreateTextures;
 import static org.lwjgl.opengl.GL45C.glTextureStorage2D;
 
 public class GlTexture extends TrackedObject {
-    final int id;
+    public final int id;
     private final int type;
     public GlTexture() {
         this(GL_TEXTURE_2D);
@@ -23,7 +23,7 @@ public class GlTexture extends TrackedObject {
 
     public GlTexture store(int format, int levels, int width, int height) {
         if (this.type == GL_TEXTURE_2D) {
-            glTextureStorage2D(this.id, format, levels, width, height);
+            glTextureStorage2D(this.id, levels, format, width, height);
         } else {
             throw new IllegalStateException("Unknown texture type");
         }

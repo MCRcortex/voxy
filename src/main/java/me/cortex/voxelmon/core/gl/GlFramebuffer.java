@@ -23,6 +23,9 @@ public class GlFramebuffer extends TrackedObject {
     }
 
     public void verify() {
-        glCheckNamedFramebufferStatus(this.id, GL_FRAMEBUFFER);
+        int code;
+        if ((code = glCheckNamedFramebufferStatus(this.id, GL_FRAMEBUFFER)) != GL_FRAMEBUFFER_COMPLETE) {
+            throw new IllegalStateException("Framebuffer incomplete with error code: " + code);
+        }
     }
 }

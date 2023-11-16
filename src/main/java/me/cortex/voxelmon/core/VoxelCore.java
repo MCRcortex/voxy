@@ -1,9 +1,7 @@
 package me.cortex.voxelmon.core;
 
-import me.cortex.voxelmon.core.rendering.AbstractFarWorldRenderer;
-import me.cortex.voxelmon.core.rendering.Gl46FarWorldRenderer;
-import me.cortex.voxelmon.core.rendering.RenderTracker;
-import me.cortex.voxelmon.core.rendering.SharedIndexBuffer;
+import com.mojang.blaze3d.platform.GlStateManager;
+import me.cortex.voxelmon.core.rendering.*;
 import me.cortex.voxelmon.core.rendering.building.BuiltSectionGeometry;
 import me.cortex.voxelmon.core.rendering.building.RenderGenerationService;
 import me.cortex.voxelmon.core.util.DebugUtil;
@@ -29,6 +27,9 @@ import org.lwjgl.system.MemoryUtil;
 import java.io.File;
 import java.util.*;
 
+import static org.lwjgl.opengl.ARBFramebufferObject.GL_FRAMEBUFFER;
+import static org.lwjgl.opengl.ARBFramebufferObject.glBindFramebuffer;
+
 //Core class that ingests new data from sources and updates the required systems
 
 //3 primary services:
@@ -50,7 +51,9 @@ public class VoxelCore {
     private final DistanceTracker distanceTracker;
     private final RenderGenerationService renderGen;
     private final RenderTracker renderTracker;
+
     private final AbstractFarWorldRenderer renderer;
+    private final PostProcessing postProcessing;
 
 
     public VoxelCore() {
@@ -65,6 +68,8 @@ public class VoxelCore {
         this.renderTracker.setRenderGen(this.renderGen);
 
         this.distanceTracker = new DistanceTracker(this.renderTracker, 5);
+
+        this.postProcessing = new PostProcessing();
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
 
@@ -140,66 +145,21 @@ public class VoxelCore {
         DebugUtil.setPositionMatrix(matrices);
         matrices.pop();
 
-        /*
-        for (int i = 0; i < 5; i++) {
-            for (int y = 0; y < Math.max(1, 10>>i); y++) {
-                for (int x = -32; x < 32; x++) {
-                    for (int z = -32; z < 32; z++) {
-                        if (-16 < x && x < 16 && -16 < z && z < 16) {
-                            continue;
-                        }
-                        var sec = this.world.getOrLoadAcquire(i, x, y, z);
-                        this.renderGen.enqueueTask(sec);
-                        sec.release();
-                    }
-                }
-            }
-        }*/
+        int boundFB = GlStateManager.getBoundFramebuffer();
+        this.postProcessing.setSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
+        this.postProcessing.bindClearFramebuffer();
+
+        //TODO: FIXME: since we just bound the post processing FB the depth information isnt
+        // copied over, we must do this manually and also copy it with respect to the
+        // near/far planes
 
 
-        //DebugRenderUtil.renderAABB(new Box(0,100,0,1,101,1), 0,1,0,0.1f);
-        //DebugRenderUtil.renderAABB(new Box(1,100,1,2,101,2), 1,0,0,0.1f);
-
-
-        /*
-        int LEVEL = 4;
-        int SEC_Y = 1>>LEVEL;
-        int X = 47>>LEVEL;
-        int Z = 32>>LEVEL;
-        var section = world.getOrLoadAcquire(LEVEL,X,SEC_Y,Z);
-        var data = section.copyData();
-        int SCALE = 1<<LEVEL;
-        int Y_OFFSET = SEC_Y<<(5+LEVEL);
-        int X_OFFSET = X<<(5+LEVEL);
-        int Z_OFFSET = Z<<(5+LEVEL);
-        for (int y = 0; y < 32; y++) {
-            for (int z = 0; z < 32; z++) {
-                for (int x = 0; x < 32; x++) {
-                    var point = data[WorldSection.getIndex(x,y,z)];
-                    if (point != 0) {
-                        //var colours = world.getMapper().getColours(point);
-                        //int colour =  colours[Direction.UP.getId()];
-                        //DebugUtil.renderAABB(new Box(x*SCALE,y*SCALE+Y_OFFSET,z*SCALE,x*SCALE+SCALE,y*SCALE+SCALE+Y_OFFSET,z*SCALE+SCALE), colour|0xFF);
-                        point >>>= 27;
-                        DebugUtil.renderAABB(new Box(x*SCALE + X_OFFSET,y*SCALE+Y_OFFSET,z*SCALE+Z_OFFSET,x*SCALE+SCALE + X_OFFSET,y*SCALE+SCALE+Y_OFFSET,z*SCALE+SCALE+Z_OFFSET), (float) (point&7)/7,(float) ((point>>3)&7)/7,(float) ((point>>6)&7)/7,1f);
-                    }
-                }
-            }
-        }
-        section.release();
-         */
-
-
-        /*
-        var points = RingUtil.generatingBoundingCorner2D(4);
-        for (var point : points) {
-            int x = point>>>16;
-            int y = point&0xFFFF;
-            DebugUtil.renderAABB(new Box(x,150,y,x+1,151,y+1), 1,1,0,1);
-        }
-        */
-
+        //TODO: have the renderer also render a bounding full face just like black boarders around lvl 0
+        // this is cause the terrain might not exist and so all the caves are visible causing hell for the
+        // occlusion culler
         this.renderer.renderFarAwayOpaque(matrices, cameraX, cameraY, cameraZ);
+        glBindFramebuffer(GL_FRAMEBUFFER, boundFB);
+        this.postProcessing.renderPost(boundFB);
     }
 
     public void addDebugInfo(List<String> debug) {
@@ -220,6 +180,7 @@ public class VoxelCore {
     public void shutdown() {
         try {this.renderGen.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.renderer.shutdown();} catch (Exception e) {System.err.println(e);}
+        try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
     }
 }
