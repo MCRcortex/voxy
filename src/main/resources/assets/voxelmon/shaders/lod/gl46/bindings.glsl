@@ -50,17 +50,21 @@ layout(binding = 3, std430) readonly restrict buffer SectionBuffer {
     SectionMeta sectionData[];
 };
 
-layout(binding = 4, std430) readonly restrict buffer StateBuffer {
-    State stateData[];
-};
-
-layout(binding = 5, std430) readonly restrict buffer BiomeBuffer {
-    Biome biomeData[];
-};
-
 #ifndef VISIBILITY_ACCESS
 #define VISIBILITY_ACCESS readonly
 #endif
-layout(binding = 6, std430) VISIBILITY_ACCESS restrict buffer VisibilityBuffer {
+layout(binding = 4, std430) VISIBILITY_ACCESS restrict buffer VisibilityBuffer {
     uint visibilityData[];
+};
+
+layout(binding = 5, std430) readonly restrict buffer StateBuffer {
+    State stateData[];
+};
+
+layout(binding = 6, std430) readonly restrict buffer BiomeBuffer {
+    Biome biomeData[];
+};
+
+layout(binding = 7, std430) readonly restrict buffer LightingBuffer {
+    vec4 lightData[];
 };

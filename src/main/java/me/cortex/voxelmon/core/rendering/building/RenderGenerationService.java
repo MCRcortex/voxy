@@ -115,19 +115,20 @@ public class RenderGenerationService {
             return;
         }
 
-        //Wait for the ingest to finish
-        while (this.taskCounter.availablePermits() != 0) {
-            Thread.onSpinWait();
-        }
-
-        //Shutdown
+        //Since this is just render data, dont care about any tasks needing to finish
         this.running = false;
         this.taskCounter.release(1000);
+
         //Wait for thread to join
         try {
             for (var worker : this.workers) {
                 worker.join();
             }
         } catch (InterruptedException e) {throw new RuntimeException(e);}
+
+        //Cleanup any remaining data
+        while (!this.taskQueue.isEmpty()) {
+            this.taskQueue.pop();
+        }
     }
 }

@@ -48,6 +48,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
             .compile();
 
     private final GlBuffer glCommandBuffer = new GlBuffer(100_000*5*4, 0);
+    private final GlBuffer glVisibilityBuffer = new GlBuffer(100_000*4, 0);
 
     public Gl46FarWorldRenderer() {
         super();
@@ -63,9 +64,10 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometry.geometryId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.glCommandBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometry.metaId());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.stateDataBuffer.id);//State LUT
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.biomeDataBuffer.id);//Biome LUT
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, 0);//Lighting LUT
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.glVisibilityBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.stateDataBuffer.id);//State LUT
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.biomeDataBuffer.id);//Biome LUT
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, 0);//Lighting LUT
         glBindVertexArray(0);
     }
 
@@ -91,11 +93,23 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT|GL_FRAMEBUFFER_BARRIER_BIT);
         //TODO: add gpu occlusion culling here (after the lod drawing) (maybe, finish the rest of the PoC first)
+        cullShader.bind();
+
+        glColorMask(false,false,false,false);
+        glDepthMask(false);
+        glDrawElementsInstanced(GL_TRIANGLES, 6*2*3, GL_UNSIGNED_BYTE, (1<<16)*6*2, this.geometry.getSectionCount());
+        glDepthMask(true);
+        glColorMask(true,true,true,true);
+
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
         glBindVertexArray(0);
 
         RenderLayer.getCutoutMipped().endDrawing();
     }
 
+    //FIXME: dont do something like this as it breaks multiviewport mods
+    private int frameId = 0;
     private void updateUniformBuffer(MatrixStack stack, double cx, double cy, double cz) {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, this.uniformBuffer.size());
         var mat = new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix());
@@ -111,6 +125,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
             plane.getToAddress(ptr); ptr += 4*4;
         }
         innerTranslation.getToAddress(ptr); ptr += 4*3;
+        MemoryUtil.memPutInt(ptr, this.frameId++); ptr += 4;
     }
 
     @Override
@@ -119,6 +134,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         this.commandGen.free();
         this.lodShader.free();
         this.cullShader.free();
+        this.glCommandBuffer.free();
+        this.glVisibilityBuffer.free();
     }
 
     @Override

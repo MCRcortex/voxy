@@ -167,19 +167,23 @@ public class RenderTracker {
     }
 
     public int getBuildFlagsOrAbort(WorldSection section) {
+        var cam = MinecraftClient.getInstance().cameraEntity;
+        if (cam == null) {
+            return 0;
+        }
         var holder = this.activeSections.get(section.getKey());
         int buildMask = 0;
         if (holder != null) {
-            if (section.z< (((int)MinecraftClient.getInstance().cameraEntity.getPos().z)>>(5+section.lvl))+1) {
+            if (section.z<(((int)cam.getPos().z)>>(5+section.lvl))+1) {
                 buildMask |= 1<< Direction.SOUTH.getId();
             }
-            if (section.z>(((int)MinecraftClient.getInstance().cameraEntity.getPos().z)>>(5+section.lvl))-1) {
+            if (section.z>(((int)cam.getPos().z)>>(5+section.lvl))-1) {
                 buildMask |= 1<<Direction.NORTH.getId();
             }
-            if (section.x<(((int)MinecraftClient.getInstance().cameraEntity.getPos().x)>>(5+section.lvl))+1) {
+            if (section.x<(((int)cam.getPos().x)>>(5+section.lvl))+1) {
                 buildMask |= 1<<Direction.EAST.getId();
             }
-            if (section.x>(((int)MinecraftClient.getInstance().cameraEntity.getPos().x)>>(5+section.lvl))-1) {
+            if (section.x>(((int)cam.getPos().x)>>(5+section.lvl))-1) {
                 buildMask |= 1<<Direction.WEST.getId();
             }
             buildMask |= 1<<Direction.UP.getId();

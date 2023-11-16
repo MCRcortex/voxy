@@ -8,18 +8,20 @@ flat out uint id;
 flat out uint value;
 
 void main() {
-    SectionMeta section = sectionData[gl_VertexID>>3];
+    uint sid = gl_InstanceID;
+
+    SectionMeta section = sectionData[sid];
 
     uint detail = extractDetail(section);
     ivec3 ipos = extractPosition(section);
 
     //Transform ipos with respect to the vertex corner
-    ipos += ivec3(gl_VertexID&1, (gl_VertexID>>1)&1, (gl_VertexID>>2)&1);
+    ipos += ivec3(gl_VertexID&1, (gl_VertexID>>2)&1, (gl_VertexID>>1)&1);
 
     vec3 cornerPos = vec3(((ipos<<detail)-baseSectionPos)<<5);
     gl_Position = MVP * vec4(cornerPos,1);
 
     //Write to this id
-    id = gl_VertexID>>3;
+    id = sid;
     value = frameId;
 }

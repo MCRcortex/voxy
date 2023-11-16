@@ -17,12 +17,11 @@ import java.util.concurrent.atomic.AtomicReference;
 //Use an LMDB backend to store the world, use a local inmemory cache for lod sections
 // automatically manages and invalidates sections of the world as needed
 public class WorldEngine {
-    private static final int ACTIVE_CACHE_SIZE = 10;
 
     public final StorageBackend storage;
     private final Mapper mapper;
     private final ActiveSectionTracker sectionTracker;
-    public final VoxelIngestService ingestService = new VoxelIngestService(this);
+    public final VoxelIngestService ingestService;
     public final SectionSavingService savingService;
     private RenderTracker renderTracker;
 
@@ -42,6 +41,7 @@ public class WorldEngine {
         this.sectionTracker = new ActiveSectionTracker(maxMipLayers, this::unsafeLoadSection);
 
         this.savingService = new SectionSavingService(this, savingServiceWorkers);
+        this.ingestService  = new VoxelIngestService(this);
     }
 
     private boolean unsafeLoadSection(WorldSection into) {
@@ -69,7 +69,7 @@ public class WorldEngine {
     }
 
     //Marks a section as dirty, enqueuing it for saving and or render data rebuilding
-    private void markDirty(WorldSection section) {
+    public void markDirty(WorldSection section) {
         this.renderTracker.sectionUpdated(section);
         //TODO: add an option for having synced saving, that is when call enqueueSave, that will instead, instantly
         // save to the db, this can be useful for just reducing the amount of thread pools in total

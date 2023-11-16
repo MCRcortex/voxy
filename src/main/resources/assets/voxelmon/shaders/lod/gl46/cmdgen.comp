@@ -34,11 +34,19 @@ void main() {
     uint detail = extractDetail(meta);
     ivec3 ipos = extractPosition(meta);
 
-    //TODO: fixme; i dont think this is correct
     vec3 cornerPos = vec3(((ipos<<detail)-baseSectionPos)<<5)-cameraSubPos;
 
 
     bool shouldRender = testFrustum(frustum, cornerPos, cornerPos+vec3(1<<(detail+5)));
+
+    //Check the occlusion data from last frame
+    if (visibilityData[gl_GlobalInvocationID.x] != frameId - 1) {
+        shouldRender = false;
+    }
+    //Clear the occlusion data (not strictly? needed? i think???)
+    //visibilityData[gl_GlobalInvocationID.x] = 0;
+
+    //TODO: need to make it check that only if it was also in the frustum last frame does it apply the visibilityData check!
 
     //This prevents overflow of the relative position encoder
     if (shouldRender) {

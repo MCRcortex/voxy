@@ -24,10 +24,13 @@ public class DistanceTracker {
         this.rings = new TransitionRing2D[rings+1];
         this.tracker = tracker;
 
-        int DIST = 16;
+        //NOTE: This is in our render distance units, to convert to chunks at lvl 0 multiply by 2
+        int DIST = 24;
 
         this.rings[0] = new TransitionRing2D(5, DIST, (x,z)->{
-            if (true) return;
+            if (true) {
+                return;
+            }
             for (int y = -2; y < 10; y++) {
                 this.tracker.remLvl0(x, y, z);
             }
