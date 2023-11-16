@@ -68,7 +68,7 @@ public class SaveLoadSystem {
         return out;
     }
 
-    public static WorldSection deserialize(WorldEngine world, int lvl, int x, int y, int z, byte[] data) {
+    public static boolean deserialize(WorldSection section, byte[] data) {
         var buff = MemoryUtil.memAlloc(data.length);
         buff.put(data);
         buff.rewind();
@@ -89,8 +89,6 @@ public class SaveLoadSystem {
             hash ^= lut[i];
         }
 
-        var section = new WorldSection(lvl, x, y, z, world);
-        section.definitelyEmpty = false;
         if (section.getKey() != key) {
             throw new IllegalStateException("Decompressed section not the same as requested. got: " + key + " expected: " + section.getKey());
         }
@@ -107,16 +105,16 @@ public class SaveLoadSystem {
         if (expectedHash != hash) {
             //throw new IllegalStateException("Hash mismatch got: " + hash + " expected: " + expectedHash);
             System.err.println("Hash mismatch got: " + hash + " expected: " + expectedHash + " removing region");
-            return null;
+            return false;
         }
 
         if (decompressed.hasRemaining()) {
             //throw new IllegalStateException("Decompressed section had excess data");
             System.err.println("Decompressed section had excess data removing region");
-            return null;
+            return false;
         }
         MemoryUtil.memFree(decompressed);
 
-        return section;
+        return true;
     }
 }

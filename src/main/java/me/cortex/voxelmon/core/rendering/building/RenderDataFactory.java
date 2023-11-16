@@ -38,9 +38,11 @@ public class RenderDataFactory {
         // appearing between lods
 
 
-        if (section.definitelyEmpty()) {
-            return new BuiltSectionGeometry(section.getKey(), null, null);
-        }
+        //if (section.definitelyEmpty()) {//Fast path if its known the entire chunk is empty
+        //    return new BuiltSectionGeometry(section.getKey(), null, null);
+        //}
+
+
         var data = section.copyData();
 
         long[] connectedData = null;
@@ -64,7 +66,7 @@ public class RenderDataFactory {
                         if (y == 31 && ((buildMask>>(6+dirId))&1) == 0) {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
-                                var connectedSection = this.world.getOrLoadAcquire(section.lvl, section.x, section.y + 1, section.z);
+                                var connectedSection = this.world.acquire(section.lvl, section.x, section.y + 1, section.z);
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }
@@ -106,7 +108,7 @@ public class RenderDataFactory {
                         if (x == 31 && ((buildMask>>(6+dirId))&1) == 0) {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
-                                var connectedSection = this.world.getOrLoadAcquire(section.lvl, section.x + 1, section.y, section.z);
+                                var connectedSection = this.world.acquire(section.lvl, section.x + 1, section.y, section.z);
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }
@@ -148,7 +150,7 @@ public class RenderDataFactory {
                         if (z == 31 && ((buildMask>>(6+dirId))&1) == 0) {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
-                                var connectedSection = this.world.getOrLoadAcquire(section.lvl, section.x, section.y, section.z + 1);
+                                var connectedSection = this.world.acquire(section.lvl, section.x, section.y, section.z + 1);
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }
@@ -190,7 +192,7 @@ public class RenderDataFactory {
                         if (x == 0 && ((buildMask>>(6+dirId))&1) == 0) {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
-                                var connectedSection = this.world.getOrLoadAcquire(section.lvl, section.x - 1, section.y, section.z);
+                                var connectedSection = this.world.acquire(section.lvl, section.x - 1, section.y, section.z);
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }
@@ -232,7 +234,7 @@ public class RenderDataFactory {
                         if (z == 0 && ((buildMask>>(6+dirId))&1) == 0) {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
-                                var connectedSection = this.world.getOrLoadAcquire(section.lvl, section.x, section.y, section.z - 1);
+                                var connectedSection = this.world.acquire(section.lvl, section.x, section.y, section.z - 1);
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }
@@ -274,7 +276,7 @@ public class RenderDataFactory {
                         if (y == 0 && ((buildMask>>(6+dirId))&1) == 0) {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
-                                var connectedSection = this.world.getOrLoadAcquire(section.lvl, section.x, section.y - 1, section.z);
+                                var connectedSection = this.world.acquire(section.lvl, section.x, section.y - 1, section.z);
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }

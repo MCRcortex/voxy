@@ -13,20 +13,21 @@ public final class WorldSection {
     public final int y;
     public final int z;
 
-    ////Maps from a local id to global meaning it should be much cheaper to store in memory probably
-    //private final int[] dataMapping = null;
-    //private final short[] data = new short[32*32*32];
-    final long[] data = new long[32*32*32];
-    boolean definitelyEmpty = true;
+    long[] data;
+    private final ActiveSectionTracker tracker;
+    public final AtomicBoolean inSaveQueue = new AtomicBoolean();
 
-    private final WorldEngine world;
+    //When the first bit is set it means its loaded
+    private final AtomicInteger atomicState = new AtomicInteger(1);
 
-    public WorldSection(int lvl, int x, int y, int z, WorldEngine worldIn) {
+    WorldSection(int lvl, int x, int y, int z, ActiveSectionTracker tracker) {
         this.lvl = lvl;
         this.x = x;
         this.y = y;
         this.z = z;
-        this.world = worldIn;
+        this.tracker = tracker;
+
+        this.data = new long[32*32*32];
     }
 
     @Override
@@ -34,63 +35,47 @@ public final class WorldSection {
         return ((x*1235641+y)*8127451+z)*918267913+lvl;
     }
 
-    public final AtomicBoolean inSaveQueue = new AtomicBoolean();
-    private final AtomicInteger usageCounts = new AtomicInteger();
 
     public int acquire() {
-        this.assertNotFree();
-        return this.usageCounts.getAndAdd(1);
-    }
-
-    //TODO: Fixme i dont think this is fully thread safe/correct
-    public boolean tryAcquire() {
-        if (this.freed) {
-            return false;
+        int state = this.atomicState.addAndGet(2);
+        if ((state&1) == 0) {
+            throw new IllegalStateException("Tried to acquire unloaded section");
         }
-        this.usageCounts.getAndAdd(1);
-        if (this.freed) {
-            return false;
-        }
-        return true;
+        return state>>1;
     }
 
     public int release() {
-        this.assertNotFree();
-        int i = this.usageCounts.addAndGet(-1);
-        if (i < 0) {
-            throw new IllegalStateException();
+        int state = this.atomicState.addAndGet(-2);
+        if (state < 1) {
+            throw new IllegalStateException("Section got into an invalid state");
+        }
+        if ((state&1)==0) {
+            throw new IllegalStateException("Tried releasing a freed section");
+        }
+        if ((state>>1)==0) {
+            this.tracker.tryUnload(this);
         }
 
-
-        //NOTE: cant actually check for not free as at this stage it technically could be unloaded, as soon
-        //this.assertNotFree();
-
-
-        //Try to unload the section if its empty
-        if (i == 0) {
-            this.world.tryUnload(this);
-        }
-        return i;
+        return state>>1;
     }
 
-    private volatile boolean freed = false;
-    void setFreed() {
-        this.assertNotFree();
-        this.freed = true;
+    //Returns true on success, false on failure
+    boolean trySetFreed() {
+        int witness = this.atomicState.compareAndExchange(1, 0);
+        if ((witness&1)==0 && witness != 0) {
+            throw new IllegalStateException("Section marked as free but has refs");
+        }
+        boolean isFreed = witness == 1;
+        if (isFreed) {
+            this.data = null;
+        }
+        return isFreed;
     }
 
     public void assertNotFree() {
-        if (this.freed) {
+        if ((this.atomicState.get() & 1) == 0) {
             throw new IllegalStateException();
         }
-    }
-
-    public boolean isAcquired() {
-        return this.usageCounts.get() != 0;
-    }
-
-    public int getRefCount() {
-        return this.usageCounts.get();
     }
 
     public long getKey() {
@@ -114,11 +99,18 @@ public final class WorldSection {
 
     //Generates a copy of the data array, this is to help with atomic operations like rendering
     public long[] copyData() {
+        this.assertNotFree();
         return Arrays.copyOf(this.data, this.data.length);
     }
 
-    public boolean definitelyEmpty() {
-        return this.definitelyEmpty;
+    public boolean tryAcquire() {
+        int state = this.atomicState.updateAndGet(val -> {
+            if ((val&1) != 0) {
+                return val+2;
+            }
+            return val;
+        });
+        return (state&1) != 0;
     }
 }
 

@@ -54,7 +54,7 @@ public class RenderTracker {
                             continue;
 
                         for (int y = -3>>i; y < Math.max(1, 10 >> i); y++) {
-                            var sec = this.world.getOrLoadAcquire(i, x + (OX>>(1+i)), y, z + (OZ>>(1+i)));
+                            var sec = this.world.acquire(i, x + (OX>>(1+i)), y, z + (OZ>>(1+i)));
                             //this.renderGen.enqueueTask(sec);
                             sec.release();
                         }

@@ -81,7 +81,7 @@ public class RenderGenerationService {
     public void enqueueTask(int lvl, int x, int y, int z) {
         this.taskQueue.add(new BuildTask(()->{
             if (this.tracker.shouldStillBuild(lvl, x, y, z)) {
-                return this.world.getOrLoadAcquire(lvl, x, y, z);
+                return this.world.acquire(lvl, x, y, z);
             } else {
                 return null;
             }
