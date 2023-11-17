@@ -26,4 +26,8 @@ public class BuiltSectionGeometry {
             this.translucentGeometryBuffer.free();
         }
     }
+
+    public BuiltSectionGeometry clone() {
+        return new BuiltSectionGeometry(this.position, this.geometryBuffer!=null?this.geometryBuffer.copy():null, this.translucentGeometryBuffer!=null?this.translucentGeometryBuffer.copy():null);
+    }
 }

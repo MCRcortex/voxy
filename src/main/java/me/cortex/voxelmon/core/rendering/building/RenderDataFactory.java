@@ -10,10 +10,6 @@ import net.minecraft.util.math.Direction;
 import org.lwjgl.system.MemoryUtil;
 
 
-
-//TODO: make this only emit quads that are facing the rebuild location
-// HAVE IT AS FLAGS so that a range around the player can be built with all quads etc
-// this will cut down on the amount of quads by an insane about and help alot overall
 public class RenderDataFactory {
     private final Mesher2D mesher = new Mesher2D(5,15);//15
     private final LongArrayList outData = new LongArrayList(1000);

@@ -21,4 +21,10 @@ public class MemoryBuffer extends TrackedObject {
         super.free0();
         MemoryUtil.nmemFree(this.address);
     }
+
+    public MemoryBuffer copy() {
+        var copy = new MemoryBuffer(this.size);
+        this.cpyTo(copy.address);
+        return copy;
+    }
 }

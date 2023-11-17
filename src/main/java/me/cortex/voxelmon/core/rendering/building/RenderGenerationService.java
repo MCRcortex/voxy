@@ -11,27 +11,27 @@ import net.minecraft.world.chunk.WorldChunk;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Semaphore;
+import java.util.function.Consumer;
+import java.util.function.IntFunction;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
 //TODO: Add a render cache
 public class RenderGenerationService {
-    //TODO: make it accept either a section or section position and have a concurrent hashset to determine if
-    // a section is in the build queue
-    private record BuildTask(Supplier<WorldSection> sectionSupplier) {}
+    public interface TaskChecker {boolean check(int lvl, int x, int y, int z);}
+    private record BuildTask(Supplier<WorldSection> sectionSupplier, ToIntFunction<WorldSection> flagSupplier) {}
 
     private volatile boolean running = true;
     private final Thread[] workers;
 
-    private final ConcurrentLinkedDeque<BuildTask> taskQueue = new ConcurrentLinkedDeque<>();
+    private final Long2ObjectLinkedOpenHashMap<BuildTask> taskQueue = new Long2ObjectLinkedOpenHashMap<>();
     private final Semaphore taskCounter = new Semaphore(0);
-
     private final WorldEngine world;
-    private final RenderTracker tracker;
+    private final Consumer<BuiltSectionGeometry> resultConsumer;
 
-    public RenderGenerationService(WorldEngine world, RenderTracker tracker, int workers) {
+    public RenderGenerationService(WorldEngine world, int workers, Consumer<BuiltSectionGeometry> consumer) {
         this.world = world;
-        this.tracker = tracker;
-
+        this.resultConsumer = consumer;
         this.workers =  new Thread[workers];
         for (int i = 0; i < workers; i++) {
             this.workers[i] = new Thread(this::renderWorker);
@@ -41,6 +41,7 @@ public class RenderGenerationService {
         }
     }
 
+    private final ConcurrentHashMap<Long, BuiltSectionGeometry> renderCache = new ConcurrentHashMap<>(1000,0.75f,10);
 
     //TODO: add a generated render data cache
     private void renderWorker() {
@@ -49,15 +50,23 @@ public class RenderGenerationService {
         while (this.running) {
             this.taskCounter.acquireUninterruptibly();
             if (!this.running) break;
-            var task = this.taskQueue.pop();
+            BuildTask task;
+            synchronized (this.taskQueue) {
+                task = this.taskQueue.removeFirst();
+            }
             var section = task.sectionSupplier.get();
             if (section == null) {
                 continue;
             }
             section.assertNotFree();
-            int buildFlags = this.tracker.getBuildFlagsOrAbort(section);
+            int buildFlags = task.flagSupplier.applyAsInt(section);
             if (buildFlags != 0) {
-                this.tracker.processBuildResult(factory.generateMesh(section, buildFlags));
+                var mesh = factory.generateMesh(section, buildFlags);
+                this.resultConsumer.accept(mesh.clone());
+                var prevCache = this.renderCache.put(mesh.position, mesh);
+                if (prevCache != null) {
+                    prevCache.free();
+                }
             }
             section.release();
         }
@@ -79,26 +88,39 @@ public class RenderGenerationService {
     // like if its in the render queue and if we should abort building the render data
     //1 proposal fix is a Long2ObjectLinkedOpenHashMap<WorldSection> which means we can abort if needed,
     // also gets rid of dependency on a WorldSection (kinda)
-    public void enqueueTask(int lvl, int x, int y, int z) {
-        this.taskQueue.add(new BuildTask(()->{
-            if (this.tracker.shouldStillBuild(lvl, x, y, z)) {
-                return this.world.acquire(lvl, x, y, z);
-            } else {
-                return null;
-            }
-        }));
-        this.taskCounter.release();
+    public void enqueueTask(int lvl, int x, int y, int z, ToIntFunction<WorldSection> flagSupplier) {
+        this.enqueueTask(lvl, x, y, z, (l,x1,y1,z1)->true, flagSupplier);
     }
 
-    public void enqueueTask(WorldSection section) {
-        //TODO: fixme! buildMask could have changed
-        //if (!section.inRenderQueue.getAndSet(true)) {
-        //    //TODO: add a boolean for needsRenderUpdate that can be set to false if the section is no longer needed
-        //    // to be rendered, e.g. LoD level changed so that lod is no longer being rendered
-        //    section.acquire();
-        //    this.taskQueue.add(new BuildTask(()->section));
-        //    this.taskCounter.release();
-        //}
+    public void enqueueTask(int lvl, int x, int y, int z, TaskChecker checker, ToIntFunction<WorldSection> flagSupplier) {
+        long ikey = WorldEngine.getWorldSectionId(lvl, x, y, z);
+        {
+            var cache = this.renderCache.get(ikey);
+            if (cache != null) {
+                this.resultConsumer.accept(cache.clone());
+                return;
+            }
+        }
+        synchronized (this.taskQueue) {
+            this.taskQueue.computeIfAbsent(ikey, key->{
+                this.taskCounter.release();
+                return new BuildTask(()->{
+                    if (checker.check(lvl, x, y, z)) {
+                        return this.world.acquire(lvl, x, y, z);
+                    } else {
+                        return null;
+                    }
+                }, flagSupplier);
+            });
+        }
+    }
+
+    public void removeTask(int lvl, int x, int y, int z) {
+        synchronized (this.taskQueue) {
+            if (this.taskQueue.remove(WorldEngine.getWorldSectionId(lvl, x, y, z)) != null) {
+                this.taskCounter.acquireUninterruptibly();
+            }
+        }
     }
 
     public int getTaskCount() {
@@ -129,7 +151,8 @@ public class RenderGenerationService {
 
         //Cleanup any remaining data
         while (!this.taskQueue.isEmpty()) {
-            this.taskQueue.pop();
+            this.taskQueue.removeFirst();
         }
+        this.renderCache.values().forEach(BuiltSectionGeometry::free);
     }
 }

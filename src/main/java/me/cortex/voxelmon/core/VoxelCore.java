@@ -60,10 +60,10 @@ public class VoxelCore {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
-        this.world = new WorldEngine(new File("storagefile.db"), 5, 5);//"storagefile.db"//"ethoslab.db"
+        this.world = new WorldEngine(new File("storagefile.db"), 20, 5);//"storagefile.db"//"ethoslab.db"
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
-        this.renderGen = new RenderGenerationService(this.world, this.renderTracker,4);
+        this.renderGen = new RenderGenerationService(this.world,4, this.renderTracker::processBuildResult);
         this.world.setRenderTracker(this.renderTracker);
         this.renderTracker.setRenderGen(this.renderGen);
 
@@ -179,8 +179,8 @@ public class VoxelCore {
 
     public void shutdown() {
         try {this.renderGen.shutdown();} catch (Exception e) {System.err.println(e);}
+        try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.renderer.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}
-        try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
     }
 }

@@ -69,18 +69,28 @@ public class SectionSavingService {
 
     public void shutdown() {
         boolean anyAlive = false;
+        boolean allAlive = true;
         for (var worker : this.workers) {
             anyAlive |= worker.isAlive();
+            allAlive &= worker.isAlive();
         }
 
         if (!anyAlive) {
             System.err.println("Section saving workers already dead on shutdown! this is very very bad, check log for errors from this thread");
             return;
         }
+        if (!allAlive) {
+            System.err.println("Some section saving works have died, please check log and report errors.");
+        }
 
+
+        int i = 0;
         //Wait for all the saving to finish
         while (this.saveCounter.availablePermits() != 0) {
-            Thread.onSpinWait();
+            try {Thread.sleep(500);} catch (InterruptedException e) {break;}
+            if (i++%10 == 0) {
+                System.out.println("Section saving shutdown has " + this.saveCounter.availablePermits() + " tasks remaining");
+            }
         }
         //Shutdown
         this.running = false;

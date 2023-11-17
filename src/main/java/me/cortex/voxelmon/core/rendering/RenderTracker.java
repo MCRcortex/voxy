@@ -28,6 +28,7 @@ public class RenderTracker {
     public void setRenderGen(RenderGenerationService renderGen) {
         this.renderGen = renderGen;
     }
+
     public RenderTracker(WorldEngine world, AbstractFarWorldRenderer renderer) {
         this.world = world;
         this.renderer = renderer;
@@ -76,14 +77,15 @@ public class RenderTracker {
 
     //Adds a lvl 0 section into the world renderer
     public void addLvl0(int x, int y, int z) {
-        this.renderGen.enqueueTask(0, x, y, z);
         this.activeSections.put(WorldEngine.getWorldSectionId(0, x, y, z), O);
+        this.renderGen.enqueueTask(0, x, y, z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
     }
 
     //Removes a lvl 0 section from the world renderer
     public void remLvl0(int x, int y, int z) {
         this.activeSections.remove(WorldEngine.getWorldSectionId(0, x, y, z));
         this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(0, x, y, z), null, null));
+        this.renderGen.removeTask(0, x, y, z);
     }
 
     //Increases from lvl-1 to lvl at the coordinates (which are in lvl space)
@@ -102,7 +104,7 @@ public class RenderTracker {
         // concurrent hashmap or something, this is so that e.g. the build data position
         // can be updated
 
-        this.renderGen.enqueueTask(lvl, x, y, z);
+        this.renderGen.enqueueTask(lvl, x, y, z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
 
         this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1)), null, null));
         this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1)+1), null, null));
@@ -114,8 +116,14 @@ public class RenderTracker {
         this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1)+1), null, null));
 
 
-
-
+        this.renderGen.removeTask(lvl-1, (x<<1), (y<<1), (z<<1));
+        this.renderGen.removeTask(lvl-1, (x<<1), (y<<1), (z<<1)+1);
+        this.renderGen.removeTask(lvl-1, (x<<1), (y<<1)+1, (z<<1));
+        this.renderGen.removeTask(lvl-1, (x<<1), (y<<1)+1, (z<<1)+1);
+        this.renderGen.removeTask(lvl-1, (x<<1)+1, (y<<1), (z<<1));
+        this.renderGen.removeTask(lvl-1, (x<<1)+1, (y<<1), (z<<1)+1);
+        this.renderGen.removeTask(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1));
+        this.renderGen.removeTask(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1)+1);
     }
 
     //Decreases from lvl to lvl-1 at the coordinates (which are in lvl space)
@@ -131,15 +139,16 @@ public class RenderTracker {
         this.activeSections.remove(WorldEngine.getWorldSectionId(lvl, x, y, z));
 
         this.renderer.enqueueResult(new BuiltSectionGeometry(lvl, x, y, z, null, null));
+        this.renderGen.removeTask(lvl, x, y, z);
 
-        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1));
-        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1)+1);
-        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1)+1, (z<<1));
-        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1)+1, (z<<1)+1);
-        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1), (z<<1));
-        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1), (z<<1)+1);
-        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1)+1, (z<<1));
-        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1)+1, (z<<1)+1);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1), this::shouldStillBuild, this::getBuildFlagsOrAbort);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1)+1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1)+1, (z<<1), this::shouldStillBuild, this::getBuildFlagsOrAbort);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1)+1, (z<<1)+1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1), (z<<1), this::shouldStillBuild, this::getBuildFlagsOrAbort);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1), (z<<1)+1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1)+1, (z<<1), this::shouldStillBuild, this::getBuildFlagsOrAbort);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1)+1, (z<<1)+1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
 
     }
 
@@ -187,7 +196,7 @@ public class RenderTracker {
                 buildMask |= 1<<Direction.WEST.getId();
             }
             buildMask |= 1<<Direction.UP.getId();
-            //buildMask |= ((1<<6)-1)^(1);
+            buildMask |= ((1<<6)-1)^(1);
         }
         return buildMask;
     }

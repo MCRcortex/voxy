@@ -72,6 +72,7 @@ public class WorldImporter {
     }
 
     private void importRegionFile(Path file, int x, int z) throws IOException {
+        //if (true) return;
         try (var fileStream = FileChannel.open(file, StandardOpenOption.READ)) {
             var sectorsSavesBB = MemoryUtil.memAlloc(8192);
             if (fileStream.read(sectorsSavesBB, 0) != 8192) {
