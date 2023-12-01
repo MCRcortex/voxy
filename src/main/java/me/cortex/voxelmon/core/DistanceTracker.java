@@ -11,6 +11,7 @@ import me.cortex.voxelmon.core.rendering.building.RenderGenerationService;
 import me.cortex.voxelmon.core.util.DebugUtil;
 import me.cortex.voxelmon.core.util.RingUtil;
 import me.cortex.voxelmon.core.world.WorldEngine;
+import net.minecraft.client.MinecraftClient;
 
 //Can use ring logic
 // i.e. when a player moves the rings of each lod change (how it was doing in the original attempt)
@@ -27,8 +28,8 @@ public class DistanceTracker {
         //NOTE: This is in our render distance units, to convert to chunks at lvl 0 multiply by 2
         int DIST = 16;//24;
 
-        this.rings[0] = new TransitionRing2D(5, DIST, (x,z)->{
-            if (true) {
+        this.rings[0] = new TransitionRing2D(5, (int) Math.ceil(MinecraftClient.getInstance().gameRenderer.getViewDistance()/16)/2, (x, z)->{
+            if (false) {
                 return;
             }
             for (int y = -2; y < 10; y++) {
@@ -97,6 +98,9 @@ public class DistanceTracker {
 
         //Note radius is in shiftScale
         private TransitionRing2D(int shiftSize, int radius, Transition2DCallback onEntry, Transition2DCallback onExit) {
+            this(shiftSize, radius, onEntry, onExit, 0, 0, 0);
+        }
+        private TransitionRing2D(int shiftSize, int radius, Transition2DCallback onEntry, Transition2DCallback onExit, int ix, int iy, int iz) {
             //trigger just less than every shiftSize scale
             this.triggerRangeSquared = 1<<((shiftSize<<1) - 1);
             this.shiftSize = shiftSize;
@@ -111,15 +115,22 @@ public class DistanceTracker {
         }
 
         public void update(int x, int z) {
-            int dx = this.lastUpdateX - x;
-            int dz = this.lastUpdateZ - z;
-            int distSquared =  dx*dx + dz*dz;
+            int MAX_STEPS_PER_UPDATE = 1;
+
+
+            long dx = this.lastUpdateX - x;
+            long dz = this.lastUpdateZ - z;
+            long distSquared =  dx*dx + dz*dz;
             if (distSquared < this.triggerRangeSquared) {
                 return;
             }
+
+            //TODO: fixme: this last update needs to be incremented by a delta since
+
             //Update the last update position
-            this.lastUpdateX = x;
-            this.lastUpdateZ = z;
+            int maxStep = this.triggerRangeSquared/2;
+            this.lastUpdateX += Math.min(maxStep,Math.max(-maxStep, x-this.lastUpdateX));
+            this.lastUpdateZ += Math.min(maxStep,Math.max(-maxStep, z-this.lastUpdateZ));
 
 
 
@@ -137,7 +148,7 @@ public class DistanceTracker {
 
             Long2IntOpenHashMap ops = new Long2IntOpenHashMap();
 
-
+            int zcount = MAX_STEPS_PER_UPDATE;
             int dir = nz<this.currentZ?-1:1;
             while (nz != this.currentZ) {
                 for (int corner : this.cornerPoints) {
@@ -156,8 +167,11 @@ public class DistanceTracker {
                 //ops.addTo(Prel(0, -this.radius+Math.min(0, dir)), -dir);
 
                 this.currentZ += dir;
+
+                if (--zcount == 0) break;
             }
 
+            int xcount = MAX_STEPS_PER_UPDATE;
             dir = nx<this.currentX?-1:1;
             while (nx != this.currentX) {
 
@@ -174,6 +188,8 @@ public class DistanceTracker {
                 }
 
                 this.currentX += dir;
+
+                if (--xcount == 0) break;
             }
 
 

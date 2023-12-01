@@ -8,6 +8,6 @@ import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 public class Voxelmon implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
-        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> TestSparseGenCommand.register(dispatcher));
+        //CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> TestSparseGenCommand.register(dispatcher));
     }
 }

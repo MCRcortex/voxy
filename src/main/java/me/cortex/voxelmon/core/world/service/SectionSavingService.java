@@ -44,14 +44,9 @@ public class SectionSavingService {
             section.assertNotFree();
             section.inSaveQueue.set(false);
 
-            //TODO: stop converting between all these types and just use a native buffer all the time
             var saveData = SaveLoadSystem.serialize(section);
-            //Note: this is done like this because else the gc can collect the buffer before the transaction is completed
-            // thus the transaction reads from undefined memory
-            ByteBuffer buffer = MemoryUtil.memAlloc(saveData.length);
-            buffer.put(saveData).rewind();
-            this.world.storage.setSectionData(section.getKey(), buffer);
-            MemoryUtil.memFree(buffer);
+            this.world.storage.setSectionData(section.getKey(), saveData);
+            MemoryUtil.memFree(saveData);
 
             section.release();
         }

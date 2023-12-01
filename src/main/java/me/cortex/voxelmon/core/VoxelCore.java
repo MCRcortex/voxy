@@ -12,6 +12,7 @@ import me.cortex.voxelmon.core.world.WorldSection;
 import me.cortex.voxelmon.core.world.other.BiomeColour;
 import me.cortex.voxelmon.core.world.other.BlockStateColour;
 import me.cortex.voxelmon.core.world.other.ColourResolver;
+import me.cortex.voxelmon.core.world.other.Mapper;
 import me.cortex.voxelmon.importers.WorldImporter;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
@@ -45,6 +46,18 @@ import static org.lwjgl.opengl.ARBFramebufferObject.glBindFramebuffer;
 //There is strict forward only dataflow
 //Ingest -> world engine -> raw render data -> render data
 public class VoxelCore {
+    private static final Set<Block> biomeTintableAllFaces = new HashSet<>(List.of(Blocks.OAK_LEAVES, Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES, Blocks.DARK_OAK_LEAVES, Blocks.VINE, Blocks.MANGROVE_LEAVES,
+            Blocks.TALL_GRASS, Blocks.LARGE_FERN,
+
+            Blocks.SPRUCE_LEAVES,
+            Blocks.BIRCH_LEAVES,
+            Blocks.PINK_PETALS,
+            Blocks.FERN, Blocks.GRASS, Blocks.POTTED_FERN));
+    private static final Set<Block> biomeTintableUpFace = new HashSet<>(List.of(Blocks.GRASS_BLOCK));
+    private static final Set<Block> waterTint = new HashSet<>(List.of(Blocks.WATER));
+
+
+
     public static VoxelCore INSTANCE = new VoxelCore();
 
     private final WorldEngine world;
@@ -55,12 +68,11 @@ public class VoxelCore {
     private final AbstractFarWorldRenderer renderer;
     private final PostProcessing postProcessing;
 
-
     public VoxelCore() {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
-        this.world = new WorldEngine(new File("storagefile.db"), 20, 5);//"storagefile.db"//"ethoslab.db"
+        this.world = new WorldEngine(new File("storagefile2.db"), 20, 5);//"storagefile.db"//"ethoslab.db"
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
         this.renderGen = new RenderGenerationService(this.world,4, this.renderTracker::processBuildResult);
@@ -70,6 +82,8 @@ public class VoxelCore {
         this.distanceTracker = new DistanceTracker(this.renderTracker, 5);
 
         this.postProcessing = new PostProcessing();
+
+        this.world.getMapper().setCallbacks(this::stateUpdate, this::biomeUpdate);
 
         Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
 
@@ -97,38 +111,37 @@ public class VoxelCore {
         //WorldImporter importer = new WorldImporter(this.world, MinecraftClient.getInstance().world);
         //importer.importWorldAsyncStart(new File("saves/New World/region"));
 
-        Set<Block> biomeTintableAllFaces = new HashSet<>(List.of(Blocks.OAK_LEAVES, Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES, Blocks.DARK_OAK_LEAVES, Blocks.VINE, Blocks.MANGROVE_LEAVES,
-                Blocks.TALL_GRASS, Blocks.LARGE_FERN));
 
-        biomeTintableAllFaces.add(Blocks.SPRUCE_LEAVES);
-        biomeTintableAllFaces.add(Blocks.BIRCH_LEAVES);
-        biomeTintableAllFaces.add(Blocks.PINK_PETALS);
-        biomeTintableAllFaces.addAll(List.of(Blocks.FERN, Blocks.GRASS, Blocks.POTTED_FERN));
-        Set<Block> biomeTintableUpFace = new HashSet<>(List.of(Blocks.GRASS_BLOCK));
 
-        Set<Block> waterTint = new HashSet<>(List.of(Blocks.WATER));
-
-        int i = 0;
-        for (var state : this.world.getMapper().getBlockStates()) {
-            int tintMsk = 0;
-            if (biomeTintableAllFaces.contains(state.getBlock())) {
-                tintMsk |= (1<<6)-1;
-            }
-            if (biomeTintableUpFace.contains(state.getBlock())) {
-                tintMsk |= 1<<Direction.UP.getId();
-            }
-            if (waterTint.contains(state.getBlock())) {
-                tintMsk |= 1<<6;
-            }
-            this.renderer.enqueueUpdate(new BlockStateColour(i++, tintMsk, ColourResolver.resolveColour(state)));
+        for (var state : this.world.getMapper().getStateEntries()) {
+            this.stateUpdate(state);
         }
 
-        i = 0;
-        for (var biome : this.world.getMapper().getBiomes()) {
-            long dualColour = ColourResolver.resolveBiomeColour(biome);
-            this.renderer.enqueueUpdate(new BiomeColour(i++, (int) dualColour, (int) (dualColour>>32)));
+        for (var biome : this.world.getMapper().getBiomeEntries()) {
+            this.biomeUpdate(biome);
         }
     }
+
+    private void stateUpdate(Mapper.StateEntry entry) {
+        var state = entry.state;
+        int tintMsk = 0;
+        if (biomeTintableAllFaces.contains(state.getBlock())) {
+            tintMsk |= (1<<6)-1;
+        }
+        if (biomeTintableUpFace.contains(state.getBlock())) {
+            tintMsk |= 1<<Direction.UP.getId();
+        }
+        if (waterTint.contains(state.getBlock())) {
+            tintMsk |= 1<<6;
+        }
+        this.renderer.enqueueUpdate(new BlockStateColour(entry.id, tintMsk, ColourResolver.resolveColour(state)));
+    }
+
+    private void biomeUpdate(Mapper.BiomeEntry entry) {
+        long dualColour = ColourResolver.resolveBiomeColour(entry.biome);
+        this.renderer.enqueueUpdate(new BiomeColour(entry.id, (int) dualColour, (int) (dualColour>>32)));
+    }
+
 
     public void enqueueIngest(WorldChunk worldChunk) {
         this.world.ingestService.enqueueIngest(worldChunk);
@@ -145,9 +158,9 @@ public class VoxelCore {
         DebugUtil.setPositionMatrix(matrices);
         matrices.pop();
 
-        int boundFB = GlStateManager.getBoundFramebuffer();
-        this.postProcessing.setSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
-        this.postProcessing.bindClearFramebuffer();
+        //int boundFB = GlStateManager.getBoundFramebuffer();
+        //this.postProcessing.setSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
+        //this.postProcessing.bindClearFramebuffer();
 
         //TODO: FIXME: since we just bound the post processing FB the depth information isnt
         // copied over, we must do this manually and also copy it with respect to the
@@ -158,8 +171,8 @@ public class VoxelCore {
         // this is cause the terrain might not exist and so all the caves are visible causing hell for the
         // occlusion culler
         this.renderer.renderFarAwayOpaque(matrices, cameraX, cameraY, cameraZ);
-        glBindFramebuffer(GL_FRAMEBUFFER, boundFB);
-        this.postProcessing.renderPost(boundFB);
+        //glBindFramebuffer(GL_FRAMEBUFFER, boundFB);
+       // this.postProcessing.renderPost(boundFB);
     }
 
     public void addDebugInfo(List<String> debug) {

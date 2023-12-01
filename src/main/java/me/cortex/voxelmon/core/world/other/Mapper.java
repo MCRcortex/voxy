@@ -10,6 +10,7 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.stat.Stat;
 import net.minecraft.world.biome.Biome;
 import org.lwjgl.system.MemoryUtil;
 
@@ -17,9 +18,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 
 //There are independent mappings for biome and block states, these get combined in the shader and allow for more
@@ -32,10 +33,13 @@ public class Mapper {
     public static final int UNKNOWN_MAPPING = -1;
     public static final int AIR = 0;
 
-    private final Object2ObjectOpenHashMap<BlockState, StateEntry> block2stateEntry = new Object2ObjectOpenHashMap<>();
+    private final Map<BlockState, StateEntry> block2stateEntry = new ConcurrentHashMap<>(2000,0.75f, 10);
     private final ObjectArrayList<StateEntry> blockId2stateEntry = new ObjectArrayList<>();
-    private final Object2ObjectOpenHashMap<String, BiomeEntry> biome2biomeEntry = new Object2ObjectOpenHashMap<>();
+    private final Map<String, BiomeEntry> biome2biomeEntry = new ConcurrentHashMap<>(2000,0.75f, 10);
     private final ObjectArrayList<BiomeEntry> biomeId2biomeEntry = new ObjectArrayList<>();
+
+    private Consumer<StateEntry> newStateCallback;
+    private Consumer<BiomeEntry> newBiomeCallback;
     public Mapper(StorageBackend storage) {
         this.storage = storage;
         //Insert air since its a special entry (index 0)
@@ -44,6 +48,20 @@ public class Mapper {
         blockId2stateEntry.add(airEntry);
 
         this.loadFromStorage();
+    }
+
+    public static boolean isTranslucent(long id) {
+        //Atm hardcode to air
+        return ((id>>27)&((1<<20)-1)) == 0;
+    }
+
+    public static boolean isAir(long id) {
+        return ((id>>27)&((1<<20)-1)) == 0;
+    }
+
+    public void setCallbacks(Consumer<StateEntry> stateCallback, Consumer<BiomeEntry> biomeCallback) {
+        this.newStateCallback = stateCallback;
+        this.newBiomeCallback = biomeCallback;
     }
 
     private void loadFromStorage() {
@@ -88,7 +106,7 @@ public class Mapper {
 
     private StateEntry registerNewBlockState(BlockState state) {
         StateEntry entry = new StateEntry(this.blockId2stateEntry.size(), state);
-        this.block2stateEntry.put(state, entry);
+        //this.block2stateEntry.put(state, entry);
         this.blockId2stateEntry.add(entry);
 
         byte[] serialized = entry.serialize();
@@ -97,12 +115,14 @@ public class Mapper {
         buffer.rewind();
         this.storage.putIdMapping(entry.id | (BLOCK_STATE_TYPE<<30), buffer);
         MemoryUtil.memFree(buffer);
+
+        if (this.newStateCallback!=null)this.newStateCallback.accept(entry);
         return entry;
     }
 
     private BiomeEntry registerNewBiome(String biome) {
         BiomeEntry entry = new BiomeEntry(this.biome2biomeEntry.size(), biome);
-        this.biome2biomeEntry.put(biome, entry);
+        //this.biome2biomeEntry.put(biome, entry);
         this.biomeId2biomeEntry.add(entry);
 
         byte[] serialized = entry.serialize();
@@ -111,62 +131,54 @@ public class Mapper {
         buffer.rewind();
         this.storage.putIdMapping(entry.id | (BIOME_TYPE<<30), buffer);
         MemoryUtil.memFree(buffer);
+
+        if (this.newBiomeCallback!=null)this.newBiomeCallback.accept(entry);
         return entry;
     }
 
 
-    //TODO:FIXME: IS VERY SLOW NEED TO MAKE IT LOCK FREE
+    //TODO:FIXME: IS VERY SLOW NEED TO MAKE IT LOCK FREE, or at minimum use a concurrent map
     public long getBaseId(byte light, BlockState state, RegistryEntry<Biome> biome) {
-        StateEntry sentry = null;
-        BiomeEntry bentry = null;
-        synchronized (this.block2stateEntry) {
-            sentry = this.block2stateEntry.get(state);
-            if (sentry == null) {
-                sentry = this.registerNewBlockState(state);
-            }
-        }
-        synchronized (this.biome2biomeEntry) {
-            String biomeId = biome.getKey().get().getValue().toString();
-            bentry = this.biome2biomeEntry.get(biomeId);
-            if (bentry == null) {
-                bentry = this.registerNewBiome(biomeId);
-            }
-        }
+        if (state.isAir()) return ((long)light)<<56;//Special case and fast return for air, dont care about the biome
+        StateEntry sentry = this.block2stateEntry.computeIfAbsent(state, this::registerNewBlockState);
+
+        String biomeId = biome.getKey().get().getValue().toString();
+        BiomeEntry bentry = this.biome2biomeEntry.computeIfAbsent(biomeId, this::registerNewBiome);
 
         return (Byte.toUnsignedLong(light)<<56)|(Integer.toUnsignedLong(bentry.id) << 47)|(Integer.toUnsignedLong(sentry.id)<<27);
     }
 
-    public BlockState[] getBlockStates() {
-        synchronized (this.block2stateEntry) {
-            BlockState[] out = new BlockState[this.blockId2stateEntry.size()];
-            int i = 0;
-            for (var entry : this.blockId2stateEntry) {
-                if (entry.id != i++) {
-                    throw new IllegalStateException();
-                }
-                out[i-1] = entry.state;
+    //TODO: fixme: synchronize access to this.blockId2stateEntry
+    public StateEntry[] getStateEntries() {
+        var set = new ArrayList<>(this.blockId2stateEntry);
+        StateEntry[] out = new StateEntry[set.size()];
+        int i = 0;
+        for (var entry : set) {
+            if (entry.id != i++) {
+                throw new IllegalStateException();
             }
-            return out;
+            out[i-1] = entry;
         }
+        return out;
     }
 
-    public String[] getBiomes() {
-        synchronized (this.biome2biomeEntry) {
-            String[] out = new String[this.biome2biomeEntry.size()];
-            int i = 0;
-            for (var entry : this.biomeId2biomeEntry) {
-                if (entry.id != i++) {
-                    throw new IllegalStateException();
-                }
-                out[i-1] = entry.biome;
+    //TODO: fixme: synchronize access to this.biomeId2biomeEntry
+    public BiomeEntry[] getBiomeEntries() {
+        var set = new ArrayList<>(this.biomeId2biomeEntry);
+        BiomeEntry[] out = new BiomeEntry[set.size()];
+        int i = 0;
+        for (var entry : set) {
+            if (entry.id != i++) {
+                throw new IllegalStateException();
             }
-            return out;
+            out[i-1] = entry;
         }
+        return out;
     }
 
     public static final class StateEntry {
-        private final int id;
-        private final BlockState state;
+        public final int id;
+        public final BlockState state;
         public StateEntry(int id, BlockState state) {
             this.id = id;
             this.state = state;
@@ -200,8 +212,8 @@ public class Mapper {
     }
 
     public static final class BiomeEntry {
-        private final int id;
-        private final String biome;
+        public final int id;
+        public final String biome;
 
         public BiomeEntry(int id, String biome) {
             this.id = id;

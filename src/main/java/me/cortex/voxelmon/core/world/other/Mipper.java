@@ -10,30 +10,31 @@ public class Mipper {
         //TODO: mip with respect to all the variables, what that means is take whatever has the highest count and return that
         //TODO: also average out the light level and set that as the new light level
         //For now just take the most top corner
-        if (I111 != 0) {
+        if (!Mapper.isAir(I111)) {
             return I111;
         }
-        if (I110 != 0) {
+        if (!Mapper.isAir(I110)) {
             return I110;
         }
-        if (I011 != 0) {
+        if (!Mapper.isAir(I011)) {
             return I011;
         }
-        if (I010 != 0) {
+        if (!Mapper.isAir(I010)) {
             return I010;
         }
-        if (I101 != 0) {
+        if (!Mapper.isAir(I101)) {
             return I101;
         }
-        if (I100 != 0) {
+        if (!Mapper.isAir(I100)) {
             return I100;
         }
-        if (I001 != 0) {
+        if (!Mapper.isAir(I001)) {
             return I001;
         }
-        if (I000 != 0) {
+        if (!Mapper.isAir(I000)) {
             return I000;
         }
+        //TODO: need to account for different light levels of "air"
         return 0;
     }
 }

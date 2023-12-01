@@ -18,10 +18,11 @@ public class WorldConversionFactory {
         return ((y<<2)|(z<<1)|x) + 4*4*4;
     }
 
+    //TODO: add a local mapper cache since it should be smaller and faster
     public static VoxelizedSection convert(Mapper stateMapper,
                                            PalettedContainer<BlockState> blockContainer,
                                            ReadableContainer<RegistryEntry<Biome>> biomeContainer,
-                                           I3dByteSupplier lightSupplier,
+                                           ILightingSupplier lightSupplier,
                                            int sx,
                                            int sy,
                                            int sz) {
@@ -41,9 +42,10 @@ public class WorldConversionFactory {
                                 int y = (oy<<2)|iy;
                                 int z = (oz<<2)|iz;
                                 var state = blockContainer.get(x, y, z);
-                                if (!state.isAir()) {
+                                byte light = lightSupplier.supply(x,y,z,state);
+                                if (!(state.isAir() && (light==0))) {//TODO:FIXME:optimize this in such a way that having skylight access/no skylight means that an entire section is created, WHICH IS VERY BAD FOR PERFORMANCE!!!!
                                     nonAir++;
-                                    current[I(ix, iy, iz)]  = stateMapper.getBaseId(lightSupplier.supply(x,y,z), state, biome);
+                                    current[I(ix, iy, iz)]  = stateMapper.getBaseId(light, state, biome);
                                 }
                             }
                         }

@@ -6,9 +6,8 @@ import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
 
 @Mixin(BackgroundRenderer.class)
-
 public class MixinBackgroundRenderer {
-    @ModifyConstant(method = "applyFog", constant = @Constant(floatValue = 192.0F))
+    @ModifyConstant(method = "applyFog", constant = @Constant(floatValue = 192.0F), require = 0)
     private static float changeFog(float fog) {
         return 9999999f;
     }

@@ -169,7 +169,7 @@ public class WorldImporter {
                 this.world.getMapper(),
                 blockStates,
                 biomes,
-                (bx, by, bz) -> (byte) 0,
+                (bx, by, bz, state) -> (byte) 0,
                 x,
                 y,
                 z

@@ -7,6 +7,7 @@ import me.cortex.voxelmon.core.world.other.Mapper;
 import me.cortex.voxelmon.core.world.service.SectionSavingService;
 import me.cortex.voxelmon.core.world.service.VoxelIngestService;
 import me.cortex.voxelmon.core.world.storage.StorageBackend;
+import org.lwjgl.system.MemoryUtil;
 
 import java.io.File;
 import java.util.Arrays;
@@ -41,25 +42,36 @@ public class WorldEngine {
         this.sectionTracker = new ActiveSectionTracker(maxMipLayers, this::unsafeLoadSection);
 
         this.savingService = new SectionSavingService(this, savingServiceWorkers);
-        this.ingestService  = new VoxelIngestService(this);
+        this.ingestService  = new VoxelIngestService(this, 2);
     }
 
-    private boolean unsafeLoadSection(WorldSection into) {
+    private int unsafeLoadSection(WorldSection into) {
         var data = this.storage.getSectionData(into.getKey());
         if (data != null) {
-            if (!SaveLoadSystem.deserialize(into, data)) {
-                this.storage.deleteSectionData(into.getKey());
-                //TODO: regenerate the section from children
-                Arrays.fill(into.data, Mapper.AIR);
-                System.err.println("Section " + into.lvl + ", " + into.x + ", " + into.y + ", " + into.z + " was unable to load, setting to air");
-                return true;
+            try {
+                if (!SaveLoadSystem.deserialize(into, data)) {
+                    this.storage.deleteSectionData(into.getKey());
+                    //TODO: regenerate the section from children
+                    Arrays.fill(into.data, Mapper.AIR);
+                    System.err.println("Section " + into.lvl + ", " + into.x + ", " + into.y + ", " + into.z + " was unable to load, setting to air");
+                    return -1;
+                } else {
+                    return 0;
+                }
+            } finally {
+                MemoryUtil.memFree(data);
             }
+        } else {
+            return 1;
         }
-        return true;
+    }
+
+    public WorldSection acquireIfExists(int lvl, int x, int y, int z) {
+        return this.sectionTracker.acquire(lvl, x, y, z, true);
     }
 
     public WorldSection acquire(int lvl, int x, int y, int z) {
-        return this.sectionTracker.acquire(lvl, x, y, z);
+        return this.sectionTracker.acquire(lvl, x, y, z, false);
     }
 
     //TODO: Fixme/optimize, cause as the lvl gets higher, the size of x,y,z gets smaller so i can dynamically compact the format

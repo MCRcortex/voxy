@@ -1,6 +1,7 @@
 package me.cortex.voxelmon.core.world.storage;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.util.lmdb.MDBVal;
 
 import java.io.File;
@@ -80,7 +81,7 @@ public class StorageBackend {
     }
 
     //TODO: make batch get and updates
-    public byte[] getSectionData(long key) {
+    public ByteBuffer getSectionData(long key) {
         return this.synchronizedTransaction(() -> this.sectionDatabase.transaction(MDB_RDONLY, transaction->{
             var buff = transaction.stack.malloc(8);
             buff.putLong(0, key);
@@ -88,9 +89,9 @@ public class StorageBackend {
             if (bb == null) {
                 return null;
             }
-            var res = new byte[bb.remaining()];
-            bb.get(res);
-            return res;
+            var copy = MemoryUtil.memAlloc(bb.remaining());
+            MemoryUtil.memCopy(bb, copy);
+            return copy;
         }));
     }
 

@@ -65,6 +65,9 @@ void main() {
     uint biomeId = extractBiomeId(quad);
     State stateInfo = stateData[stateId];
     colour = uint2vec4RGBA(stateInfo.faceColours[face]);
+
+    colour *= getLighting(extractLightId(quad));
+
     if (((stateInfo.biomeTintMsk>>face)&1) == 1) {
         vec4 biomeColour = uint2vec4RGBA(biomeData[biomeId].foliage);
         colour *= biomeColour;

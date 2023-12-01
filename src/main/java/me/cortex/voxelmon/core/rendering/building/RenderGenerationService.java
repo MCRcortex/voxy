@@ -6,6 +6,7 @@ import me.cortex.voxelmon.core.rendering.RenderTracker;
 import me.cortex.voxelmon.core.world.WorldEngine;
 import me.cortex.voxelmon.core.world.WorldSection;
 import net.minecraft.util.math.Direction;
+import net.minecraft.world.chunk.ChunkNibbleArray;
 import net.minecraft.world.chunk.WorldChunk;
 
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,6 +26,7 @@ public class RenderGenerationService {
     private final Thread[] workers;
 
     private final Long2ObjectLinkedOpenHashMap<BuildTask> taskQueue = new Long2ObjectLinkedOpenHashMap<>();
+
     private final Semaphore taskCounter = new Semaphore(0);
     private final WorldEngine world;
     private final Consumer<BuiltSectionGeometry> resultConsumer;
@@ -63,9 +65,14 @@ public class RenderGenerationService {
             if (buildFlags != 0) {
                 var mesh = factory.generateMesh(section, buildFlags);
                 this.resultConsumer.accept(mesh.clone());
-                var prevCache = this.renderCache.put(mesh.position, mesh);
-                if (prevCache != null) {
-                    prevCache.free();
+
+                if (false) {
+                    var prevCache = this.renderCache.put(mesh.position, mesh);
+                    if (prevCache != null) {
+                        prevCache.free();
+                    }
+                } else {
+                    mesh.free();
                 }
             }
             section.release();
@@ -106,7 +113,7 @@ public class RenderGenerationService {
                 this.taskCounter.release();
                 return new BuildTask(()->{
                     if (checker.check(lvl, x, y, z)) {
-                        return this.world.acquire(lvl, x, y, z);
+                        return this.world.acquireIfExists(lvl, x, y, z);
                     } else {
                         return null;
                     }

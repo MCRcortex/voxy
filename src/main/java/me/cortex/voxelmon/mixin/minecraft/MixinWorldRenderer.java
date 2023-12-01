@@ -36,12 +36,12 @@ public abstract class MixinWorldRenderer {
 
 
 
-    @Redirect(method = "render", at = @At(value = "INVOKE", target = "Ljava/lang/Math;max(FF)F"))
+    @Redirect(method = "render", at = @At(value = "INVOKE", target = "Ljava/lang/Math;max(FF)F"), require = 0)
     private float redirectMax(float a, float b) {
         return a;
     }
 
-    @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/GameRenderer;getViewDistance()F"))
+    @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/GameRenderer;getViewDistance()F"), require = 0)
     private float changeRD(GameRenderer instance) {
         float viewDistance = instance.getViewDistance();
         return 16*1512;

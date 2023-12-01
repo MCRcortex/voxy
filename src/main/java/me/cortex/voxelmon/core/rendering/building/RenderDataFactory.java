@@ -50,12 +50,13 @@ public class RenderDataFactory {
                 for (int z = 0; z < 32; z++) {
                     for (int x = 0; x < 32; x++) {
                         var self = data[WorldSection.getIndex(x, y, z)];
-                        if (self == Mapper.AIR) {
+                        if (Mapper.isAir(self)) {
                             continue;
                         }
+                        long up = -1;
                         if (y < 31) {
-                            var up = data[WorldSection.getIndex(x, y + 1, z)];
-                            if (up != Mapper.AIR) {
+                            up = data[WorldSection.getIndex(x, y + 1, z)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
@@ -66,19 +67,19 @@ public class RenderDataFactory {
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }
-                            var up = connectedData[WorldSection.getIndex(x, 0, z)];
-                            if (up != Mapper.AIR) {
+                            up = connectedData[WorldSection.getIndex(x, 0, z)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
-                        this.mesher.put(x, z, self);
+                        this.mesher.put(x, z, (self&~(0xFFL<<56))|(up&(0xFFL<<56)));
                     }
                 }
 
                 var quads = this.mesher.process();
                 for (int i = 0; i < quads.length; i++) {
                     var quad = quads[i];
-                    this.outData.add(QuadFormat.encode(null, data[WorldSection.getIndex(Mesher2D.getX(quad), y, Mesher2D.getZ(quad))], 1, y, quad));
+                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 1, y, quad));
                 }
             }
             connectedData = null;
@@ -92,12 +93,13 @@ public class RenderDataFactory {
                 for (int y = 0; y < 32; y++) {
                     for (int z = 0; z < 32; z++) {
                         var self = data[WorldSection.getIndex(x, y, z)];
-                        if (self == Mapper.AIR) {
+                        if (Mapper.isAir(self)) {
                             continue;
                         }
+                        long up = -1;
                         if (x < 31) {
-                            var up = data[WorldSection.getIndex(x + 1, y, z)];
-                            if (up != Mapper.AIR) {
+                            up = data[WorldSection.getIndex(x + 1, y, z)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
@@ -108,19 +110,19 @@ public class RenderDataFactory {
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }
-                            var up = connectedData[WorldSection.getIndex(0, y, z)];
-                            if (up != Mapper.AIR) {
+                            up = connectedData[WorldSection.getIndex(0, y, z)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
-                        this.mesher.put(y, z, self);
+                        this.mesher.put(y, z, (self&~(0xFFL<<56))|(up&(0xFFL<<56)));
                     }
                 }
 
                 var quads = this.mesher.process();
                 for (int i = 0; i < quads.length; i++) {
                     var quad = quads[i];
-                    this.outData.add(QuadFormat.encode(null, data[WorldSection.getIndex(x, Mesher2D.getX(quad), Mesher2D.getZ(quad))], 5, x, quad));
+                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 5, x, quad));
                 }
             }
             connectedData = null;
@@ -134,12 +136,13 @@ public class RenderDataFactory {
                 for (int x = 0; x < 32; x++) {
                     for (int y = 0; y < 32; y++) {
                         var self = data[WorldSection.getIndex(x, y, z)];
-                        if (self == Mapper.AIR) {
+                        if (Mapper.isAir(self)) {
                             continue;
                         }
+                        long up = -1;
                         if (z < 31) {
-                            var up = data[WorldSection.getIndex(x, y, z + 1)];
-                            if (up != Mapper.AIR) {
+                            up = data[WorldSection.getIndex(x, y, z + 1)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
@@ -150,19 +153,19 @@ public class RenderDataFactory {
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }
-                            var up = connectedData[WorldSection.getIndex(x, y, 0)];
-                            if (up != Mapper.AIR) {
+                            up = connectedData[WorldSection.getIndex(x, y, 0)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
-                        this.mesher.put(x, y, self);
+                        this.mesher.put(x, y, (self&~(0xFFL<<56))|(up&(0xFFL<<56)));
                     }
                 }
 
                 var quads = this.mesher.process();
                 for (int i = 0; i < quads.length; i++) {
                     var quad = quads[i];
-                    this.outData.add(QuadFormat.encode(null, data[WorldSection.getIndex(Mesher2D.getX(quad), Mesher2D.getZ(quad), z)], 3, z, quad));
+                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 3, z, quad));
                 }
             }
             connectedData = null;
@@ -176,12 +179,13 @@ public class RenderDataFactory {
                 for (int y = 0; y < 32; y++) {
                     for (int z = 0; z < 32; z++) {
                         var self = data[WorldSection.getIndex(x, y, z)];
-                        if (self == Mapper.AIR) {
+                        if (Mapper.isAir(self)) {
                             continue;
                         }
+                        long up = -1;
                         if (x != 0) {
-                            var up = data[WorldSection.getIndex(x - 1, y, z)];
-                            if (up != Mapper.AIR) {
+                            up = data[WorldSection.getIndex(x - 1, y, z)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
@@ -192,19 +196,19 @@ public class RenderDataFactory {
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }
-                            var up = connectedData[WorldSection.getIndex(31, y, z)];
-                            if (up != Mapper.AIR) {
+                            up = connectedData[WorldSection.getIndex(31, y, z)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
-                        this.mesher.put(y, z, self);
+                        this.mesher.put(y, z, (self&~(0xFFL<<56))|(up&(0xFFL<<56)));
                     }
                 }
 
                 var quads = this.mesher.process();
                 for (int i = 0; i < quads.length; i++) {
                     var quad = quads[i];
-                    this.outData.add(QuadFormat.encode(null, data[WorldSection.getIndex(x, Mesher2D.getX(quad), Mesher2D.getZ(quad))], 4, x, quad));
+                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 4, x, quad));
                 }
             }
             connectedData = null;
@@ -218,12 +222,13 @@ public class RenderDataFactory {
                 for (int x = 0; x < 32; x++) {
                     for (int y = 0; y < 32; y++) {
                         var self = data[WorldSection.getIndex(x, y, z)];
-                        if (self == Mapper.AIR) {
+                        if (Mapper.isAir(self)) {
                             continue;
                         }
+                        long up = -1;
                         if (z != 0) {
-                            var up = data[WorldSection.getIndex(x, y, z - 1)];
-                            if (up != Mapper.AIR) {
+                            up = data[WorldSection.getIndex(x, y, z - 1)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
@@ -234,19 +239,19 @@ public class RenderDataFactory {
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }
-                            var up = connectedData[WorldSection.getIndex(x, y, 31)];
-                            if (up != Mapper.AIR) {
+                            up = connectedData[WorldSection.getIndex(x, y, 31)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
-                        this.mesher.put(x, y, self);
+                        this.mesher.put(x, y, (self&~(0xFFL<<56))|(up&(0xFFL<<56)));
                     }
                 }
 
                 var quads = this.mesher.process();
                 for (int i = 0; i < quads.length; i++) {
                     var quad = quads[i];
-                    this.outData.add(QuadFormat.encode(null, data[WorldSection.getIndex(Mesher2D.getX(quad), Mesher2D.getZ(quad), z)], 2, z, quad));
+                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 2, z, quad));
                 }
             }
             connectedData = null;
@@ -260,12 +265,13 @@ public class RenderDataFactory {
                 for (int x = 0; x < 32; x++) {
                     for (int z = 0; z < 32; z++) {
                         var self = data[WorldSection.getIndex(x, y, z)];
-                        if (self == Mapper.AIR) {
+                        if (Mapper.isAir(self)) {
                             continue;
                         }
+                        long up = -1;
                         if (y != 0) {
-                            var up = data[WorldSection.getIndex(x, y - 1, z)];
-                            if (up != Mapper.AIR) {
+                            up = data[WorldSection.getIndex(x, y - 1, z)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
@@ -276,19 +282,19 @@ public class RenderDataFactory {
                                 connectedData = connectedSection.copyData();
                                 connectedSection.release();
                             }
-                            var up = connectedData[WorldSection.getIndex(x, 31, z)];
-                            if (up != Mapper.AIR) {
+                            up = connectedData[WorldSection.getIndex(x, 31, z)];
+                            if (!Mapper.isTranslucent(up)) {
                                 continue;
                             }
                         }
-                        this.mesher.put(x, z, self);
+                        this.mesher.put(x, z, (self&~(0xFFL<<56))|(up&(0xFFL<<56)));
                     }
                 }
 
                 var quads = this.mesher.process();
                 for (int i = 0; i < quads.length; i++) {
                     var quad = quads[i];
-                    this.outData.add(QuadFormat.encode(null, data[WorldSection.getIndex(Mesher2D.getX(quad), y, Mesher2D.getZ(quad))], 0, y, quad));
+                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 0, y, quad));
                 }
             }
             connectedData = null;

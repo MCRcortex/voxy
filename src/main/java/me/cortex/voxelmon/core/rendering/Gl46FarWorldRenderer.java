@@ -1,21 +1,16 @@
 package me.cortex.voxelmon.core.rendering;
 
-import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxelmon.core.gl.GlBuffer;
 import me.cortex.voxelmon.core.gl.shader.Shader;
 import me.cortex.voxelmon.core.gl.shader.ShaderType;
-import me.cortex.voxelmon.core.rendering.building.BuiltSectionGeometry;
 import me.cortex.voxelmon.core.rendering.util.UploadStream;
-import me.cortex.voxelmon.core.util.MemoryBuffer;
-import me.cortex.voxelmon.core.world.WorldEngine;
-import me.cortex.voxelmon.core.world.WorldSection;
 import me.cortex.voxelmon.mixin.joml.AccessFrustumIntersection;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import org.joml.Vector4f;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
@@ -67,7 +62,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.glVisibilityBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.stateDataBuffer.id);//State LUT
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.biomeDataBuffer.id);//Biome LUT
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, 0);//Lighting LUT
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.lightDataBuffer.id);//Lighting LUT
         glBindVertexArray(0);
     }
 
@@ -80,6 +75,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         //RenderSystem.defaultBlendFunc();
 
         this.updateUniformBuffer(stack, cx, cy, cz);
+
         UploadStream.INSTANCE.commit();
 
         glBindVertexArray(this.vao);

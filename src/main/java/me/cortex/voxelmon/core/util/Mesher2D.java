@@ -163,5 +163,13 @@ public class Mesher2D {
         this.meshed.clear();
         Arrays.fill(this.data, 0);
     }
+
+    public long getDataFromQuad(int quad) {
+        return this.getData(getX(quad), getZ(quad));
+    }
+
+    public long getData(int x, int z) {
+        return this.data[this.getIdx(x, z)];
+    }
 }
 

@@ -7,7 +7,7 @@ import java.lang.ref.Reference;
 
 public class ActiveSectionTracker {
     //Deserialize into the supplied section, returns true on success, false on failure
-    public interface SectionLoader {boolean load(WorldSection section);}
+    public interface SectionLoader {int load(WorldSection section);}
 
     //Loaded section world cache, TODO: get rid of VolatileHolder and use something more sane
 
@@ -21,7 +21,7 @@ public class ActiveSectionTracker {
         }
     }
 
-    public WorldSection acquire(int lvl, int x, int y, int z) {
+    public WorldSection acquire(int lvl, int x, int y, int z, boolean nullOnEmpty) {
         long key = WorldEngine.getWorldSectionId(lvl, x, y, z);
         var cache = this.loadedSectionCache[lvl];
         VolatileHolder<WorldSection> holder = null;
@@ -42,12 +42,17 @@ public class ActiveSectionTracker {
         //If this thread was the one to create the reference then its the thread to load the section
         if (isLoader) {
             var section = new WorldSection(lvl, x, y, z, this);
-            if (!this.loader.load(section)) {
+            int status = this.loader.load(section);
+            if (status < 0) {
                 //TODO: Instead if throwing an exception do something better
                 throw new IllegalStateException("Unable to load section");
             }
             section.acquire();
             holder.obj = section;
+            if (nullOnEmpty && status == 1) {//If its air return null as stated, release the section aswell
+                section.release();
+                return null;
+            }
             return section;
         } else {
             WorldSection section = null;
@@ -59,7 +64,7 @@ public class ActiveSectionTracker {
                     return section;
                 }
             }
-            return this.acquire(lvl, x, y, z);
+            return this.acquire(lvl, x, y, z, nullOnEmpty);
         }
     }
 
@@ -85,14 +90,14 @@ public class ActiveSectionTracker {
 
 
     public static void main(String[] args) {
-        var tracker = new ActiveSectionTracker(1, a->true);
+        var tracker = new ActiveSectionTracker(1, a->0);
 
-        var section = tracker.acquire(0,0,0,0);
+        var section = tracker.acquire(0,0,0,0, false);
         section.acquire();
-        var section2 = tracker.acquire(0,0,0,0);
+        var section2 = tracker.acquire(0,0,0,0, false);
         section.release();
         section.release();
-        section = tracker.acquire(0,0,0,0);
+        section = tracker.acquire(0,0,0,0, false);
         section.release();
 
     }

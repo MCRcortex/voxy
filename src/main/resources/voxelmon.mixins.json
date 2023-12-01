@@ -8,12 +8,10 @@
     "minecraft.MixinDebugHud",
     "minecraft.MixinGameRenderer",
     "minecraft.MixinMinecraftClient",
-    "minecraft.MixinWorldRenderer"
+    "minecraft.MixinWorldRenderer",
+    "joml.AccessFrustumIntersection"
   ],
   "injectors": {
     "defaultRequire": 1
-  },
-  "mixins": [
-    "joml.AccessFrustumIntersection"
-  ]
+  }
 }

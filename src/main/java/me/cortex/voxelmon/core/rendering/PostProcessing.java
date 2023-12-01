@@ -4,6 +4,7 @@ import me.cortex.voxelmon.core.gl.GlFramebuffer;
 import me.cortex.voxelmon.core.gl.GlTexture;
 import me.cortex.voxelmon.core.gl.shader.Shader;
 import me.cortex.voxelmon.core.gl.shader.ShaderType;
+import org.lwjgl.opengl.GL11C;
 
 import static org.lwjgl.opengl.ARBFramebufferObject.*;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glBindImageTexture;
@@ -29,6 +30,11 @@ public class PostProcessing {
     private final Shader ssao = Shader.make()
             .add(ShaderType.COMPUTE, "voxelmon:lod/ssao/ssao.comp")
             .compile();
+
+    //private final Shader blit = Shader.make()
+    //        .add(ShaderType.VERTEX, "voxelmon:lod/blit_nodepth/quad.vert")
+    //        .add(ShaderType.FRAGMENT, "voxelmon:lod/blit_nodepth/quad.frag")
+    //        .compile();
 
     public PostProcessing() {
         this.framebuffer = new GlFramebuffer();
@@ -61,12 +67,14 @@ public class PostProcessing {
     //Executes the post processing and emits to whatever framebuffer is currently bound via a blit
     public void renderPost(int outputFb) {
         this.ssao.bind();
-        glBindImageTexture(0, this.colour.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
         glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, this.depthStencil.id);
+        glBindImageTexture(0, this.colour.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
         //glDispatchCompute(this.width/32, this.height/32, 1);
         glTextureBarrier();
-        glBlitNamedFramebuffer(this.framebuffer.id, outputFb, 0,0, this.width, this.height, 0, 0, this.width, this.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, this.colour.id);
+        glDrawArrays(GL11C.GL_TRIANGLES, 0, 3);
     }
 
     public void shutdown() {
@@ -74,5 +82,6 @@ public class PostProcessing {
         if (this.colour != null) this.colour.free();
         if (this.depthStencil != null) this.depthStencil.free();
         this.ssao.free();
+        //this.blit.free();
     }
 }

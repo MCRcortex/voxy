@@ -66,5 +66,9 @@ layout(binding = 6, std430) readonly restrict buffer BiomeBuffer {
 };
 
 layout(binding = 7, std430) readonly restrict buffer LightingBuffer {
-    vec4 lightData[];
+    uint lightData[];
 };
+
+vec4 getLighting(uint index) {
+    return vec4((uvec4(lightData[index])>>uvec4(16,8,0,24))&uvec4(0xFF))*vec4(1f/255.0f);
+}

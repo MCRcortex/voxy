@@ -3,36 +3,23 @@ package me.cortex.voxelmon.core.rendering;
 //NOTE: an idea on how to do it is so that any render section, we _keep_ aquired (yes this will be very memory intensive)
 // could maybe tosomething else
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxelmon.core.gl.GlBuffer;
-import me.cortex.voxelmon.core.gl.shader.Shader;
-import me.cortex.voxelmon.core.gl.shader.ShaderType;
 import me.cortex.voxelmon.core.rendering.building.BuiltSectionGeometry;
 import me.cortex.voxelmon.core.rendering.util.UploadStream;
 import me.cortex.voxelmon.core.world.other.BiomeColour;
 import me.cortex.voxelmon.core.world.other.BlockStateColour;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
-import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.FrustumIntersection;
-import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 import static org.lwjgl.opengl.ARBMultiDrawIndirect.glMultiDrawElementsIndirect;
-import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
-import static org.lwjgl.opengl.GL11.GL_UNSIGNED_SHORT;
-import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
-import static org.lwjgl.opengl.GL15.glBindBuffer;
 import static org.lwjgl.opengl.GL30.*;
-import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
-import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
-import static org.lwjgl.opengl.GL42.GL_COMMAND_BARRIER_BIT;
-import static org.lwjgl.opengl.GL42.glMemoryBarrier;
-import static org.lwjgl.opengl.GL43.*;
 
 //can make it so that register the key of the sections we have rendered, then when a section changes and is registered,
 // dispatch an update to the render section data builder which then gets consumed by the render system and updates
@@ -53,7 +40,7 @@ public abstract class AbstractFarWorldRenderer {
     private final ConcurrentLinkedDeque<BiomeColour> biomeUpdateQueue = new ConcurrentLinkedDeque<>();
     protected final GlBuffer stateDataBuffer;
     protected final GlBuffer biomeDataBuffer;
-    protected final GlBuffer light = null;
+    protected final GlBuffer lightDataBuffer;
 
 
     //Current camera base level section position
@@ -68,6 +55,7 @@ public abstract class AbstractFarWorldRenderer {
         //TODO: make these both dynamically sized
         this.stateDataBuffer  = new GlBuffer((1<<16)*28, 0);//Capacity for 1<<16 entries
         this.biomeDataBuffer  = new GlBuffer(512*4*2, 0);//capacity for 1<<9 entries
+        this.lightDataBuffer  = new GlBuffer(256*4, 0);//256 of uint
         this.geometry = new GeometryManager();
     }
 
@@ -80,11 +68,25 @@ public abstract class AbstractFarWorldRenderer {
         this.sy = camera.getBlockPos().getY() >> 5;
         this.sz = camera.getBlockPos().getZ() >> 5;
 
+
         //TODO: move this to a render function that is only called
         // once per frame when using multi viewport mods
         //it shouldent matter if its called multiple times a frame however, as its synced with fences
         UploadStream.INSTANCE.tick();
 
+
+        //Update the lightmap
+        {
+            long upload = UploadStream.INSTANCE.upload(this.lightDataBuffer, 0, 256*4);
+            var lmt = MinecraftClient.getInstance().gameRenderer.getLightmapTextureManager().texture.getImage();
+            for (int light = 0; light < 256; light++) {
+                int x = light&0xF;
+                int y = ((light>>4)&0xF);
+                int sample = lmt.getColor(x,y);
+                sample = ((sample&0xFF0000)>>16)|(sample&0xFF00)|((sample&0xFF)<<16);
+                MemoryUtil.memPutInt(upload + (((x<<4)|(15-y))*4), sample|(0xFF<<28));//Skylight is inverted
+            }
+        }
 
         this.geometry.uploadResults();
         //Upload any block state changes
@@ -129,5 +131,6 @@ public abstract class AbstractFarWorldRenderer {
         this.uniformBuffer.free();
         this.stateDataBuffer.free();
         this.biomeDataBuffer.free();
+        this.lightDataBuffer.free();
     }
 }

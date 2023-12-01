@@ -1,23 +1,15 @@
 package me.cortex.voxelmon.core.world;
 
-import it.unimi.dsi.fastutil.ints.Int2ShortOpenHashMap;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.Long2ShortOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
-import it.unimi.dsi.fastutil.shorts.ShortArrayList;
 import org.lwjgl.system.MemoryUtil;
-import org.lwjgl.util.zstd.Zstd;
 
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Map;
-import java.util.Random;
 
 import static org.lwjgl.util.zstd.Zstd.*;
 
 public class SaveLoadSystem {
-    public static byte[] serialize(WorldSection section) {
+    public static ByteBuffer serialize(WorldSection section) {
         var data = section.copyData();
         var compressed = new Short[data.length];
         Long2ShortOpenHashMap LUT = new Long2ShortOpenHashMap();
@@ -57,24 +49,17 @@ public class SaveLoadSystem {
         raw.rewind();
         ByteBuffer compressedData  = MemoryUtil.memAlloc((int)ZSTD_COMPRESSBOUND(raw.remaining()));
         long compressedSize = ZSTD_compress(compressedData, raw, 15);
-        byte[] out = new byte[(int) compressedSize];
         compressedData.limit((int) compressedSize);
-        compressedData.get(out);
-
+        compressedData.rewind();
         MemoryUtil.memFree(raw);
-        MemoryUtil.memFree(compressedData);
 
         //Compress into a key + data pallet format
-        return out;
+        return compressedData;
     }
 
-    public static boolean deserialize(WorldSection section, byte[] data) {
-        var buff = MemoryUtil.memAlloc(data.length);
-        buff.put(data);
-        buff.rewind();
+    public static boolean deserialize(WorldSection section, ByteBuffer data) {
         var decompressed = MemoryUtil.memAlloc(32*32*32*4*2);
-        long size = ZSTD_decompress(decompressed, buff);
-        MemoryUtil.memFree(buff);
+        long size = ZSTD_decompress(decompressed, data);
         decompressed.limit((int) size);
 
         long hash = 0;
