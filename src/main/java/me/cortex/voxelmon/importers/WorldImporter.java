@@ -30,8 +30,14 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class WorldImporter {
+    public record ImportUpdate(){}
+
     private final WorldEngine world;
     private final World mcWorld;
     private final Codec<ReadableContainer<RegistryEntry<Biome>>> biomeCodec;
@@ -45,27 +51,35 @@ public class WorldImporter {
     }
 
     private Thread worker;
-    public void importWorldAsyncStart(File directory) {
+    public void importWorldAsyncStart(File directory, int threads, Function<ImportUpdate, Boolean> updateCallback, Runnable onCompletion) {
         this.worker = new Thread(() -> {
-            Arrays.stream(directory.listFiles()).parallel().forEach(file -> {
+            var workers = new ForkJoinPool(threads);
+            for (var file : directory.listFiles()) {
                 if (!file.isFile()) {
-                    return;
+                    continue;
                 }
                 var name = file.getName();
                 var sections = name.split("\\.");
                 if (sections.length != 4 || (!sections[0].equals("r")) || (!sections[3].equals("mca"))) {
                     System.err.println("Unknown file: " + name);
-                    return;
+                    continue;
                 }
                 int rx = Integer.parseInt(sections[1]);
                 int rz = Integer.parseInt(sections[2]);
-                try {
-                    this.importRegionFile(file.toPath(), rx, rz);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            });
-            System.err.println("Done");
+                workers.submit(() -> {
+                    try {
+                        this.importRegionFile(file.toPath(), rx, rz);
+                    } catch (
+                            Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+            }
+            workers.shutdown();
+            try {
+                workers.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+            } catch (InterruptedException e) {}
+            onCompletion.run();
         });
         this.worker.setName("World importer");
         this.worker.start();

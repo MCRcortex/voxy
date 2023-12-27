@@ -3,6 +3,7 @@ package me.cortex.voxelmon.core.rendering.building;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import me.cortex.voxelmon.core.util.MemoryBuffer;
 import me.cortex.voxelmon.core.util.Mesher2D;
+import me.cortex.voxelmon.core.util.Mesher2Dv2;
 import me.cortex.voxelmon.core.world.WorldEngine;
 import me.cortex.voxelmon.core.world.WorldSection;
 import me.cortex.voxelmon.core.world.other.Mapper;
@@ -11,7 +12,7 @@ import org.lwjgl.system.MemoryUtil;
 
 
 public class RenderDataFactory {
-    private final Mesher2D mesher = new Mesher2D(5,15);//15
+    private final Mesher2Dv2 mesher = new Mesher2Dv2(5,15);//15
     private final LongArrayList outData = new LongArrayList(1000);
     private final WorldEngine world;
     public RenderDataFactory(WorldEngine world) {

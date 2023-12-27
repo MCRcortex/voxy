@@ -22,6 +22,7 @@ import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
+import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 import org.lwjgl.system.MemoryUtil;
 
@@ -72,7 +73,7 @@ public class VoxelCore {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
-        this.world = new WorldEngine(new File("storagefile2.db"), 20, 5);//"storagefile.db"//"ethoslab.db"
+        this.world = new WorldEngine(new File("storagefile.db"), 20, 5);//"storagefile.db"//"ethoslab.db"
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
         this.renderGen = new RenderGenerationService(this.world,4, this.renderTracker::processBuildResult);
@@ -195,5 +196,13 @@ public class VoxelCore {
         try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.renderer.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}
+    }
+
+    public WorldImporter createWorldImporter(World mcWorld, File worldPath) {
+        var importer = new WorldImporter(this.world, mcWorld);
+        importer.importWorldAsyncStart(worldPath, 10, null, ()->{
+            System.err.println("DONE IMPORT");
+        });
+        return importer;
     }
 }

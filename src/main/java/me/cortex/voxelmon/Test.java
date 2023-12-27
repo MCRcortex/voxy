@@ -57,6 +57,6 @@ public class Test {
         //WorldEngine engine = new WorldEngine(new File("storagefile2.db"), 5);
         WorldImporter importer = new WorldImporter(null, null);
         //importer.importWorld(new File("run/saves/Drehmal 2.2 Apotheosis Beta - 1.0.0/region/"));
-        importer.importWorldAsyncStart(new File("D:\\PrismLauncher-Windows-MSVC-Portable-7.1\\instances\\1.20.1(3)\\.minecraft\\.bobby\\build.docm77.de\\-8149132374211427218\\minecraft\\overworld\\"));
+        importer.importWorldAsyncStart(new File("D:\\PrismLauncher-Windows-MSVC-Portable-7.1\\instances\\1.20.1(3)\\.minecraft\\.bobby\\build.docm77.de\\-8149132374211427218\\minecraft\\overworld\\"),  2,null, null);
     }
 }
