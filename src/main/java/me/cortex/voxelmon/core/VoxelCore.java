@@ -73,7 +73,7 @@ public class VoxelCore {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
-        this.world = new WorldEngine(new File("storagefile2.db"), 5, 20, 5);//"storagefile.db"//"ethoslab.db"
+        this.world = new WorldEngine(new File("storagefile2.db"), 2, 5, 5);//"storagefile.db"//"ethoslab.db"
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
         this.renderGen = new RenderGenerationService(this.world,5, this.renderTracker::processBuildResult);
@@ -83,7 +83,7 @@ public class VoxelCore {
         //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
         this.distanceTracker = new DistanceTracker(this.renderTracker, 5, 16);
 
-        this.postProcessing = null;// = new PostProcessing();
+        this.postProcessing = new PostProcessing();
 
         this.world.getMapper().setCallbacks(this::stateUpdate, this::biomeUpdate);
 
@@ -178,8 +178,10 @@ public class VoxelCore {
         // this is cause the terrain might not exist and so all the caves are visible causing hell for the
         // occlusion culler
         this.renderer.renderFarAwayOpaque(matrices, cameraX, cameraY, cameraZ);
+
+
         //glBindFramebuffer(GL_FRAMEBUFFER, boundFB);
-       // this.postProcessing.renderPost(boundFB);
+        //this.postProcessing.renderPost(boundFB);
     }
 
     public void addDebugInfo(List<String> debug) {
@@ -198,8 +200,8 @@ public class VoxelCore {
     // since they are AABBS crossing the normal is impossible without one of the axis being equal
 
     public void shutdown() {
-        try {this.renderGen.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
+        try {this.renderGen.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.renderer.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}
     }

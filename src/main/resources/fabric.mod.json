@@ -1,10 +1,12 @@
 {
   "schemaVersion": 1,
-  "id": "voxelmon",
+  "id": "zenith",
   "version": "${version}",
-  "name": "voxelmon",
+  "name": "zenith",
   "description": "",
-  "authors": [],
+  "authors": [
+    "Cortex"
+  ],
   "contact": {
   },
   "license": "All-Rights-Reserved",

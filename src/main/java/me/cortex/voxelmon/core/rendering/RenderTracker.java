@@ -160,6 +160,17 @@ public class RenderTracker {
 
     //Called by the world engine when a section gets dirtied
     public void sectionUpdated(WorldSection section) {
+        if (this.activeSections.containsKey(section.getKey())) {
+            //TODO:FIXME: if the section gets updated, that means that its neighbors might need to be updated aswell
+            // (due to block occlusion)
+
+            //TODO: FIXME: REBUILDING THE ENTIRE NEIGHBORS when probably only the internal layout changed is NOT SMART
+            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+            this.renderGen.enqueueTask(section.lvl, section.x-1, section.y, section.z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+            this.renderGen.enqueueTask(section.lvl, section.x+1, section.y, section.z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z-1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z+1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+        }
         //this.renderGen.enqueueTask(section);
     }
 
