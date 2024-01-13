@@ -80,23 +80,38 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
         glBindVertexArray(this.vao);
         this.commandGen.bind();
-        glDispatchCompute((this.geometry.getSectionCount()+127)/128, 1, 1);
-        glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT|GL_UNIFORM_BARRIER_BIT);
+        glDispatchCompute((this.geometry.getSectionCount() + 127) / 128, 1, 1);
+        glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_UNIFORM_BARRIER_BIT);
 
         this.lodShader.bind();
-        glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, this.geometry.getSectionCount(), 0);
+        if (false) {//Bloody intel gpus
+            glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 1000, 0);
+
+            //int count = this.geometry.getSectionCount()/1000;
+            //for (int i = 0; i < 10; i++) {
+            //    glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, i*1000L*20, 1000, 0);
+            //}
+            //int rem = this.geometry.getSectionCount() - (count*1000);
+            //if (rem != 0) {
+            //    glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, count*1000L*20, rem, 0);
+            //}
+
+        } else {
+            //TODO: swap to a multidraw indirect counted
+            glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, this.geometry.getSectionCount(), 0);
+        }
         //ARBIndirectParameters.glMultiDrawElementsIndirectCountARB(
 
-        glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT|GL_FRAMEBUFFER_BARRIER_BIT);
+        glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
         //TODO: add gpu occlusion culling here (after the lod drawing) (maybe, finish the rest of the PoC first)
+
+
         cullShader.bind();
-
-        glColorMask(false,false,false,false);
+        glColorMask(false, false, false, false);
         glDepthMask(false);
-        glDrawElementsInstanced(GL_TRIANGLES, 6*2*3, GL_UNSIGNED_BYTE, (1<<16)*6*2, this.geometry.getSectionCount());
+        glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3, GL_UNSIGNED_BYTE, (1 << 16) * 6 * 2, this.geometry.getSectionCount());
         glDepthMask(true);
-        glColorMask(true,true,true,true);
-
+        glColorMask(true, true, true, true);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
         glBindVertexArray(0);

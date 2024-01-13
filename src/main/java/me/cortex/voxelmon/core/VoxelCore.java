@@ -73,17 +73,17 @@ public class VoxelCore {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
-        this.world = new WorldEngine(new File("storagefile.db"), 5, 20, 5);//"storagefile.db"//"ethoslab.db"
+        this.world = new WorldEngine(new File("storagefile2.db"), 5, 20, 5);//"storagefile.db"//"ethoslab.db"
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
-        this.renderGen = new RenderGenerationService(this.world,10, this.renderTracker::processBuildResult);
+        this.renderGen = new RenderGenerationService(this.world,5, this.renderTracker::processBuildResult);
         this.world.setRenderTracker(this.renderTracker);
         this.renderTracker.setRenderGen(this.renderGen);
 
         //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
         this.distanceTracker = new DistanceTracker(this.renderTracker, 5, 16);
 
-        this.postProcessing = new PostProcessing();
+        this.postProcessing = null;// = new PostProcessing();
 
         this.world.getMapper().setCallbacks(this::stateUpdate, this::biomeUpdate);
 

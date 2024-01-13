@@ -70,5 +70,8 @@ layout(binding = 7, std430) readonly restrict buffer LightingBuffer {
 };
 
 vec4 getLighting(uint index) {
-    return vec4((uvec4(lightData[index])>>uvec4(16,8,0,24))&uvec4(0xFF))*vec4(1f/255.0f);
+    uvec4 arr = uvec4(lightData[index]);
+    arr = arr>>uvec4(16,8,0,24);
+    arr = arr & uvec4(0xFF);
+    return vec4(arr)*vec4(1.0f/255.0f);
 }

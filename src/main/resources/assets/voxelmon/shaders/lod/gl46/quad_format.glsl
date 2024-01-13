@@ -33,29 +33,39 @@ uint extractLightId(uint64_t quad) {
 
 #define Quad ivec2
 
-#define Eu32(data, amountBits, shift) (uint((data)>>(shift))&((1u<<(amountBits))-1))
+//#define Eu32(data, amountBits, shift) (uint((data)>>(shift))&((1u<<(amountBits))-1))
+
+uint Eu32v(ivec2 data, int amount, int shift) {
+    if (shift > 31) {
+        shift -= 32;
+        return (uint(data.y)>>uint(shift))&((1u<<uint(amount))-1);
+    } else {
+        return (uint(data.x)>>uint(shift))&((1u<<uint(amount))-1);
+    }
+}
 
 vec3 extractPos(ivec2 quad) {
-    return vec3(0);
+    return vec3(Eu32v(quad, 5, 21), Eu32v(quad, 5, 16), Eu32v(quad, 5, 11));
 }
 
 ivec2 extractSize(ivec2 quad) {
-    return ivec2(0);
+    return ivec2(Eu32v(quad, 4, 3), Eu32v(quad, 4, 7)) + ivec2(1);//the + 1 is cause you cant actually have a 0 size quad
 }
 
 uint extractFace(ivec2 quad) {
-    return quad.y&7;
+    return Eu32v(quad, 3, 0);
 }
 
 uint extractStateId(ivec2 quad) {
-    return 0;
+    //Eu32(quad, 20, 26);
+    return 1;
 }
 
 uint extractBiomeId(ivec2 quad) {
-    return 0;
+    return Eu32v(quad, 9, 46);
 }
 
 uint extractLightId(ivec2 quad) {
-    return 0;
+    return Eu32v(quad, 8, 55);
 }
 #endif

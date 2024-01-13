@@ -26,6 +26,9 @@ uint encodeLocalLodPos(uint detail, ivec3 pos) {
     return (detail<<29)|(detla.x<<20)|(detla.y<<11)|(detla.z<<2);
 }
 
+
+//TODO: swap to a multidraw indirect counted
+
 void main() {
     if (gl_GlobalInvocationID.x >= sectionCount) {
         return;
@@ -37,16 +40,14 @@ void main() {
     vec3 cornerPos = vec3(((ipos<<detail)-baseSectionPos)<<5)-cameraSubPos;
 
 
-    bool shouldRender = testFrustum(frustum, cornerPos, cornerPos+vec3(1<<(detail+5)));
-
     //Check the occlusion data from last frame
-    if (visibilityData[gl_GlobalInvocationID.x] != frameId - 1) {
-        shouldRender = false;
-    }
+    bool shouldRender = visibilityData[gl_GlobalInvocationID.x] == frameId - 1;
+
     //Clear the occlusion data (not strictly? needed? i think???)
     //visibilityData[gl_GlobalInvocationID.x] = 0;
 
     //TODO: need to make it check that only if it was also in the frustum last frame does it apply the visibilityData check!
+    // this fixes temporal coherance
 
     //This prevents overflow of the relative position encoder
     if (shouldRender) {
