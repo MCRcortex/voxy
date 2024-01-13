@@ -13,6 +13,7 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.NbtTagSizeTracker;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.stat.Stat;
+import net.minecraft.util.Pair;
 import net.minecraft.world.biome.Biome;
 import org.lwjgl.system.MemoryUtil;
 
@@ -32,8 +33,8 @@ public class Mapper {
     private static final int BIOME_TYPE = 2;
 
     private final StorageBackend storage;
-    public static final int UNKNOWN_MAPPING = -1;
-    public static final int AIR = 0;
+    public static final long UNKNOWN_MAPPING = -1;
+    public static final long AIR = 0;
 
     private final Map<BlockState, StateEntry> block2stateEntry = new ConcurrentHashMap<>(2000,0.75f, 10);
     private final ObjectArrayList<StateEntry> blockId2stateEntry = new ObjectArrayList<>();
@@ -62,6 +63,11 @@ public class Mapper {
         return ((id>>27)&((1<<20)-1)) == 0;
     }
 
+    public static boolean shouldRenderFace(int dirId, long self, long other) {
+        //TODO: fixme make it be with respect to the type itself e.g. water, glass etc
+        return isTranslucent(other);
+    }
+
     public void setCallbacks(Consumer<StateEntry> stateCallback, Consumer<BiomeEntry> biomeCallback) {
         this.newStateCallback = stateCallback;
         this.newBiomeCallback = biomeCallback;
@@ -71,15 +77,17 @@ public class Mapper {
         var mappings = this.storage.getIdMappings();
         List<StateEntry> sentries = new ArrayList<>();
         List<BiomeEntry> bentries = new ArrayList<>();
+        List<Pair<byte[], Integer>> sentryErrors = new ArrayList<>();
+
         for (var entry : mappings.int2ObjectEntrySet()) {
             int entryType = entry.getIntKey()>>>30;
             int id = entry.getIntKey() & ((1<<30)-1);
             if (entryType == BLOCK_STATE_TYPE) {
                 var sentry = StateEntry.deserialize(id, entry.getValue());
                 if (sentry.state.isAir()) {
-                    System.err.println("Deserialization had air, probably corrupt, Inserting garbage type");
-                    sentry = new StateEntry(id, Block.STATE_IDS.get(new Random().nextInt(Block.STATE_IDS.size()-1)));
-                    //TODO THIS
+                    System.err.println("Deserialization was air, removed block");
+                    sentryErrors.add(new Pair<>(entry.getValue(), id));
+                    continue;
                 }
                 sentries.add(sentry);
                 var oldEntry = this.block2stateEntry.put(sentry.state, sentry);
@@ -94,6 +102,20 @@ public class Mapper {
                 }
             } else {
                 throw new IllegalStateException("Unknown entryType");
+            }
+        }
+
+        {
+            //Insert garbage types into the mapping for those blocks, TODO:FIXME: Need to upgrade the type or have a solution to error blocks
+            var rand = new Random();
+            for (var error : sentryErrors) {
+                while (true) {
+                    var state = new StateEntry(error.getRight(), Block.STATE_IDS.get(rand.nextInt(Block.STATE_IDS.size() - 1)));
+                    if (this.block2stateEntry.put(state.state, state) == null) {
+                        sentries.add(state);
+                        break;
+                    }
+                }
             }
         }
 

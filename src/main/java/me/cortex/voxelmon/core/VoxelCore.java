@@ -80,7 +80,8 @@ public class VoxelCore {
         this.world.setRenderTracker(this.renderTracker);
         this.renderTracker.setRenderGen(this.renderGen);
 
-        this.distanceTracker = new DistanceTracker(this.renderTracker, 5);
+        //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
+        this.distanceTracker = new DistanceTracker(this.renderTracker, 5, 16);
 
         this.postProcessing = new PostProcessing();
 

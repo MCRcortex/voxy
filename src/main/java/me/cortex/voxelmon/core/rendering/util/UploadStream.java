@@ -5,6 +5,7 @@ import me.cortex.voxelmon.core.gl.GlBuffer;
 import me.cortex.voxelmon.core.gl.GlFence;
 import me.cortex.voxelmon.core.gl.GlPersistentMappedBuffer;
 import me.cortex.voxelmon.core.util.AllocationArena;
+import org.lwjgl.opengl.GL42;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -16,6 +17,7 @@ import static org.lwjgl.opengl.ARBMapBufferRange.*;
 import static org.lwjgl.opengl.GL11.glFinish;
 import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL42C.GL_BUFFER_UPDATE_BARRIER_BIT;
+import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BARRIER_BIT;
 import static org.lwjgl.opengl.GL44.GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT;
 
 public class UploadStream {
@@ -81,14 +83,15 @@ public class UploadStream {
             }
             this.flushList.clear();
         }
-        glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT);
+        glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
+
         //Execute all the copies
         for (var entry : this.uploadList) {
             glCopyNamedBufferSubData(this.uploadBuffer.id, entry.target.id, entry.uploadOffset, entry.targetOffset, entry.size);
         }
         this.uploadList.clear();
 
-        glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
 
         this.caddr = -1;
         this.offset = 0;

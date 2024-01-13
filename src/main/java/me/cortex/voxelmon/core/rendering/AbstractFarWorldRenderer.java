@@ -74,7 +74,6 @@ public abstract class AbstractFarWorldRenderer {
         //it shouldent matter if its called multiple times a frame however, as its synced with fences
         UploadStream.INSTANCE.tick();
 
-
         //Update the lightmap
         {
             long upload = UploadStream.INSTANCE.upload(this.lightDataBuffer, 0, 256*4);
@@ -88,7 +87,9 @@ public abstract class AbstractFarWorldRenderer {
             }
         }
 
+        //Upload any new geometry
         this.geometry.uploadResults();
+
         //Upload any block state changes
         while (!this.stateUpdateQueue.isEmpty()) {
             var stateUpdate = this.stateUpdateQueue.pop();
@@ -98,6 +99,7 @@ public abstract class AbstractFarWorldRenderer {
                 MemoryUtil.memPutInt(ptr, faceColour); ptr+=4;
             }
         }
+
         //Upload any biome changes
         while (!this.biomeUpdateQueue.isEmpty()) {
             var biomeUpdate = this.biomeUpdateQueue.pop();

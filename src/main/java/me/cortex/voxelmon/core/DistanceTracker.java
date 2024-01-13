@@ -22,12 +22,12 @@ import net.minecraft.client.MinecraftClient;
 public class DistanceTracker {
     private final TransitionRing2D[] rings;
     private final RenderTracker tracker;
-    public DistanceTracker(RenderTracker tracker, int rings) {
+    private final int scale;
+
+    public DistanceTracker(RenderTracker tracker, int rings, int scale) {
         this.rings = new TransitionRing2D[rings];
         this.tracker = tracker;
-
-        //NOTE: This is in our render distance units, to convert to chunks at lvl 0 multiply by 2
-        int DIST = 16;//24;
+        this.scale = scale;
 
         this.rings[0] = new TransitionRing2D(5, (int) Math.ceil(MinecraftClient.getInstance().gameRenderer.getViewDistance()/16)/2, (x, z)->{
             if (false) {
@@ -42,9 +42,12 @@ public class DistanceTracker {
             }
         });
 
+        //The rings 0+ start at 64 vanilla rd, no matter what the game is set at, that is if the game is set to 32 rd
+        // there will still be 32 chunks untill the first lod drop
+        // if the game is set to 16, then there will be 48 chunks until the drop
         for (int i = 1; i < rings; i++) {
             int capRing = i;
-            this.rings[i] = new TransitionRing2D(5+i, DIST, (x, z) -> this.dec(capRing, x, z), (x, z) -> this.inc(capRing, x, z));
+            this.rings[i] = new TransitionRing2D(5+i, scale, (x, z) -> this.dec(capRing, x, z), (x, z) -> this.inc(capRing, x, z));
         }
     }
 
@@ -67,7 +70,7 @@ public class DistanceTracker {
     //if the center suddenly changes (say more than 1<<(7+lodlvl) block) then invalidate the entire ring and recompute
     // the lod sections
     public void setCenter(int x, int y, int z) {
-        for (var ring : rings) {
+        for (var ring : this.rings) {
             if (ring != null) {
                 ring.update(x, z);
             }
@@ -75,6 +78,16 @@ public class DistanceTracker {
     }
 
     public void init(int x, int z) {
+        //Radius of chunks to enqueue
+        int SIZE = 40;
+        //Insert highest LOD level
+        for (int ox = -SIZE; ox <= SIZE; ox++) {
+            for (int oz = -SIZE; oz <= SIZE; oz++) {
+                this.inc(4, (x>>(5+this.rings.length-1)) + ox, (z>>(5+this.rings.length-1)) + oz);
+            }
+        }
+
+
         for (int i = this.rings.length-1; 0 <= i; i--) {
             if (this.rings[i] != null) {
                 this.rings[i].fill(x, z);
@@ -214,6 +227,10 @@ public class DistanceTracker {
         }
 
         public void fill(int x, int z) {
+            this.fill(x, z, null);
+        }
+
+        public void fill(int x, int z, Transition2DCallback outsideCallback) {
             int cx = x>>this.shiftSize;
             int cz = z>>this.shiftSize;
 
@@ -222,6 +239,15 @@ public class DistanceTracker {
                 int b = (int) Math.floor(Math.sqrt(r2-(a*a)));
                 for (int c = -b; c <= b; c++) {
                     this.enter.callback(a + cx, c + cz);
+                }
+                if (outsideCallback != null) {
+                    for (int c = -this.radius; c < -b; c++) {
+                        outsideCallback.callback(a + cx, c + cz);
+                    }
+
+                    for (int c = b+1; c <= this.radius; c++) {
+                        outsideCallback.callback(a + cx, c + cz);
+                    }
                 }
             }
 
