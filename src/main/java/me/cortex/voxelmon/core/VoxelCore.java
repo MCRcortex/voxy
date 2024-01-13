@@ -148,7 +148,12 @@ public class VoxelCore {
         this.world.ingestService.enqueueIngest(worldChunk);
     }
 
+    boolean firstTime = true;
     public void renderSetup(Frustum frustum, Camera camera) {
+        if (this.firstTime) {
+            this.distanceTracker.init(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
+            this.firstTime = false;
+        }
         this.distanceTracker.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
         this.renderer.setupRender(frustum, camera);
     }

@@ -103,6 +103,12 @@ public final class WorldSection {
         return Arrays.copyOf(this.data, this.data.length);
     }
 
+    public void copyDataTo(long[] cache) {
+        this.assertNotFree();
+        if (cache.length != this.data.length) throw new IllegalArgumentException();
+        System.arraycopy(this.data, 0, cache, 0, this.data.length);
+    }
+
     public boolean tryAcquire() {
         int state = this.atomicState.updateAndGet(val -> {
             if ((val&1) != 0) {

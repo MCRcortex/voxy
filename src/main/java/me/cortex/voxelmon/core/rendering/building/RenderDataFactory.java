@@ -3,7 +3,6 @@ package me.cortex.voxelmon.core.rendering.building;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import me.cortex.voxelmon.core.util.MemoryBuffer;
 import me.cortex.voxelmon.core.util.Mesher2D;
-import me.cortex.voxelmon.core.util.Mesher2Dv2;
 import me.cortex.voxelmon.core.world.WorldEngine;
 import me.cortex.voxelmon.core.world.WorldSection;
 import me.cortex.voxelmon.core.world.other.Mapper;
@@ -12,9 +11,12 @@ import org.lwjgl.system.MemoryUtil;
 
 
 public class RenderDataFactory {
-    private final Mesher2Dv2 mesher = new Mesher2Dv2(5,15);//15
+    private final Mesher2D mesher = new Mesher2D(5,15);//15
     private final LongArrayList outData = new LongArrayList(1000);
     private final WorldEngine world;
+    private final long[] sectionCache = new long[32*32*32];
+    private final long[] connectedSectionCache = new long[32*32*32];
+
     public RenderDataFactory(WorldEngine world) {
         this.world = world;
     }
@@ -39,8 +41,8 @@ public class RenderDataFactory {
         //    return new BuiltSectionGeometry(section.getKey(), null, null);
         //}
 
-
-        var data = section.copyData();
+        section.copyDataTo(this.sectionCache);
+        var data = this.sectionCache;
 
         long[] connectedData = null;
         int dirId = Direction.UP.getId();
@@ -65,7 +67,8 @@ public class RenderDataFactory {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
                                 var connectedSection = this.world.acquire(section.lvl, section.x, section.y + 1, section.z);
-                                connectedData = connectedSection.copyData();
+                                connectedSection.copyDataTo(this.connectedSectionCache);
+                                connectedData = this.connectedSectionCache;
                                 connectedSection.release();
                             }
                             up = connectedData[WorldSection.getIndex(x, 0, z)];
@@ -77,9 +80,10 @@ public class RenderDataFactory {
                     }
                 }
 
-                var quads = this.mesher.process();
-                for (int i = 0; i < quads.length; i++) {
-                    var quad = quads[i];
+                var count = this.mesher.process();
+                var array = this.mesher.getArray();
+                for (int i = 0; i < count; i++) {
+                    var quad = array[i];
                     this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 1, y, quad));
                 }
             }
@@ -108,7 +112,8 @@ public class RenderDataFactory {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
                                 var connectedSection = this.world.acquire(section.lvl, section.x + 1, section.y, section.z);
-                                connectedData = connectedSection.copyData();
+                                connectedSection.copyDataTo(this.connectedSectionCache);
+                                connectedData = this.connectedSectionCache;
                                 connectedSection.release();
                             }
                             up = connectedData[WorldSection.getIndex(0, y, z)];
@@ -120,9 +125,10 @@ public class RenderDataFactory {
                     }
                 }
 
-                var quads = this.mesher.process();
-                for (int i = 0; i < quads.length; i++) {
-                    var quad = quads[i];
+                var count = this.mesher.process();
+                var array = this.mesher.getArray();
+                for (int i = 0; i < count; i++) {
+                    var quad = array[i];
                     this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 5, x, quad));
                 }
             }
@@ -151,7 +157,8 @@ public class RenderDataFactory {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
                                 var connectedSection = this.world.acquire(section.lvl, section.x, section.y, section.z + 1);
-                                connectedData = connectedSection.copyData();
+                                connectedSection.copyDataTo(this.connectedSectionCache);
+                                connectedData = this.connectedSectionCache;
                                 connectedSection.release();
                             }
                             up = connectedData[WorldSection.getIndex(x, y, 0)];
@@ -163,9 +170,10 @@ public class RenderDataFactory {
                     }
                 }
 
-                var quads = this.mesher.process();
-                for (int i = 0; i < quads.length; i++) {
-                    var quad = quads[i];
+                var count = this.mesher.process();
+                var array = this.mesher.getArray();
+                for (int i = 0; i < count; i++) {
+                    var quad = array[i];
                     this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 3, z, quad));
                 }
             }
@@ -194,7 +202,8 @@ public class RenderDataFactory {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
                                 var connectedSection = this.world.acquire(section.lvl, section.x - 1, section.y, section.z);
-                                connectedData = connectedSection.copyData();
+                                connectedSection.copyDataTo(this.connectedSectionCache);
+                                connectedData = this.connectedSectionCache;
                                 connectedSection.release();
                             }
                             up = connectedData[WorldSection.getIndex(31, y, z)];
@@ -206,9 +215,10 @@ public class RenderDataFactory {
                     }
                 }
 
-                var quads = this.mesher.process();
-                for (int i = 0; i < quads.length; i++) {
-                    var quad = quads[i];
+                var count = this.mesher.process();
+                var array = this.mesher.getArray();
+                for (int i = 0; i < count; i++) {
+                    var quad = array[i];
                     this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 4, x, quad));
                 }
             }
@@ -237,7 +247,8 @@ public class RenderDataFactory {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
                                 var connectedSection = this.world.acquire(section.lvl, section.x, section.y, section.z - 1);
-                                connectedData = connectedSection.copyData();
+                                connectedSection.copyDataTo(this.connectedSectionCache);
+                                connectedData = this.connectedSectionCache;
                                 connectedSection.release();
                             }
                             up = connectedData[WorldSection.getIndex(x, y, 31)];
@@ -249,9 +260,10 @@ public class RenderDataFactory {
                     }
                 }
 
-                var quads = this.mesher.process();
-                for (int i = 0; i < quads.length; i++) {
-                    var quad = quads[i];
+                var count = this.mesher.process();
+                var array = this.mesher.getArray();
+                for (int i = 0; i < count; i++) {
+                    var quad = array[i];
                     this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 2, z, quad));
                 }
             }
@@ -280,7 +292,8 @@ public class RenderDataFactory {
                             //Load and copy the data into a local cache, TODO: optimize so its not doing billion of copies
                             if (connectedData == null) {
                                 var connectedSection = this.world.acquire(section.lvl, section.x, section.y - 1, section.z);
-                                connectedData = connectedSection.copyData();
+                                connectedSection.copyDataTo(this.connectedSectionCache);
+                                connectedData = this.connectedSectionCache;
                                 connectedSection.release();
                             }
                             up = connectedData[WorldSection.getIndex(x, 31, z)];
@@ -292,9 +305,10 @@ public class RenderDataFactory {
                     }
                 }
 
-                var quads = this.mesher.process();
-                for (int i = 0; i < quads.length; i++) {
-                    var quad = quads[i];
+                var count = this.mesher.process();
+                var array = this.mesher.getArray();
+                for (int i = 0; i < count; i++) {
+                    var quad = array[i];
                     this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 0, y, quad));
                 }
             }

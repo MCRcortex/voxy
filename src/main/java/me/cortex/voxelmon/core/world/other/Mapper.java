@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.cortex.voxelmon.core.util.MemoryBuffer;
 import me.cortex.voxelmon.core.world.storage.StorageBackend;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.nbt.NbtCompound;
@@ -51,6 +52,7 @@ public class Mapper {
         this.loadFromStorage();
     }
 
+
     public static boolean isTranslucent(long id) {
         //Atm hardcode to air
         return ((id>>27)&((1<<20)-1)) == 0;
@@ -74,8 +76,14 @@ public class Mapper {
             int id = entry.getIntKey() & ((1<<30)-1);
             if (entryType == BLOCK_STATE_TYPE) {
                 var sentry = StateEntry.deserialize(id, entry.getValue());
+                if (sentry.state.isAir()) {
+                    System.err.println("Deserialization had air, probably corrupt, Inserting garbage type");
+                    sentry = new StateEntry(id, Block.STATE_IDS.get(new Random().nextInt(Block.STATE_IDS.size()-1)));
+                    //TODO THIS
+                }
                 sentries.add(sentry);
-                if (this.block2stateEntry.put(sentry.state, sentry) != null) {
+                var oldEntry = this.block2stateEntry.put(sentry.state, sentry);
+                if (oldEntry != null) {
                     throw new IllegalStateException("Multiple mappings for blockstate");
                 }
             } else if (entryType == BIOME_TYPE) {

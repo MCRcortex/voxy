@@ -85,20 +85,20 @@ void main() {
     }
 
 
-    //gl_Position = MVP * vec4(vec3(((cornerIdx)&1)+10,10,((cornerIdx>>1)&1)+10),1);
-    //uint i = uint(quad>>32);
-    //uint i = uint(gl_BaseInstance);
-    //i ^= i>>16;
-    //i *= 124128573;
-    //i ^= i>>16;
-    //i *= 4211346123;
-    //i ^= i>>16;
-    //i *= 462312435;
-    //i ^= i>>16;
-    //i *= 542354341;
-    //i ^= i>>16;
-
-    //uint i = uint(lodLevel+12)*215387625;
-    //colour *= vec4(vec3(float((uint(i)>>2)&7)/7,float((uint(i)>>5)&7)/7,float((uint(i)>>8)&7)/7)*0.7+0.3,1);
-    //colour = vec4(vec3(float((uint(i)>>2)&7)/7,float((uint(i)>>5)&7)/7,float((uint(i)>>8)&7)/7),1);
 }
+//gl_Position = MVP * vec4(vec3(((cornerIdx)&1)+10,10,((cornerIdx>>1)&1)+10),1);
+//uint i = uint(quad>>32);
+//uint i = uint(gl_BaseInstance);
+//i ^= i>>16;
+//i *= 124128573;
+//i ^= i>>16;
+//i *= 4211346123;
+//i ^= i>>16;
+//i *= 462312435;
+//i ^= i>>16;
+//i *= 542354341;
+//i ^= i>>16;
+
+//uint i = uint(lodLevel+12)*215387625;
+//colour *= vec4(vec3(float((uint(i)>>2)&7)/7,float((uint(i)>>5)&7)/7,float((uint(i)>>8)&7)/7)*0.7+0.3,1);
+//colour = vec4(vec3(float((uint(i)>>2)&7)/7,float((uint(i)>>5)&7)/7,float((uint(i)>>8)&7)/7),1);

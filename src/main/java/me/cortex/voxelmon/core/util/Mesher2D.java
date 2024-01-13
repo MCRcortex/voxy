@@ -8,13 +8,13 @@ public class Mesher2D {
     private final int size;
     private final int maxSize;
     private final long[] data;
-    private final BitSet meshed;
+    private final BitSet setset;
     private int[] quadCache;
     public Mesher2D(int sizeBits, int maxSize) {
         this.size = sizeBits;
         this.maxSize = maxSize;
         this.data = new long[1<<(sizeBits<<1)];
-        this.meshed = new BitSet(1<<(sizeBits<<1));
+        this.setset = new BitSet(1<<(sizeBits<<1));
         this.quadCache = new int[128];
     }
 
@@ -27,7 +27,9 @@ public class Mesher2D {
     }
 
     public Mesher2D put(int x, int z, long data) {
-        this.data[this.getIdx(x, z)] = data;
+        int idx = this.getIdx(x, z);
+        this.data[idx] = data;
+        this.setset.set(idx);
         return this;
     }
 
@@ -54,90 +56,91 @@ public class Mesher2D {
 
     private boolean canMerge(int x, int z, long match) {
         int id = this.getIdx(x, z);
-        return this.data[id] == match && !this.meshed.get(id);
+        return this.setset.get(id) && this.data[id] == match;
     }
 
-    public int[] process() {
-        //TODO: replace this loop with a loop over a bitset of data that has been put into the mesher, have the this.meshed be removed
-        // and just clear the databitset when its meshed
-
+    //Returns the number of compacted quads
+    public int process() {
         int[] quads = this.quadCache;
         int idxCount = 0;
 
         //TODO: add different strategies/ways to mesh
-        for (int z = 0; z < 1<<this.size; z++) {
-            for (int x = 0; x < 1<<this.size; x++) {
-                int idx = this.getIdx(x,z);
-                long data = this.data[idx];
-                if (data == 0 || this.meshed.get(idx)) {
-                    //if this position has been meshed or is empty, dont mesh and continue
-                    continue;
+        int posId = this.data[0] == 0?this.setset.nextSetBit(0):0;
+        while (posId < this.data.length && posId != -1) {
+            int idx = posId;
+            long data = this.data[idx];
+
+            int M = (1<<this.size)-1;
+            int x = idx&M;
+            int z = (idx>>>this.size)&M;
+
+            boolean ex = x != ((1<<this.size)-1);
+            boolean ez = z != ((1<<this.size)-1);
+            int endX = x;
+            int endZ = z;
+            while (ex || ez) {
+                //Expand in the x direction
+                if (ex) {
+                    if (endX + 1 > this.maxSize || endX+1 == (1 << this.size) - 1) {
+                        ex = false;
+                    }
                 }
-
-
-                boolean ex = x != ((1<<this.size)-1);
-                boolean ez = z != ((1<<this.size)-1);
-                int endX = x;
-                int endZ = z;
-                while (ex || ez) {
-                    //Expand in the x direction
-                    if (ex) {
-                        if (endX + 1 > this.maxSize || endX+1 == (1 << this.size) - 1) {
+                if (ex) {
+                    for (int tz = z; tz < endZ+1; tz++) {
+                        if (!this.canMerge(endX + 1, tz, data)) {
                             ex = false;
                         }
                     }
-                    if (ex) {
-                        for (int tz = z; tz < endZ+1; tz++) {
-                            if (!this.canMerge(endX + 1, tz, data)) {
-                                ex = false;
-                            }
-                        }
+                }
+                if (ex) {
+                    endX++;
+                }
+                if (ez) {
+                    if (endZ + 1 > this.maxSize || endZ+1 == (1<<this.size)-1) {
+                        ez = false;
                     }
-                    if (ex) {
-                        endX++;
-                    }
-                    if (ez) {
-                        if (endZ + 1 > this.maxSize || endZ+1 == (1<<this.size)-1) {
+                }
+                if (ez) {
+                    for (int tx = x; tx < endX+1; tx++) {
+                        if (!this.canMerge(tx, endZ + 1, data)) {
                             ez = false;
                         }
                     }
-                    if (ez) {
-                        for (int tx = x; tx < endX+1; tx++) {
-                            if (!this.canMerge(tx, endZ + 1, data)) {
-                                ez = false;
-                            }
-                        }
-                    }
-                    if (ez) {
-                        endZ++;
-                    }
                 }
-
-                //Mark the sections as meshed
-                for (int mx = x; mx <= endX; mx++) {
-                    for (int mz = z; mz <= endZ; mz++) {
-                        this.meshed.set(this.getIdx(mx, mz));
-                    }
-                }
-
-                int encodedQuad = encodeQuad(x, z, endX - x + 1, endZ - z + 1);
-
-                {
-                    int pIdx = idxCount++;
-                    if (pIdx == quads.length) {
-                        var newArray = new int[quads.length + 64];
-                        System.arraycopy(quads, 0, newArray, 0, quads.length);
-                        quads = newArray;
-                    }
-                    quads[pIdx] = encodedQuad;
+                if (ez) {
+                    endZ++;
                 }
             }
+
+            //Mark the sections as meshed
+            for (int mx = x; mx <= endX; mx++) {
+                for (int mz = z; mz <= endZ; mz++) {
+                    this.setset.clear(this.getIdx(mx, mz));
+                }
+            }
+
+            int encodedQuad = encodeQuad(x, z, endX - x + 1, endZ - z + 1);
+
+            {
+                int pIdx = idxCount++;
+                if (pIdx == quads.length) {
+                    var newArray = new int[quads.length + 64];
+                    System.arraycopy(quads, 0, newArray, 0, quads.length);
+                    quads = newArray;
+                }
+                quads[pIdx] = encodedQuad;
+            }
+
+
+            posId = this.setset.nextSetBit(posId);
         }
 
-        var out = new int[idxCount];
-        System.arraycopy(quads, 0, out, 0, idxCount);
         this.quadCache = quads;
-        return out;
+        return idxCount;
+    }
+
+    public int[] getArray() {
+        return this.quadCache;
     }
 
     public static void main(String[] args) {
@@ -152,7 +155,7 @@ public class Mesher2D {
             long s = System.nanoTime();
             var result = mesh.process();
             total += System.nanoTime() - s;
-            a += result.hashCode();
+            a += result;
         }
         System.out.println(total/(1e+6));
         System.out.println((double) (total/(1e+6))/200000);
@@ -160,7 +163,7 @@ public class Mesher2D {
     }
 
     public void reset() {
-        this.meshed.clear();
+        this.setset.clear();
         Arrays.fill(this.data, 0);
     }
 

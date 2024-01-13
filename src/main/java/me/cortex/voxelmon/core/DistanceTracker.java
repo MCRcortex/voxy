@@ -3,6 +3,7 @@ package me.cortex.voxelmon.core;
 //Contains the logic to determine what is loaded and at what LoD level, dispatches render changes
 // also determines what faces are built etc
 
+import it.unimi.dsi.fastutil.Arrays;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxelmon.core.rendering.AbstractFarWorldRenderer;
@@ -22,7 +23,7 @@ public class DistanceTracker {
     private final TransitionRing2D[] rings;
     private final RenderTracker tracker;
     public DistanceTracker(RenderTracker tracker, int rings) {
-        this.rings = new TransitionRing2D[rings+1];
+        this.rings = new TransitionRing2D[rings];
         this.tracker = tracker;
 
         //NOTE: This is in our render distance units, to convert to chunks at lvl 0 multiply by 2
@@ -48,13 +49,13 @@ public class DistanceTracker {
     }
 
     private void inc(int lvl, int x, int z) {
-        for (int y = -2>>lvl; y < 10>>lvl; y++) {
+        for (int y = -2>>lvl; y <= 10>>lvl; y++) {
             this.tracker.inc(lvl, x, y, z);
         }
     }
 
     private void dec(int lvl, int x, int z) {
-        for (int y = -2>>lvl; y < 10>>lvl; y++) {
+        for (int y = -2>>lvl; y <= 10>>lvl; y++) {
             this.tracker.dec(lvl, x, y, z);
         }
     }
@@ -69,6 +70,14 @@ public class DistanceTracker {
         for (var ring : rings) {
             if (ring != null) {
                 ring.update(x, z);
+            }
+        }
+    }
+
+    public void init(int x, int z) {
+        for (int i = this.rings.length-1; 0 <= i; i--) {
+            if (this.rings[i] != null) {
+                this.rings[i].fill(x, z);
             }
         }
     }
@@ -204,8 +213,22 @@ public class DistanceTracker {
             ops.clear();
         }
 
-        public void fill() {
+        public void fill(int x, int z) {
+            int cx = x>>this.shiftSize;
+            int cz = z>>this.shiftSize;
 
+            int r2 = this.radius*this.radius;
+            for (int a = -this.radius; a <= this.radius; a++) {
+                int b = (int) Math.floor(Math.sqrt(r2-(a*a)));
+                for (int c = -b; c <= b; c++) {
+                    this.enter.callback(a + cx, c + cz);
+                }
+            }
+
+            this.currentX = cx;
+            this.currentZ = cz;
+            this.lastUpdateX = x;
+            this.lastUpdateZ = z;
         }
     }
 }
