@@ -53,7 +53,7 @@ public class VoxelCore {
             Blocks.SPRUCE_LEAVES,
             Blocks.BIRCH_LEAVES,
             Blocks.PINK_PETALS,
-            Blocks.FERN, Blocks.GRASS, Blocks.POTTED_FERN));
+            Blocks.FERN, Blocks.POTTED_FERN));
     private static final Set<Block> biomeTintableUpFace = new HashSet<>(List.of(Blocks.GRASS_BLOCK));
     private static final Set<Block> waterTint = new HashSet<>(List.of(Blocks.WATER));
 
@@ -73,10 +73,10 @@ public class VoxelCore {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
-        this.world = new WorldEngine(new File("storagefile.db"), 20, 5);//"storagefile.db"//"ethoslab.db"
+        this.world = new WorldEngine(new File("storagefile.db"), 5, 20, 5);//"storagefile.db"//"ethoslab.db"
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
-        this.renderGen = new RenderGenerationService(this.world,4, this.renderTracker::processBuildResult);
+        this.renderGen = new RenderGenerationService(this.world,10, this.renderTracker::processBuildResult);
         this.world.setRenderTracker(this.renderTracker);
         this.renderTracker.setRenderGen(this.renderGen);
 

@@ -35,14 +35,14 @@ public class WorldEngine {
     private final int maxMipLevels;
 
 
-    public WorldEngine(File storagePath, int savingServiceWorkers, int maxMipLayers) {
+    public WorldEngine(File storagePath, int ingestWorkers, int savingServiceWorkers, int maxMipLayers) {
         this.maxMipLevels = maxMipLayers;
         this.storage = new StorageBackend(storagePath);
         this.mapper = new Mapper(this.storage);
         this.sectionTracker = new ActiveSectionTracker(maxMipLayers, this::unsafeLoadSection);
 
         this.savingService = new SectionSavingService(this, savingServiceWorkers);
-        this.ingestService  = new VoxelIngestService(this, 2);
+        this.ingestService  = new VoxelIngestService(this, ingestWorkers);
     }
 
     private int unsafeLoadSection(WorldSection into) {
@@ -89,6 +89,8 @@ public class WorldEngine {
         this.savingService.enqueueSave(section);
     }
 
+
+    //TODO: move this to auxilery class  so that it can take into account larger than 4 mip levels
     //Executes an update to the world and automatically updates all the parent mip layers up to level 4 (e.g. where 1 chunk section is 1 block big)
     public void insertUpdate(VoxelizedSection section) {
         //The >>1 is cause the world sections size is 32x32x32 vs the 16x16x16 of the voxelized section

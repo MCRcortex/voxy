@@ -9,6 +9,7 @@ import net.minecraft.block.Blocks;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.NbtTagSizeTracker;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.stat.Stat;
 import net.minecraft.world.biome.Biome;
@@ -199,7 +200,7 @@ public class Mapper {
 
         public static StateEntry deserialize(int id, byte[] data) {
             try {
-                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data));
+                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data), NbtTagSizeTracker.ofUnlimitedBytes());
                 if (compound.getInt("id") != id) {
                     throw new IllegalStateException("Encoded id != expected id");
                 }
@@ -235,7 +236,7 @@ public class Mapper {
 
         public static BiomeEntry deserialize(int id, byte[] data) {
             try {
-                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data));
+                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data), NbtTagSizeTracker.ofUnlimitedBytes());
                 if (compound.getInt("id") != id) {
                     throw new IllegalStateException("Encoded id != expected id");
                 }
