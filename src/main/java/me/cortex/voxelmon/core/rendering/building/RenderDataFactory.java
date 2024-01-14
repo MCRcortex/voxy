@@ -76,6 +76,7 @@ public class RenderDataFactory {
                                 continue;
                             }
                         }
+                        //Recodes the id to include the correct lighting
                         this.mesher.put(x, z, (self&~(0xFFL<<56))|(up&(0xFFL<<56)));
                     }
                 }

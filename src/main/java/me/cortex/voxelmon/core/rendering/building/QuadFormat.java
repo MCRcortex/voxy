@@ -77,7 +77,18 @@ public class QuadFormat {
         return ((id>>>27)<<26)|Integer.toUnsignedLong(encodedPosition);
     }
 
-    public static long encode(Mapper mapper, long id, int face, int other, int encodedMeshedData) {
-        return encode(mapper, id, encodePosition(face, other, encodedMeshedData));
+    public static long encode(Mapper mapper, long id, int face, int otherAxis, int encodedMeshedData) {
+        return encode(mapper, id, encodePosition(face, otherAxis, encodedMeshedData));
+    }
+
+
+
+    private static long encodeV2(Mapper mapper, long id, int face, int otherAxis, int encodedMeshedData) {
+        int position = encodePosition(face, otherAxis, encodedMeshedData);
+        int lighting = (int) ((id>>56)&0xFF);
+        int biome = (int) ((id>>47)&((1<<9)-1));
+        int blockstate = (int) ((id>>20)&((1<<20)-1));
+
+        return -1;
     }
 }

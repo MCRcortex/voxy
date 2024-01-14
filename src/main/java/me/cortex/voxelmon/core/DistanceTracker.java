@@ -29,7 +29,7 @@ public class DistanceTracker {
         this.tracker = tracker;
         this.scale = scale;
 
-        this.rings[0] = new TransitionRing2D(5, (int) MinecraftClient.getInstance().options.getClampedViewDistance()/2, (x, z)->{
+        this.rings[0] = new TransitionRing2D(5, MinecraftClient.getInstance().options.getClampedViewDistance()/2, (x, z)->{
             if (false) {
                 return;
             }

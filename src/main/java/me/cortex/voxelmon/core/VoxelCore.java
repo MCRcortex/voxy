@@ -69,20 +69,26 @@ public class VoxelCore {
     //private final Thread shutdownThread = new Thread(this::shutdown);
 
     public VoxelCore() {
+        System.out.println("Initializing voxel core");
+
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
-        this.world = new WorldEngine(new File("storagefile2.db"), 2, 5, 5);//"storagefile.db"//"ethoslab.db"
+        System.out.println("Renderer initialized");
+        this.world = new WorldEngine(new File("storagefile.db"), 2, 15, 5);//"storagefile.db"//"ethoslab.db"
+        System.out.println("World engine");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
         this.renderGen = new RenderGenerationService(this.world,5, this.renderTracker::processBuildResult);
         this.world.setRenderTracker(this.renderTracker);
         this.renderTracker.setRenderGen(this.renderGen);
+        System.out.println("Render tracker and generator initialized");
 
         //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
         this.distanceTracker = new DistanceTracker(this.renderTracker, 5, 16);//20
+        System.out.println("Distance tracker initialized");
 
-        this.postProcessing = new PostProcessing();
+        this.postProcessing = null;//new PostProcessing();
 
         this.world.getMapper().setCallbacks(this::stateUpdate, this::biomeUpdate);
 
@@ -101,6 +107,10 @@ public class VoxelCore {
         for (var biome : this.world.getMapper().getBiomeEntries()) {
             this.biomeUpdate(biome);
         }
+        System.out.println("Entry updates applied");
+
+
+        System.out.println("Voxel core initialized");
     }
 
     private void stateUpdate(Mapper.StateEntry entry) {
@@ -188,7 +198,7 @@ public class VoxelCore {
         try {this.renderGen.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.renderer.shutdown();} catch (Exception e) {System.err.println(e);}
-        try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}
+        if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}}
     }
 
     public WorldImporter createWorldImporter(World mcWorld, File worldPath) {

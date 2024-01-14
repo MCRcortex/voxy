@@ -190,6 +190,13 @@ public class WorldImporter {
         );
 
         this.world.insertUpdate(csec);
+        while (this.world.savingService.getTaskCount() > 1500) {
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
 }

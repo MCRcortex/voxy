@@ -33,13 +33,22 @@ public abstract class TrackedObject {
     private static final Cleaner cleaner = Cleaner.create();
     public static Ref register(Object obj) {
         String clazz = obj.getClass().getName();
-        Throwable trace = new Throwable();
-        trace.fillInStackTrace();
+        Throwable trace;
+        if (true) {
+            trace = new Throwable();
+            trace.fillInStackTrace();
+        } else {
+            trace = null;
+        }
         boolean[] freed = new boolean[1];
         var clean = cleaner.register(obj, ()->{
             if (!freed[0]) {
                 System.err.println("Object named: "+ clazz+" was not freed, location at:\n");
-                trace.printStackTrace();
+                if (trace != null) {
+                    trace.printStackTrace();
+                } else {
+                    System.err.println("Enable error tracing");
+                }
                 System.err.flush();
             }
         });
