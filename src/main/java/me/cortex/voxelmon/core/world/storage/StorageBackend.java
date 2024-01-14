@@ -115,7 +115,7 @@ public class StorageBackend {
         }));
     }
 
-    public void putIdMapping(int id, ByteBuffer data) {
+    public synchronized void putIdMapping(int id, ByteBuffer data) {
         this.resizingTransaction(()->this.idMappingDatabase.transaction(transaction->{
             var keyBuff = transaction.stack.malloc(4);
             keyBuff.putInt(0, id);
@@ -135,7 +135,9 @@ public class StorageBackend {
                         int keyVal = keyPtr.mv_data().getInt(0);
                         byte[] data = new byte[(int) valPtr.mv_size()];
                         Objects.requireNonNull(valPtr.mv_data()).get(data);
-                        mapping.put(keyVal, data);
+                        if (mapping.put(keyVal, data) != null) {
+                            throw new IllegalStateException("Multiple mappings to same id");
+                        }
                     }
                 }
                 return null;

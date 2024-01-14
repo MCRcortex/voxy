@@ -48,7 +48,7 @@ import static org.lwjgl.opengl.ARBFramebufferObject.glBindFramebuffer;
 //Ingest -> world engine -> raw render data -> render data
 public class VoxelCore {
     private static final Set<Block> biomeTintableAllFaces = new HashSet<>(List.of(Blocks.OAK_LEAVES, Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES, Blocks.DARK_OAK_LEAVES, Blocks.VINE, Blocks.MANGROVE_LEAVES,
-            Blocks.TALL_GRASS, Blocks.LARGE_FERN,
+            Blocks.TALL_GRASS, Blocks.LARGE_FERN, Blocks.SHORT_GRASS,
 
             Blocks.SPRUCE_LEAVES,
             Blocks.BIRCH_LEAVES,
@@ -58,9 +58,6 @@ public class VoxelCore {
     private static final Set<Block> waterTint = new HashSet<>(List.of(Blocks.WATER));
 
 
-
-    public static VoxelCore INSTANCE = new VoxelCore();
-
     private final WorldEngine world;
     private final DistanceTracker distanceTracker;
     private final RenderGenerationService renderGen;
@@ -68,6 +65,8 @@ public class VoxelCore {
 
     private final AbstractFarWorldRenderer renderer;
     private final PostProcessing postProcessing;
+
+    //private final Thread shutdownThread = new Thread(this::shutdown);
 
     public VoxelCore() {
         //Trigger the shared index buffer loading
@@ -81,33 +80,13 @@ public class VoxelCore {
         this.renderTracker.setRenderGen(this.renderGen);
 
         //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
-        this.distanceTracker = new DistanceTracker(this.renderTracker, 5, 16);
+        this.distanceTracker = new DistanceTracker(this.renderTracker, 5, 16);//20
 
         this.postProcessing = new PostProcessing();
 
         this.world.getMapper().setCallbacks(this::stateUpdate, this::biomeUpdate);
 
-        Runtime.getRuntime().addShutdownHook(new Thread(this::shutdown));
-
-
-
-        /*
-        Random r = new Random();
-        for (int ring = 0; ring < 5; ring++) {
-            for (int x = -32; x < 32; x++) {
-                for (int z = -32; z < 32; z++) {
-                    if ((-16 < x && x < 16) && (-16 < z && z < 16)) {
-                        continue;
-                    }
-                    var b = new MemoryBuffer(1000 * 8);
-                    for (long j = 0; j < b.size; j += 8) {
-                        MemoryUtil.memPutLong(b.address + j, r.nextLong());
-                    }
-                    this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(ring, x, 2>>ring, z), b, null));
-                }
-            }
-        }*/
-
+        //Runtime.getRuntime().addShutdownHook(this.shutdownThread);
 
 
         //WorldImporter importer = new WorldImporter(this.world, MinecraftClient.getInstance().world);
@@ -200,15 +179,21 @@ public class VoxelCore {
     // since they are AABBS crossing the normal is impossible without one of the axis being equal
 
     public void shutdown() {
-        try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
+        //if (Thread.currentThread() != this.shutdownThread) {
+        //    Runtime.getRuntime().removeShutdownHook(this.shutdownThread);
+        //}
+
+        //this.world.getMapper().forceResaveStates();
+        System.out.println("Shutting down voxel core");
         try {this.renderGen.shutdown();} catch (Exception e) {System.err.println(e);}
+        try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.renderer.shutdown();} catch (Exception e) {System.err.println(e);}
         try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}
     }
 
     public WorldImporter createWorldImporter(World mcWorld, File worldPath) {
         var importer = new WorldImporter(this.world, mcWorld);
-        importer.importWorldAsyncStart(worldPath, 10, null, ()->{
+        importer.importWorldAsyncStart(worldPath, 5, null, ()->{
             System.err.println("DONE IMPORT");
         });
         return importer;

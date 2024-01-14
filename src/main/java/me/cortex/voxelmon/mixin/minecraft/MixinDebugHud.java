@@ -1,6 +1,8 @@
 package me.cortex.voxelmon.mixin.minecraft;
 
+import me.cortex.voxelmon.IGetVoxelCore;
 import me.cortex.voxelmon.core.VoxelCore;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.DebugHud;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -14,6 +16,9 @@ public class MixinDebugHud {
     @Inject(method = "getRightText", at = @At("TAIL"))
     private void injectDebug(CallbackInfoReturnable<List<String>> cir) {
         var ret = cir.getReturnValue();
-        VoxelCore.INSTANCE.addDebugInfo(ret);
+        var core = ((IGetVoxelCore) MinecraftClient.getInstance().worldRenderer).getVoxelCore();
+        if (core != null) {
+            core.addDebugInfo(ret);
+        }
     }
 }

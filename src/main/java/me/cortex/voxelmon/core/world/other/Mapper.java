@@ -79,6 +79,7 @@ public class Mapper {
         List<BiomeEntry> bentries = new ArrayList<>();
         List<Pair<byte[], Integer>> sentryErrors = new ArrayList<>();
 
+
         for (var entry : mappings.int2ObjectEntrySet()) {
             int entryType = entry.getIntKey()>>>30;
             int id = entry.getIntKey() & ((1<<30)-1);
@@ -126,6 +127,7 @@ public class Mapper {
             }
             this.blockId2stateEntry.add(entry);
         });
+
         bentries.stream().sorted(Comparator.comparing(a->a.id)).forEach(entry -> {
             if (this.biomeId2biomeEntry.size() != entry.id) {
                 throw new IllegalStateException("Biome entry not ordered");
@@ -135,7 +137,7 @@ public class Mapper {
 
     }
 
-    private StateEntry registerNewBlockState(BlockState state) {
+    private synchronized StateEntry registerNewBlockState(BlockState state) {
         StateEntry entry = new StateEntry(this.blockId2stateEntry.size(), state);
         //this.block2stateEntry.put(state, entry);
         this.blockId2stateEntry.add(entry);
@@ -151,7 +153,7 @@ public class Mapper {
         return entry;
     }
 
-    private BiomeEntry registerNewBiome(String biome) {
+    private synchronized BiomeEntry registerNewBiome(String biome) {
         BiomeEntry entry = new BiomeEntry(this.biome2biomeEntry.size(), biome);
         //this.biome2biomeEntry.put(biome, entry);
         this.biomeId2biomeEntry.add(entry);
@@ -205,6 +207,42 @@ public class Mapper {
             out[i-1] = entry;
         }
         return out;
+    }
+
+    public void forceResaveStates() {
+        var blocks = new ArrayList<>(this.block2stateEntry.values());
+        var biomes = new ArrayList<>(this.biome2biomeEntry.values());
+
+
+        for (var entry : blocks) {
+            if (entry.state.isAir() && entry.id == 0) {
+                continue;
+            }
+            if (this.blockId2stateEntry.indexOf(entry) != entry.id) {
+                throw new IllegalStateException("State Id NOT THE SAME, very critically bad");
+            }
+            byte[] serialized = entry.serialize();
+            ByteBuffer buffer = MemoryUtil.memAlloc(serialized.length);
+            buffer.put(serialized);
+            buffer.rewind();
+            this.storage.putIdMapping(entry.id | (BLOCK_STATE_TYPE<<30), buffer);
+            MemoryUtil.memFree(buffer);
+        }
+
+        for (var entry : biomes) {
+            if (this.biomeId2biomeEntry.indexOf(entry) != entry.id) {
+                throw new IllegalStateException("Biome Id NOT THE SAME, very critically bad");
+            }
+
+            byte[] serialized = entry.serialize();
+            ByteBuffer buffer = MemoryUtil.memAlloc(serialized.length);
+            buffer.put(serialized);
+            buffer.rewind();
+            this.storage.putIdMapping(entry.id | (BIOME_TYPE<<30), buffer);
+            MemoryUtil.memFree(buffer);
+        }
+
+        this.storage.flush();
     }
 
     public static final class StateEntry {

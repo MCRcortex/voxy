@@ -1,29 +1,31 @@
 package me.cortex.voxelmon.terrain;
 
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import me.cortex.voxelmon.core.VoxelCore;
+import me.cortex.voxelmon.IGetVoxelCore;
 import me.cortex.voxelmon.importers.WorldImporter;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ClientCommandSource;
-import net.minecraft.server.command.ServerCommandSource;
+import net.minecraft.text.Text;
+import org.jetbrains.annotations.NotNull;
 
-import static com.mojang.brigadier.builder.LiteralArgumentBuilder.literal;
-import static com.mojang.brigadier.builder.RequiredArgumentBuilder.argument;
+import java.io.File;
 
 
-/*
 public class WorldImportCommand {
-    public static void register(CommandDispatcher<ClientCommandSource> dispatcher) {
-        dispatcher.register(literal("zenith")
-                .then(literal("import").then(literal("world").then(argument("world_name", StringArgumentType.string()).executes(WorldImportCommand::importWorld)))));
+    public static LiteralArgumentBuilder<FabricClientCommandSource> register() {
+        return ClientCommandManager.literal("zenith").then(ClientCommandManager.literal("import").then(ClientCommandManager.literal("world").then(ClientCommandManager.argument("world_name", StringArgumentType.string()).executes(WorldImportCommand::importWorld))));
     }
 
+    public static WorldImporter importerInstance;
 
-    private static int importWorld(CommandContext<ClientCommandSource> ctx) {
-        VoxelCore.INSTANCE.createWorldImporter(MinecraftClient.getInstance().world, ctx.getArgument("world_name", String.class));
+    private static int importWorld(CommandContext<FabricClientCommandSource> ctx) {
+        var instance = MinecraftClient.getInstance();
+        var file = new File(ctx.getArgument("world_name", String.class));
+        importerInstance = ((IGetVoxelCore)instance.worldRenderer).getVoxelCore().createWorldImporter(MinecraftClient.getInstance().player.clientWorld, file);
         return 0;
     }
+
 }
-*/

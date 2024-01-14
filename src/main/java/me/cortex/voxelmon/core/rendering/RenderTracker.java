@@ -32,47 +32,6 @@ public class RenderTracker {
     public RenderTracker(WorldEngine world, AbstractFarWorldRenderer renderer) {
         this.world = world;
         this.renderer = renderer;
-
-
-
-        var loader = new Thread(()->{
-            try {
-                Thread.sleep(1);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-
-            int OX = 0;//-27;
-            int OZ = 0;//276;
-            int DROP = 48;
-
-            //Do ring rendering
-            for (int i = 0; i < 5; i++) {
-                for (int x = -DROP; x <= DROP; x++) {
-                    for (int z = -DROP; z <= DROP; z++) {
-                        int d = x*x+z*z;
-                        if (d<(DROP/2-1)*(DROP/2) || d>DROP*DROP)
-                            continue;
-
-                        for (int y = -3>>i; y < Math.max(1, 10 >> i); y++) {
-                            var sec = this.world.acquire(i, x + (OX>>(1+i)), y, z + (OZ>>(1+i)));
-                            //this.renderGen.enqueueTask(sec);
-                            sec.release();
-                        }
-
-                        try {
-                            while (this.renderGen.getTaskCount() > 1000) {
-                                Thread.sleep(50);
-                            }
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                }
-            }
-        });
-        loader.setDaemon(true);
-        //loader.start();
     }
 
     //Adds a lvl 0 section into the world renderer

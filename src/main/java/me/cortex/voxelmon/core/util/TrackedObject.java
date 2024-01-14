@@ -38,7 +38,8 @@ public abstract class TrackedObject {
         boolean[] freed = new boolean[1];
         var clean = cleaner.register(obj, ()->{
             if (!freed[0]) {
-                System.err.println("Object named: "+ clazz+" was not freed, location at:\n" + trace);
+                System.err.println("Object named: "+ clazz+" was not freed, location at:\n");
+                trace.printStackTrace();
                 System.err.flush();
             }
         });

@@ -131,6 +131,10 @@ public class ColourResolver {
 
     public static long resolveBiomeColour(String biomeId) {
         var biome = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME).get(new Identifier(biomeId));
+        if (biome == null) {
+            System.err.println("Biome: " + biomeId + " doesnt exist in registry!");
+            return 0;
+        }
         int ARGBFoliage = biome.getFoliageColor();
         int ARGBWater = biome.getWaterColor();
         return Integer.toUnsignedLong(((ARGBFoliage&0xFFFFFF)<<8)|(ARGBFoliage>>>24)) | (Integer.toUnsignedLong(((ARGBWater&0xFFFFFF)<<8)|(ARGBWater>>>24))<<32);
