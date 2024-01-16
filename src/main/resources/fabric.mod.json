@@ -13,7 +13,9 @@
   "icon": "assets/voxelmon/icon.png",
   "environment": "client",
   "entrypoints": {
-    "client": ["me.cortex.voxelmon.Voxelmon"]
+    "client": [
+      "me.cortex.voxelmon.client.Voxelmon"
+    ]
   },
   "mixins": [
     "voxelmon.mixins.json"
