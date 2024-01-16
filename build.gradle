@@ -20,6 +20,14 @@ repositories {
     }
 }
 
+processResources {
+    inputs.property "version", project.version
+    archivesBaseName = "zenith"
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
 loom {
     accessWidenerPath = file("src/main/resources/voxelmon.accesswidener")
 }
