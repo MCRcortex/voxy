@@ -196,9 +196,13 @@ public class VoxelCore {
         //this.world.getMapper().forceResaveStates();
         System.out.println("Shutting down voxel core");
         try {this.renderGen.shutdown();} catch (Exception e) {System.err.println(e);}
+        System.out.println("Render gen shut down");
         try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
+        System.out.println("World engine shut down");
         try {this.renderer.shutdown();} catch (Exception e) {System.err.println(e);}
+        System.out.println("Renderer shut down");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}}
+        System.out.println("Voxel core shut down");
     }
 
     public WorldImporter createWorldImporter(World mcWorld, File worldPath) {
