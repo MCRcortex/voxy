@@ -6,6 +6,7 @@ import me.cortex.voxelmon.core.util.Mesher2D;
 import me.cortex.voxelmon.core.world.WorldEngine;
 import me.cortex.voxelmon.core.world.WorldSection;
 import me.cortex.voxelmon.core.world.other.Mapper;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.util.math.Direction;
 import org.lwjgl.system.MemoryUtil;
 
@@ -16,9 +17,11 @@ public class RenderDataFactory {
     private final WorldEngine world;
     private final long[] sectionCache = new long[32*32*32];
     private final long[] connectedSectionCache = new long[32*32*32];
-
+    private final ColourMapping colourCache = new ColourMapping();
+    private final QuadEncoder encoder;
     public RenderDataFactory(WorldEngine world) {
         this.world = world;
+        this.encoder = new QuadEncoder(world.getMapper(), MinecraftClient.getInstance().getBlockColors(), MinecraftClient.getInstance().world);
     }
 
 
@@ -31,6 +34,7 @@ public class RenderDataFactory {
     //buildMask in the lower 6 bits contains the faces to build, the next 6 bits are whether the edge face builds against
     // its neigbor or not (0 if it does 1 if it doesnt (0 is default behavior))
     public BuiltSectionGeometry generateMesh(WorldSection section, int buildMask) {
+        this.colourCache.reset();
         //TODO: to speed it up more, check like section.isEmpty() and stuff like that, have masks for if a slice/layer is entirly air etc
 
         //TODO: instead of having it check its neighbors with the same lod level, compare against 1 level lower, this will prevent cracks and seams from
@@ -85,7 +89,7 @@ public class RenderDataFactory {
                 var array = this.mesher.getArray();
                 for (int i = 0; i < count; i++) {
                     var quad = array[i];
-                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 1, y, quad));
+                    this.outData.add(this.encoder.encode(this.mesher.getDataFromQuad(quad), 1, y, quad));
                 }
             }
             connectedData = null;
@@ -130,7 +134,7 @@ public class RenderDataFactory {
                 var array = this.mesher.getArray();
                 for (int i = 0; i < count; i++) {
                     var quad = array[i];
-                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 5, x, quad));
+                    this.outData.add(this.encoder.encode(this.mesher.getDataFromQuad(quad), 5, x, quad));
                 }
             }
             connectedData = null;
@@ -175,7 +179,7 @@ public class RenderDataFactory {
                 var array = this.mesher.getArray();
                 for (int i = 0; i < count; i++) {
                     var quad = array[i];
-                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 3, z, quad));
+                    this.outData.add(this.encoder.encode(this.mesher.getDataFromQuad(quad), 3, z, quad));
                 }
             }
             connectedData = null;
@@ -220,7 +224,7 @@ public class RenderDataFactory {
                 var array = this.mesher.getArray();
                 for (int i = 0; i < count; i++) {
                     var quad = array[i];
-                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 4, x, quad));
+                    this.outData.add(this.encoder.encode(this.mesher.getDataFromQuad(quad), 4, x, quad));
                 }
             }
             connectedData = null;
@@ -265,7 +269,7 @@ public class RenderDataFactory {
                 var array = this.mesher.getArray();
                 for (int i = 0; i < count; i++) {
                     var quad = array[i];
-                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 2, z, quad));
+                    this.outData.add(this.encoder.encode(this.mesher.getDataFromQuad(quad), 2, z, quad));
                 }
             }
             connectedData = null;
@@ -310,7 +314,7 @@ public class RenderDataFactory {
                 var array = this.mesher.getArray();
                 for (int i = 0; i < count; i++) {
                     var quad = array[i];
-                    this.outData.add(QuadFormat.encode(null, this.mesher.getDataFromQuad(quad), 0, y, quad));
+                    this.outData.add(this.encoder.encode(this.mesher.getDataFromQuad(quad), 0, y, quad));
                 }
             }
             connectedData = null;

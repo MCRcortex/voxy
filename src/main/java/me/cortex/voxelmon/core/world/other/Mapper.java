@@ -181,6 +181,11 @@ public class Mapper {
         return (Byte.toUnsignedLong(light)<<56)|(Integer.toUnsignedLong(bentry.id) << 47)|(Integer.toUnsignedLong(sentry.id)<<27);
     }
 
+    public BlockState getBlockStateFromId(long id) {
+        int blockId = (int) ((id>>27)&((1<<20)-1));
+        return this.blockId2stateEntry.get(blockId).state;
+    }
+
     //TODO: fixme: synchronize access to this.blockId2stateEntry
     public StateEntry[] getStateEntries() {
         var set = new ArrayList<>(this.blockId2stateEntry);
@@ -244,6 +249,7 @@ public class Mapper {
 
         this.storage.flush();
     }
+
 
     public static final class StateEntry {
         public final int id;
