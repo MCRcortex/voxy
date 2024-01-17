@@ -39,10 +39,10 @@ public class QuadEncoder {
         int biome = (int) ((id>>47)&((1<<9)-1));
         int blockstate = (int) ((id>>20)&((1<<20)-1));
 
-        int blockColour = this.getColour(id, -1, -1, -1);
+        //int blockColour = this.getColour(id, -1, -1, -1);
         // if blockColour is -1 it means it doesnt have colour
 
-        return -1;
+        return ((id>>>27)<<26)|Integer.toUnsignedLong(encodePosition);
     }
 
 

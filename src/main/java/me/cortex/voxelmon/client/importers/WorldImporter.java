@@ -186,7 +186,7 @@ public class WorldImporter {
         );
 
         this.world.insertUpdate(csec);
-        while (this.world.savingService.getTaskCount() > 1500) {
+        while (this.world.savingService.getTaskCount() > 2000) {
             try {
                 Thread.sleep(250);
             } catch (InterruptedException e) {
