@@ -14,14 +14,14 @@
   "environment": "client",
   "entrypoints": {
     "client": [
-      "me.cortex.voxelmon.client.Voxelmon"
+      "me.cortex.zenith.client.Voxelmon"
     ]
   },
   "mixins": [
-    "voxelmon.mixins.json"
+    "zenith.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.14.22"
   },
-  "accessWidener": "voxelmon.accesswidener"
+  "accessWidener": "zenith.accesswidener"
 }

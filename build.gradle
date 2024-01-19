@@ -29,7 +29,7 @@ processResources {
 }
 
 loom {
-    accessWidenerPath = file("src/main/resources/voxelmon.accesswidener")
+    accessWidenerPath = file("src/main/resources/zenith.accesswidener")
 }
 
 dependencies {
