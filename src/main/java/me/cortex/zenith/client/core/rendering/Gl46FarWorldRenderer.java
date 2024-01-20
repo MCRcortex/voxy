@@ -110,8 +110,6 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glColorMask(false, false, false, false);
         glDepthMask(false);
 
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
         //glEnable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
 
         glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3, GL_UNSIGNED_BYTE, (1 << 16) * 6 * 2, this.geometry.getSectionCount());
