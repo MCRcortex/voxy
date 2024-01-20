@@ -15,6 +15,9 @@
   "entrypoints": {
     "client": [
       "me.cortex.zenith.client.Voxelmon"
+    ],
+    "modmenu": [
+      "me.cortex.zenith.client.config.ZenithConfigScreenFactory"
     ]
   },
   "mixins": [

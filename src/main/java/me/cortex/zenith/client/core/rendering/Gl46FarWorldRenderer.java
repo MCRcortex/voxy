@@ -23,26 +23,27 @@ import static org.lwjgl.opengl.GL42.*;
 import static org.lwjgl.opengl.GL42.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
+import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FRAGMENT_TEST_NV;
 
 public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
     private final Shader commandGen = Shader.make()
-            .add(ShaderType.COMPUTE, "voxelmon:lod/gl46/cmdgen.comp")
+            .add(ShaderType.COMPUTE, "zenith:lod/gl46/cmdgen.comp")
             .compile();
 
     private final Shader lodShader = Shader.make()
-            .add(ShaderType.VERTEX, "voxelmon:lod/gl46/quads.vert")
-            .add(ShaderType.FRAGMENT, "voxelmon:lod/gl46/quads.frag")
+            .add(ShaderType.VERTEX, "zenith:lod/gl46/quads.vert")
+            .add(ShaderType.FRAGMENT, "zenith:lod/gl46/quads.frag")
             .compile();
 
 
     //TODO: Note the cull shader needs a different element array since its rastering cubes not quads
     private final Shader cullShader = Shader.make()
-            .add(ShaderType.VERTEX, "voxelmon:lod/gl46/cull/raster.vert")
-            .add(ShaderType.FRAGMENT, "voxelmon:lod/gl46/cull/raster.frag")
+            .add(ShaderType.VERTEX, "zenith:lod/gl46/cull/raster.vert")
+            .add(ShaderType.FRAGMENT, "zenith:lod/gl46/cull/raster.frag")
             .compile();
 
-    private final GlBuffer glCommandBuffer = new GlBuffer(100_000*5*4, 0);
-    private final GlBuffer glVisibilityBuffer = new GlBuffer(100_000*4, 0);
+    private final GlBuffer glCommandBuffer = new GlBuffer(200_000*5*4, 0);
+    private final GlBuffer glVisibilityBuffer = new GlBuffer(200_000*4, 0);
 
     public Gl46FarWorldRenderer() {
         super();
@@ -108,6 +109,11 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         cullShader.bind();
         glColorMask(false, false, false, false);
         glDepthMask(false);
+
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
+        //glEnable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
+
         glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3, GL_UNSIGNED_BYTE, (1 << 16) * 6 * 2, this.geometry.getSectionCount());
         glDepthMask(true);
         glColorMask(true, true, true, true);

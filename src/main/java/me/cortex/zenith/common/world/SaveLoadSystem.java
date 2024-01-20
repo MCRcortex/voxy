@@ -48,7 +48,7 @@ public class SaveLoadSystem {
         raw.limit(raw.position());
         raw.rewind();
         ByteBuffer compressedData  = MemoryUtil.memAlloc((int)ZSTD_COMPRESSBOUND(raw.remaining()));
-        long compressedSize = ZSTD_compress(compressedData, raw, 15);
+        long compressedSize = ZSTD_compress(compressedData, raw, 7);
         compressedData.limit((int) compressedSize);
         compressedData.rewind();
         MemoryUtil.memFree(raw);

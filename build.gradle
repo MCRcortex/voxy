@@ -44,7 +44,12 @@ dependencies {
     modImplementation(fabricApi.module("fabric-command-api-v2", project.fabric_version))
     modImplementation("net.fabricmc.fabric-api:fabric-rendering-data-attachment-v1:0.3.38+73761d2e9a")
 
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
     modImplementation "maven.modrinth:sodium:mc1.20.3-0.5.5"
+
+    modImplementation("maven.modrinth:cloth-config:13.0.121+fabric")
+    modImplementation("maven.modrinth:modmenu:9.0.0")
 }
 
 

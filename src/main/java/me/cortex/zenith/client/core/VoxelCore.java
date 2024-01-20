@@ -9,6 +9,7 @@ import me.cortex.zenith.client.core.other.BlockStateColour;
 import me.cortex.zenith.client.core.other.ColourResolver;
 import me.cortex.zenith.common.world.other.Mapper;
 import me.cortex.zenith.client.importers.WorldImporter;
+import me.cortex.zenith.common.world.storage.SplicedStorageBackendAdaptor;
 import me.cortex.zenith.common.world.storage.lmdb.LMDBStorageBackend;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
@@ -65,17 +66,17 @@ public class VoxelCore {
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
         System.out.println("Renderer initialized");
-        this.world = new WorldEngine(new LMDBStorageBackend(new File("storagefile.db")), 2, 20, 5);//"storagefile.db"//"ethoslab.db"
+        this.world = new WorldEngine(new SplicedStorageBackendAdaptor(), 2, 20, 5);//"storagefile.db"//"ethoslab.db"
         System.out.println("World engine");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
-        this.renderGen = new RenderGenerationService(this.world,5, this.renderTracker::processBuildResult);
+        this.renderGen = new RenderGenerationService(this.world,7, this.renderTracker::processBuildResult);
         this.world.setDirtyCallback(this.renderTracker::sectionUpdated);
         this.renderTracker.setRenderGen(this.renderGen);
         System.out.println("Render tracker and generator initialized");
 
         //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
-        this.distanceTracker = new DistanceTracker(this.renderTracker, 5, 20);//16
+        this.distanceTracker = new DistanceTracker(this.renderTracker, 5, 64);//16
         System.out.println("Distance tracker initialized");
 
         this.postProcessing = null;//new PostProcessing();
