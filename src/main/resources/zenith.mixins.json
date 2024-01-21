@@ -3,15 +3,18 @@
   "package": "me.cortex.zenith.client.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
+    "joml.AccessFrustumIntersection",
     "minecraft.MixinBackgroundRenderer",
     "minecraft.MixinClientChunkManager",
     "minecraft.MixinDebugHud",
     "minecraft.MixinGameRenderer",
     "minecraft.MixinMinecraftClient",
-    "minecraft.MixinWorldRenderer",
-    "joml.AccessFrustumIntersection"
+    "minecraft.MixinWorldRenderer"
   ],
   "injectors": {
     "defaultRequire": 1
-  }
+  },
+  "mixins": [
+    "sodium.MixinOcclusionCuller"
+  ]
 }
