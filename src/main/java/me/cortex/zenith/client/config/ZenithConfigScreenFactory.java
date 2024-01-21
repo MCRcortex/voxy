@@ -55,7 +55,7 @@ public class ZenithConfigScreenFactory implements ModMenuApi {
                 .setDefaultValue(DEFAULT.enabled)
                 .build());
 
-        category.addEntry(entryBuilder.startIntSlider(Text.translatable("zenith.config.general.quality"), config.qualityScale, 10, 50)
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("zenith.config.general.quality"), config.qualityScale, 8, 50)
                 .setTooltip(Text.translatable("zenith.config.general.quality.tooltip"))
                 .setSaveConsumer(val -> config.qualityScale = val)
                 .setDefaultValue(DEFAULT.qualityScale)

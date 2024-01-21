@@ -10,11 +10,11 @@
   "contact": {
   },
   "license": "All-Rights-Reserved",
-  "icon": "assets/voxelmon/icon.png",
+  "icon": "assets/zenith/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
-      "me.cortex.zenith.client.Voxelmon"
+      "me.cortex.zenith.client.Zenith"
     ],
     "modmenu": [
       "me.cortex.zenith.client.config.ZenithConfigScreenFactory"
