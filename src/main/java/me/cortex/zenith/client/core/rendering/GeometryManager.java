@@ -145,6 +145,9 @@ public class GeometryManager {
     }
 
     public void free() {
+        while (!this.buildResults.isEmpty()) {
+            this.buildResults.pop().free();
+        }
         this.sectionMetaBuffer.free();
         this.geometryBuffer.free();
     }

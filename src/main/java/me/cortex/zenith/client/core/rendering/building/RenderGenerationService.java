@@ -57,6 +57,8 @@ public class RenderGenerationService {
             int buildFlags = task.flagSupplier.applyAsInt(section);
             if (buildFlags != 0) {
                 var mesh = factory.generateMesh(section, buildFlags);
+                section.release();
+
                 this.resultConsumer.accept(mesh.clone());
 
                 if (false) {
@@ -67,8 +69,9 @@ public class RenderGenerationService {
                 } else {
                     mesh.free();
                 }
+            } else {
+                section.release();
             }
-            section.release();
         }
     }
 
