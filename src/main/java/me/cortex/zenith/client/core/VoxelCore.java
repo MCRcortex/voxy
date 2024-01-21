@@ -9,8 +9,7 @@ import me.cortex.zenith.client.core.other.BlockStateColour;
 import me.cortex.zenith.client.core.other.ColourResolver;
 import me.cortex.zenith.common.world.other.Mapper;
 import me.cortex.zenith.client.importers.WorldImporter;
-import me.cortex.zenith.common.world.storage.SplicedStorageBackendAdaptor;
-import me.cortex.zenith.common.world.storage.lmdb.LMDBStorageBackend;
+import me.cortex.zenith.common.world.storage.FragmentedStorageBackendAdaptor;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
 import net.minecraft.client.render.Camera;
@@ -39,7 +38,8 @@ import java.util.*;
 //Ingest -> world engine -> raw render data -> render data
 public class VoxelCore {
     private static final Set<Block> biomeTintableAllFaces = new HashSet<>(List.of(Blocks.OAK_LEAVES, Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES, Blocks.DARK_OAK_LEAVES, Blocks.VINE, Blocks.MANGROVE_LEAVES,
-            Blocks.TALL_GRASS, Blocks.LARGE_FERN, Blocks.SHORT_GRASS,
+            Blocks.TALL_GRASS, Blocks.LARGE_FERN,
+            //Blocks.SHORT_GRASS,
 
             Blocks.SPRUCE_LEAVES,
             Blocks.BIRCH_LEAVES,
@@ -66,7 +66,7 @@ public class VoxelCore {
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
         System.out.println("Renderer initialized");
-        this.world = new WorldEngine(new SplicedStorageBackendAdaptor(), 2, 20, 5);//"storagefile.db"//"ethoslab.db"
+        this.world = new WorldEngine(new FragmentedStorageBackendAdaptor(), 4, 20, 5);//"storagefile.db"//"ethoslab.db"
         System.out.println("World engine");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
@@ -76,7 +76,7 @@ public class VoxelCore {
         System.out.println("Render tracker and generator initialized");
 
         //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
-        this.distanceTracker = new DistanceTracker(this.renderTracker, 5, 64);//16
+        this.distanceTracker = new DistanceTracker(this.renderTracker, 5, 64);//16//64
         System.out.println("Distance tracker initialized");
 
         this.postProcessing = null;//new PostProcessing();

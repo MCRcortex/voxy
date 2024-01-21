@@ -8,12 +8,12 @@ import java.io.File;
 import java.nio.ByteBuffer;
 
 //Segments the section data into multiple dbs
-public class SplicedStorageBackendAdaptor extends StorageBackend {
+public class FragmentedStorageBackendAdaptor extends StorageBackend {
     private final StorageBackend[] backends = new StorageBackend[32];
 
-    public SplicedStorageBackendAdaptor() {
+    public FragmentedStorageBackendAdaptor() {
         for (int i = 0; i < this.backends.length; i++) {
-            this.backends[i] = new LMDBStorageBackend(new File("db_store/storage-db-"+i+".db"));
+            this.backends[i] = new LMDBStorageBackend(new File("storage-db-"+i+".db"));
         }
     }
 
