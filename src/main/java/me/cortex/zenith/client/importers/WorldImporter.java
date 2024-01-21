@@ -8,15 +8,13 @@ import me.cortex.zenith.common.world.WorldEngine;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtElement;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.*;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeKeys;
+import net.minecraft.world.chunk.ChunkNibbleArray;
 import net.minecraft.world.chunk.PalettedContainer;
 import net.minecraft.world.chunk.ReadableContainer;
 import net.minecraft.world.storage.ChunkStreamVersion;
@@ -182,11 +180,32 @@ public class WorldImporter {
         }
     }
 
+    private static int getIndex(int x, int y, int z) {
+        return y << 8 | z << 4 | x;
+    }
+
 
     private static final Codec<PalettedContainer<BlockState>> BLOCK_STATE_CODEC = PalettedContainer.createPalettedContainerCodec(Block.STATE_IDS, BlockState.CODEC, PalettedContainer.PaletteProvider.BLOCK_STATE, Blocks.AIR.getDefaultState());
     private void importSectionNBT(int x, int y, int z, NbtCompound section) {
         if (section.getCompound("block_states").isEmpty()) {
             return;
+        }
+
+        byte[] blockLightData = section.getByteArray("BlockLight");
+        byte[] skyLightData = section.getByteArray("SkyLight");
+
+        ChunkNibbleArray blockLight;
+        if (blockLightData.length != 0) {
+            blockLight = new ChunkNibbleArray(blockLightData);
+        } else {
+            blockLight = null;
+        }
+
+        ChunkNibbleArray skyLight;
+        if (skyLightData.length != 0) {
+            skyLight = new ChunkNibbleArray(skyLightData);
+        } else {
+            skyLight = null;
         }
 
         var blockStates = BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states")).result().get();
@@ -195,7 +214,18 @@ public class WorldImporter {
                 this.world.getMapper(),
                 blockStates,
                 biomes,
-                (bx, by, bz, state) -> (byte) 0,
+                (bx, by, bz, state) -> {
+                    int block = 0;
+                    int sky = 0;
+                    if (blockLight != null) {
+                        block = blockLight.get(bx, by, bz);
+                    }
+                    if (skyLight != null) {
+                        sky = skyLight.get(bx, by, bz);
+                    }
+                    sky = 15-sky;
+                    return (byte) (sky|(block<<4));
+                },
                 x,
                 y,
                 z,
