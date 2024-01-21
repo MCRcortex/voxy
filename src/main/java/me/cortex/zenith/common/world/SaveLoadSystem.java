@@ -9,7 +9,7 @@ import java.nio.ByteBuffer;
 import static org.lwjgl.util.zstd.Zstd.*;
 
 public class SaveLoadSystem {
-    public static ByteBuffer serialize(WorldSection section) {
+    public static ByteBuffer serialize(WorldSection section, int compressionLevel) {
         var data = section.copyData();
         var compressed = new Short[data.length];
         Long2ShortOpenHashMap LUT = new Long2ShortOpenHashMap();
@@ -48,7 +48,7 @@ public class SaveLoadSystem {
         raw.limit(raw.position());
         raw.rewind();
         ByteBuffer compressedData  = MemoryUtil.memAlloc((int)ZSTD_COMPRESSBOUND(raw.remaining()));
-        long compressedSize = ZSTD_compress(compressedData, raw, 7);
+        long compressedSize = ZSTD_compress(compressedData, raw, compressionLevel);
         compressedData.limit((int) compressedSize);
         compressedData.rewind();
         MemoryUtil.memFree(raw);

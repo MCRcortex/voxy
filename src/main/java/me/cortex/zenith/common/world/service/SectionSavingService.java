@@ -15,12 +15,13 @@ public class SectionSavingService {
     private volatile boolean running = true;
     private final Thread[] workers;
 
+    private final int compressionLevel;
     private final ConcurrentLinkedDeque<WorldSection> saveQueue = new ConcurrentLinkedDeque<>();
     private final Semaphore saveCounter = new Semaphore(0);
 
     private final WorldEngine world;
 
-    public SectionSavingService(WorldEngine worldEngine, int workers) {
+    public SectionSavingService(WorldEngine worldEngine, int workers, int compressionLevel) {
         this.workers = new Thread[workers];
         for (int i = 0; i < workers; i++) {
             var worker = new Thread(this::saveWorker);
@@ -29,7 +30,7 @@ public class SectionSavingService {
             worker.start();
             this.workers[i] = worker;
         }
-
+        this.compressionLevel = compressionLevel;
         this.world = worldEngine;
     }
 
@@ -41,7 +42,7 @@ public class SectionSavingService {
             section.assertNotFree();
             section.inSaveQueue.set(false);
 
-            var saveData = SaveLoadSystem.serialize(section);
+            var saveData = SaveLoadSystem.serialize(section, this.compressionLevel);
             this.world.storage.setSectionData(section.getKey(), saveData);
             MemoryUtil.memFree(saveData);
 

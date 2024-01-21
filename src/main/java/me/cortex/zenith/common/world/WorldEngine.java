@@ -24,18 +24,18 @@ public class WorldEngine {
 
 
     public void setDirtyCallback(Consumer<WorldSection> tracker) {
-        this.dirtyCallback = dirtyCallback;
+        this.dirtyCallback = tracker;
     }
 
     public Mapper getMapper() {return this.mapper;}
 
-    public WorldEngine(StorageBackend storageBackend, int ingestWorkers, int savingServiceWorkers, int maxMipLayers) {
+    public WorldEngine(StorageBackend storageBackend, int ingestWorkers, int savingServiceWorkers, int compressionLevel, int maxMipLayers) {
         this.maxMipLevels = maxMipLayers;
         this.storage = storageBackend;
         this.mapper = new Mapper(this.storage);
         this.sectionTracker = new ActiveSectionTracker(maxMipLayers, this::unsafeLoadSection);
 
-        this.savingService = new SectionSavingService(this, savingServiceWorkers);
+        this.savingService = new SectionSavingService(this, savingServiceWorkers, compressionLevel);
         this.ingestService  = new VoxelIngestService(this, ingestWorkers);
     }
 

@@ -1,5 +1,6 @@
 package me.cortex.zenith.client.core;
 
+import me.cortex.zenith.client.config.ZenithConfig;
 import me.cortex.zenith.client.core.rendering.*;
 import me.cortex.zenith.client.core.rendering.building.RenderGenerationService;
 import me.cortex.zenith.client.core.util.DebugUtil;
@@ -39,7 +40,7 @@ import java.util.*;
 public class VoxelCore {
     private static final Set<Block> biomeTintableAllFaces = new HashSet<>(List.of(Blocks.OAK_LEAVES, Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES, Blocks.DARK_OAK_LEAVES, Blocks.VINE, Blocks.MANGROVE_LEAVES,
             Blocks.TALL_GRASS, Blocks.LARGE_FERN,
-            //Blocks.SHORT_GRASS,
+            Blocks.SHORT_GRASS,
 
             Blocks.SPRUCE_LEAVES,
             Blocks.BIRCH_LEAVES,
@@ -66,30 +67,22 @@ public class VoxelCore {
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer();
         System.out.println("Renderer initialized");
-        this.world = new WorldEngine(new FragmentedStorageBackendAdaptor(), 4, 20, 5);//"storagefile.db"//"ethoslab.db"
+        this.world = new WorldEngine(new FragmentedStorageBackendAdaptor(new File(ZenithConfig.CONFIG.storagePath)), ZenithConfig.CONFIG.ingestThreads, ZenithConfig.CONFIG.savingThreads, ZenithConfig.CONFIG.savingCompressionLevel, 5);//"storagefile.db"//"ethoslab.db"
         System.out.println("World engine");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
-        this.renderGen = new RenderGenerationService(this.world,7, this.renderTracker::processBuildResult);
+        this.renderGen = new RenderGenerationService(this.world,ZenithConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult);
         this.world.setDirtyCallback(this.renderTracker::sectionUpdated);
         this.renderTracker.setRenderGen(this.renderGen);
         System.out.println("Render tracker and generator initialized");
 
         //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
-        this.distanceTracker = new DistanceTracker(this.renderTracker, 5, 64);//16//64
+        this.distanceTracker = new DistanceTracker(this.renderTracker, 5, ZenithConfig.CONFIG.qualityScale);
         System.out.println("Distance tracker initialized");
 
         this.postProcessing = null;//new PostProcessing();
 
         this.world.getMapper().setCallbacks(this::stateUpdate, this::biomeUpdate);
-
-        //Runtime.getRuntime().addShutdownHook(this.shutdownThread);
-
-
-        //WorldImporter importer = new WorldImporter(this.world, MinecraftClient.getInstance().world);
-        //importer.importWorldAsyncStart(new File("saves/New World/region"));
-
-
 
         for (var state : this.world.getMapper().getStateEntries()) {
             this.stateUpdate(state);
@@ -99,7 +92,6 @@ public class VoxelCore {
             this.biomeUpdate(biome);
         }
         System.out.println("Entry updates applied");
-
 
         System.out.println("Voxel core initialized");
     }
