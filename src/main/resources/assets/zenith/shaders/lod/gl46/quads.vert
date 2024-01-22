@@ -81,7 +81,7 @@ void main() {
     if (face == 0) {
         colour.xyz *= vec3(0.75, 0.75, 0.75);
     } else if (face != 1) {
-        colour.xyz *= vec3((float(face-2)/4)*0.5 + 0.5);
+        colour.xyz *= vec3((float(face-2)/4)*0.6 + 0.4);
     }
 
 
