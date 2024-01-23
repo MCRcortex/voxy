@@ -15,15 +15,19 @@ public class GeometryManager {
     private static final int SECTION_METADATA_SIZE = 32;
 
 
-    private record SectionMeta(long position, long opaqueGeometryPtr, int opaqueQuadCount, long translucentGeometryPtr, int translucentQuadCount) {
+    //Note! the opaquePreDataCount and translucentPreDataCount are never writen to the meta buffer, as they are indexed in reverse relative to the base opaque and translucent geometry
+    private record SectionMeta(long position, long opaqueGeometryPtr, int opaqueQuadCount, int opaquePreDataCount, long translucentGeometryPtr, int translucentQuadCount, int translucentPreDataCount) {
         public void writeMetadata(long ptr) {
             //THIS IS DUE TO ENDIANNESS and that we are splitting a long into 2 ints
             MemoryUtil.memPutInt(ptr, (int) (this.position>>32)); ptr += 4;
             MemoryUtil.memPutInt(ptr, (int) this.position); ptr += 4;
+            ptr += 8;
 
-
-            MemoryUtil.memPutInt(ptr, (int) this.opaqueGeometryPtr); ptr += 4;
+            MemoryUtil.memPutInt(ptr, (int) this.opaqueGeometryPtr + this.opaquePreDataCount); ptr += 4;
             MemoryUtil.memPutInt(ptr, this.opaqueQuadCount); ptr += 4;
+
+            MemoryUtil.memPutInt(ptr, (int) this.translucentGeometryPtr + this.translucentPreDataCount); ptr += 4;
+            MemoryUtil.memPutInt(ptr, this.translucentQuadCount); ptr += 4;
         }
     }
 
@@ -40,7 +44,7 @@ public class GeometryManager {
 
     public GeometryManager() {
         this.sectionMetaBuffer = new GlBuffer(1L << 23, 0);
-        this.geometryBuffer = new BufferArena((1L << 31) - 1024, 8);
+        this.geometryBuffer = new BufferArena((1L << 30) - 1024, 8);
         this.pos2id.defaultReturnValue(-1);
     }
 
@@ -52,7 +56,7 @@ public class GeometryManager {
         long geometryPtr = this.geometryBuffer.upload(geometry.geometryBuffer);
 
         //TODO: support translucent geometry
-        return new SectionMeta(geometry.position, geometryPtr, (int) (geometry.geometryBuffer.size/8), -1,0);
+        return new SectionMeta(geometry.position, geometryPtr, (int) (geometry.geometryBuffer.size/8), 0, -1,0, 0);
     }
 
     private void freeMeta(SectionMeta meta) {

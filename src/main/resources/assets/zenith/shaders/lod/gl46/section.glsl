@@ -13,9 +13,9 @@ ivec3 extractPosition(SectionMeta section) {
 }
 
 uint extractQuadStart(SectionMeta meta) {
-    return meta.header.z;
+    return meta.drawdata.x;
 }
 
 uint extractQuadCount(SectionMeta meta) {
-    return meta.header.w;
+    return meta.drawdata.y;
 }
