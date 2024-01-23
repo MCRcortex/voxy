@@ -25,7 +25,7 @@ public class ZenithConfigScreenFactory implements ModMenuApi {
     private static Screen buildConfigScreen(Screen parent, ZenithConfig config) {
         ConfigBuilder builder = ConfigBuilder.create()
                 .setParentScreen(parent)
-                .setTitle(Text.translatable("title.zenith.config"));
+                .setTitle(Text.translatable("zenith.config.title"));
 
 
         addGeneralCategory(builder, config);
@@ -59,6 +59,18 @@ public class ZenithConfigScreenFactory implements ModMenuApi {
                 .setTooltip(Text.translatable("zenith.config.general.quality.tooltip"))
                 .setSaveConsumer(val -> config.qualityScale = val)
                 .setDefaultValue(DEFAULT.qualityScale)
+                .build());
+
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("zenith.config.general.geometryBuffer"), config.geometryBufferSize, (1<<27)/8, ((1<<31)-1)/8)
+                .setTooltip(Text.translatable("zenith.config.general.geometryBuffer.tooltip"))
+                .setSaveConsumer(val -> config.geometryBufferSize = val)
+                .setDefaultValue(DEFAULT.geometryBufferSize)
+                .build());
+
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("zenith.config.general.maxSections"), config.maxSections, 100_000, 400_000)
+                .setTooltip(Text.translatable("zenith.config.general.maxSections.tooltip"))
+                .setSaveConsumer(val -> config.maxSections = val)
+                .setDefaultValue(DEFAULT.maxSections)
                 .build());
 
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("zenith.config.general.compression"), config.savingCompressionLevel, 1, 21)

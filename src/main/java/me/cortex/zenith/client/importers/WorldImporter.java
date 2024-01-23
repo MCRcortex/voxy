@@ -216,7 +216,7 @@ public class WorldImporter {
                 biomes,
                 (bx, by, bz, state) -> {
                     int block = 0;
-                    int sky = 0;
+                    int sky = 15;//since sky is inverted
                     if (blockLight != null) {
                         block = blockLight.get(bx, by, bz);
                     }

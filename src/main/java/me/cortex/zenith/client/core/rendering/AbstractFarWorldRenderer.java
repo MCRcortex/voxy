@@ -50,13 +50,13 @@ public abstract class AbstractFarWorldRenderer {
 
     protected FrustumIntersection frustum;
 
-    public AbstractFarWorldRenderer() {
+    public AbstractFarWorldRenderer(int geometrySize, int maxSections) {
         this.uniformBuffer  = new GlBuffer(1024, 0);
         //TODO: make these both dynamically sized
         this.stateDataBuffer  = new GlBuffer((1<<16)*28, 0);//Capacity for 1<<16 entries
         this.biomeDataBuffer  = new GlBuffer(512*4*2, 0);//capacity for 1<<9 entries
         this.lightDataBuffer  = new GlBuffer(256*4, 0);//256 of uint
-        this.geometry = new GeometryManager();
+        this.geometry = new GeometryManager(geometrySize*8L, maxSections);
     }
 
     protected abstract void setupVao();

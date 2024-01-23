@@ -1,5 +1,6 @@
 package me.cortex.zenith.client.core;
 
+import me.cortex.zenith.client.Zenith;
 import me.cortex.zenith.client.config.ZenithConfig;
 import me.cortex.zenith.client.core.rendering.*;
 import me.cortex.zenith.client.core.rendering.building.RenderGenerationService;
@@ -65,7 +66,7 @@ public class VoxelCore {
 
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
-        this.renderer = new Gl46FarWorldRenderer();
+        this.renderer = new Gl46FarWorldRenderer(ZenithConfig.CONFIG.geometryBufferSize, ZenithConfig.CONFIG.maxSections);
         System.out.println("Renderer initialized");
         this.world = new WorldEngine(new FragmentedStorageBackendAdaptor(new File(ZenithConfig.CONFIG.storagePath)), ZenithConfig.CONFIG.ingestThreads, ZenithConfig.CONFIG.savingThreads, ZenithConfig.CONFIG.savingCompressionLevel, 5);//"storagefile.db"//"ethoslab.db"
         System.out.println("World engine");

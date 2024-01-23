@@ -18,11 +18,14 @@ import static org.lwjgl.opengl.ARBMultiDrawIndirect.glMultiDrawElementsIndirect;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_SHORT;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
+import static org.lwjgl.opengl.GL30C.GL_R8UI;
+import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
 import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
 import static org.lwjgl.opengl.GL42.*;
 import static org.lwjgl.opengl.GL42.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
+import static org.lwjgl.opengl.GL45C.glClearNamedBufferData;
 import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FRAGMENT_TEST_NV;
 
 public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
@@ -42,11 +45,15 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
             .add(ShaderType.FRAGMENT, "zenith:lod/gl46/cull/raster.frag")
             .compile();
 
-    private final GlBuffer glCommandBuffer = new GlBuffer(200_000*5*4, 0);
-    private final GlBuffer glVisibilityBuffer = new GlBuffer(200_000*4, 0);
+    private final GlBuffer glCommandBuffer;
+    private final GlBuffer glVisibilityBuffer;
 
-    public Gl46FarWorldRenderer() {
-        super();
+    public Gl46FarWorldRenderer(int geometryBuffer, int maxSections) {
+        super(geometryBuffer, maxSections);
+        glCommandBuffer = new GlBuffer(maxSections*5L*4, 0);
+        glVisibilityBuffer = new GlBuffer(maxSections*4L, 0);
+        glClearNamedBufferData(glCommandBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
+        glClearNamedBufferData(glVisibilityBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
         setupVao();
     }
 

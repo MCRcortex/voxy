@@ -19,6 +19,11 @@ public class NvFarWorldRenderer extends AbstractFarWorldRenderer {
             .add(ShaderType.MESH, "voxelmon:lod/nvmesh/primary.mesh")
             .add(ShaderType.FRAGMENT, "voxelmon:lod/nvmesh/primary.frag")
             .compile();
+
+    public NvFarWorldRenderer(int geometrySize, int maxSections) {
+        super(geometrySize, maxSections);
+    }
+
     @Override
     protected void setupVao() {
 
