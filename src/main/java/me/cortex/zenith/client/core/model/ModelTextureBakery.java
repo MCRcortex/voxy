@@ -56,7 +56,7 @@ public class ModelTextureBakery {
 
     private static void addView(float pitch, float yaw) {
         var stack = new MatrixStack();
-        stack.translate(0.5f,0.5f,0);
+        stack.translate(0.5f,0.5f,0.5f);
         stack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(pitch));
         stack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(yaw));
         stack.translate(-0.5f,-0.5f,-0.5f);
@@ -106,7 +106,7 @@ public class ModelTextureBakery {
         RenderSystem.setProjectionMatrix(oldProjection, VertexSorter.BY_DISTANCE);
         glBindFramebuffer(GL_FRAMEBUFFER, oldFB);
         GL11C.glViewport(GlStateManager.Viewport.getX(), GlStateManager.Viewport.getY(), GlStateManager.Viewport.getWidth(), GlStateManager.Viewport.getHeight());
-
+        glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,0,0,256,256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         return faces;
     }
 
