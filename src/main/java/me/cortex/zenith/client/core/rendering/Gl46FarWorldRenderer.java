@@ -50,10 +50,10 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
     public Gl46FarWorldRenderer(int geometryBuffer, int maxSections) {
         super(geometryBuffer, maxSections);
-        glCommandBuffer = new GlBuffer(maxSections*5L*4, 0);
-        glVisibilityBuffer = new GlBuffer(maxSections*4L, 0);
-        glClearNamedBufferData(glCommandBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
-        glClearNamedBufferData(glVisibilityBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
+        this.glCommandBuffer = new GlBuffer(maxSections*5L*4);
+        this.glVisibilityBuffer = new GlBuffer(maxSections*4L);
+        glClearNamedBufferData(this.glCommandBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
+        glClearNamedBufferData(this.glVisibilityBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
         setupVao();
     }
 
@@ -67,9 +67,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.glCommandBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometry.metaId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.glVisibilityBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.stateDataBuffer.id);//State LUT
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.biomeDataBuffer.id);//Biome LUT
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.lightDataBuffer.id);//Lighting LUT
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.models.getBufferId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.lightDataBuffer.id);//Lighting LUT
         glBindVertexArray(0);
     }
 

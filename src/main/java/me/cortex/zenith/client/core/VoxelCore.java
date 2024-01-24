@@ -1,23 +1,20 @@
 package me.cortex.zenith.client.core;
 
-import me.cortex.zenith.client.Zenith;
 import me.cortex.zenith.client.config.ZenithConfig;
+import me.cortex.zenith.client.core.model.ModelTextureBakery;
+import me.cortex.zenith.client.core.model.TextureUtils;
 import me.cortex.zenith.client.core.rendering.*;
 import me.cortex.zenith.client.core.rendering.building.RenderGenerationService;
 import me.cortex.zenith.client.core.util.DebugUtil;
 import me.cortex.zenith.common.world.WorldEngine;
-import me.cortex.zenith.client.core.other.BiomeColour;
-import me.cortex.zenith.client.core.other.BlockStateColour;
-import me.cortex.zenith.client.core.other.ColourResolver;
-import me.cortex.zenith.common.world.other.Mapper;
 import me.cortex.zenith.client.importers.WorldImporter;
 import me.cortex.zenith.common.world.storage.FragmentedStorageBackendAdaptor;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.CropBlock;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 
@@ -83,39 +80,11 @@ public class VoxelCore {
 
         this.postProcessing = null;//new PostProcessing();
 
-        this.world.getMapper().setCallbacks(this::stateUpdate, this::biomeUpdate);
-
-        for (var state : this.world.getMapper().getStateEntries()) {
-            this.stateUpdate(state);
-        }
-
-        for (var biome : this.world.getMapper().getBiomeEntries()) {
-            this.biomeUpdate(biome);
-        }
-        System.out.println("Entry updates applied");
+        this.world.getMapper().setCallbacks(a->{}, a->{});
 
         System.out.println("Voxel core initialized");
     }
 
-    private void stateUpdate(Mapper.StateEntry entry) {
-        var state = entry.state;
-        int tintMsk = 0;
-        if (biomeTintableAllFaces.contains(state.getBlock())) {
-            tintMsk |= (1<<6)-1;
-        }
-        if (biomeTintableUpFace.contains(state.getBlock())) {
-            tintMsk |= 1<<Direction.UP.getId();
-        }
-        if (waterTint.contains(state.getBlock())) {
-            tintMsk |= 1<<6;
-        }
-        this.renderer.enqueueUpdate(new BlockStateColour(entry.id, tintMsk, ColourResolver.resolveColour(state)));
-    }
-
-    private void biomeUpdate(Mapper.BiomeEntry entry) {
-        long dualColour = ColourResolver.resolveBiomeColour(entry.biome);
-        this.renderer.enqueueUpdate(new BiomeColour(entry.id, (int) dualColour, (int) (dualColour>>32)));
-    }
 
 
     public void enqueueIngest(WorldChunk worldChunk) {
@@ -129,7 +98,7 @@ public class VoxelCore {
             this.firstTime = false;
         }
         this.distanceTracker.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
-        this.renderer.setupRender(frustum, camera);
+        //this.renderer.setupRender(frustum, camera);
     }
 
     public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
@@ -137,6 +106,8 @@ public class VoxelCore {
         matrices.translate(-cameraX, -cameraY, -cameraZ);
         DebugUtil.setPositionMatrix(matrices);
         matrices.pop();
+
+        renderer.getModelManager().updateEntry(0, Blocks.FERN.getDefaultState());
 
         //int boundFB = GlStateManager.getBoundFramebuffer();
         //this.postProcessing.setSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
@@ -150,7 +121,8 @@ public class VoxelCore {
         //TODO: have the renderer also render a bounding full face just like black boarders around lvl 0
         // this is cause the terrain might not exist and so all the caves are visible causing hell for the
         // occlusion culler
-        this.renderer.renderFarAwayOpaque(matrices, cameraX, cameraY, cameraZ);
+        if (false)
+            this.renderer.renderFarAwayOpaque(matrices, cameraX, cameraY, cameraZ);
 
 
         //glBindFramebuffer(GL_FRAMEBUFFER, boundFB);

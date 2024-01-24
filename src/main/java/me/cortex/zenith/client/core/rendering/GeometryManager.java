@@ -43,7 +43,7 @@ public class GeometryManager {
 
 
     public GeometryManager(long geometryBufferSize, int maxSections) {
-        this.sectionMetaBuffer = new GlBuffer(((long) maxSections) * SECTION_METADATA_SIZE, 0);
+        this.sectionMetaBuffer = new GlBuffer(((long) maxSections) * SECTION_METADATA_SIZE);
         this.geometryBuffer = new BufferArena(geometryBufferSize, 8);
         this.pos2id.defaultReturnValue(-1);
     }

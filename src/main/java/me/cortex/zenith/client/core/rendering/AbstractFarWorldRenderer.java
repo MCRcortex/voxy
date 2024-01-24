@@ -4,10 +4,9 @@ package me.cortex.zenith.client.core.rendering;
 // could maybe tosomething else
 
 import me.cortex.zenith.client.core.gl.GlBuffer;
+import me.cortex.zenith.client.core.model.ModelManager;
 import me.cortex.zenith.client.core.rendering.building.BuiltSectionGeometry;
 import me.cortex.zenith.client.core.rendering.util.UploadStream;
-import me.cortex.zenith.client.core.other.BiomeColour;
-import me.cortex.zenith.client.core.other.BlockStateColour;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
@@ -16,7 +15,6 @@ import org.joml.FrustumIntersection;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
-import java.util.concurrent.ConcurrentLinkedDeque;
 
 import static org.lwjgl.opengl.ARBMultiDrawIndirect.glMultiDrawElementsIndirect;
 import static org.lwjgl.opengl.GL30.*;
@@ -35,13 +33,8 @@ public abstract class AbstractFarWorldRenderer {
 
     protected final GlBuffer uniformBuffer;
     protected final GeometryManager geometry;
-
-    private final ConcurrentLinkedDeque<BlockStateColour> stateUpdateQueue = new ConcurrentLinkedDeque<>();
-    private final ConcurrentLinkedDeque<BiomeColour> biomeUpdateQueue = new ConcurrentLinkedDeque<>();
-    protected final GlBuffer stateDataBuffer;
-    protected final GlBuffer biomeDataBuffer;
+    protected final ModelManager models;
     protected final GlBuffer lightDataBuffer;
-
 
     //Current camera base level section position
     protected int sx;
@@ -51,12 +44,10 @@ public abstract class AbstractFarWorldRenderer {
     protected FrustumIntersection frustum;
 
     public AbstractFarWorldRenderer(int geometrySize, int maxSections) {
-        this.uniformBuffer  = new GlBuffer(1024, 0);
-        //TODO: make these both dynamically sized
-        this.stateDataBuffer  = new GlBuffer((1<<16)*28, 0);//Capacity for 1<<16 entries
-        this.biomeDataBuffer  = new GlBuffer(512*4*2, 0);//capacity for 1<<9 entries
-        this.lightDataBuffer  = new GlBuffer(256*4, 0);//256 of uint
+        this.uniformBuffer  = new GlBuffer(1024);
+        this.lightDataBuffer  = new GlBuffer(256*4);//256 of uint
         this.geometry = new GeometryManager(geometrySize*8L, maxSections);
+        this.models = new ModelManager();
     }
 
     protected abstract void setupVao();
@@ -89,35 +80,9 @@ public abstract class AbstractFarWorldRenderer {
 
         //Upload any new geometry
         this.geometry.uploadResults();
-
-        //Upload any block state changes
-        while (!this.stateUpdateQueue.isEmpty()) {
-            var stateUpdate = this.stateUpdateQueue.pop();
-            long ptr = UploadStream.INSTANCE.upload(this.stateDataBuffer, stateUpdate.id()*28L, 28);
-            MemoryUtil.memPutInt(ptr, stateUpdate.biomeTintMsk()); ptr+=4;
-            for (int faceColour : stateUpdate.faceColours()) {
-                MemoryUtil.memPutInt(ptr, faceColour); ptr+=4;
-            }
-        }
-
-        //Upload any biome changes
-        while (!this.biomeUpdateQueue.isEmpty()) {
-            var biomeUpdate = this.biomeUpdateQueue.pop();
-            long ptr = UploadStream.INSTANCE.upload(this.biomeDataBuffer, biomeUpdate.id()*8L, 8);
-            MemoryUtil.memPutInt(ptr, biomeUpdate.foliageColour()); ptr+=4;
-            MemoryUtil.memPutInt(ptr, biomeUpdate.waterColour()); ptr+=4;
-        }
     }
 
     public abstract void renderFarAwayOpaque(MatrixStack stack, double cx, double cy, double cz);
-
-    public void enqueueUpdate(BlockStateColour stateColour) {
-        this.stateUpdateQueue.add(stateColour);
-    }
-
-    public void enqueueUpdate(BiomeColour biomeColour) {
-        this.biomeUpdateQueue.add(biomeColour);
-    }
 
     public void enqueueResult(BuiltSectionGeometry result) {
         this.geometry.enqueueResult(result);
@@ -129,10 +94,13 @@ public abstract class AbstractFarWorldRenderer {
 
     public void shutdown() {
         glDeleteVertexArrays(this.vao);
+        this.models.free();
         this.geometry.free();
         this.uniformBuffer.free();
-        this.stateDataBuffer.free();
-        this.biomeDataBuffer.free();
         this.lightDataBuffer.free();
+    }
+
+    public ModelManager getModelManager() {
+        return this.models;
     }
 }

@@ -63,19 +63,10 @@ void main() {
 
     uint stateId = extractStateId(quad);
     uint biomeId = extractBiomeId(quad);
-    State stateInfo = stateData[stateId];
+    BlockModel stateInfo = modelData[stateId];
     colour = uint2vec4RGBA(stateInfo.faceColours[face]);
 
     colour *= getLighting(extractLightId(quad));
-
-    if (((stateInfo.biomeTintMsk>>face)&1) == 1) {
-        vec4 biomeColour = uint2vec4RGBA(biomeData[biomeId].foliage);
-        colour *= biomeColour;
-    }
-    //Apply water tint
-    if (((stateInfo.biomeTintMsk>>6)&1) == 1) {
-        colour *= vec4(0.247, 0.463, 0.894, 1);
-    }
 
     //Apply face tint
     if (face == 0) {

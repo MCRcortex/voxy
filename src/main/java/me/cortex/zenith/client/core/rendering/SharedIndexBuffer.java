@@ -14,7 +14,7 @@ public class SharedIndexBuffer {
     private final GlBuffer indexBuffer;
 
     public SharedIndexBuffer() {
-        this.indexBuffer = new GlBuffer((1<<16)*6*2 + 6*2*3, 0);
+        this.indexBuffer = new GlBuffer((1<<16)*6*2 + 6*2*3);
         var quadIndexBuff = IndexUtil.generateQuadIndicesShort(16380);
         var cubeBuff = generateCubeIndexBuffer();
 

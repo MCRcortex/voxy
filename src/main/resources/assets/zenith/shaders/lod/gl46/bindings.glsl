@@ -11,14 +11,8 @@ layout(binding = 0, std140) uniform SceneUniform {
     uint frameId;
 };
 
-struct State {
-    uint biomeTintMsk;
+struct BlockModel {
     uint faceColours[6];
-};
-
-struct Biome {
-    uint foliage;
-    uint water;
 };
 
 struct SectionMeta {
@@ -57,15 +51,11 @@ layout(binding = 4, std430) VISIBILITY_ACCESS restrict buffer VisibilityBuffer {
     uint visibilityData[];
 };
 
-layout(binding = 5, std430) readonly restrict buffer StateBuffer {
-    State stateData[];
+layout(binding = 5, std430) readonly restrict buffer ModelBuffer {
+    BlockModel modelData[];
 };
 
-layout(binding = 6, std430) readonly restrict buffer BiomeBuffer {
-    Biome biomeData[];
-};
-
-layout(binding = 7, std430) readonly restrict buffer LightingBuffer {
+layout(binding = 6, std430) readonly restrict buffer LightingBuffer {
     uint lightData[];
 };
 

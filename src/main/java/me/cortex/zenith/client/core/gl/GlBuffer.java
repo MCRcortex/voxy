@@ -10,6 +10,11 @@ import static org.lwjgl.opengl.GL45C.glNamedBufferStorage;
 public class GlBuffer extends TrackedObject {
     public final int id;
     private final long size;
+
+    public GlBuffer(long size) {
+        this(size, 0);
+    }
+
     public GlBuffer(long size, int flags) {
         this.id = glCreateBuffers();
         this.size = size;
