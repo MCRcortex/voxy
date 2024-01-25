@@ -1,19 +1,40 @@
 package me.cortex.zenith.client.core.model;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import me.cortex.zenith.client.core.gl.GlBuffer;
+import me.cortex.zenith.client.core.gl.GlTexture;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.registry.Registries;
+import org.lwjgl.opengl.GL45C;
+
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL11C.GL_NEAREST;
+import static org.lwjgl.opengl.GL11C.GL_NEAREST_MIPMAP_LINEAR;
+import static org.lwjgl.opengl.GL12C.GL_TEXTURE_MAX_LOD;
+import static org.lwjgl.opengl.GL12C.GL_TEXTURE_MIN_LOD;
+import static org.lwjgl.opengl.GL33.glDeleteSamplers;
+import static org.lwjgl.opengl.GL33.glGenSamplers;
+import static org.lwjgl.opengl.GL33C.glSamplerParameteri;
+import static org.lwjgl.opengl.GL45C.glTextureSubImage2D;
 
 //Manages the storage and updating of model states, textures and colours
 
 //Also has a fast long[] based metadata lookup for when the terrain mesher needs to look up the face occlusion data
+
+//TODO: support more than 65535 states, what should actually happen is a blockstate is registered, the model data is generated, then compared
+// to all other models already loaded, if it is a duplicate, create a mapping from the id to the already loaded id, this will help with meshing aswell
+// as leaves and such will be able to be merged
 public class ModelManager {
     public static final int MODEL_SIZE = 64;
-    private final ModelTextureBakery bakery = new ModelTextureBakery(16, 16);
+    private final ModelTextureBakery bakery;
     private final GlBuffer modelBuffer;
+    private final GlTexture textures;
+    private final int blockSampler = glGenSamplers();
 
+    //Model data might also contain a constant colour if the colour resolver produces a constant colour, this saves space in the
+    // section buffer reverse indexing
 
     //The Meta-cache contains critical information needed for meshing, colour provider bit, per-face = is empty, has alpha, is solid, full width, full height
     // alpha means that some pixels have alpha values and belong in the translucent rendering layer,
@@ -38,9 +59,24 @@ public class ModelManager {
     // this has an issue with scaffolding i believe tho, so maybe make it a probability to render??? idk
     private final long[] metadataCache;
 
-    public ModelManager() {
+    //Provides a map from id -> model id as multiple ids might have the same internal model id
+    private final int[] idMappings;
+    private final int modelTextureSize;
+
+    public ModelManager(int modelTextureSize) {
+        this.modelTextureSize = modelTextureSize;
+        this.bakery = new ModelTextureBakery(modelTextureSize, modelTextureSize);
         this.modelBuffer = new GlBuffer(MODEL_SIZE * (1<<16));
+        //TODO: figure out how to do mipping :blobfox_pineapple:
+        this.textures = new GlTexture().store(GL_RGBA8, 1, modelTextureSize*3*256,modelTextureSize*2*256);
         this.metadataCache = new long[1<<16];
+        this.idMappings = new int[1<<16];
+
+
+        glSamplerParameteri(this.blockSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+        glSamplerParameteri(this.blockSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glSamplerParameteri(this.blockSampler, GL_TEXTURE_MIN_LOD, 0);
+        glSamplerParameteri(this.blockSampler, GL_TEXTURE_MAX_LOD, 4);
     }
 
     public void updateEntry(int id, BlockState blockState) {
@@ -64,6 +100,16 @@ public class ModelManager {
 
     }
 
+    private void putTextures(int id, ColourDepthTextureData[] textures) {
+        int X = (id&0xFF) * this.modelTextureSize*3;
+        int Y = ((id>>8)&0xFF) * this.modelTextureSize*2;
+        for (int subTex = 0; subTex < 6; subTex++) {
+
+
+            //glTextureSubImage2D(this.textures.id, 0, );
+        }
+    }
+
     public long getModelMetadata(int id) {
         return this.metadataCache[id];
     }
@@ -72,8 +118,17 @@ public class ModelManager {
         return this.modelBuffer.id;
     }
 
+    public int getTextureId() {
+        return this.textures.id;
+    }
+    public int getSamplerId() {
+        return this.blockSampler;
+    }
+
     public void free() {
         this.bakery.free();
         this.modelBuffer.free();
+        this.textures.free();
+        glDeleteSamplers(this.blockSampler);
     }
 }

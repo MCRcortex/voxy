@@ -4,7 +4,7 @@
 #import <zenith:lod/gl46/quad_format.glsl>
 #import <zenith:lod/gl46/bindings.glsl>
 
-layout(location = 0) out flat vec4 colour;
+layout(location = 0) out vec2 uv;
 
 uint extractLodLevel() {
     return uint(gl_BaseInstance)>>29;
@@ -41,7 +41,8 @@ void main() {
         cornerIdx ^= 1;
     }
 
-    ivec2 size = extractSize(quad) * ivec2((cornerIdx>>1)&1, cornerIdx&1) * (1<<lodLevel);
+    ivec2 sizePreLod = extractSize(quad) * ivec2((cornerIdx>>1)&1, cornerIdx&1);
+    ivec2 size = sizePreLod * (1<<lodLevel);
 
     vec3 pos = corner;
 
@@ -63,19 +64,8 @@ void main() {
 
     uint stateId = extractStateId(quad);
     uint biomeId = extractBiomeId(quad);
-    BlockModel stateInfo = modelData[stateId];
-    colour = uint2vec4RGBA(stateInfo.faceColours[face]);
 
-    colour *= getLighting(extractLightId(quad));
-
-    //Apply face tint
-    if (face == 0) {
-        colour.xyz *= vec3(0.75, 0.75, 0.75);
-    } else if (face != 1) {
-        colour.xyz *= vec3((float(face-2)/4)*0.6 + 0.4);
-    }
-
-
+    uv = vec2(sizePreLod);
 }
 //gl_Position = MVP * vec4(vec3(((cornerIdx)&1)+10,10,((cornerIdx>>1)&1)+10),1);
 //uint i = uint(quad>>32);

@@ -99,7 +99,7 @@ public class VoxelCore {
             this.firstTime = false;
         }
         this.distanceTracker.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
-        //this.renderer.setupRender(frustum, camera);
+        this.renderer.setupRender(frustum, camera);
     }
 
     public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
@@ -109,7 +109,7 @@ public class VoxelCore {
         matrices.pop();
 
         //this.renderer.getModelManager().updateEntry(0, Blocks.COMPARATOR.getDefaultState());
-        this.renderer.getModelManager().updateEntry(0, Blocks.OAK_LEAVES.getDefaultState());
+        //this.renderer.getModelManager().updateEntry(0, Blocks.OAK_LEAVES.getDefaultState());
 
         //int boundFB = GlStateManager.getBoundFramebuffer();
         //this.postProcessing.setSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
@@ -123,8 +123,8 @@ public class VoxelCore {
         //TODO: have the renderer also render a bounding full face just like black boarders around lvl 0
         // this is cause the terrain might not exist and so all the caves are visible causing hell for the
         // occlusion culler
-        if (false)
-            this.renderer.renderFarAwayOpaque(matrices, cameraX, cameraY, cameraZ);
+
+        this.renderer.renderFarAwayOpaque(matrices, cameraX, cameraY, cameraZ);
 
 
         //glBindFramebuffer(GL_FRAMEBUFFER, boundFB);

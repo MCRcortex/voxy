@@ -1,5 +1,6 @@
 package me.cortex.zenith.client.core.rendering;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.gl.shader.Shader;
@@ -10,6 +11,8 @@ import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.lwjgl.opengl.GL11C;
+import org.lwjgl.opengl.GL45C;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
@@ -17,6 +20,7 @@ import java.util.List;
 import static org.lwjgl.opengl.ARBMultiDrawIndirect.glMultiDrawElementsIndirect;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_SHORT;
+import static org.lwjgl.opengl.GL11.glGetInteger;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30C.GL_R8UI;
 import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
@@ -77,6 +81,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
             return;
         }
         RenderLayer.getCutoutMipped().startDrawing();
+        int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
+        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
         //RenderSystem.enableBlend();
         //RenderSystem.defaultBlendFunc();
 
@@ -85,32 +91,23 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         UploadStream.INSTANCE.commit();
 
         glBindVertexArray(this.vao);
+
+
+        //Bind the texture atlas
+        glBindSampler(0, this.models.getSamplerId());
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
+
+
         this.commandGen.bind();
         glDispatchCompute((this.geometry.getSectionCount() + 127) / 128, 1, 1);
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_UNIFORM_BARRIER_BIT);
 
         this.lodShader.bind();
-        if (false) {//Bloody intel gpus
-            glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 1000, 0);
-
-            //int count = this.geometry.getSectionCount()/1000;
-            //for (int i = 0; i < 10; i++) {
-            //    glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, i*1000L*20, 1000, 0);
-            //}
-            //int rem = this.geometry.getSectionCount() - (count*1000);
-            //if (rem != 0) {
-            //    glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, count*1000L*20, rem, 0);
-            //}
-
-        } else {
-            //TODO: swap to a multidraw indirect counted
-            glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, this.geometry.getSectionCount(), 0);
-        }
+        glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, this.geometry.getSectionCount(), 0);
         //ARBIndirectParameters.glMultiDrawElementsIndirectCountARB(
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
-        //TODO: add gpu occlusion culling here (after the lod drawing) (maybe, finish the rest of the PoC first)
-
 
         cullShader.bind();
         glColorMask(false, false, false, false);
@@ -124,8 +121,13 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glColorMask(true, true, true, true);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
-        glBindVertexArray(0);
 
+        //TODO: need to do temporal rasterization here
+
+        glBindVertexArray(0);
+        glBindSampler(0, 0);
+        GL11C.glBindTexture(GL_TEXTURE_2D, oldBoundTexture);
+        glActiveTexture(oldActiveTexture);
         RenderLayer.getCutoutMipped().endDrawing();
     }
 

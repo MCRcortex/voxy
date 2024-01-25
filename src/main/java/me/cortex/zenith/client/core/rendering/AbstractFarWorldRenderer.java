@@ -47,7 +47,7 @@ public abstract class AbstractFarWorldRenderer {
         this.uniformBuffer  = new GlBuffer(1024);
         this.lightDataBuffer  = new GlBuffer(256*4);//256 of uint
         this.geometry = new GeometryManager(geometrySize*8L, maxSections);
-        this.models = new ModelManager();
+        this.models = new ModelManager(16);
     }
 
     protected abstract void setupVao();

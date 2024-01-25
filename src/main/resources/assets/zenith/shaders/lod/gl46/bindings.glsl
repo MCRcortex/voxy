@@ -29,6 +29,8 @@ struct DrawCommand {
     uint  baseInstance;
 };
 
+layout(binding = 0) uniform sampler2D blockModelAtlas;
+
 #ifndef Quad
 #define Quad ivec2
 #endif
@@ -65,3 +67,5 @@ vec4 getLighting(uint index) {
     arr = arr & uvec4(0xFF);
     return vec4(arr)*vec4(1.0f/255.0f);
 }
+
+
