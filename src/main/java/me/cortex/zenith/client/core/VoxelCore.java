@@ -84,6 +84,12 @@ public class VoxelCore {
         this.world.getMapper().setCallbacks(a->{}, a->{});
 
         System.out.println("Voxel core initialized");
+
+
+        for (var state : this.world.getMapper().getStateEntries()) {
+            this.renderer.getModelManager().updateEntry(state.id, state.state);
+        }
+        //this.renderer.getModelManager().updateEntry(0, Blocks.GRASS_BLOCK.getDefaultState());
     }
 
 
@@ -107,6 +113,7 @@ public class VoxelCore {
         matrices.translate(-cameraX, -cameraY, -cameraZ);
         DebugUtil.setPositionMatrix(matrices);
         matrices.pop();
+        //this.renderer.getModelManager().updateEntry(0, Blocks.DIRT_PATH.getDefaultState());
 
         //this.renderer.getModelManager().updateEntry(0, Blocks.COMPARATOR.getDefaultState());
         //this.renderer.getModelManager().updateEntry(0, Blocks.OAK_LEAVES.getDefaultState());

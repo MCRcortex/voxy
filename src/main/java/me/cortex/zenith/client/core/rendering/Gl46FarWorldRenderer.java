@@ -7,6 +7,7 @@ import me.cortex.zenith.client.core.gl.shader.Shader;
 import me.cortex.zenith.client.core.gl.shader.ShaderType;
 import me.cortex.zenith.client.core.rendering.util.UploadStream;
 import me.cortex.zenith.client.mixin.joml.AccessFrustumIntersection;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
@@ -80,6 +81,9 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         if (this.geometry.getSectionCount() == 0) {
             return;
         }
+
+        //this.getModelManager().updateEntry(this.frameId%(1<<15), Blocks.STONE.getDefaultState());
+
         RenderLayer.getCutoutMipped().startDrawing();
         int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
         int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);

@@ -1,5 +1,6 @@
 package me.cortex.zenith.client.core.model;
 
+import com.mojang.blaze3d.platform.GlConst;
 import com.mojang.blaze3d.platform.GlStateManager;
 import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.gl.GlTexture;
@@ -88,6 +89,8 @@ public class ModelManager {
 
         int aaaa = 1;
 
+        this.putTextures(id, textureData);
+
 
         //Model data contains, the quad size and offset of each face and whether the face needs to be resolved with a colour modifier
         // sourced from the quad data and reverse indexed into the section data (meaning there will be a maxiumum number of colours)
@@ -104,9 +107,14 @@ public class ModelManager {
         int X = (id&0xFF) * this.modelTextureSize*3;
         int Y = ((id>>8)&0xFF) * this.modelTextureSize*2;
         for (int subTex = 0; subTex < 6; subTex++) {
+            int x = X + (subTex%3)*this.modelTextureSize;
+            int y = Y + (subTex/3)*this.modelTextureSize;
 
-
-            //glTextureSubImage2D(this.textures.id, 0, );
+            GlStateManager._pixelStore(GlConst.GL_UNPACK_ROW_LENGTH, 0);
+            GlStateManager._pixelStore(GlConst.GL_UNPACK_SKIP_PIXELS, 0);
+            GlStateManager._pixelStore(GlConst.GL_UNPACK_SKIP_ROWS, 0);
+            GlStateManager._pixelStore(GlConst.GL_UNPACK_ALIGNMENT, 4);
+            glTextureSubImage2D(this.textures.id, 0, x, y, this.modelTextureSize, this.modelTextureSize, GL_RGBA, GL_UNSIGNED_BYTE, textures[subTex].colour());
         }
     }
 

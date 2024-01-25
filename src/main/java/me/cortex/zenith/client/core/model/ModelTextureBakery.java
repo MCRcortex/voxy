@@ -37,13 +37,13 @@ public class ModelTextureBakery {
 
     private static final List<MatrixStack> FACE_VIEWS = new ArrayList<>();
     static {
-        addView(-90,0);//Direction.DOWN
-        addView(90,0);//Direction.UP
-        addView(0,180);//Direction.NORTH
-        addView(0,0);//Direction.SOUTH
+        addView(-90,0, 0);//Direction.DOWN
+        addView(90,0, 0);//Direction.UP
+        addView(0,180, 0);//Direction.NORTH
+        addView(0,0, 0);//Direction.SOUTH
         //TODO: check these arnt the wrong way round
-        addView(0,90);//Direction.EAST
-        addView(0,270);//Direction.WEST
+        addView(0,90, -90);//Direction.EAST
+        addView(0,270, -90);//Direction.WEST
     }
 
     public ModelTextureBakery(int width, int height) {
@@ -54,9 +54,10 @@ public class ModelTextureBakery {
         this.framebuffer = new GlFramebuffer().bind(GL_COLOR_ATTACHMENT0, this.colourTex).bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthTex).verify();
     }
 
-    private static void addView(float pitch, float yaw) {
+    private static void addView(float pitch, float yaw, float rotation) {
         var stack = new MatrixStack();
         stack.translate(0.5f,0.5f,0.5f);
+        stack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(rotation));
         stack.multiply(RotationAxis.POSITIVE_X.rotationDegrees(pitch));
         stack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(yaw));
         stack.translate(-0.5f,-0.5f,-0.5f);
@@ -80,6 +81,11 @@ public class ModelTextureBakery {
         glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id);
 
 
+        var renderLayer = RenderLayers.getBlockLayer(state);
+        if (renderLayer == RenderLayer.getTranslucent()) {
+            //TODO: TRANSLUCENT, must sort the quad first
+        }
+        renderLayer.startDrawing();
         RenderSystem.depthMask(true);
         RenderSystem.enableBlend();
         RenderSystem.enableDepthTest();
@@ -93,20 +99,17 @@ public class ModelTextureBakery {
             //TODO: render fluid
         }
 
-        var renderLayer = RenderLayers.getBlockLayer(state);
-        if (renderLayer == RenderLayer.getTranslucent()) {
-            //TODO: TRANSLUCENT, must sort the quad first
-        }
-
         var faces = new ColourDepthTextureData[FACE_VIEWS.size()];
         for (int i = 0; i < faces.length; i++) {
             faces[i] = captureView(state, model, FACE_VIEWS.get(i), randomValue);
         }
 
+        renderLayer.endDrawing();
+
         RenderSystem.setProjectionMatrix(oldProjection, VertexSorter.BY_DISTANCE);
         glBindFramebuffer(GL_FRAMEBUFFER, oldFB);
         GL11C.glViewport(GlStateManager.Viewport.getX(), GlStateManager.Viewport.getY(), GlStateManager.Viewport.getWidth(), GlStateManager.Viewport.getHeight());
-        glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,0,0,256,256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        //glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,0,0,256,256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         return faces;
     }
 

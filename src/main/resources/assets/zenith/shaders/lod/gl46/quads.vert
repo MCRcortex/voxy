@@ -5,6 +5,8 @@
 #import <zenith:lod/gl46/bindings.glsl>
 
 layout(location = 0) out vec2 uv;
+layout(location = 1) out flat vec2 baseUV;
+layout(location = 2) out flat vec4 colourTinting;
 
 uint extractLodLevel() {
     return uint(gl_BaseInstance)>>29;
@@ -66,6 +68,21 @@ void main() {
     uint biomeId = extractBiomeId(quad);
 
     uv = vec2(sizePreLod);
+
+    vec2 modelUV = vec2(stateId&0xFF, (stateId>>8)&0xFF)*(1f/(256f));
+
+    //TODO: make the face orientated by 2x3 so that division is not a integer div and modulo isnt needed
+    // as these are very slow ops
+    baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3,2)*256f)));
+
+    colourTinting = getLighting(extractLightId(quad));
+    //Apply face tint
+    if (face == 0) {
+        colourTinting.xyz *= vec3(0.75, 0.75, 0.75);
+    } else if (face != 1) {
+        colourTinting.xyz *= vec3((float(face-2)/4)*0.6 + 0.4);
+    }
+
 }
 //gl_Position = MVP * vec4(vec3(((cornerIdx)&1)+10,10,((cornerIdx>>1)&1)+10),1);
 //uint i = uint(quad>>32);
