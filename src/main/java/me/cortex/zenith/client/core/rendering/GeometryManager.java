@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.cortex.zenith.client.core.gl.GlBuffer;
+import me.cortex.zenith.client.core.rendering.building.BuiltSection;
 import me.cortex.zenith.client.core.rendering.building.BuiltSectionGeometry;
 import me.cortex.zenith.client.core.rendering.util.BufferArena;
 import me.cortex.zenith.client.core.rendering.util.UploadStream;
@@ -31,7 +32,7 @@ public class GeometryManager {
         }
     }
 
-    private final ConcurrentLinkedDeque<BuiltSectionGeometry> buildResults = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<BuiltSection> buildResults = new ConcurrentLinkedDeque<>();
 
     private int sectionCount = 0;
     private final Long2IntOpenHashMap pos2id = new Long2IntOpenHashMap();
@@ -48,15 +49,15 @@ public class GeometryManager {
         this.pos2id.defaultReturnValue(-1);
     }
 
-    public void enqueueResult(BuiltSectionGeometry sectionGeometry) {
+    public void enqueueResult(BuiltSection sectionGeometry) {
         this.buildResults.add(sectionGeometry);
     }
 
-    private SectionMeta createMeta(BuiltSectionGeometry geometry) {
-        long geometryPtr = this.geometryBuffer.upload(geometry.geometryBuffer);
+    private SectionMeta createMeta(BuiltSection geometry) {
+        long geometryPtr = this.geometryBuffer.upload(geometry.buffer);
 
         //TODO: support translucent geometry
-        return new SectionMeta(geometry.position, geometryPtr, (int) (geometry.geometryBuffer.size/8), 0, -1,0, 0);
+        return new SectionMeta(geometry.position, geometryPtr, (int) (geometry.buffer.size/8), 0, -1,0, 0);
     }
 
     private void freeMeta(SectionMeta meta) {
@@ -71,7 +72,7 @@ public class GeometryManager {
     void uploadResults() {
         while (!this.buildResults.isEmpty()) {
             var result = this.buildResults.pop();
-            boolean isDelete = result.geometryBuffer == null && result.translucentGeometryBuffer == null;
+            boolean isDelete = result.buffer == null && result.translucentGeometryBuffer == null;
             if (isDelete) {
                 int id = -1;
                 if ((id = this.pos2id.remove(result.position)) != -1) {

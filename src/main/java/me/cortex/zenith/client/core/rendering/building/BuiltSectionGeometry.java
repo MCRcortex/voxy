@@ -1,32 +1,21 @@
 package me.cortex.zenith.client.core.rendering.building;
 
 import me.cortex.zenith.common.util.MemoryBuffer;
-import me.cortex.zenith.common.world.WorldEngine;
 
-public class BuiltSectionGeometry {
-    public final long position;
-    public final MemoryBuffer geometryBuffer;
-    public final MemoryBuffer translucentGeometryBuffer;
+import java.util.Arrays;
 
-    public BuiltSectionGeometry(int lvl, int x, int y, int z, MemoryBuffer geometryBuffer, MemoryBuffer translucentGeometryBuffer) {
-        this(WorldEngine.getWorldSectionId(lvl, x, y, z), geometryBuffer, translucentGeometryBuffer);
-    }
-    public BuiltSectionGeometry(long position, MemoryBuffer geometryBuffer, MemoryBuffer translucentGeometryBuffer) {
-        this.position = position;
-        this.geometryBuffer = geometryBuffer;
-        this.translucentGeometryBuffer = translucentGeometryBuffer;
+/**
+ * @param startOffsets Will be converted to ending offsets when doing data computation
+ */
+public record BuiltSectionGeometry(MemoryBuffer buffer, short[] startOffsets) {
+
+    public BuiltSectionGeometry clone() {
+        return new BuiltSectionGeometry(this.buffer != null ? this.buffer.copy() : null, Arrays.copyOf(this.startOffsets, this.startOffsets.length));
     }
 
     public void free() {
-        if (this.geometryBuffer != null) {
-            this.geometryBuffer.free();
+        if (this.buffer != null) {
+            this.buffer.free();
         }
-        if (this.translucentGeometryBuffer != null) {
-            this.translucentGeometryBuffer.free();
-        }
-    }
-
-    public BuiltSectionGeometry clone() {
-        return new BuiltSectionGeometry(this.position, this.geometryBuffer!=null?this.geometryBuffer.copy():null, this.translucentGeometryBuffer!=null?this.translucentGeometryBuffer.copy():null);
     }
 }

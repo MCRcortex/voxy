@@ -1,5 +1,6 @@
 package me.cortex.zenith.client.core.rendering;
 
+import me.cortex.zenith.client.core.rendering.building.BuiltSection;
 import me.cortex.zenith.client.core.rendering.building.BuiltSectionGeometry;
 import me.cortex.zenith.client.core.rendering.building.RenderGenerationService;
 import me.cortex.zenith.common.world.WorldEngine;
@@ -41,7 +42,7 @@ public class RenderTracker {
     //Removes a lvl 0 section from the world renderer
     public void remLvl0(int x, int y, int z) {
         this.activeSections.remove(WorldEngine.getWorldSectionId(0, x, y, z));
-        this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(0, x, y, z), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(0, x, y, z), null, null));
         this.renderGen.removeTask(0, x, y, z);
     }
 
@@ -63,14 +64,14 @@ public class RenderTracker {
 
         this.renderGen.enqueueTask(lvl, x, y, z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
 
-        this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1)), null, null));
-        this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1)+1), null, null));
-        this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1)+1, (z<<1)), null, null));
-        this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1)+1, (z<<1)+1), null, null));
-        this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1), (z<<1)), null, null));
-        this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1), (z<<1)+1), null, null));
-        this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1)), null, null));
-        this.renderer.enqueueResult(new BuiltSectionGeometry(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1)+1), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1)), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1)+1), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1)+1, (z<<1)), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1)+1, (z<<1)+1), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1), (z<<1)), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1), (z<<1)+1), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1)), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1)+1), null, null));
 
 
         this.renderGen.removeTask(lvl-1, (x<<1), (y<<1), (z<<1));
@@ -95,7 +96,7 @@ public class RenderTracker {
         this.activeSections.put(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1)+1), O);
         this.activeSections.remove(WorldEngine.getWorldSectionId(lvl, x, y, z));
 
-        this.renderer.enqueueResult(new BuiltSectionGeometry(lvl, x, y, z, null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl, x, y, z), null, null));
         this.renderGen.removeTask(lvl, x, y, z);
 
         this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1), this::shouldStillBuild, this::getBuildFlagsOrAbort);
@@ -134,7 +135,7 @@ public class RenderTracker {
     //called by the RenderGenerationService about built geometry, the RenderTracker checks if it can use the result (e.g. the LoD hasnt changed/still correct etc)
     // and dispatches it to the renderer
     // it also batch collects the geometry sections until all the geometry for an operation is collected, then it executes the operation, its removes flickering
-    public void processBuildResult(BuiltSectionGeometry section) {
+    public void processBuildResult(BuiltSection section) {
         //Check that we still want the section
         if (this.activeSections.containsKey(section.position)) {
             this.renderer.enqueueResult(section);

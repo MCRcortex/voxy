@@ -5,6 +5,7 @@ package me.cortex.zenith.client.core.rendering;
 
 import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.model.ModelManager;
+import me.cortex.zenith.client.core.rendering.building.BuiltSection;
 import me.cortex.zenith.client.core.rendering.building.BuiltSectionGeometry;
 import me.cortex.zenith.client.core.rendering.util.UploadStream;
 import net.minecraft.client.MinecraftClient;
@@ -84,7 +85,7 @@ public abstract class AbstractFarWorldRenderer {
 
     public abstract void renderFarAwayOpaque(MatrixStack stack, double cx, double cy, double cz);
 
-    public void enqueueResult(BuiltSectionGeometry result) {
+    public void enqueueResult(BuiltSection result) {
         this.geometry.enqueueResult(result);
     }
 

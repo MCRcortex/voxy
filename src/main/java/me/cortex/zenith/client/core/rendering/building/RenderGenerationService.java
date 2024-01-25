@@ -22,9 +22,9 @@ public class RenderGenerationService {
 
     private final Semaphore taskCounter = new Semaphore(0);
     private final WorldEngine world;
-    private final Consumer<BuiltSectionGeometry> resultConsumer;
+    private final Consumer<BuiltSection> resultConsumer;
 
-    public RenderGenerationService(WorldEngine world, int workers, Consumer<BuiltSectionGeometry> consumer) {
+    public RenderGenerationService(WorldEngine world, int workers, Consumer<BuiltSection> consumer) {
         this.world = world;
         this.resultConsumer = consumer;
         this.workers =  new Thread[workers];
@@ -36,7 +36,7 @@ public class RenderGenerationService {
         }
     }
 
-    private final ConcurrentHashMap<Long, BuiltSectionGeometry> renderCache = new ConcurrentHashMap<>(1000,0.75f,10);
+    private final ConcurrentHashMap<Long, BuiltSection> renderCache = new ConcurrentHashMap<>(1000,0.75f,10);
 
     //TODO: add a generated render data cache
     private void renderWorker() {
@@ -156,6 +156,6 @@ public class RenderGenerationService {
         while (!this.taskQueue.isEmpty()) {
             this.taskQueue.removeFirst();
         }
-        this.renderCache.values().forEach(BuiltSectionGeometry::free);
+        this.renderCache.values().forEach(BuiltSection::free);
     }
 }

@@ -37,6 +37,9 @@ public class ModelManager {
     //Model data might also contain a constant colour if the colour resolver produces a constant colour, this saves space in the
     // section buffer reverse indexing
 
+    //model data also contains if a face should be randomly rotated,flipped etc to get rid of moire effect
+    // this would be done in the fragment shader
+
     //The Meta-cache contains critical information needed for meshing, colour provider bit, per-face = is empty, has alpha, is solid, full width, full height
     // alpha means that some pixels have alpha values and belong in the translucent rendering layer,
     // is empty means that the face is air/shouldent be rendered as there is nothing there
