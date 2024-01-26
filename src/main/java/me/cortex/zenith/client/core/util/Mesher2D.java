@@ -81,7 +81,7 @@ public class Mesher2D {
             while (ex || ez) {
                 //Expand in the x direction
                 if (ex) {
-                    if (endX + 1 > this.maxSize || endX+1 == (1 << this.size) - 1) {
+                    if (endX - x >= this.maxSize || endX >= (1 << this.size) - 1) {
                         ex = false;
                     }
                 }
@@ -96,7 +96,7 @@ public class Mesher2D {
                     endX++;
                 }
                 if (ez) {
-                    if (endZ + 1 > this.maxSize || endZ+1 == (1<<this.size)-1) {
+                    if (endZ - z >= this.maxSize || endZ >= (1<<this.size)-1) {
                         ez = false;
                     }
                 }
@@ -143,7 +143,31 @@ public class Mesher2D {
         return this.quadCache;
     }
 
+    public void reset() {
+        this.setset.clear();
+        Arrays.fill(this.data, 0);
+    }
+
+    public long getDataFromQuad(int quad) {
+        return this.getData(getX(quad), getZ(quad));
+    }
+
+    public long getData(int x, int z) {
+        return this.data[this.getIdx(x, z)];
+    }
+
     public static void main(String[] args) {
+        var mesh = new Mesher2D(5,15);
+        mesh.put(30,30, 123);
+        mesh.put(31,30, 123);
+        mesh.put(30,31, 123);
+        mesh.put(31,31, 123);
+        int count = mesh.process();
+
+        System.err.println(count);
+    }
+
+    public static void main2(String[] args) {
         var r = new Random(123451);
         int a = 0;
         long total = 0;
@@ -160,19 +184,6 @@ public class Mesher2D {
         System.out.println(total/(1e+6));
         System.out.println((double) (total/(1e+6))/200000);
         //mesh.put(0,0,1);
-    }
-
-    public void reset() {
-        this.setset.clear();
-        Arrays.fill(this.data, 0);
-    }
-
-    public long getDataFromQuad(int quad) {
-        return this.getData(getX(quad), getZ(quad));
-    }
-
-    public long getData(int x, int z) {
-        return this.data[this.getIdx(x, z)];
     }
 }
 
