@@ -1,15 +1,22 @@
 package me.cortex.zenith.client.core.model;
 
+import com.mojang.blaze3d.platform.GlConst;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.systems.VertexSorter;
 import me.cortex.zenith.client.core.gl.GlFramebuffer;
 import me.cortex.zenith.client.core.gl.GlTexture;
+import me.cortex.zenith.client.core.gl.shader.Shader;
+import me.cortex.zenith.client.core.gl.shader.ShaderLoader;
+import me.cortex.zenith.client.core.gl.shader.ShaderType;
+import me.jellysquid.mods.sodium.client.gl.shader.GlShader;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.render.*;
 import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.RotationAxis;
 import net.minecraft.util.math.random.LocalRandom;
@@ -24,6 +31,8 @@ import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_FRAMEBUFFER_BARRIER_BI
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glMemoryBarrier;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
+import static org.lwjgl.opengl.GL20C.glUniformMatrix4fv;
+import static org.lwjgl.opengl.GL20C.glUseProgram;
 import static org.lwjgl.opengl.GL45C.glBlitNamedFramebuffer;
 import static org.lwjgl.opengl.GL45C.glGetTextureImage;
 
@@ -34,6 +43,10 @@ public class ModelTextureBakery {
     private final GlTexture colourTex;
     private final GlTexture depthTex;
     private final GlFramebuffer framebuffer;
+    private final Shader rasterShader = Shader.make()
+            .add(ShaderType.VERTEX, "zenith:bakery/position_tex.vsh")
+            .add(ShaderType.FRAGMENT, "zenith:bakery/position_tex.fsh")
+            .compile();
 
     private static final List<MatrixStack> FACE_VIEWS = new ArrayList<>();
     static {
@@ -42,8 +55,8 @@ public class ModelTextureBakery {
         addView(0,180, 0);//Direction.NORTH
         addView(0,0, 0);//Direction.SOUTH
         //TODO: check these arnt the wrong way round
-        addView(0,90, -90);//Direction.EAST
-        addView(0,270, -90);//Direction.WEST
+        addView(0,90, 270);//Direction.EAST
+        addView(0,270, 270);//Direction.WEST
     }
 
     public ModelTextureBakery(int width, int height) {
@@ -64,6 +77,9 @@ public class ModelTextureBakery {
         FACE_VIEWS.add(stack);
     }
 
+
+    //TODO: For block entities, also somehow attempt to render the default block entity, e.g. chests and stuff
+    // cause that will result in ok looking micro details in the terrain
     public ColourDepthTextureData[] renderFaces(BlockState state, long randomValue) {
         var model = MinecraftClient.getInstance()
                 .getBakedModelManager()
@@ -82,9 +98,7 @@ public class ModelTextureBakery {
 
 
         var renderLayer = RenderLayers.getBlockLayer(state);
-        if (renderLayer == RenderLayer.getTranslucent()) {
-            //TODO: TRANSLUCENT, must sort the quad first
-        }
+
         renderLayer.startDrawing();
         RenderSystem.depthMask(true);
         RenderSystem.enableBlend();
@@ -92,8 +106,16 @@ public class ModelTextureBakery {
         RenderSystem.enableCull();
         RenderSystem.depthFunc(GL_LESS);
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
 
+        //TODO: bind the required uniforms and
+        this.rasterShader.bind();
+        RenderSystem.bindTexture(RenderSystem.getShaderTexture(0));
+        GlUniform.uniform1(0, 0);
+        RenderSystem.activeTexture(GlConst.GL_TEXTURE0);
+
+        if (renderLayer == RenderLayer.getTranslucent()) {
+            //TODO: TRANSLUCENT, must sort the quad first, or something idk
+        }
 
         if (!state.getFluidState().isEmpty()) {
             //TODO: render fluid
@@ -109,7 +131,7 @@ public class ModelTextureBakery {
         RenderSystem.setProjectionMatrix(oldProjection, VertexSorter.BY_DISTANCE);
         glBindFramebuffer(GL_FRAMEBUFFER, oldFB);
         GL11C.glViewport(GlStateManager.Viewport.getX(), GlStateManager.Viewport.getY(), GlStateManager.Viewport.getWidth(), GlStateManager.Viewport.getHeight());
-        //glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,0,0,256,256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,0,0,256,256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         return faces;
     }
 
@@ -118,7 +140,11 @@ public class ModelTextureBakery {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
         renderQuads(vc, state, model, stack, randomValue);
-        BufferRenderer.drawWithGlobalProgram(vc.end());
+
+        float[] mat = new float[4*4];
+        new Matrix4f(RenderSystem.getModelViewMatrix()).mul(RenderSystem.getProjectionMatrix()).get(mat);
+        glUniformMatrix4fv(1, false, mat);
+        BufferRenderer.draw(vc.end());
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
         int[] colourData = new int[this.width*this.height];
@@ -141,5 +167,6 @@ public class ModelTextureBakery {
         this.framebuffer.free();
         this.colourTex.free();
         this.depthTex.free();
+        this.rasterShader.free();
     }
 }

@@ -1,6 +1,5 @@
 package me.cortex.zenith.client.core.rendering;
 
-import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.gl.shader.Shader;
@@ -13,7 +12,6 @@ import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11C;
-import org.lwjgl.opengl.GL45C;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
@@ -31,7 +29,6 @@ import static org.lwjgl.opengl.GL42.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
 import static org.lwjgl.opengl.GL45C.glClearNamedBufferData;
-import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FRAGMENT_TEST_NV;
 
 public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
     private final Shader commandGen = Shader.make()
@@ -82,7 +79,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
             return;
         }
 
-        //this.getModelManager().updateEntry(this.frameId%(1<<15), Blocks.STONE.getDefaultState());
+        //this.getModelManager().addEntry(this.frameId%(1<<15), Blocks.OAK_BUTTON.getDefaultState());
 
         RenderLayer.getCutoutMipped().startDrawing();
         int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);

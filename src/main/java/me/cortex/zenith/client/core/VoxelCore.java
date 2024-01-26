@@ -1,8 +1,6 @@
 package me.cortex.zenith.client.core;
 
 import me.cortex.zenith.client.config.ZenithConfig;
-import me.cortex.zenith.client.core.model.ModelTextureBakery;
-import me.cortex.zenith.client.core.model.TextureUtils;
 import me.cortex.zenith.client.core.rendering.*;
 import me.cortex.zenith.client.core.rendering.building.RenderGenerationService;
 import me.cortex.zenith.client.core.util.DebugUtil;
@@ -11,8 +9,6 @@ import me.cortex.zenith.client.importers.WorldImporter;
 import me.cortex.zenith.common.world.storage.FragmentedStorageBackendAdaptor;
 import net.minecraft.block.Block;
 import net.minecraft.block.Blocks;
-import net.minecraft.block.CropBlock;
-import net.minecraft.block.SnowBlock;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
@@ -87,7 +83,7 @@ public class VoxelCore {
 
 
         for (var state : this.world.getMapper().getStateEntries()) {
-            this.renderer.getModelManager().updateEntry(state.id, state.state);
+            this.renderer.getModelManager().addEntry(state.id, state.state);
         }
         //this.renderer.getModelManager().updateEntry(0, Blocks.GRASS_BLOCK.getDefaultState());
     }
