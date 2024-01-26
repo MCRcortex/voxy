@@ -1,8 +1,10 @@
 package me.cortex.zenith.client.core.rendering.building;
 
+import me.cortex.zenith.common.util.MemoryBuffer;
 import me.cortex.zenith.common.world.WorldEngine;
 import me.cortex.zenith.common.world.WorldSection;
 import net.minecraft.client.MinecraftClient;
+import org.lwjgl.system.MemoryUtil;
 
 
 public class RenderDataFactory {
@@ -27,7 +29,9 @@ public class RenderDataFactory {
     public BuiltSection generateMesh(WorldSection section, int buildMask) {
         section.copyDataTo(this.sectionCache);
 
-        return new BuiltSection(section.getKey(), null, null);
+        var output = new MemoryBuffer(8*1);
+
+        return new BuiltSection(section.getKey(), new BuiltSectionGeometry(output, new short[0]), null);
     }
 
 }

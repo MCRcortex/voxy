@@ -101,10 +101,14 @@ public class VoxelCore {
     boolean firstTime = true;
     public void renderSetup(Frustum frustum, Camera camera) {
         if (this.firstTime) {
-            this.distanceTracker.init(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
+            //this.distanceTracker.init(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
             this.firstTime = false;
+
+            this.renderTracker.addLvl0(0,0,0);
+
+
         }
-        this.distanceTracker.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
+        //this.distanceTracker.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
         this.renderer.setupRender(frustum, camera);
     }
 
