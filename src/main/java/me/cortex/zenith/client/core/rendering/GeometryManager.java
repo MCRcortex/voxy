@@ -106,6 +106,10 @@ public class GeometryManager {
         }
     }
 
+    public void enqueueResult(BuiltSection sectionGeometry) {
+        this.buildResults.add(sectionGeometry);
+    }
+
     public int getSectionCount() {
         return this.sectionCount;
     }
@@ -131,10 +135,14 @@ public class GeometryManager {
     }
 
 
+    //=========================================================================================================================================================================================
+    //=========================================================================================================================================================================================
+    //=========================================================================================================================================================================================
+
 
     //TODO: pack the offsets of each axis so that implicit face culling can work
     //Note! the opaquePreDataCount and translucentPreDataCount are never writen to the meta buffer, as they are indexed in reverse relative to the base opaque and translucent geometry
-    private record SectionMeta(long position, int aabb, long opaqueGeometryPtr, int opaqueQuadCount, int opaquePreDataCount, long translucentGeometryPtr, int translucentQuadCount, int translucentPreDataCount) {
+    private record SectionMeta(long position, int aabb, int opaqueGeometryPtr, int opaqueQuadCount, int opaquePreDataCount, int translucentGeometryPtr, int translucentQuadCount, int translucentPreDataCount) {
         public void writeMetadata(long ptr) {
             //THIS IS DUE TO ENDIANNESS and that we are splitting a long into 2 ints
             MemoryUtil.memPutInt(ptr, (int) (this.position>>32)); ptr += 4;
@@ -150,7 +158,7 @@ public class GeometryManager {
     }
 
     private SectionMeta createMeta(BuiltSection geometry) {
-        long geometryPtr = this.geometryBuffer.upload(geometry.opaque.buffer());
+        int geometryPtr = (int) this.geometryBuffer.upload(geometry.opaque.buffer());
 
         //TODO: support translucent geometry
         return new SectionMeta(geometry.position, 0, geometryPtr, (int) (geometry.opaque.buffer().size/8), 0, -1,0, 0);
@@ -163,10 +171,6 @@ public class GeometryManager {
         if (meta.translucentGeometryPtr != -1) {
             this.geometryBuffer.free(meta.translucentGeometryPtr);
         }
-    }
-
-    public void enqueueResult(BuiltSection sectionGeometry) {
-        this.buildResults.add(sectionGeometry);
     }
 
 }
