@@ -96,6 +96,10 @@ public class FragmentedStorageBackendAdaptor extends StorageBackend {
             verification.addTo(repackaged, 1);
             any = repackaged;
         }
+        if (any == null) {
+            return new Int2ObjectOpenHashMap<>();
+        }
+
         if (verification.size() != 1) {
             System.err.println("Error id mapping not matching across all fragments, attempting to recover");
             Object2IntMap.Entry<Int2ObjectOpenHashMap<EqualingArray>> maxEntry = null;
