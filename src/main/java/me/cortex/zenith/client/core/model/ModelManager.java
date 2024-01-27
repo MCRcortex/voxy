@@ -7,6 +7,7 @@ import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.gl.GlTexture;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.math.Direction;
@@ -97,9 +98,9 @@ public class ModelManager {
     //TODO: so need a few things, per face sizes and offsets, the sizes should be computed from the pixels and find the minimum bounding pixel
     // while the depth is computed from the depth buffer data
     public int addEntry(int blockId, BlockState blockState) {
-        if (this.idMappings[blockId] != -1) {
-            throw new IllegalArgumentException("Trying to add entry for duplicate id");
-        }
+        //if (this.idMappings[blockId] != -1) {
+        //    throw new IllegalArgumentException("Trying to add entry for duplicate id");
+        //}
 
         int modelId = -1;
         var textureData = this.bakery.renderFaces(blockState, 123456);
@@ -107,7 +108,8 @@ public class ModelManager {
             int possibleDuplicate = this.modelTexture2id.getInt(List.of(textureData));
             if (possibleDuplicate != -1) {//Duplicate found
                 this.idMappings[blockId] = possibleDuplicate;
-                return possibleDuplicate;
+                modelId = possibleDuplicate;
+                //return possibleDuplicate;
             } else {//Not a duplicate so create a new entry
                 modelId = this.modelTexture2id.size();
                 this.idMappings[blockId] = modelId;
@@ -119,22 +121,15 @@ public class ModelManager {
         var colourProvider = MinecraftClient.getInstance().getBlockColors().providers.get(Registries.BLOCK.getRawId(blockState.getBlock()));
 
         var blockRenderLayer = RenderLayers.getBlockLayer(blockState);
+        int checkMode = blockRenderLayer==RenderLayer.getSolid()?TextureUtils.WRITE_CHECK_STENCIL:TextureUtils.WRITE_CHECK_ALPHA;
+
         //If it is the solid layer, it is _always_ going to occlude fully for all written pixels, even if they are 100% translucent, this should save alot of resources
         // if it is cutout it might occlude might not, need to test
         // if it is translucent it will _never_ occlude
 
         //NOTE: this is excluding fluid states
 
-        //This also checks if there is a block colour resolver for the given blockstate and marks that the block has a resolver
-        var sizes = this.computeModelDepth(textureData);
 
-        for (int face = 0; face < 6; face++) {
-            if (sizes[face] == -1) {//Face is empty, so ignore
-                continue;
-            }
-            //TODO: combine all the methods into a single
-            //boolean fullyOccluding = TextureUtils.hasAlpha()
-        }
 
 
         //Model data contains, the quad size and offset of each face and whether the face needs to be resolved with a colour modifier
@@ -162,7 +157,20 @@ public class ModelManager {
 
 
 
+        //This also checks if there is a block colour resolver for the given blockstate and marks that the block has a resolver
+        var sizes = this.computeModelDepth(textureData, checkMode);
 
+        for (int face = 0; face < 6; face++) {
+            if (sizes[face] < -0.1) {//Face is empty, so ignore
+                continue;
+            }
+            //TODO: replace this with a more intelligent method that
+            // if using solid use TextureUtils.computeBounds() with depth testing
+            // if using translucent or transparent compare if alpha is 0
+            var faceSize = TextureUtils.computeBounds(textureData[face], checkMode);
+
+            int eee = 0;
+        }
 
 
 
@@ -170,17 +178,30 @@ public class ModelManager {
         return modelId;
     }
 
-    private int[] computeModelDepth(ColourDepthTextureData[] textures) {
-        int[] res = new int[6];
+
+
+
+
+
+
+
+
+
+
+
+
+
+    private float[] computeModelDepth(ColourDepthTextureData[] textures, int checkMode) {
+        float[] res = new float[6];
         for (var dir : Direction.values()) {
             var data = textures[dir.getId()];
-            float fd = TextureUtils.computeDepth(data, TextureUtils.DEPTH_MODE_MIN);//Compute the min float depth, smaller means closer to the camera, range 0-1
+            float fd = TextureUtils.computeDepth(data, TextureUtils.DEPTH_MODE_MIN, checkMode);//Compute the min float depth, smaller means closer to the camera, range 0-1
             int depth = Math.round(fd * this.modelTextureSize);
             //If fd is -1, it means that there was nothing rendered on that face and it should be discarded
             if (fd < -0.1) {
                 res[dir.ordinal()] = -1;
             } else {
-                res[dir.ordinal()] = depth;
+                res[dir.ordinal()] = ((float) depth)/this.modelTextureSize;
             }
         }
         return res;

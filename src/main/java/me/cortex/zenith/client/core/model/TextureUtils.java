@@ -22,7 +22,7 @@ public class TextureUtils {
     public static int getNonWrittenPixels(ColourDepthTextureData texture) {
         int count = 0;
         for (int pixel : texture.depth()) {
-            count += (((pixel>>8)&0xFFFFFF) == 0xFFFFFF)?1:0;
+            count += ((pixel&0xFF) == 0)?1:0;
         }
         return count;
     }
@@ -36,12 +36,27 @@ public class TextureUtils {
         return true;
     }
 
+    public static final int WRITE_CHECK_STENCIL = 1;
+    public static final int WRITE_CHECK_DEPTH = 2;
+    public static final int WRITE_CHECK_ALPHA = 3;
+    private static boolean wasPixelWritten(ColourDepthTextureData data, int mode, int index) {
+        if (mode == WRITE_CHECK_STENCIL) {
+            return (data.depth()[index]&0xFF)!=0;
+        } else if (mode == WRITE_CHECK_DEPTH) {
+            return (data.depth()[index]>>>8)!=((1<<24)-1);
+        } else if (mode == WRITE_CHECK_ALPHA) {
+            return ((data.colour()[index]>>>24)&0xff)!=0;
+        }
+        throw new IllegalArgumentException();
+    }
+
     public static final int DEPTH_MODE_AVG = 1;
     public static final int DEPTH_MODE_MAX = 2;
     public static final int DEPTH_MODE_MIN = 3;
 
+
     //Computes depth info based on written pixel data
-    public static float computeDepth(ColourDepthTextureData texture, int mode) {
+    public static float computeDepth(ColourDepthTextureData texture, int mode, int checkMode) {
         final var colourData = texture.colour();
         final var depthData = texture.depth();
         long a = 0;
@@ -53,7 +68,7 @@ public class TextureUtils {
             a = Long.MIN_VALUE;
         }
         for (int i = 0; i < colourData.length; i++) {
-            if ((colourData[i]&0xFF)==0) {
+            if (!wasPixelWritten(texture, checkMode, i)) {
                 continue;
             }
             int depth = depthData[i]>>>8;
@@ -87,6 +102,74 @@ public class TextureUtils {
     }
 
     private static float u2fdepth(int depth) {
-        return (((float)depth)/(float)(1<<24));
+        float depthF = (float) ((double)depth/((1<<24)-1));
+        //https://registry.khronos.org/OpenGL-Refpages/gl4/html/glDepthRange.xhtml
+        // due to this and the unsigned bullshit, i believe the depth value needs to get multiplied by 2
+        depthF *= 2;
+        if (depthF > 1.00001f) {
+            throw new IllegalArgumentException("Depth greater than 1");
+        }
+        return depthF;
+    }
+
+
+    //NOTE: data goes from bottom left to top right (x first then y)
+    public static int[] computeBounds(ColourDepthTextureData data, int checkMode) {
+        final var depth = data.depth();
+        //Compute x bounds first
+        int minX = 0;
+        minXCheck:
+        do {
+            for (int y = 0; y < data.height(); y++) {
+                int idx = minX + (y * data.width());
+                if (wasPixelWritten(data, checkMode, idx)) {
+                    break minXCheck;//pixel was written too so break from loop
+                }
+            }
+            minX++;
+        } while (minX != data.width());
+
+        int maxX = data.width()-1;
+        maxXCheck:
+        do {
+            for (int y = data.height()-1; y!=-1; y--) {
+                int idx = maxX + (y * data.width());
+                if (wasPixelWritten(data, checkMode, idx)) {
+                    break maxXCheck;//pixel was written too so break from loop
+                }
+            }
+            maxX--;
+        } while (maxX != -1);
+        maxX++;
+
+
+        //Compute y bounds
+        int minY = 0;
+        minYCheck:
+        do {
+            for (int x = 0; x < data.width(); x++) {
+                int idx = (minY * data.height()) + x;
+                if (wasPixelWritten(data, checkMode, idx)) {
+                    break minYCheck;//pixel was written too
+                }
+            }
+            minY++;
+        } while (minY != data.height());
+
+
+        int maxY = data.height()-1;
+        maxYCheck:
+        do {
+            for (int x = data.width()-1; x!=-1; x--) {
+                int idx = (maxY * data.height()) + x;
+                if (wasPixelWritten(data, checkMode, idx)) {
+                    break maxYCheck;//pixel was written too so break from loop
+                }
+            }
+            maxY--;
+        } while (maxY != -1);
+        maxY++;
+
+        return new int[]{minX, maxX, minY, maxY};
     }
 }

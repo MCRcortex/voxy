@@ -2,7 +2,7 @@ package me.cortex.zenith.client.core.model;
 
 import java.util.Arrays;
 
-public record ColourDepthTextureData(int[] colour, int[] depth) {
+public record ColourDepthTextureData(int[] colour, int[] depth, int width, int height) {
     @Override
     public boolean equals(Object obj) {
         if (obj == null) return false;
@@ -12,6 +12,6 @@ public record ColourDepthTextureData(int[] colour, int[] depth) {
 
     @Override
     public int hashCode() {
-        return Arrays.hashCode(this.colour) ^ Arrays.hashCode(this.depth);
+        return (this.width * 312337173 * (Arrays.hashCode(this.colour) ^ Arrays.hashCode(this.depth))) ^ this.height;
     }
 }

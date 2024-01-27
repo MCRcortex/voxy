@@ -90,7 +90,12 @@ public class ModelTextureBakery {
         var oldProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
         GL11C.glViewport(0, 0, this.width, this.height);
 
-        RenderSystem.setProjectionMatrix(new Matrix4f().identity().scale(2,2,-1f).translate(-0.5f, -0.5f, 0.0f), VertexSorter.BY_Z);
+        RenderSystem.setProjectionMatrix(new Matrix4f().identity().set(new float[]{
+                2,0,0,0,
+                0, 2,0,0,
+                0,0, -1f,0,
+                -1,-1,0,1,
+        }), VertexSorter.BY_Z);
 
         glClearColor(0,0,0,0);
         glClearDepth(1);
@@ -100,6 +105,8 @@ public class ModelTextureBakery {
         var renderLayer = RenderLayers.getBlockLayer(state);
 
         renderLayer.startDrawing();
+        glEnable(GL_STENCIL_TEST);
+        glDepthRange(0, 1);
         RenderSystem.depthMask(true);
         RenderSystem.enableBlend();
         RenderSystem.enableDepthTest();
@@ -107,7 +114,10 @@ public class ModelTextureBakery {
         RenderSystem.depthFunc(GL_LESS);
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
-        //TODO: bind the required uniforms and
+        glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        glStencilMask(0xFF);
+
         this.rasterShader.bind();
         RenderSystem.bindTexture(RenderSystem.getShaderTexture(0));
         GlUniform.uniform1(0, 0);
@@ -124,14 +134,18 @@ public class ModelTextureBakery {
         var faces = new ColourDepthTextureData[FACE_VIEWS.size()];
         for (int i = 0; i < faces.length; i++) {
             faces[i] = captureView(state, model, FACE_VIEWS.get(i), randomValue);
+            //glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,300*(i%3),300*(i/3),300*(i%3)+256,300*(i/3)+256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         }
 
         renderLayer.endDrawing();
+        glDisable(GL_STENCIL_TEST);
 
         RenderSystem.setProjectionMatrix(oldProjection, VertexSorter.BY_DISTANCE);
         glBindFramebuffer(GL_FRAMEBUFFER, oldFB);
         GL11C.glViewport(GlStateManager.Viewport.getX(), GlStateManager.Viewport.getY(), GlStateManager.Viewport.getWidth(), GlStateManager.Viewport.getHeight());
-        glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,0,0,256,256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+        //TODO: FIXME: fully revert the state of opengl
+
         return faces;
     }
 
@@ -142,7 +156,7 @@ public class ModelTextureBakery {
         renderQuads(vc, state, model, stack, randomValue);
 
         float[] mat = new float[4*4];
-        new Matrix4f(RenderSystem.getModelViewMatrix()).mul(RenderSystem.getProjectionMatrix()).get(mat);
+        RenderSystem.getProjectionMatrix().get(mat);
         glUniformMatrix4fv(1, false, mat);
         BufferRenderer.draw(vc.end());
 
@@ -151,7 +165,7 @@ public class ModelTextureBakery {
         int[] depthData = new int[this.width*this.height];
         glGetTextureImage(this.colourTex.id, 0, GL_RGBA, GL_UNSIGNED_BYTE, colourData);
         glGetTextureImage(this.depthTex.id, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, depthData);
-        return new ColourDepthTextureData(colourData, depthData);
+        return new ColourDepthTextureData(colourData, depthData, this.width, this.height);
     }
 
     private static void renderQuads(BufferBuilder builder, BlockState state, BakedModel model, MatrixStack stack, long randomValue) {
