@@ -142,18 +142,19 @@ public class GeometryManager {
 
     //TODO: pack the offsets of each axis so that implicit face culling can work
     //Note! the opaquePreDataCount and translucentPreDataCount are never writen to the meta buffer, as they are indexed in reverse relative to the base opaque and translucent geometry
-    private record SectionMeta(long position, int aabb, int opaqueGeometryPtr, int opaqueQuadCount, int opaquePreDataCount, int translucentGeometryPtr, int translucentQuadCount, int translucentPreDataCount) {
+    private record SectionMeta(long position, int aabb, int opaqueGeometryPtr, int count, int translucentGeometryPtr) {
         public void writeMetadata(long ptr) {
             //THIS IS DUE TO ENDIANNESS and that we are splitting a long into 2 ints
             MemoryUtil.memPutInt(ptr, (int) (this.position>>32)); ptr += 4;
             MemoryUtil.memPutInt(ptr, (int) this.position); ptr += 4;
-            ptr += 8;
+            MemoryUtil.memPutInt(ptr, (int) this.aabb); ptr += 4;
+            ptr += 4;
 
-            MemoryUtil.memPutInt(ptr, (int) this.opaqueGeometryPtr + this.opaquePreDataCount); ptr += 4;
-            MemoryUtil.memPutInt(ptr, this.opaqueQuadCount); ptr += 4;
+            MemoryUtil.memPutInt(ptr, this.count); ptr += 4;
+            //MemoryUtil.memPutInt(ptr, this.opaqueQuadCount); ptr += 4;
 
-            MemoryUtil.memPutInt(ptr, (int) this.translucentGeometryPtr + this.translucentPreDataCount); ptr += 4;
-            MemoryUtil.memPutInt(ptr, this.translucentQuadCount); ptr += 4;
+            //MemoryUtil.memPutInt(ptr, (int) this.translucentGeometryPtr + this.translucentPreDataCount); ptr += 4;
+            //MemoryUtil.memPutInt(ptr, this.translucentQuadCount); ptr += 4;
         }
     }
 
@@ -161,7 +162,8 @@ public class GeometryManager {
         int geometryPtr = (int) this.geometryBuffer.upload(geometry.opaque.buffer());
 
         //TODO: support translucent geometry
-        return new SectionMeta(geometry.position, 0, geometryPtr, (int) (geometry.opaque.buffer().size/8), 0, -1,0, 0);
+        //return new SectionMeta(geometry.position, 0, geometryPtr, (int) (geometry.opaque.buffer().size/8), 0, -1,0, 0);
+        return new SectionMeta(geometry.position, 0, geometryPtr, (int) (geometry.opaque.buffer().size/8), 0);
     }
 
     private void freeMeta(SectionMeta meta) {

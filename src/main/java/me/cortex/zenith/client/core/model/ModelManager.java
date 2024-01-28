@@ -5,12 +5,14 @@ import com.mojang.blaze3d.platform.GlStateManager;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.gl.GlTexture;
+import me.cortex.zenith.client.core.rendering.util.UploadStream;
 import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;
 import net.minecraft.registry.Registries;
 import net.minecraft.util.math.Direction;
+import org.lwjgl.system.MemoryUtil;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -155,23 +157,68 @@ public class ModelManager {
         // solid layer renders it as black so might need to add a bitset in the model data of whether the face is rendering
         // in discard or solid mode maybe?
 
+        long uploadPtr = UploadStream.INSTANCE.upload(this.modelBuffer, (long) modelId * MODEL_SIZE, MODEL_SIZE);
 
+
+        //TODO: implement
+        boolean hasBiomeColourResolver = false;
 
         //This also checks if there is a block colour resolver for the given blockstate and marks that the block has a resolver
         var sizes = this.computeModelDepth(textureData, checkMode);
 
-        for (int face = 0; face < 6; face++) {
-            if (sizes[face] < -0.1) {//Face is empty, so ignore
+        //Each face gets 1 byte, with the top 2 bytes being for whatever
+        long metadata = hasBiomeColourResolver?1:0;
+        metadata |= blockRenderLayer == RenderLayer.getTranslucent()?2:0;
+
+        //TODO: add a bunch of control config options for overriding/setting options of metadata for each face of each type
+        for (int face = 5; face != -1; face--) {//In reverse order to make indexing into the metadata long easier
+            long faceUploadPtr = uploadPtr + 4L * face;//Each face gets 4 bytes worth of data
+            metadata <<= 8;
+            float offset = sizes[face];
+            if (offset < -0.1) {//Face is empty, so ignore
+                metadata |= 0xFF;//Mark the face as non-existent
+                //Set to -1 as safepoint
+                MemoryUtil.memPutLong(faceUploadPtr, -1);
                 continue;
             }
-            //TODO: replace this with a more intelligent method that
-            // if using solid use TextureUtils.computeBounds() with depth testing
-            // if using translucent or transparent compare if alpha is 0
             var faceSize = TextureUtils.computeBounds(textureData[face], checkMode);
 
-            int eee = 0;
-        }
+            boolean faceCoversFullBlock = faceSize[0] == 0 && faceSize[2] == 0 &&
+                    faceSize[1] == (this.modelTextureSize-1) && faceSize[3] == (this.modelTextureSize-1);
 
+            metadata |= faceCoversFullBlock?2:0;
+
+            //TODO: add alot of config options for the following
+            boolean occludesFace = true;
+            occludesFace &= blockRenderLayer != RenderLayer.getTranslucent();//If its translucent, it doesnt occlude
+
+            //TODO: make this an option, basicly if the face is really close, it occludes otherwise it doesnt
+            occludesFace &= offset < 0.1;//If the face is rendered far away from the other face, then it doesnt occlude
+
+            if (occludesFace) {
+                int writeCount = TextureUtils.getWrittenPixelCount(textureData[face], checkMode);
+                occludesFace &= ((float)writeCount)/(this.modelTextureSize * this.modelTextureSize) > 0.9;// only occlude if the face covers more than 90% of the face
+            }
+            metadata |= occludesFace?1:0;
+
+
+            //Scale face size from 0->this.modelTextureSize-1 to 0->15
+            for (int i = 0; i < 4; i++) {
+                faceSize[i] = Math.round((((float)faceSize[i])/(this.modelTextureSize-1))*15);
+            }
+
+            int faceModelData = 0;
+            faceModelData |= faceSize[0] | (faceSize[1]<<4) | (faceSize[2]<<8) | (faceSize[3]<<12);
+            faceModelData |= Math.round(offset*63);//Change the scale from 0->1 (ends inclusive) float to 0->63 (6 bits) NOTE! that 63 == 1.0f meaning its shifted all the way to the other side of the model
+            //Still have 11 bits free
+
+            MemoryUtil.memPutInt(faceUploadPtr, faceModelData);
+        }
+        this.metadataCache[modelId] = metadata;
+
+        uploadPtr += 4*6;
+        //Have 40 bytes free for remaining model data
+        // todo: put in like the render layer type ig? along with colour resolver info
 
 
 

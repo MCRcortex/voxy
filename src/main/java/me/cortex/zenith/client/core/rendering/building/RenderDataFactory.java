@@ -29,9 +29,13 @@ public class RenderDataFactory {
     public BuiltSection generateMesh(WorldSection section, int buildMask) {
         section.copyDataTo(this.sectionCache);
 
-        var output = new MemoryBuffer(8*1);
+        //TODO:NOTE! when doing face culling of translucent blocks,
+        // if the connecting type of the translucent block is the same AND the face is full, discard it
+        // this stops e.g. multiple layers of glass (and ocean) from having 3000 layers of quads etc
 
-        return new BuiltSection(section.getKey(), new BuiltSectionGeometry(output, new short[0]), null);
+        var buff = new MemoryBuffer(8*1);
+
+        return new BuiltSection(section.getKey(), new BuiltSectionGeometry(buff, new short[0]), null);
     }
 
 }

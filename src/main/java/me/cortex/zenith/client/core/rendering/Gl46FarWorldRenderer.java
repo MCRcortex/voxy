@@ -78,9 +78,6 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
     }
 
     public void renderFarAwayOpaque(MatrixStack stack, double cx, double cy, double cz) {
-        this.getModelManager().addEntry(this.frameId%(1<<15), Blocks.OAK_BUTTON.getDefaultState().with(WallMountedBlock.FACE, BlockFace.FLOOR).with(WallMountedBlock.FACING, Direction.SOUTH));
-        //this.getModelManager().addEntry(this.frameId%(1<<15), Blocks.HEAVY_WEIGHTED_PRESSURE_PLATE.getDefaultState());
-        //this.getModelManager().addEntry(this.frameId%(1<<15), Blocks.COMPARATOR.getDefaultState());
         if (this.geometry.getSectionCount() == 0) {
             return;
         }

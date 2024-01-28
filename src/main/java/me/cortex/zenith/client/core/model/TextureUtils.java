@@ -4,25 +4,11 @@ import java.util.Map;
 
 //Texturing utils to manipulate data from the model bakery
 public class TextureUtils {
-    //Returns a bitset of
-    public static int computeColourData(ColourDepthTextureData texture) {
-        final var colour = texture.colour();
-        int bitset = 0b101;
-        for (int i = 0; i < colour.length && bitset != 0b010; i++) {
-            int pixel = colour[i];
-            int alpha = (pixel>>24)&0xFF;
-            bitset |= (alpha != 0 && alpha != 255)?2:0;//Test if the pixel is translucent (has alpha)
-            bitset &= (alpha != 0)?3:7;// test if the pixel is not empty (assumes that if alpha is 0 it wasnt written to!!) FIXME: THIS MIGHT NOT BE CORRECT
-            bitset &= alpha != 255?6:7;// test if the pixel is anything but solid, (occlusion culling stuff)
-        }
-        return bitset;
-    }
-
     //Returns the number of non pixels not written to
-    public static int getNonWrittenPixels(ColourDepthTextureData texture) {
+    public static int getWrittenPixelCount(ColourDepthTextureData texture, int checkMode) {
         int count = 0;
-        for (int pixel : texture.depth()) {
-            count += ((pixel&0xFF) == 0)?1:0;
+        for (int i = 0; i < texture.colour().length; i++) {
+            count += wasPixelWritten(texture, checkMode, i)?1:0;
         }
         return count;
     }
@@ -140,7 +126,7 @@ public class TextureUtils {
             }
             maxX--;
         } while (maxX != -1);
-        maxX++;
+        //maxX++;
 
 
         //Compute y bounds
@@ -168,7 +154,7 @@ public class TextureUtils {
             }
             maxY--;
         } while (maxY != -1);
-        maxY++;
+        //maxY++;
 
         return new int[]{minX, maxX, minY, maxY};
     }
