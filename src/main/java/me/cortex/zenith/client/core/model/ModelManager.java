@@ -188,7 +188,7 @@ public class ModelManager {
             if (offset < -0.1) {//Face is empty, so ignore
                 metadata |= 0xFF;//Mark the face as non-existent
                 //Set to -1 as safepoint
-                MemoryUtil.memPutLong(faceUploadPtr, -1);
+                MemoryUtil.memPutInt(faceUploadPtr, -1);
                 continue;
             }
             var faceSize = TextureUtils.computeBounds(textureData[face], checkMode);

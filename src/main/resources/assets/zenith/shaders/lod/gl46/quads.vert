@@ -26,7 +26,7 @@ vec4 uint2vec4RGBA(uint colour) {
 }
 
 //Gets the face offset with respect to the face direction (e.g. some will be + some will be -)
-float getFaceOffset(BlockModel model, uint face) {
+float getDepthOffset(BlockModel model, uint face) {
     float offset = extractFaceIndentation(model.faceData[face]);
     return offset * (1-((int(face)&1)*2));
 }
@@ -62,7 +62,7 @@ void main() {
     vec2 quadSize = vec2(extractSize(quad) * ivec2((cornerIdx>>1)&1, cornerIdx&1));
     vec2 size = (quadSize + faceOffset) * (1<<lodLevel);
 
-    vec3 offset = vec3(size, (float(face&1) + getFaceOffset(model, face)) * (1<<lodLevel));
+    vec3 offset = vec3(size, (float(face&1) + getDepthOffset(model, face)) * (1<<lodLevel));
 
     if ((face>>1) == 0) {//Up/down
         offset = offset.xzy;
@@ -83,9 +83,9 @@ void main() {
     //TODO: make the face orientated by 2x3 so that division is not a integer div and modulo isnt needed
     // as these are very slow ops
     baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3,2)*256f)));
-    uv = quadSize + faceOffset;//Add in the face offset for 0,0 uv
+    uv = quadSize;// + faceOffset;//Add in the face offset for 0,0 uv
 
-    discardAlpha = 0;
+    discardAlpha = 1;
 
     //Compute lighting
     colourTinting = getLighting(extractLightId(quad));

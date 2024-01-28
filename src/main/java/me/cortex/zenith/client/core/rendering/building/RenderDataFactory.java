@@ -33,15 +33,16 @@ public class RenderDataFactory {
         // if the connecting type of the translucent block is the same AND the face is full, discard it
         // this stops e.g. multiple layers of glass (and ocean) from having 3000 layers of quads etc
 
-        var buff = new MemoryBuffer(8*1);
-        //MemoryUtil.memPutLong(buff.address,        encodeRaw(1, 0,2,0,0,0,515,0, 0));//92
-        //MemoryUtil.memPutLong(buff.address+8,  encodeRaw(2, 1,1,0,0,0,515,0, 0));//92
-        //MemoryUtil.memPutLong(buff.address+16, encodeRaw(3, 0,0,0,0,0,515,0, 0));//92
-        //MemoryUtil.memPutLong(buff.address+24, encodeRaw(4, 0,2,0,0,0,515,0, 0));//92
-        //MemoryUtil.memPutLong(buff.address+32, encodeRaw(5, 0,2,0,0,0,515,0, 0));//92
+        var buff = new MemoryBuffer(8*8);
+        MemoryUtil.memPutLong(buff.address,        encodeRaw(2, 0,0,0,0,0,515,0, 0));//92
+        MemoryUtil.memPutLong(buff.address+8,  encodeRaw(3, 0,0,0,0,0,515,0, 0));//92
+        MemoryUtil.memPutLong(buff.address+16, encodeRaw(4, 0,2,0,0,0,515,0, 0));//92
+        MemoryUtil.memPutLong(buff.address+24, encodeRaw(5, 0,2,0,0,0,515,0, 0));//92
+        MemoryUtil.memPutLong(buff.address+32, encodeRaw(2, 0,0,0,0,1,515,0, 0));//92
+        MemoryUtil.memPutLong(buff.address+40, encodeRaw(3, 0,0,0,0,1,515,0, 0));//92
+        MemoryUtil.memPutLong(buff.address+48, encodeRaw(2, 0,0,0,0,2,515,0, 0));//92
+        MemoryUtil.memPutLong(buff.address+56, encodeRaw(3, 0,0,0,0,2,515,0, 0));//92
 
-        MemoryUtil.memPutLong(buff.address,  encodeRaw(2, 1,1,0,0,0,515,0, 0));//92
-        //MemoryUtil.memPutLong(buff.address,  encodeRaw(3, 0,0,0,0,0,515,0, 0));//92
         return new BuiltSection(section.getKey(), new BuiltSectionGeometry(buff, new short[0]), null);
     }
 
