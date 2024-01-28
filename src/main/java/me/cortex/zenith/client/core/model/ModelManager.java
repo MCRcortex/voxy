@@ -222,7 +222,7 @@ public class ModelManager {
             faceModelData |= Math.round(offset*63)<<16;//Change the scale from 0->1 (ends inclusive) float to 0->63 (6 bits) NOTE! that 63 == 1.0f meaning its shifted all the way to the other side of the model
             //Still have 11 bits free
 
-            MemoryUtil.memPutInt(faceUploadPtr, 0);
+            MemoryUtil.memPutInt(faceUploadPtr, faceModelData);
         }
         this.metadataCache[modelId] = metadata;
 
