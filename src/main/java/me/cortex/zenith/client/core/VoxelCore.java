@@ -100,7 +100,7 @@ public class VoxelCore {
             //this.distanceTracker.init(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
             this.firstTime = false;
 
-            this.renderTracker.addLvl0(0,0,0);
+            this.renderTracker.addLvl0(0,6,0);
 
 
         }

@@ -100,9 +100,9 @@ public class ModelManager {
     //TODO: so need a few things, per face sizes and offsets, the sizes should be computed from the pixels and find the minimum bounding pixel
     // while the depth is computed from the depth buffer data
     public int addEntry(int blockId, BlockState blockState) {
-        //if (this.idMappings[blockId] != -1) {
-        //    throw new IllegalArgumentException("Trying to add entry for duplicate id");
-        //}
+        if (this.idMappings[blockId] != -1) {
+            throw new IllegalArgumentException("Trying to add entry for duplicate id");
+        }
 
         int modelId = -1;
         var textureData = this.bakery.renderFaces(blockState, 123456);
@@ -111,7 +111,7 @@ public class ModelManager {
             if (possibleDuplicate != -1) {//Duplicate found
                 this.idMappings[blockId] = possibleDuplicate;
                 modelId = possibleDuplicate;
-                //return possibleDuplicate;
+                return possibleDuplicate;
             } else {//Not a duplicate so create a new entry
                 modelId = this.modelTexture2id.size();
                 this.idMappings[blockId] = modelId;
@@ -163,6 +163,16 @@ public class ModelManager {
         //TODO: implement
         boolean hasBiomeColourResolver = false;
 
+
+        //TODO: THIS, note this can be tested for in 2 ways, re render the model with quad culling disabled and see if the result
+        // is the same, (if yes then needs double sided quads)
+        // another way to test it is if e.g. up and down havent got anything rendered but the sides do (e.g. all plants etc)
+        boolean needsDoubleSidedQuads = false;
+
+        //TODO: special case stuff like vines and glow lichen, where it can be represented by a single double sided quad
+        // since that would help alot with perf of lots of vines
+
+
         //This also checks if there is a block colour resolver for the given blockstate and marks that the block has a resolver
         var sizes = this.computeModelDepth(textureData, checkMode);
 
@@ -209,10 +219,10 @@ public class ModelManager {
 
             int faceModelData = 0;
             faceModelData |= faceSize[0] | (faceSize[1]<<4) | (faceSize[2]<<8) | (faceSize[3]<<12);
-            faceModelData |= Math.round(offset*63);//Change the scale from 0->1 (ends inclusive) float to 0->63 (6 bits) NOTE! that 63 == 1.0f meaning its shifted all the way to the other side of the model
+            faceModelData |= Math.round(offset*63)<<16;//Change the scale from 0->1 (ends inclusive) float to 0->63 (6 bits) NOTE! that 63 == 1.0f meaning its shifted all the way to the other side of the model
             //Still have 11 bits free
 
-            MemoryUtil.memPutInt(faceUploadPtr, faceModelData);
+            MemoryUtil.memPutInt(faceUploadPtr, 0);
         }
         this.metadataCache[modelId] = metadata;
 

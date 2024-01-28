@@ -150,8 +150,8 @@ public class GeometryManager {
             MemoryUtil.memPutInt(ptr, (int) this.aabb); ptr += 4;
             ptr += 4;
 
+            MemoryUtil.memPutInt(ptr, this.opaqueGeometryPtr); ptr += 4;
             MemoryUtil.memPutInt(ptr, this.count); ptr += 4;
-            //MemoryUtil.memPutInt(ptr, this.opaqueQuadCount); ptr += 4;
 
             //MemoryUtil.memPutInt(ptr, (int) this.translucentGeometryPtr + this.translucentPreDataCount); ptr += 4;
             //MemoryUtil.memPutInt(ptr, this.translucentQuadCount); ptr += 4;
@@ -163,7 +163,7 @@ public class GeometryManager {
 
         //TODO: support translucent geometry
         //return new SectionMeta(geometry.position, 0, geometryPtr, (int) (geometry.opaque.buffer().size/8), 0, -1,0, 0);
-        return new SectionMeta(geometry.position, 0, geometryPtr, (int) (geometry.opaque.buffer().size/8), 0);
+        return new SectionMeta(geometry.position, 0, geometryPtr, (int) (geometry.opaque.buffer().size/8), -1);
     }
 
     private void freeMeta(SectionMeta meta) {

@@ -12,12 +12,17 @@ layout(binding = 0, std140) uniform SceneUniform {
 };
 
 struct BlockModel {
-    uint faceColours[6];
+    uint faceData[6];
+    uint _pad[10];
 };
 
 struct SectionMeta {
-    uvec4 header;
-    uvec4 drawdata;
+    uint posA;
+    uint posB;
+    uint AABB;
+    uint _padA;
+    uint ptr;
+    uint cnt;
 };
 
 //TODO: see if making the stride 2*4*4 bytes or something cause you get that 16 byte write

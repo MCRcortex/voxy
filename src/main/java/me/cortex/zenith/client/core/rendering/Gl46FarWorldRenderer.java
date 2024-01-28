@@ -107,12 +107,14 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_UNIFORM_BARRIER_BIT);
 
         this.lodShader.bind();
+        glDisable(GL_CULL_FACE);
         glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, this.geometry.getSectionCount(), 0);
+        glEnable(GL_CULL_FACE);
         //ARBIndirectParameters.glMultiDrawElementsIndirectCountARB(
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
 
-        cullShader.bind();
+        this.cullShader.bind();
         glColorMask(false, false, false, false);
         glDepthMask(false);
 

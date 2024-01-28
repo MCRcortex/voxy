@@ -34,8 +34,20 @@ public class RenderDataFactory {
         // this stops e.g. multiple layers of glass (and ocean) from having 3000 layers of quads etc
 
         var buff = new MemoryBuffer(8*1);
+        //MemoryUtil.memPutLong(buff.address,        encodeRaw(1, 0,2,0,0,0,515,0, 0));//92
+        //MemoryUtil.memPutLong(buff.address+8,  encodeRaw(2, 1,1,0,0,0,515,0, 0));//92
+        //MemoryUtil.memPutLong(buff.address+16, encodeRaw(3, 0,0,0,0,0,515,0, 0));//92
+        //MemoryUtil.memPutLong(buff.address+24, encodeRaw(4, 0,2,0,0,0,515,0, 0));//92
+        //MemoryUtil.memPutLong(buff.address+32, encodeRaw(5, 0,2,0,0,0,515,0, 0));//92
 
+        MemoryUtil.memPutLong(buff.address,  encodeRaw(2, 1,1,0,0,0,515,0, 0));//92
+        //MemoryUtil.memPutLong(buff.address,  encodeRaw(3, 0,0,0,0,0,515,0, 0));//92
         return new BuiltSection(section.getKey(), new BuiltSectionGeometry(buff, new short[0]), null);
+    }
+
+
+    private static long encodeRaw(int face, int width, int height, int x, int y, int z, int blockId, int biomeId, int lightId) {
+        return ((long)face) | (((long) width)<<3) | (((long) height)<<7) | (((long) z)<<11) | (((long) y)<<16) | (((long) x)<<21) | (((long) blockId)<<26) | (((long) biomeId)<<46) | (((long) lightId)<<55);
     }
 
 }

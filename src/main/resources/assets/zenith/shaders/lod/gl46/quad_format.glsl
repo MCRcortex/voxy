@@ -17,7 +17,7 @@ uint extractFace(uint64_t quad) {
 }
 
 uint extractStateId(uint64_t quad) {
-    return Eu32(quad, 20, 26);
+    return Eu32(quad, 16, 26);
 }
 
 uint extractBiomeId(uint64_t quad) {
