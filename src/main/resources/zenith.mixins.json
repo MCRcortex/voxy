@@ -15,6 +15,7 @@
     "defaultRequire": 1
   },
   "mixins": [
-    "sodium.MixinOcclusionCuller"
+    "sodium.MixinOcclusionCuller",
+    "sodium.MixinSodiumWorldRender"
   ]
 }

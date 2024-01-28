@@ -1,19 +1,27 @@
 package me.cortex.zenith.client.core.rendering.building;
 
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import me.cortex.zenith.client.core.model.ModelManager;
+import me.cortex.zenith.client.core.util.Mesher2D;
 import me.cortex.zenith.common.util.MemoryBuffer;
 import me.cortex.zenith.common.world.WorldEngine;
 import me.cortex.zenith.common.world.WorldSection;
+import me.cortex.zenith.common.world.other.Mapper;
 import net.minecraft.client.MinecraftClient;
 import org.lwjgl.system.MemoryUtil;
+
+import java.util.Map;
 
 
 public class RenderDataFactory {
     private final WorldEngine world;
+    private final ModelManager modelMan;
     private final QuadEncoder encoder;
     private final long[] sectionCache = new long[32*32*32];
     private final long[] connectedSectionCache = new long[32*32*32];
-    public RenderDataFactory(WorldEngine world) {
+    public RenderDataFactory(WorldEngine world, ModelManager modelManager) {
         this.world = world;
+        this.modelMan = modelManager;
         this.encoder = new QuadEncoder(world.getMapper(), MinecraftClient.getInstance().getBlockColors(), MinecraftClient.getInstance().world);
     }
 
@@ -33,15 +41,83 @@ public class RenderDataFactory {
         // if the connecting type of the translucent block is the same AND the face is full, discard it
         // this stops e.g. multiple layers of glass (and ocean) from having 3000 layers of quads etc
 
-        var buff = new MemoryBuffer(8*8);
-        MemoryUtil.memPutLong(buff.address,        encodeRaw(2, 0,0,0,0,0,515,0, 0));//92
-        MemoryUtil.memPutLong(buff.address+8,  encodeRaw(3, 0,0,0,0,0,515,0, 0));//92
-        MemoryUtil.memPutLong(buff.address+16, encodeRaw(4, 0,2,0,0,0,515,0, 0));//92
-        MemoryUtil.memPutLong(buff.address+24, encodeRaw(5, 0,2,0,0,0,515,0, 0));//92
-        MemoryUtil.memPutLong(buff.address+32, encodeRaw(2, 0,0,0,0,1,515,0, 0));//92
-        MemoryUtil.memPutLong(buff.address+40, encodeRaw(3, 0,0,0,0,1,515,0, 0));//92
-        MemoryUtil.memPutLong(buff.address+48, encodeRaw(2, 0,0,0,0,2,515,0, 0));//92
-        MemoryUtil.memPutLong(buff.address+56, encodeRaw(3, 0,0,0,0,2,515,0, 0));//92
+
+        Mesher2D mesher = new Mesher2D(5,15);
+
+        LongArrayList outData = new LongArrayList(1000);
+
+        //Up direction
+
+        for (int y = 0; y < 32; y++) {
+            mesher.reset();
+            for (int x = 0; x < 32; x++) {
+                for (int z = 0; z < 32; z++) {
+                    long self = this.sectionCache[WorldSection.getIndex(x, y, z)];
+                    if (Mapper.isAir(self)) continue;
+
+                    int selfBlockId = Mapper.getBlockId(self);
+                    long metadata = this.modelMan.getModelMetadata(selfBlockId);
+
+                    //If the model doesnt have a face, then just skip it
+                    if (!ModelManager.faceExists(metadata, 1)) {
+                        continue;
+                    }
+
+                    long facingState = Mapper.AIR;
+                    //Need to access the other connecting section
+                    if (y == 31) {
+
+                    } else {
+                        facingState = this.sectionCache[WorldSection.getIndex(x, y+1, z)];
+                    }
+
+                    long facingMetadata = this.modelMan.getModelMetadata(Mapper.getBlockId(facingState));
+
+                    //If face can be occluded and is occluded from the facing block, then dont render the face
+                    if (ModelManager.faceCanBeOccluded(metadata, 1) && ModelManager.faceOccludes(facingMetadata, 0)) {
+                        continue;
+                    }
+
+                    int clientModelId = this.modelMan.getModelId(selfBlockId);
+
+                    mesher.put(x, z, ((long)clientModelId) | (((long) Mapper.getLightId(facingState))<<16) | (((long) Mapper.getBiomeId(self))<<24));
+                }
+            }
+
+            //TODO: encode translucents and double sided quads to different global buffers
+            int count = mesher.process();
+            var array = mesher.getArray();
+            for (int i = 0; i < count; i++) {
+                int quad = array[i];
+                long data = mesher.getDataFromQuad(quad);
+                outData.add(Integer.toUnsignedLong(QuadEncoder.encodePosition(1, y, quad)) | ((data&0xFFFF)<<26) | (((data>>16)&0xFF)<<55) | (((data>>24)&0x1FF)<<46));
+                //outData.add(Integer.toUnsignedLong(QuadEncoder.encodePosition(1, y, quad)) | (1<<26));
+            }
+        }
+
+
+
+
+
+        //var buff = new MemoryBuffer(8*8);
+        //MemoryUtil.memPutLong(buff.address,        encodeRaw(2, 0,1,0,0,0,159,0, 0));//92 515
+        //MemoryUtil.memPutLong(buff.address+8,  encodeRaw(3, 0,1,0,0,0,159,0, 0));//92 515
+        //MemoryUtil.memPutLong(buff.address+16, encodeRaw(4, 1,2,0,0,0,159,0, 0));//92 515
+        //MemoryUtil.memPutLong(buff.address+24, encodeRaw(5, 1,2,0,0,0,159,0, 0));//92 515
+        //MemoryUtil.memPutLong(buff.address+32, encodeRaw(2, 0,1,0,0,1,159,0, 0));//92 515
+        //MemoryUtil.memPutLong(buff.address+40, encodeRaw(3, 0,1,0,0,1,159,0, 0));//92 515
+        //MemoryUtil.memPutLong(buff.address+48, encodeRaw(2, 0,1,0,0,2,159,0, 0));//92 515
+        //MemoryUtil.memPutLong(buff.address+56, encodeRaw(3, 0,1,0,0,2,159,0, 0));//92 515
+        if (outData.isEmpty()) {
+            return new BuiltSection(section.getKey(), null, null);
+        }
+
+        //outData.add(encodeRaw(3, 0,1,0,0,0,159,0, 0));
+        var buff = new MemoryBuffer(outData.size()*8L);
+        long ptr = buff.address;
+        for (long data : outData) {
+            MemoryUtil.memPutLong(ptr, data); ptr+=8;
+        }
 
         return new BuiltSection(section.getKey(), new BuiltSectionGeometry(buff, new short[0]), null);
     }

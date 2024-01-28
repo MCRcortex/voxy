@@ -66,7 +66,7 @@ public class VoxelCore {
         System.out.println("World engine");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
-        this.renderGen = new RenderGenerationService(this.world,ZenithConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult);
+        this.renderGen = new RenderGenerationService(this.world, this.renderer.getModelManager(), ZenithConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult);
         this.world.setDirtyCallback(this.renderTracker::sectionUpdated);
         this.renderTracker.setRenderGen(this.renderGen);
         System.out.println("Render tracker and generator initialized");
@@ -97,14 +97,10 @@ public class VoxelCore {
     boolean firstTime = true;
     public void renderSetup(Frustum frustum, Camera camera) {
         if (this.firstTime) {
-            //this.distanceTracker.init(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
+            this.distanceTracker.init(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
             this.firstTime = false;
-
-            this.renderTracker.addLvl0(0,6,0);
-
-
         }
-        //this.distanceTracker.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
+        this.distanceTracker.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
         this.renderer.setupRender(frustum, camera);
     }
 

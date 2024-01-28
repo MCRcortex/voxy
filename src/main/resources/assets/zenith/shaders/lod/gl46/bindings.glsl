@@ -23,6 +23,8 @@ struct SectionMeta {
     uint _padA;
     uint ptr;
     uint cnt;
+    uint _padB;
+    uint _padC;
 };
 
 //TODO: see if making the stride 2*4*4 bytes or something cause you get that 16 byte write

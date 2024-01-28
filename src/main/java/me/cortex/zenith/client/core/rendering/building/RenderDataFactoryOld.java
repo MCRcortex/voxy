@@ -12,6 +12,7 @@ import org.lwjgl.system.MemoryUtil;
 
 
 public class RenderDataFactoryOld {
+    /*
     private final Mesher2D mesher = new Mesher2D(5,15);//15
     private final LongArrayList outData = new LongArrayList(1000);
     private final WorldEngine world;
@@ -331,5 +332,6 @@ public class RenderDataFactoryOld {
         this.outData.clear();
         //return new BuiltSectionGeometry(section.getKey(), output, null);
     }
+     */
 
 }

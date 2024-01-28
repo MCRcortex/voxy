@@ -1,6 +1,7 @@
 package me.cortex.zenith.client.core.rendering.building;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import me.cortex.zenith.client.core.model.ModelManager;
 import me.cortex.zenith.common.world.WorldEngine;
 import me.cortex.zenith.common.world.WorldSection;
 
@@ -22,10 +23,12 @@ public class RenderGenerationService {
 
     private final Semaphore taskCounter = new Semaphore(0);
     private final WorldEngine world;
+    private final ModelManager modelManager;
     private final Consumer<BuiltSection> resultConsumer;
 
-    public RenderGenerationService(WorldEngine world, int workers, Consumer<BuiltSection> consumer) {
+    public RenderGenerationService(WorldEngine world, ModelManager modelManager, int workers, Consumer<BuiltSection> consumer) {
         this.world = world;
+        this.modelManager = modelManager;
         this.resultConsumer = consumer;
         this.workers =  new Thread[workers];
         for (int i = 0; i < workers; i++) {
@@ -41,7 +44,7 @@ public class RenderGenerationService {
     //TODO: add a generated render data cache
     private void renderWorker() {
         //Thread local instance of the factory
-        var factory = new RenderDataFactory(this.world);
+        var factory = new RenderDataFactory(this.world, this.modelManager);
         while (this.running) {
             this.taskCounter.acquireUninterruptibly();
             if (!this.running) break;

@@ -212,6 +212,15 @@ public class ModelManager {
             metadata |= occludesFace?1:0;
 
 
+
+            boolean canBeOccluded = true;
+            //TODO: make this an option on how far/close
+            canBeOccluded &= offset < 0.3;//If the face is rendered far away from the other face, then it cant be occluded
+
+            metadata |= canBeOccluded?4:0;
+
+
+
             //Scale face size from 0->this.modelTextureSize-1 to 0->15
             for (int i = 0; i < 4; i++) {
                 faceSize[i] = Math.round((((float)faceSize[i])/(this.modelTextureSize-1))*15);
@@ -235,6 +244,28 @@ public class ModelManager {
         return modelId;
     }
 
+
+    public static boolean faceExists(long metadata, int face) {
+        return ((metadata>>(8*face))&0xFF)!=0xFF;
+    }
+
+    public static boolean faceCanBeOccluded(long metadata, int face) {
+        return ((metadata>>(8*face))&0b100)==0b100;
+    }
+
+    public static boolean faceOccludes(long metadata, int face) {
+        return faceExists(metadata, face) && ((metadata>>(8*face))&0b1)==0b1;
+    }
+
+    public static boolean isColoured(long metadata) {
+        //TODO: THIS
+        return false;
+    }
+
+    public static boolean isTranslucent(long metadata) {
+        //TODO: THIS
+        return false;
+    }
 
 
 
