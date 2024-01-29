@@ -8,11 +8,23 @@ import me.cortex.zenith.client.core.gl.GlTexture;
 import me.cortex.zenith.client.core.rendering.util.UploadStream;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.FluidBlock;
+import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.color.block.BlockColorProvider;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;
+import net.minecraft.fluid.FluidState;
 import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
+import net.minecraft.world.BlockRenderView;
+import net.minecraft.world.LightType;
+import net.minecraft.world.biome.Biome;
+import net.minecraft.world.biome.BiomeKeys;
+import net.minecraft.world.biome.ColorResolver;
+import net.minecraft.world.chunk.light.LightingProvider;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.ArrayList;
@@ -98,6 +110,7 @@ public class ModelManager {
     }
 
 
+
     //TODO: what i need to do is seperate out fluid states from blockStates
 
 
@@ -127,6 +140,7 @@ public class ModelManager {
 
         var colourProvider = MinecraftClient.getInstance().getBlockColors().providers.get(Registries.BLOCK.getRawId(blockState.getBlock()));
 
+
         RenderLayer blockRenderLayer = null;
         if (blockState.getBlock() instanceof FluidBlock) {
             blockRenderLayer = RenderLayers.getFluidLayer(blockState.getFluidState());
@@ -139,37 +153,6 @@ public class ModelManager {
 
 
 
-        //If it is the solid layer, it is _always_ going to occlude fully for all written pixels, even if they are 100% translucent, this should save alot of resources
-        // if it is cutout it might occlude might not, need to test
-        // if it is translucent it will _never_ occlude
-
-        //NOTE: this is excluding fluid states
-
-
-
-
-        //Model data contains, the quad size and offset of each face and whether the face needs to be resolved with a colour modifier
-        // sourced from the quad data and reverse indexed into the section data (meaning there will be a maxiumum number of colours)
-        // can possibly also put texture coords if needed
-        //Supplying the quad size and offset means that much more accurate rendering quads are rendered and stuff like snow layers will look correct
-        // the size/offset of the corners of the quads will only be applied to the corner quads of the merged quads with adjustment to the UV to ensure textures are not alignned weirdly
-        // the other axis offset is always applied and means that the models will look more correct even when merged into a large quad (which will have alot of overdraw)
-        //TODO: need to make an option for like leaves to be fully opaque as by default they are not!!!!
-
-
-
-
-
-
-
-
-
-
-        //Models data is computed per face, the axis offset of the face is computed from the depth component of the rasterized data
-        // the size and offset of the face data is computed from the remaining pixels that where actually rastered (e.g. depth != 1.0)
-        //  (note this might be able to be optimized for cuttout layers where it automatically tries to squish as much as possible)
-        // solid layer renders it as black so might need to add a bitset in the model data of whether the face is rendering
-        // in discard or solid mode maybe?
 
         long uploadPtr = UploadStream.INSTANCE.upload(this.modelBuffer, (long) modelId * MODEL_SIZE, MODEL_SIZE);
 
@@ -177,6 +160,9 @@ public class ModelManager {
         //TODO: implement;
         // TODO: if it has a constant colour instead... idk why (apparently for things like spruce leaves)?? but premultiply the texture data by the constant colour
         boolean hasBiomeColourResolver = false;
+        if (colourProvider != null) {
+            hasBiomeColourResolver = isBiomeDependentColour(colourProvider, blockState);
+        }
 
 
 
@@ -266,13 +252,130 @@ public class ModelManager {
         //Have 40 bytes free for remaining model data
         // todo: put in like the render layer type ig? along with colour resolver info
         int modelFlags = 0;
+        modelFlags |= colourProvider != null?1:0;
+        modelFlags |= hasBiomeColourResolver?2:0;//Basicly whether to use the next int as a colour or as a base index/id into a colour buffer for biome dependent colours
+
+
         //modelFlags |= blockRenderLayer == RenderLayer.getSolid()?0:1;// should discard alpha
         MemoryUtil.memPutInt(uploadPtr, modelFlags);
-
+        //Temporary override to always be non biome specific
+        if (colourProvider != null && ((!hasBiomeColourResolver) || true)) {
+            Biome defaultBiome = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME).get(BiomeKeys.PLAINS);
+            MemoryUtil.memPutInt(uploadPtr + 4, captureColourConstant(colourProvider, blockState, defaultBiome)|0xFF000000);
+        } else {
+            MemoryUtil.memPutInt(uploadPtr + 4, -1);//Set the default to nothing so that its faster on the gpu
+        }
 
 
         return modelId;
     }
+
+    //TODO: add a method to detect biome dependent colours (can do by detecting if getColor is ever called)
+    // if it is, need to add it to a list and mark it as biome colour dependent or something then the shader
+    // will either use the uint as an index or a direct colour multiplier
+    private static int captureColourConstant(BlockColorProvider colorProvider, BlockState state, Biome biome) {
+        return colorProvider.getColor(state, new BlockRenderView() {
+            @Override
+            public float getBrightness(Direction direction, boolean shaded) {
+                return 0;
+            }
+
+            @Override
+            public int getLightLevel(LightType type, BlockPos pos) {
+                return 0;
+            }
+
+            @Override
+            public LightingProvider getLightingProvider() {
+                return null;
+            }
+
+            @Override
+            public int getColor(BlockPos pos, ColorResolver colorResolver) {
+                return colorResolver.getColor(biome, 0, 0);
+            }
+
+            @Nullable
+            @Override
+            public BlockEntity getBlockEntity(BlockPos pos) {
+                return null;
+            }
+
+            @Override
+            public BlockState getBlockState(BlockPos pos) {
+                return state;
+            }
+
+            @Override
+            public FluidState getFluidState(BlockPos pos) {
+                return state.getFluidState();
+            }
+
+            @Override
+            public int getHeight() {
+                return 0;
+            }
+
+            @Override
+            public int getBottomY() {
+                return 0;
+            }
+        }, BlockPos.ORIGIN, 0);
+    }
+
+    private static boolean isBiomeDependentColour(BlockColorProvider colorProvider, BlockState state) {
+        boolean[] biomeDependent = new boolean[1];
+        colorProvider.getColor(state, new BlockRenderView() {
+            @Override
+            public float getBrightness(Direction direction, boolean shaded) {
+                return 0;
+            }
+
+            @Override
+            public int getLightLevel(LightType type, BlockPos pos) {
+                return 0;
+            }
+
+            @Override
+            public LightingProvider getLightingProvider() {
+                return null;
+            }
+
+            @Override
+            public int getColor(BlockPos pos, ColorResolver colorResolver) {
+                biomeDependent[0] = true;
+                return 0;
+            }
+
+            @Nullable
+            @Override
+            public BlockEntity getBlockEntity(BlockPos pos) {
+                return null;
+            }
+
+            @Override
+            public BlockState getBlockState(BlockPos pos) {
+                return state;
+            }
+
+            @Override
+            public FluidState getFluidState(BlockPos pos) {
+                return state.getFluidState();
+            }
+
+            @Override
+            public int getHeight() {
+                return 0;
+            }
+
+            @Override
+            public int getBottomY() {
+                return 0;
+            }
+        }, BlockPos.ORIGIN, 0);
+        return biomeDependent[0];
+    }
+
 
 
     public static boolean faceExists(long metadata, int face) {
@@ -304,6 +407,9 @@ public class ModelManager {
         return ((metadata>>(8*6))&8) != 0;
     }
 
+    public static boolean isBiomeColoured(long metadata) {
+        return ((metadata>>(8*6))&1) != 0;
+    }
 
 
 

@@ -67,13 +67,17 @@ public class VoxelCore {
 
         this.world.getMapper().setCallbacks(a->{}, a->{});
 
-        System.out.println("Voxel core initialized");
+
+        ////Resave the db incase it failed a recovery
+        //this.world.getMapper().forceResaveStates();
 
 
         for (var state : this.world.getMapper().getStateEntries()) {
             this.renderer.getModelManager().addEntry(state.id, state.state);
         }
         //this.renderer.getModelManager().updateEntry(0, Blocks.GRASS_BLOCK.getDefaultState());
+
+        System.out.println("Voxel core initialized");
     }
 
 

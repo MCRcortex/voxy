@@ -90,10 +90,16 @@ void main() {
 
     //Compute lighting
     colourTinting = getLighting(extractLightId(quad));
+
+    //Apply model colour tinting
+    colourTinting *= uint2vec4RGBA(model.colourTint).yzwx;
+
     //Apply face tint
     if (face == 0) {
         colourTinting.xyz *= vec3(0.75, 0.75, 0.75);
     } else if (face != 1) {
         colourTinting.xyz *= vec3((float(face-2)/4)*0.6 + 0.4);
     }
+
+
 }

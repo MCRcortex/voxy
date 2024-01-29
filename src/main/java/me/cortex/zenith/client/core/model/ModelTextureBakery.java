@@ -10,10 +10,7 @@ import me.cortex.zenith.client.core.gl.shader.Shader;
 import me.cortex.zenith.client.core.gl.shader.ShaderLoader;
 import me.cortex.zenith.client.core.gl.shader.ShaderType;
 import me.jellysquid.mods.sodium.client.gl.shader.GlShader;
-import net.minecraft.block.Block;
-import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.FluidBlock;
+import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.GlUniform;
@@ -146,11 +143,6 @@ public class ModelTextureBakery {
         GlUniform.uniform1(0, 0);
         RenderSystem.activeTexture(GlConst.GL_TEXTURE0);
 
-        if (renderLayer == RenderLayer.getTranslucent()) {
-            //TODO: TRANSLUCENT, must sort the quad first, or something idk
-        }
-
-
         var faces = new ColourDepthTextureData[FACE_VIEWS.size()];
         for (int i = 0; i < faces.length; i++) {
             faces[i] = captureView(state, model, FACE_VIEWS.get(i), randomValue, i, renderFluid);
@@ -235,10 +227,20 @@ public class ModelTextureBakery {
         }
 
 
+
         float[] mat = new float[4*4];
         new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix()).get(mat);
         glUniformMatrix4fv(1, false, mat);
         BufferRenderer.draw(vc.end());
+
+
+        if (state.hasBlockEntity()) {
+            //TODO: finish BlockEntity raster
+            //var entity = ((BlockEntityProvider)state).createBlockEntity(BlockPos.ORIGIN, state);
+            //var renderer = MinecraftClient.getInstance().getBlockEntityRenderDispatcher().get(entity);
+            //renderer.render();
+            //entity.markRemoved();
+        }
 
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
