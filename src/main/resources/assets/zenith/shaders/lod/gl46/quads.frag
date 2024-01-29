@@ -1,6 +1,9 @@
 #version 460 core
 layout(binding = 0) uniform sampler2D blockModelAtlas;
 
+//TODO: need to fix when merged quads have discardAlpha set to false but they span multiple tiles
+// however they are not a full block
+
 layout(location = 0) in vec2 uv;
 layout(location = 1) in flat vec2 baseUV;
 layout(location = 2) in flat vec4 colourTinting;

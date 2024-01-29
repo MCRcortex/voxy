@@ -244,6 +244,8 @@ public class ModelManager {
 
             faceModelData |= needsAlphaDiscard?1<<22:0;
 
+            faceModelData |= (!faceCoversFullBlock)?1<<23:0;
+
             MemoryUtil.memPutInt(faceUploadPtr, faceModelData);
         }
         this.metadataCache[modelId] = metadata;

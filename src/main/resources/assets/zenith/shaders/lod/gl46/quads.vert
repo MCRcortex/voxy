@@ -60,8 +60,9 @@ void main() {
     vec3 corner = innerPos * (1<<lodLevel) + lodCorner;
 
     vec2 faceOffset = getFaceSizeOffset(faceData, cornerIdx);
-    vec2 quadSize = vec2(extractSize(quad) * ivec2((cornerIdx>>1)&1, cornerIdx&1));
-    vec2 size = (quadSize + faceOffset) * (1<<lodLevel);
+    ivec2 quadSize = extractSize(quad);
+    vec2 respectiveQuadSize = vec2(quadSize * ivec2((cornerIdx>>1)&1, cornerIdx&1));
+    vec2 size = (respectiveQuadSize + faceOffset) * (1<<lodLevel);
 
     vec3 offset = vec3(size, (float(face&1) + getDepthOffset(faceData, face)) * (1<<lodLevel));
 
@@ -84,9 +85,12 @@ void main() {
     //TODO: make the face orientated by 2x3 so that division is not a integer div and modulo isnt needed
     // as these are very slow ops
     baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3,2)*256f)));
-    uv = quadSize + faceOffset;//Add in the face offset for 0,0 uv
+    uv = respectiveQuadSize + faceOffset;//Add in the face offset for 0,0 uv
 
     discardAlpha = faceHasAlphaCuttout(faceData);
+
+    //We need to have a conditional override based on if the model size is < a full face + quadSize > 1
+    discardAlpha |= uint(any(greaterThan(quadSize, ivec2(1)))) & faceHasAlphaCuttoutOverride(faceData);
 
     //Compute lighting
     colourTinting = getLighting(extractLightId(quad));

@@ -65,7 +65,7 @@ public class VoxelCore {
 
         this.postProcessing = null;//new PostProcessing();
 
-        this.world.getMapper().setCallbacks(a->{}, a->{});
+        this.world.getMapper().setCallbacks(this.renderer::addBlockState, a->{});
 
 
         ////Resave the db incase it failed a recovery

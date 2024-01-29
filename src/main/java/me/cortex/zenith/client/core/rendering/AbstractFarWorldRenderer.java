@@ -7,6 +7,8 @@ import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.model.ModelManager;
 import me.cortex.zenith.client.core.rendering.building.BuiltSection;
 import me.cortex.zenith.client.core.rendering.util.UploadStream;
+import me.cortex.zenith.common.world.other.Mapper;
+import net.minecraft.block.BlockState;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
@@ -15,6 +17,8 @@ import org.joml.FrustumIntersection;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 import static org.lwjgl.opengl.ARBMultiDrawIndirect.glMultiDrawElementsIndirect;
 import static org.lwjgl.opengl.GL30.*;
@@ -43,6 +47,7 @@ public abstract class AbstractFarWorldRenderer {
 
     protected FrustumIntersection frustum;
 
+    private final ConcurrentLinkedDeque<Mapper.StateEntry> blockStateUpdates = new ConcurrentLinkedDeque<>();
     public AbstractFarWorldRenderer(int geometrySize, int maxSections) {
         this.uniformBuffer  = new GlBuffer(1024);
         this.lightDataBuffer  = new GlBuffer(256*4);//256 of uint
@@ -58,7 +63,6 @@ public abstract class AbstractFarWorldRenderer {
         this.sx = camera.getBlockPos().getX() >> 5;
         this.sy = camera.getBlockPos().getY() >> 5;
         this.sz = camera.getBlockPos().getZ() >> 5;
-
 
         //TODO: move this to a render function that is only called
         // once per frame when using multi viewport mods
@@ -80,6 +84,12 @@ public abstract class AbstractFarWorldRenderer {
 
         //Upload any new geometry
         this.geometry.uploadResults();
+
+        //Do any BlockChanges
+        while (!this.blockStateUpdates.isEmpty()) {
+            var update = this.blockStateUpdates.pop();
+            this.models.addEntry(update.id, update.state);
+        }
     }
 
     public abstract void renderFarAwayOpaque(MatrixStack stack, double cx, double cy, double cz);
@@ -88,6 +98,10 @@ public abstract class AbstractFarWorldRenderer {
 
     public void enqueueResult(BuiltSection result) {
         this.geometry.enqueueResult(result);
+    }
+
+    public void addBlockState(Mapper.StateEntry entry) {
+        this.blockStateUpdates.add(entry);
     }
 
     public void addDebugData(List<String> debug) {

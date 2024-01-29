@@ -11,3 +11,7 @@ vec4 extractFaceSizes(uint faceData) {
 uint faceHasAlphaCuttout(uint faceData) {
     return (faceData>>22)&1;
 }
+
+uint faceHasAlphaCuttoutOverride(uint faceData) {
+    return (faceData>>23)&1;
+}
