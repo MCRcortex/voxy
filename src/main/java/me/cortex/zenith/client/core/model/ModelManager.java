@@ -7,6 +7,7 @@ import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.gl.GlTexture;
 import me.cortex.zenith.client.core.rendering.util.UploadStream;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.FluidBlock;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.render.RenderLayers;
@@ -97,6 +98,9 @@ public class ModelManager {
     }
 
 
+    //TODO: what i need to do is seperate out fluid states from blockStates
+
+
     //TODO: so need a few things, per face sizes and offsets, the sizes should be computed from the pixels and find the minimum bounding pixel
     // while the depth is computed from the depth buffer data
     public int addEntry(int blockId, BlockState blockState) {
@@ -104,8 +108,9 @@ public class ModelManager {
             throw new IllegalArgumentException("Trying to add entry for duplicate id");
         }
 
+        boolean isFluid = blockState.getBlock() instanceof FluidBlock;
         int modelId = -1;
-        var textureData = this.bakery.renderFaces(blockState, 123456);
+        var textureData = this.bakery.renderFaces(blockState, 123456, isFluid);
         {//Deduplicate same entries
             int possibleDuplicate = this.modelTexture2id.getInt(List.of(textureData));
             if (possibleDuplicate != -1) {//Duplicate found
@@ -122,8 +127,17 @@ public class ModelManager {
 
         var colourProvider = MinecraftClient.getInstance().getBlockColors().providers.get(Registries.BLOCK.getRawId(blockState.getBlock()));
 
-        var blockRenderLayer = RenderLayers.getBlockLayer(blockState);
+        RenderLayer blockRenderLayer = null;
+        if (blockState.getBlock() instanceof FluidBlock) {
+            blockRenderLayer = RenderLayers.getFluidLayer(blockState.getFluidState());
+        } else {
+            blockRenderLayer = RenderLayers.getBlockLayer(blockState);
+        }
+
+
         int checkMode = blockRenderLayer==RenderLayer.getSolid()?TextureUtils.WRITE_CHECK_STENCIL:TextureUtils.WRITE_CHECK_ALPHA;
+
+
 
         //If it is the solid layer, it is _always_ going to occlude fully for all written pixels, even if they are 100% translucent, this should save alot of resources
         // if it is cutout it might occlude might not, need to test
@@ -183,6 +197,7 @@ public class ModelManager {
         metadata |= hasBiomeColourResolver?1:0;
         metadata |= blockRenderLayer == RenderLayer.getTranslucent()?2:0;
         metadata |= needsDoubleSidedQuads?4:0;
+        metadata |= (!blockState.getFluidState().isEmpty())?8:0;//Has a fluid state accosiacted with it
 
         //TODO: add a bunch of control config options for overriding/setting options of metadata for each face of each type
         for (int face = 5; face != -1; face--) {//In reverse order to make indexing into the metadata long easier
@@ -285,6 +300,9 @@ public class ModelManager {
         return ((metadata>>(8*6))&2) != 0;
     }
 
+    public static boolean containsFluid(long metadata) {
+        return ((metadata>>(8*6))&8) != 0;
+    }
 
 
 
@@ -316,7 +334,7 @@ public class ModelManager {
     public long getModelMetadata(int blockId) {
         int map = this.idMappings[blockId];
         if (map == -1) {
-            throw new IllegalArgumentException("Id hasnt been computed yet");
+            throw new IllegalArgumentException("Id hasnt been computed yet: " + blockId);
         }
         return this.metadataCache[map];
     }
@@ -324,7 +342,7 @@ public class ModelManager {
     public int getModelId(int blockId) {
         int map = this.idMappings[blockId];
         if (map == -1) {
-            throw new IllegalArgumentException("Id hasnt been computed yet");
+            throw new IllegalArgumentException("Id hasnt been computed yet: " + blockId);
         }
         return map;
     }

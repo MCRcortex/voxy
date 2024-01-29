@@ -10,16 +10,27 @@ import me.cortex.zenith.client.core.gl.shader.Shader;
 import me.cortex.zenith.client.core.gl.shader.ShaderLoader;
 import me.cortex.zenith.client.core.gl.shader.ShaderType;
 import me.jellysquid.mods.sodium.client.gl.shader.GlShader;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.FluidBlock;
+import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.render.*;
 import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.fluid.FluidState;
 import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.RotationAxis;
 import net.minecraft.util.math.random.LocalRandom;
+import net.minecraft.world.BlockRenderView;
+import net.minecraft.world.LightType;
+import net.minecraft.world.biome.ColorResolver;
+import net.minecraft.world.chunk.light.LightingProvider;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11C;
 
@@ -86,7 +97,7 @@ public class ModelTextureBakery {
 
     //TODO: For block entities, also somehow attempt to render the default block entity, e.g. chests and stuff
     // cause that will result in ok looking micro details in the terrain
-    public ColourDepthTextureData[] renderFaces(BlockState state, long randomValue) {
+    public ColourDepthTextureData[] renderFaces(BlockState state, long randomValue, boolean renderFluid) {
         var model = MinecraftClient.getInstance()
                 .getBakedModelManager()
                 .getBlockModels()
@@ -108,7 +119,13 @@ public class ModelTextureBakery {
         glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id);
 
 
-        var renderLayer = RenderLayers.getBlockLayer(state);
+        RenderLayer renderLayer = null;
+        if (!renderFluid) {
+            renderLayer = RenderLayers.getBlockLayer(state);
+        } else {
+            renderLayer = RenderLayers.getFluidLayer(state.getFluidState());
+        }
+
 
         renderLayer.startDrawing();
         glEnable(GL_STENCIL_TEST);
@@ -133,13 +150,10 @@ public class ModelTextureBakery {
             //TODO: TRANSLUCENT, must sort the quad first, or something idk
         }
 
-        if (!state.getFluidState().isEmpty()) {
-            //TODO: render fluid
-        }
 
         var faces = new ColourDepthTextureData[FACE_VIEWS.size()];
         for (int i = 0; i < faces.length; i++) {
-            faces[i] = captureView(state, model, FACE_VIEWS.get(i), randomValue);
+            faces[i] = captureView(state, model, FACE_VIEWS.get(i), randomValue, i, renderFluid);
             //glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,300*(i%3),300*(i/3),300*(i%3)+256,300*(i/3)+256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         }
 
@@ -155,16 +169,77 @@ public class ModelTextureBakery {
         return faces;
     }
 
-    private ColourDepthTextureData captureView(BlockState state, BakedModel model, MatrixStack stack, long randomValue) {
+    private ColourDepthTextureData captureView(BlockState state, BakedModel model, MatrixStack stack, long randomValue, int face, boolean renderFluid) {
         var vc = Tessellator.getInstance().getBuffer();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
-        renderQuads(vc, state, model, stack, randomValue);
+
+        if (!renderFluid) {
+            renderQuads(vc, state, model, new MatrixStack(), randomValue);
+        } else {
+            MinecraftClient.getInstance().getBlockRenderManager().renderFluid(BlockPos.ORIGIN, new BlockRenderView() {
+                @Override
+                public float getBrightness(Direction direction, boolean shaded) {
+                    return 0;
+                }
+
+                @Override
+                public LightingProvider getLightingProvider() {
+                    return null;
+                }
+
+                @Override
+                public int getLightLevel(LightType type, BlockPos pos) {
+                    return 0;
+                }
+
+                @Override
+                public int getColor(BlockPos pos, ColorResolver colorResolver) {
+                    return 0;
+                }
+
+                @Nullable
+                @Override
+                public BlockEntity getBlockEntity(BlockPos pos) {
+                    return null;
+                }
+
+                //TODO: make it so it returns air on some positions, e.g. so from UP,
+                @Override
+                public BlockState getBlockState(BlockPos pos) {
+                    //TODO:FIXME: Dont hardcode
+                    if (pos.equals(Direction.byId(face).getVector())) {
+                        return Blocks.AIR.getDefaultState();
+                    }
+                    return state;
+                }
+
+                @Override
+                public FluidState getFluidState(BlockPos pos) {
+                    if (pos.equals(Direction.byId(face).getVector())) {
+                        return Blocks.AIR.getDefaultState().getFluidState();
+                    }
+                    return state.getFluidState();
+                }
+
+                @Override
+                public int getHeight() {
+                    return 0;
+                }
+
+                @Override
+                public int getBottomY() {
+                    return 0;
+                }
+            }, vc, state, state.getFluidState());
+        }
+
 
         float[] mat = new float[4*4];
-        RenderSystem.getProjectionMatrix().get(mat);
+        new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix()).get(mat);
         glUniformMatrix4fv(1, false, mat);
         BufferRenderer.draw(vc.end());
+
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
         int[] colourData = new int[this.width*this.height];

@@ -1,5 +1,6 @@
 package me.cortex.zenith.client.core.rendering;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.gl.shader.Shader;
@@ -109,7 +110,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
             return;
         }
 
-        //this.models.addEntry(0, Blocks.OAK_FENCE.getDefaultState());
+        //this.models.addEntry(0, Blocks.STONE.getDefaultState());
 
 
         RenderLayer.getCutoutMipped().startDrawing();
@@ -169,6 +170,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         RenderLayer.getTranslucent().startDrawing();
         glBindVertexArray(this.vao);
         glDisable(GL_CULL_FACE);
+        RenderSystem.enableBlend();
+        RenderSystem.blendFuncSeparate(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
 
         int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
         int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
@@ -178,14 +181,18 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
         this.lodShader.bind();
 
+        glDepthMask(false);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 400_000 * 4 * 5, 4, this.geometry.getSectionCount(), 0);
+        glDepthMask(true);
 
         glEnable(GL_CULL_FACE);
         glBindVertexArray(0);
 
+
         glBindSampler(0, 0);
         GL11C.glBindTexture(GL_TEXTURE_2D, oldBoundTexture);
         glActiveTexture(oldActiveTexture);
+        RenderSystem.disableBlend();
 
         RenderLayer.getTranslucent().endDrawing();
     }

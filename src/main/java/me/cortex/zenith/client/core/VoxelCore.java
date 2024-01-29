@@ -33,18 +33,6 @@ import java.util.*;
 //There is strict forward only dataflow
 //Ingest -> world engine -> raw render data -> render data
 public class VoxelCore {
-    private static final Set<Block> biomeTintableAllFaces = new HashSet<>(List.of(Blocks.OAK_LEAVES, Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES, Blocks.DARK_OAK_LEAVES, Blocks.VINE, Blocks.MANGROVE_LEAVES,
-            Blocks.TALL_GRASS, Blocks.LARGE_FERN,
-            Blocks.SHORT_GRASS,
-
-            Blocks.SPRUCE_LEAVES,
-            Blocks.BIRCH_LEAVES,
-            Blocks.PINK_PETALS,
-            Blocks.FERN, Blocks.POTTED_FERN));
-    private static final Set<Block> biomeTintableUpFace = new HashSet<>(List.of(Blocks.GRASS_BLOCK));
-    private static final Set<Block> waterTint = new HashSet<>(List.of(Blocks.WATER));
-
-
     private final WorldEngine world;
     private final DistanceTracker distanceTracker;
     private final RenderGenerationService renderGen;

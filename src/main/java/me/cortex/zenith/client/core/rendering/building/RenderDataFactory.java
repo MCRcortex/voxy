@@ -7,6 +7,7 @@ import me.cortex.zenith.common.util.MemoryBuffer;
 import me.cortex.zenith.common.world.WorldEngine;
 import me.cortex.zenith.common.world.WorldSection;
 import me.cortex.zenith.common.world.other.Mapper;
+import net.minecraft.block.FluidBlock;
 import net.minecraft.client.MinecraftClient;
 import org.lwjgl.system.MemoryUtil;
 
@@ -209,6 +210,25 @@ public class RenderDataFactory {
             //If we are facing a block, and are translucent and it is the same block as us, cull the quad
             return false;
         }
+
+
+        //TODO: if the model has a fluid state, it should compute if a fluid face needs to be injected
+        // fluid face of type this.world.getMapper().getBlockStateFromId(self).getFluidState() and block type
+        // this.world.getMapper().getBlockStateFromId(self).getFluidState().getBlockState()
+
+        //If we are a fluid and the oposing face is also a fluid need to make a closer check
+        if (ModelManager.containsFluid(metadata) && ModelManager.containsFluid(facingMetadata)) {
+            //if (this.world.getMapper().getBlockStateFromId(self).getFluidState() != this.world.getMapper().getBlockStateFromId(facingState).getFluidState()) {
+            //  TODO: need to inject a face here of type fluid, how? i have no god damn idea, probably add an auxilery mesher just for this
+            //}
+
+            //Hackfix
+            var selfBS = this.world.getMapper().getBlockStateFromId(self);
+            if (selfBS.getBlock() instanceof FluidBlock && selfBS.getFluidState().getBlockState().getBlock() == this.world.getMapper().getBlockStateFromId(facingState).getFluidState().getBlockState().getBlock()) {
+                return false;
+            }
+        }
+
 
         int clientModelId = this.modelMan.getModelId(selfBlockId);
         long otherFlags = 0;
