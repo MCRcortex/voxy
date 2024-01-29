@@ -277,9 +277,12 @@ public class ModelManager {
         return false;
     }
 
+    public static boolean isDoubleSided(long metadata) {
+        return ((metadata>>(8*6))&4) != 0;
+    }
+
     public static boolean isTranslucent(long metadata) {
-        //TODO: THIS
-        return false;
+        return ((metadata>>(8*6))&2) != 0;
     }
 
 
