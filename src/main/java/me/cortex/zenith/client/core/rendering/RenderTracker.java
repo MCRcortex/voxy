@@ -1,7 +1,6 @@
 package me.cortex.zenith.client.core.rendering;
 
 import me.cortex.zenith.client.core.rendering.building.BuiltSection;
-import me.cortex.zenith.client.core.rendering.building.BuiltSectionGeometry;
 import me.cortex.zenith.client.core.rendering.building.RenderGenerationService;
 import me.cortex.zenith.common.world.WorldEngine;
 import me.cortex.zenith.common.world.WorldSection;
@@ -42,7 +41,7 @@ public class RenderTracker {
     //Removes a lvl 0 section from the world renderer
     public void remLvl0(int x, int y, int z) {
         this.activeSections.remove(WorldEngine.getWorldSectionId(0, x, y, z));
-        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(0, x, y, z), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(0, x, y, z)));
         this.renderGen.removeTask(0, x, y, z);
     }
 
@@ -64,14 +63,14 @@ public class RenderTracker {
 
         this.renderGen.enqueueTask(lvl, x, y, z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
 
-        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1)), null, null));
-        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1)+1), null, null));
-        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1)+1, (z<<1)), null, null));
-        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1)+1, (z<<1)+1), null, null));
-        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1), (z<<1)), null, null));
-        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1), (z<<1)+1), null, null));
-        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1)), null, null));
-        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1)+1), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1))));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1)+1)));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1)+1, (z<<1))));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1)+1, (z<<1)+1)));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1), (z<<1))));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1), (z<<1)+1)));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1))));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1)+1)));
 
 
         this.renderGen.removeTask(lvl-1, (x<<1), (y<<1), (z<<1));
@@ -96,7 +95,7 @@ public class RenderTracker {
         this.activeSections.put(WorldEngine.getWorldSectionId(lvl-1, (x<<1)+1, (y<<1)+1, (z<<1)+1), O);
         this.activeSections.remove(WorldEngine.getWorldSectionId(lvl, x, y, z));
 
-        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl, x, y, z), null, null));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl, x, y, z)));
         this.renderGen.removeTask(lvl, x, y, z);
 
         this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1), this::shouldStillBuild, this::getBuildFlagsOrAbort);

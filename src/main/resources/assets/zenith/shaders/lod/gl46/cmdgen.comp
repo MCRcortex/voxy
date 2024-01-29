@@ -55,11 +55,13 @@ void main() {
     }
 
     if (shouldRender) {
+        uint basePtr = extractQuadStart(meta);
+
         DrawCommand cmd;
-        cmd.count = extractQuadCount(meta) * 6;
+        cmd.count = (meta.cntA&0xFFFF) * 6;
         cmd.instanceCount = 1;
         cmd.firstIndex = 0;
-        cmd.baseVertex = int(extractQuadStart(meta))<<2;
+        cmd.baseVertex = int(basePtr)<<2;
         cmd.baseInstance = encodeLocalLodPos(detail, ipos);
         cmdBuffer[atomicAdd(opaqueDrawCount, 1)] = cmd;
     }

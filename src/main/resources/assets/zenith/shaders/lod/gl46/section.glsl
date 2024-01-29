@@ -16,6 +16,10 @@ uint extractQuadStart(SectionMeta meta) {
     return meta.ptr;
 }
 
-uint extractQuadCount(SectionMeta meta) {
-    return meta.cnt;
+ivec3 extractAABBOffset(SectionMeta meta) {
+    return (ivec3(meta.AABB)>>ivec3(0,5,10))&31;
+}
+
+ivec3 extractAABBSize(SectionMeta meta) {
+    return ((ivec3(meta.AABB)>>ivec3(15,20,25))&31)+1;//The size is + 1 cause its always at least 1x1x1
 }

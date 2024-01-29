@@ -6,7 +6,6 @@ package me.cortex.zenith.client.core.rendering;
 import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.model.ModelManager;
 import me.cortex.zenith.client.core.rendering.building.BuiltSection;
-import me.cortex.zenith.client.core.rendering.building.BuiltSectionGeometry;
 import me.cortex.zenith.client.core.rendering.util.UploadStream;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;

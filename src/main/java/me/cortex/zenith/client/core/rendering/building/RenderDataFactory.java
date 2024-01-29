@@ -297,7 +297,7 @@ public class RenderDataFactory {
         //MemoryUtil.memPutLong(buff.address+48, encodeRaw(2, 0,1,0,0,2,159,0, 0));//92 515
         //MemoryUtil.memPutLong(buff.address+56, encodeRaw(3, 0,1,0,0,2,159,0, 0));//92 515
         if (outData.isEmpty()) {
-            return new BuiltSection(section.getKey(), null, null);
+            return new BuiltSection(section.getKey());
         }
         //outData.clear();
 
@@ -317,7 +317,7 @@ public class RenderDataFactory {
             MemoryUtil.memPutLong(ptr, data); ptr+=8;
         }
 
-        return new BuiltSection(section.getKey(), new BuiltSectionGeometry(buff, new short[0]), null);
+        return new BuiltSection(section.getKey(), (31<<15)|(31<<20)|(31<<25), buff, new int[]{0, outData.size(), outData.size(), outData.size(), outData.size(), outData.size(), outData.size(), outData.size()});
     }
 
 

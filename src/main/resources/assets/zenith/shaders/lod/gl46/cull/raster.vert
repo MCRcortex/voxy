@@ -14,12 +14,15 @@ void main() {
 
     uint detail = extractDetail(section);
     ivec3 ipos = extractPosition(section);
+    ivec3 aabbOffset = extractAABBOffset(section);
+    ivec3 size = extractAABBSize(section);
 
     //Transform ipos with respect to the vertex corner
-    ipos += ivec3(gl_VertexID&1, (gl_VertexID>>2)&1, (gl_VertexID>>1)&1);
+    ivec3 pos = (((ipos<<detail)-baseSectionPos)<<5);
+    pos += aabbOffset;
+    pos += (ivec3(gl_VertexID&1, (gl_VertexID>>2)&1, (gl_VertexID>>1)&1)*size)*(1<<detail);
 
-    vec3 cornerPos = vec3(((ipos<<detail)-baseSectionPos)<<5);
-    gl_Position = MVP * vec4(cornerPos,1);
+    gl_Position = MVP * vec4(vec3(pos),1);
 
     //Write to this id
     id = sid;

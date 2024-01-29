@@ -361,6 +361,6 @@ public class ModelManager {
     }
 
     public void addDebugInfo(List<String> info) {
-
+        info.add("BlockModels registered: " + this.modelTexture2id.size() + "/" + (1<<16));
     }
 }

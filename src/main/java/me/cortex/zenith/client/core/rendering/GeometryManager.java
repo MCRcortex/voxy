@@ -5,7 +5,6 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.rendering.building.BuiltSection;
-import me.cortex.zenith.client.core.rendering.building.BuiltSectionGeometry;
 import me.cortex.zenith.client.core.rendering.util.BufferArena;
 import me.cortex.zenith.client.core.rendering.util.UploadStream;
 import org.lwjgl.system.MemoryUtil;
@@ -33,7 +32,7 @@ public class GeometryManager {
     void uploadResults() {
         while (!this.buildResults.isEmpty()) {
             var result = this.buildResults.pop();
-            boolean isDelete = result.opaque == null && result.translucent == null;
+            boolean isDelete = result.geometryBuffer == null;
             if (isDelete) {
                 int id = -1;
                 if ((id = this.pos2id.remove(result.position)) != -1) {
@@ -142,36 +141,29 @@ public class GeometryManager {
 
     //TODO: pack the offsets of each axis so that implicit face culling can work
     //Note! the opaquePreDataCount and translucentPreDataCount are never writen to the meta buffer, as they are indexed in reverse relative to the base opaque and translucent geometry
-    private record SectionMeta(long position, int aabb, int opaqueGeometryPtr, int count, int translucentGeometryPtr) {
+    private record SectionMeta(long position, int aabb, int geometryPtr, int size, int[] offsets) {
         public void writeMetadata(long ptr) {
             //THIS IS DUE TO ENDIANNESS and that we are splitting a long into 2 ints
             MemoryUtil.memPutInt(ptr, (int) (this.position>>32)); ptr += 4;
             MemoryUtil.memPutInt(ptr, (int) this.position); ptr += 4;
             MemoryUtil.memPutInt(ptr, (int) this.aabb); ptr += 4;
-            ptr += 4;
+            MemoryUtil.memPutInt(ptr, this.geometryPtr + this.offsets[0]); ptr += 4;
 
-            MemoryUtil.memPutInt(ptr, this.opaqueGeometryPtr); ptr += 4;
-            MemoryUtil.memPutInt(ptr, this.count); ptr += 4;
-
-            //MemoryUtil.memPutInt(ptr, (int) this.translucentGeometryPtr + this.translucentPreDataCount); ptr += 4;
-            //MemoryUtil.memPutInt(ptr, this.translucentQuadCount); ptr += 4;
+            MemoryUtil.memPutInt(ptr, (this.offsets[1]-this.offsets[0])|((this.offsets[2]-this.offsets[1])<<16)); ptr += 4;
+            MemoryUtil.memPutInt(ptr, (this.offsets[3]-this.offsets[2])|((this.offsets[4]-this.offsets[3])<<16)); ptr += 4;
+            MemoryUtil.memPutInt(ptr, (this.offsets[5]-this.offsets[4])|((this.offsets[6]-this.offsets[5])<<16)); ptr += 4;
+            MemoryUtil.memPutInt(ptr, (this.offsets[7]-this.offsets[6])|((this.size      -this.offsets[7])<<16)); ptr += 4;
         }
     }
 
     private SectionMeta createMeta(BuiltSection geometry) {
-        int geometryPtr = (int) this.geometryBuffer.upload(geometry.opaque.buffer());
-
-        //TODO: support translucent geometry
-        //return new SectionMeta(geometry.position, 0, geometryPtr, (int) (geometry.opaque.buffer().size/8), 0, -1,0, 0);
-        return new SectionMeta(geometry.position, 0, geometryPtr, (int) (geometry.opaque.buffer().size/8), -1);
+        int geometryPtr = (int) this.geometryBuffer.upload(geometry.geometryBuffer);
+        return new SectionMeta(geometry.position, geometry.aabb, geometryPtr, (int) (geometry.geometryBuffer.size/8), geometry.offsets);
     }
 
     private void freeMeta(SectionMeta meta) {
-        if (meta.opaqueGeometryPtr != -1) {
-            this.geometryBuffer.free(meta.opaqueGeometryPtr);
-        }
-        if (meta.translucentGeometryPtr != -1) {
-            this.geometryBuffer.free(meta.translucentGeometryPtr);
+        if (meta.geometryPtr != -1) {
+            this.geometryBuffer.free(meta.geometryPtr);
         }
     }
 
