@@ -13,7 +13,8 @@ layout(binding = 0, std140) uniform SceneUniform {
 
 struct BlockModel {
     uint faceData[6];
-    uint _pad[10];
+    uint flagsA;
+    uint _pad[9];
 };
 
 struct SectionMeta {

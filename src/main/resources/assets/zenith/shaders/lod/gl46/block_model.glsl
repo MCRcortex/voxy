@@ -7,3 +7,7 @@ float extractFaceIndentation(uint faceData) {
 vec4 extractFaceSizes(uint faceData) {
     return (vec4(faceData&0xF, (faceData>>4)&0xF, (faceData>>8)&0xF, (faceData>>12)&0xF)/16)+vec4(0,1f/16,0,1f/16);
 }
+
+uint faceHasAlphaCuttout(uint faceData) {
+    return (faceData>>22)&1;
+}

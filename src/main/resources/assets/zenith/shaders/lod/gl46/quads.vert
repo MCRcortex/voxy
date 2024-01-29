@@ -9,7 +9,7 @@
 layout(location = 0) out vec2 uv;
 layout(location = 1) out flat vec2 baseUV;
 layout(location = 2) out flat vec4 colourTinting;
-layout(location = 3) out flat int discardAlpha;
+layout(location = 3) out flat uint discardAlpha;
 
 uint extractLodLevel() {
     return uint(gl_BaseInstance)>>29;
@@ -26,13 +26,13 @@ vec4 uint2vec4RGBA(uint colour) {
 }
 
 //Gets the face offset with respect to the face direction (e.g. some will be + some will be -)
-float getDepthOffset(BlockModel model, uint face) {
-    float offset = extractFaceIndentation(model.faceData[face]);
+float getDepthOffset(uint faceData, uint face) {
+    float offset = extractFaceIndentation(faceData);
     return offset * (1-((int(face)&1)*2));
 }
 
-vec2 getFaceSizeOffset(BlockModel model, uint face, uint corner) {
-    vec4 faceOffsetsSizes = extractFaceSizes(model.faceData[face]);
+vec2 getFaceSizeOffset(uint faceData, uint corner) {
+    vec4 faceOffsetsSizes = extractFaceSizes(faceData);
     return mix(faceOffsetsSizes.xz, -(1-faceOffsetsSizes.yw), bvec2(((corner>>1)&1)==1, (corner&1)==1));
 }
 
@@ -46,6 +46,7 @@ void main() {
     uint face = extractFace(quad);
     uint modelId = extractStateId(quad);
     BlockModel model = modelData[modelId];
+    uint faceData = model.faceData[face];
 
     //Change the ordering due to backface culling
     //NOTE: when rendering, backface culling is disabled as we simply dispatch calls for each face
@@ -58,11 +59,11 @@ void main() {
     ivec3 lodCorner = ((extractRelativeLodPos()<<lodLevel) - (baseSectionPos&(ivec3((1<<lodLevel)-1))))<<5;
     vec3 corner = innerPos * (1<<lodLevel) + lodCorner;
 
-    vec2 faceOffset = getFaceSizeOffset(model, face, cornerIdx);
+    vec2 faceOffset = getFaceSizeOffset(faceData, cornerIdx);
     vec2 quadSize = vec2(extractSize(quad) * ivec2((cornerIdx>>1)&1, cornerIdx&1));
     vec2 size = (quadSize + faceOffset) * (1<<lodLevel);
 
-    vec3 offset = vec3(size, (float(face&1) + getDepthOffset(model, face)) * (1<<lodLevel));
+    vec3 offset = vec3(size, (float(face&1) + getDepthOffset(faceData, face)) * (1<<lodLevel));
 
     if ((face>>1) == 0) {//Up/down
         offset = offset.xzy;
@@ -85,7 +86,7 @@ void main() {
     baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3,2)*256f)));
     uv = quadSize + faceOffset;//Add in the face offset for 0,0 uv
 
-    discardAlpha = 0;
+    discardAlpha = faceHasAlphaCuttout(faceData);
 
     //Compute lighting
     colourTinting = getLighting(extractLightId(quad));

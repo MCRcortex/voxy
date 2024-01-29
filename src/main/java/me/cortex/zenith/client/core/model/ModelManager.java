@@ -160,25 +160,29 @@ public class ModelManager {
         long uploadPtr = UploadStream.INSTANCE.upload(this.modelBuffer, (long) modelId * MODEL_SIZE, MODEL_SIZE);
 
 
-        //TODO: implement
+        //TODO: implement;
+        // TODO: if it has a constant colour instead... idk why (apparently for things like spruce leaves)?? but premultiply the texture data by the constant colour
         boolean hasBiomeColourResolver = false;
 
+
+
+        //TODO: special case stuff like vines and glow lichen, where it can be represented by a single double sided quad
+        // since that would help alot with perf of lots of vines, can be done by having one of the faces just not exist and the other be in no occlusion mode
+
+        var sizes = this.computeModelDepth(textureData, checkMode);
 
         //TODO: THIS, note this can be tested for in 2 ways, re render the model with quad culling disabled and see if the result
         // is the same, (if yes then needs double sided quads)
         // another way to test it is if e.g. up and down havent got anything rendered but the sides do (e.g. all plants etc)
-        boolean needsDoubleSidedQuads = false;
-
-        //TODO: special case stuff like vines and glow lichen, where it can be represented by a single double sided quad
-        // since that would help alot with perf of lots of vines
+        boolean needsDoubleSidedQuads = (sizes[0] < -0.1 && sizes[1] < -0.1) || (sizes[2] < -0.1 && sizes[3] < -0.1) || (sizes[4] < -0.1 && sizes[5] < -0.1);
 
 
-        //This also checks if there is a block colour resolver for the given blockstate and marks that the block has a resolver
-        var sizes = this.computeModelDepth(textureData, checkMode);
 
         //Each face gets 1 byte, with the top 2 bytes being for whatever
-        long metadata = hasBiomeColourResolver?1:0;
+        long metadata = 0;
+        metadata |= hasBiomeColourResolver?1:0;
         metadata |= blockRenderLayer == RenderLayer.getTranslucent()?2:0;
+        metadata |= needsDoubleSidedQuads?4:0;
 
         //TODO: add a bunch of control config options for overriding/setting options of metadata for each face of each type
         for (int face = 5; face != -1; face--) {//In reverse order to make indexing into the metadata long easier
@@ -192,6 +196,7 @@ public class ModelManager {
                 continue;
             }
             var faceSize = TextureUtils.computeBounds(textureData[face], checkMode);
+            int writeCount = TextureUtils.getWrittenPixelCount(textureData[face], checkMode);
 
             boolean faceCoversFullBlock = faceSize[0] == 0 && faceSize[2] == 0 &&
                     faceSize[1] == (this.modelTextureSize-1) && faceSize[3] == (this.modelTextureSize-1);
@@ -206,7 +211,6 @@ public class ModelManager {
             occludesFace &= offset < 0.1;//If the face is rendered far away from the other face, then it doesnt occlude
 
             if (occludesFace) {
-                int writeCount = TextureUtils.getWrittenPixelCount(textureData[face], checkMode);
                 occludesFace &= ((float)writeCount)/(this.modelTextureSize * this.modelTextureSize) > 0.9;// only occlude if the face covers more than 90% of the face
             }
             metadata |= occludesFace?1:0;
@@ -231,6 +235,14 @@ public class ModelManager {
             faceModelData |= Math.round(offset*63)<<16;//Change the scale from 0->1 (ends inclusive) float to 0->63 (6 bits) NOTE! that 63 == 1.0f meaning its shifted all the way to the other side of the model
             //Still have 11 bits free
 
+            //Stuff like fences are solid, however they have extra side piece that mean it needs to have discard on
+            int area = (faceSize[1]-faceSize[0]+1) * (faceSize[3]-faceSize[2]+1);
+            boolean needsAlphaDiscard = ((float)writeCount)/area<0.9;//If the amount of area covered by written pixels is less than a threashold, disable discard as its not needed
+
+            needsAlphaDiscard |= blockRenderLayer != RenderLayer.getSolid();
+
+            faceModelData |= needsAlphaDiscard?1<<22:0;
+
             MemoryUtil.memPutInt(faceUploadPtr, faceModelData);
         }
         this.metadataCache[modelId] = metadata;
@@ -238,6 +250,9 @@ public class ModelManager {
         uploadPtr += 4*6;
         //Have 40 bytes free for remaining model data
         // todo: put in like the render layer type ig? along with colour resolver info
+        int modelFlags = 0;
+        //modelFlags |= blockRenderLayer == RenderLayer.getSolid()?0:1;// should discard alpha
+        MemoryUtil.memPutInt(uploadPtr, modelFlags);
 
 
 
@@ -343,5 +358,9 @@ public class ModelManager {
         this.modelBuffer.free();
         this.textures.free();
         glDeleteSamplers(this.blockSampler);
+    }
+
+    public void addDebugInfo(List<String> info) {
+
     }
 }

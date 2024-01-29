@@ -177,6 +177,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
     @Override
     public void addDebugData(List<String> debug) {
+        super.addDebugData(debug);
         debug.add("Geometry buffer usage: " + ((float)Math.round((this.geometry.getGeometryBufferUsage()*100000))/1000) + "%");
         debug.add("Render Sections: " + this.geometry.getSectionCount());
     }

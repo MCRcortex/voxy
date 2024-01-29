@@ -90,7 +90,7 @@ public abstract class AbstractFarWorldRenderer {
     }
 
     public void addDebugData(List<String> debug) {
-
+        this.models.addDebugInfo(debug);
     }
 
     public void shutdown() {
