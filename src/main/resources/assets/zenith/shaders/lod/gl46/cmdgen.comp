@@ -87,7 +87,10 @@ void main() {
         uint count = 0;
         //Translucency
         count = meta.cntA&0xFFFF;
-
+        if (count != 0) {
+            uint translucentCommandPtr = atomicAdd(translucentDrawCount, 1) + 400000;//FIXME: dont hardcode this offset
+            writeCmd(translucentCommandPtr, encodedPos, ptr, count);
+        }
         ptr += count;
 
         //Double sided quads

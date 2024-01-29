@@ -133,6 +133,9 @@ public class VoxelCore {
 
         //glBindFramebuffer(GL_FRAMEBUFFER, boundFB);
         //this.postProcessing.renderPost(boundFB);
+
+        //We can render the translucent directly after as it is the furthest translucent objects
+        this.renderer.renderFarAwayTranslucent();
     }
 
     public void addDebugInfo(List<String> debug) {

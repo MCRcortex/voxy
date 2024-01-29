@@ -84,6 +84,8 @@ public abstract class AbstractFarWorldRenderer {
 
     public abstract void renderFarAwayOpaque(MatrixStack stack, double cx, double cy, double cz);
 
+    public abstract void renderFarAwayTranslucent();
+
     public void enqueueResult(BuiltSection result) {
         this.geometry.enqueueResult(result);
     }

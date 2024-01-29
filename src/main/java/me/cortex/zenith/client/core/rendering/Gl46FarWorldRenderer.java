@@ -59,7 +59,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
     public Gl46FarWorldRenderer(int geometryBuffer, int maxSections) {
         super(geometryBuffer, maxSections);
-        this.glCommandBuffer = new GlBuffer(maxSections*5L*4);
+        this.glCommandBuffer = new GlBuffer(maxSections*5L*4 * 6);
         this.glCommandCountBuffer = new GlBuffer(4*2);
         this.glVisibilityBuffer = new GlBuffer(maxSections*4L);
         glClearNamedBufferData(this.glCommandBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
@@ -82,6 +82,26 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.models.getBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.lightDataBuffer.id);//Lighting LUT
         glBindVertexArray(0);
+    }
+
+    //FIXME: dont do something like this as it breaks multiviewport mods
+    private int frameId = 0;
+    private void updateUniformBuffer(MatrixStack stack, double cx, double cy, double cz) {
+        long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, this.uniformBuffer.size());
+        var mat = new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix());
+        var innerTranslation = new Vector3f((float) (cx-(this.sx<<5)), (float) (cy-(this.sy<<5)), (float) (cz-(this.sz<<5)));
+        mat.translate(-innerTranslation.x, -innerTranslation.y, -innerTranslation.z);
+        mat.getToAddress(ptr); ptr += 4*4*4;
+        MemoryUtil.memPutInt(ptr, this.sx); ptr += 4;
+        MemoryUtil.memPutInt(ptr, this.sy); ptr += 4;
+        MemoryUtil.memPutInt(ptr, this.sz); ptr += 4;
+        MemoryUtil.memPutInt(ptr, this.geometry.getSectionCount()); ptr += 4;
+        var planes = ((AccessFrustumIntersection)this.frustum).getPlanes();
+        for (var plane : planes) {
+            plane.getToAddress(ptr); ptr += 4*4;
+        }
+        innerTranslation.getToAddress(ptr); ptr += 4*3;
+        MemoryUtil.memPutInt(ptr, this.frameId++); ptr += 4;
     }
 
     public void renderFarAwayOpaque(MatrixStack stack, double cx, double cy, double cz) {
@@ -144,25 +164,32 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         RenderLayer.getCutoutMipped().endDrawing();
     }
 
-    //FIXME: dont do something like this as it breaks multiviewport mods
-    private int frameId = 0;
-    private void updateUniformBuffer(MatrixStack stack, double cx, double cy, double cz) {
-        long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, this.uniformBuffer.size());
-        var mat = new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix());
-        var innerTranslation = new Vector3f((float) (cx-(this.sx<<5)), (float) (cy-(this.sy<<5)), (float) (cz-(this.sz<<5)));
-        mat.translate(-innerTranslation.x, -innerTranslation.y, -innerTranslation.z);
-        mat.getToAddress(ptr); ptr += 4*4*4;
-        MemoryUtil.memPutInt(ptr, this.sx); ptr += 4;
-        MemoryUtil.memPutInt(ptr, this.sy); ptr += 4;
-        MemoryUtil.memPutInt(ptr, this.sz); ptr += 4;
-        MemoryUtil.memPutInt(ptr, this.geometry.getSectionCount()); ptr += 4;
-        var planes = ((AccessFrustumIntersection)this.frustum).getPlanes();
-        for (var plane : planes) {
-            plane.getToAddress(ptr); ptr += 4*4;
-        }
-        innerTranslation.getToAddress(ptr); ptr += 4*3;
-        MemoryUtil.memPutInt(ptr, this.frameId++); ptr += 4;
+    @Override
+    public void renderFarAwayTranslucent() {
+        RenderLayer.getTranslucent().startDrawing();
+        glBindVertexArray(this.vao);
+        glDisable(GL_CULL_FACE);
+
+        int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
+        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
+
+        glBindSampler(0, this.models.getSamplerId());
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
+        this.lodShader.bind();
+
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 400_000 * 4 * 5, 4, this.geometry.getSectionCount(), 0);
+
+        glEnable(GL_CULL_FACE);
+        glBindVertexArray(0);
+
+        glBindSampler(0, 0);
+        GL11C.glBindTexture(GL_TEXTURE_2D, oldBoundTexture);
+        glActiveTexture(oldActiveTexture);
+
+        RenderLayer.getTranslucent().endDrawing();
     }
+
 
     @Override
     public void shutdown() {
