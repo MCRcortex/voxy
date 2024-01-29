@@ -14,11 +14,14 @@ import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.math.Direction;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.lwjgl.opengl.ARBIndirectParameters;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
 
+import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
+import static org.lwjgl.opengl.ARBIndirectParameters.glMultiDrawElementsIndirectCountARB;
 import static org.lwjgl.opengl.ARBMultiDrawIndirect.glMultiDrawElementsIndirect;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_SHORT;
@@ -51,11 +54,13 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
             .compile();
 
     private final GlBuffer glCommandBuffer;
+    private final GlBuffer glCommandCountBuffer;
     private final GlBuffer glVisibilityBuffer;
 
     public Gl46FarWorldRenderer(int geometryBuffer, int maxSections) {
         super(geometryBuffer, maxSections);
         this.glCommandBuffer = new GlBuffer(maxSections*5L*4);
+        this.glCommandCountBuffer = new GlBuffer(4*2);
         this.glVisibilityBuffer = new GlBuffer(maxSections*4L);
         glClearNamedBufferData(this.glCommandBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
         glClearNamedBufferData(this.glVisibilityBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
@@ -66,14 +71,16 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
     protected void setupVao() {
         glBindVertexArray(this.vao);
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.glCommandBuffer.id);
+        glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.glCommandCountBuffer.id);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometry.geometryId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.glCommandBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometry.metaId());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.glVisibilityBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.models.getBufferId());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.lightDataBuffer.id);//Lighting LUT
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.glCommandCountBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.geometry.metaId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.glVisibilityBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.models.getBufferId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.lightDataBuffer.id);//Lighting LUT
         glBindVertexArray(0);
     }
 
@@ -81,6 +88,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         if (this.geometry.getSectionCount() == 0) {
             return;
         }
+
+        //this.models.addEntry(0, Blocks.OAK_FENCE.getDefaultState());
 
 
         RenderLayer.getCutoutMipped().startDrawing();
@@ -101,16 +110,15 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
 
-
+        glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
         this.commandGen.bind();
         glDispatchCompute((this.geometry.getSectionCount() + 127) / 128, 1, 1);
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_UNIFORM_BARRIER_BIT);
 
         this.lodShader.bind();
         glDisable(GL_CULL_FACE);
-        glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, this.geometry.getSectionCount(), 0);
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
         glEnable(GL_CULL_FACE);
-        //ARBIndirectParameters.glMultiDrawElementsIndirectCountARB(
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
 
@@ -164,6 +172,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         this.cullShader.free();
         this.glCommandBuffer.free();
         this.glVisibilityBuffer.free();
+        this.glCommandCountBuffer.free();
     }
 
     @Override

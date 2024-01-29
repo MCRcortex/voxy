@@ -99,6 +99,7 @@ public class VoxelCore {
         if (this.firstTime) {
             this.distanceTracker.init(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
             this.firstTime = false;
+            //this.renderTracker.addLvl0(0,6,0);
         }
         this.distanceTracker.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
         this.renderer.setupRender(frustum, camera);

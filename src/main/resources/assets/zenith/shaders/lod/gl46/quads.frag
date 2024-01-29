@@ -14,4 +14,6 @@ void main() {
         discard;
     }
     outColour = colour * colourTinting;
+
+    //outColour = vec4(uv + baseUV, 0, 1);
 }

@@ -49,15 +49,7 @@ public class ModelTextureBakery {
             .compile();
 
     private static final List<MatrixStack> FACE_VIEWS = new ArrayList<>();
-    static {
-        addView(-90,0, 0);//Direction.DOWN
-        addView(90,0, 0);//Direction.UP
-        addView(0,180, 0);//Direction.NORTH
-        addView(0,0, 0);//Direction.SOUTH
-        //TODO: check these arnt the wrong way round
-        addView(0,90, 270);//Direction.EAST
-        addView(0,270, 270);//Direction.WEST
-    }
+
 
     public ModelTextureBakery(int width, int height) {
         this.width = width;
@@ -65,9 +57,23 @@ public class ModelTextureBakery {
         this.colourTex = new GlTexture().store(GL_RGBA8, 1, width, height);
         this.depthTex = new GlTexture().store(GL_DEPTH24_STENCIL8, 1, width, height);
         this.framebuffer = new GlFramebuffer().bind(GL_COLOR_ATTACHMENT0, this.colourTex).bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthTex).verify();
+
+        //This is done to help make debugging easier
+        FACE_VIEWS.clear();
+        AddViews();
     }
 
-    private static void addView(float pitch, float yaw, float rotation) {
+    private static void AddViews() {
+        addView(-90,0, 0, false);//Direction.DOWN
+        addView(90,0, 0, false);//Direction.UP
+        addView(0,180, 0, true);//Direction.NORTH
+        addView(0,0, 0, false);//Direction.SOUTH
+        //TODO: check these arnt the wrong way round
+        addView(0,90, 270, false);//Direction.EAST
+        addView(0,270, 270, false);//Direction.WEST
+    }
+
+    private static void addView(float pitch, float yaw, float rotation, boolean flipX) {
         var stack = new MatrixStack();
         stack.translate(0.5f,0.5f,0.5f);
         stack.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(rotation));

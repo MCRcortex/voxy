@@ -61,14 +61,6 @@ void main() {
         cmd.firstIndex = 0;
         cmd.baseVertex = int(extractQuadStart(meta))<<2;
         cmd.baseInstance = encodeLocalLodPos(detail, ipos);
-        cmdBuffer[gl_GlobalInvocationID.x] = cmd;
-    } else {
-        DrawCommand cmd;
-        cmd.count = 0;
-        cmd.instanceCount = 0;
-        cmd.firstIndex = 0;
-        cmd.baseVertex = 0;
-        cmd.baseInstance = 0;
-        cmdBuffer[gl_GlobalInvocationID.x] = cmd;
+        cmdBuffer[atomicAdd(opaqueDrawCount, 1)] = cmd;
     }
 }

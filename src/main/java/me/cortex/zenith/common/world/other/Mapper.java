@@ -185,6 +185,14 @@ public class Mapper {
         return this.blockId2stateEntry.get(blockId).state;
     }
 
+    public int getIdFromBlockState(BlockState state) {
+        var entry = this.block2stateEntry.get(state);
+        if (entry == null) {
+            return -1;
+        }
+        return entry.id;
+    }
+
     //TODO: fixme: synchronize access to this.blockId2stateEntry
     public StateEntry[] getStateEntries() {
         var set = new ArrayList<>(this.blockId2stateEntry);

@@ -7,6 +7,7 @@ import me.cortex.zenith.common.util.MemoryBuffer;
 import me.cortex.zenith.common.world.WorldEngine;
 import me.cortex.zenith.common.world.WorldSection;
 import me.cortex.zenith.common.world.other.Mapper;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import org.lwjgl.system.MemoryUtil;
 
@@ -47,7 +48,6 @@ public class RenderDataFactory {
         LongArrayList outData = new LongArrayList(1000);
 
         //Up direction
-
         for (int y = 0; y < 32; y++) {
             mesher.reset();
             for (int x = 0; x < 32; x++) {
@@ -91,7 +91,195 @@ public class RenderDataFactory {
                 int quad = array[i];
                 long data = mesher.getDataFromQuad(quad);
                 outData.add(Integer.toUnsignedLong(QuadEncoder.encodePosition(1, y, quad)) | ((data&0xFFFF)<<26) | (((data>>16)&0xFF)<<55) | (((data>>24)&0x1FF)<<46));
-                //outData.add(Integer.toUnsignedLong(QuadEncoder.encodePosition(1, y, quad)) | (1<<26));
+            }
+        }
+
+
+        //North direction
+        for (int z = 0; z < 32; z++) {
+            mesher.reset();
+            for (int x = 0; x < 32; x++) {
+                for (int y = 0; y < 32; y++) {
+                    long self = this.sectionCache[WorldSection.getIndex(x, y, z)];
+                    if (Mapper.isAir(self)) continue;
+
+                    int selfBlockId = Mapper.getBlockId(self);
+                    long metadata = this.modelMan.getModelMetadata(selfBlockId);
+
+                    //If the model doesnt have a face, then just skip it
+                    if (!ModelManager.faceExists(metadata, 2)) {
+                        continue;
+                    }
+
+                    long facingState = Mapper.AIR;
+                    //Need to access the other connecting section
+                    if (z == 0) {
+
+                    } else {
+                        facingState = this.sectionCache[WorldSection.getIndex(x, y, z-1)];
+                    }
+
+                    long facingMetadata = this.modelMan.getModelMetadata(Mapper.getBlockId(facingState));
+
+                    //If face can be occluded and is occluded from the facing block, then dont render the face
+                    if (ModelManager.faceCanBeOccluded(metadata, 2) && ModelManager.faceOccludes(facingMetadata, 3)) {
+                        continue;
+                    }
+
+                    int clientModelId = this.modelMan.getModelId(selfBlockId);
+
+                    mesher.put(x, y, ((long)clientModelId) | (((long) Mapper.getLightId(facingState))<<16) | (((long) Mapper.getBiomeId(self))<<24));
+                }
+            }
+
+            //TODO: encode translucents and double sided quads to different global buffers
+            int count = mesher.process();
+            var array = mesher.getArray();
+            for (int i = 0; i < count; i++) {
+                int quad = array[i];
+                long data = mesher.getDataFromQuad(quad);
+                outData.add(Integer.toUnsignedLong(QuadEncoder.encodePosition(2, z, quad)) | ((data&0xFFFF)<<26) | (((data>>16)&0xFF)<<55) | (((data>>24)&0x1FF)<<46));
+            }
+        }
+
+        //South direction
+        for (int z = 0; z < 32; z++) {
+            mesher.reset();
+            for (int x = 0; x < 32; x++) {
+                for (int y = 0; y < 32; y++) {
+                    long self = this.sectionCache[WorldSection.getIndex(x, y, z)];
+                    if (Mapper.isAir(self)) continue;
+
+                    int selfBlockId = Mapper.getBlockId(self);
+                    long metadata = this.modelMan.getModelMetadata(selfBlockId);
+
+                    //If the model doesnt have a face, then just skip it
+                    if (!ModelManager.faceExists(metadata, 3)) {
+                        continue;
+                    }
+
+                    long facingState = Mapper.AIR;
+                    //Need to access the other connecting section
+                    if (z == 31) {
+
+                    } else {
+                        facingState = this.sectionCache[WorldSection.getIndex(x, y, z+1)];
+                    }
+
+                    long facingMetadata = this.modelMan.getModelMetadata(Mapper.getBlockId(facingState));
+
+                    //If face can be occluded and is occluded from the facing block, then dont render the face
+                    if (ModelManager.faceCanBeOccluded(metadata, 3) && ModelManager.faceOccludes(facingMetadata, 2)) {
+                        continue;
+                    }
+
+                    int clientModelId = this.modelMan.getModelId(selfBlockId);
+
+                    mesher.put(x, y, ((long)clientModelId) | (((long) Mapper.getLightId(facingState))<<16) | (((long) Mapper.getBiomeId(self))<<24));
+                }
+            }
+
+            //TODO: encode translucents and double sided quads to different global buffers
+            int count = mesher.process();
+            var array = mesher.getArray();
+            for (int i = 0; i < count; i++) {
+                int quad = array[i];
+                long data = mesher.getDataFromQuad(quad);
+                outData.add(Integer.toUnsignedLong(QuadEncoder.encodePosition(3, z, quad)) | ((data&0xFFFF)<<26) | (((data>>16)&0xFF)<<55) | (((data>>24)&0x1FF)<<46));
+            }
+        }
+
+        //West direction
+        for (int x = 0; x < 32; x++) {
+            mesher.reset();
+            for (int y = 0; y < 32; y++) {
+                for (int z = 0; z < 32; z++) {
+                    long self = this.sectionCache[WorldSection.getIndex(x, y, z)];
+                    if (Mapper.isAir(self)) continue;
+
+                    int selfBlockId = Mapper.getBlockId(self);
+                    long metadata = this.modelMan.getModelMetadata(selfBlockId);
+
+                    //If the model doesnt have a face, then just skip it
+                    if (!ModelManager.faceExists(metadata, 2)) {
+                        continue;
+                    }
+
+                    long facingState = Mapper.AIR;
+                    //Need to access the other connecting section
+                    if (x == 0) {
+
+                    } else {
+                        facingState = this.sectionCache[WorldSection.getIndex(x-1, y, z)];
+                    }
+
+                    long facingMetadata = this.modelMan.getModelMetadata(Mapper.getBlockId(facingState));
+
+                    //If face can be occluded and is occluded from the facing block, then dont render the face
+                    if (ModelManager.faceCanBeOccluded(metadata, 4) && ModelManager.faceOccludes(facingMetadata, 5)) {
+                        continue;
+                    }
+
+                    int clientModelId = this.modelMan.getModelId(selfBlockId);
+
+                    mesher.put(y, z, ((long)clientModelId) | (((long) Mapper.getLightId(facingState))<<16) | (((long) Mapper.getBiomeId(self))<<24));
+                }
+            }
+
+            //TODO: encode translucents and double sided quads to different global buffers
+            int count = mesher.process();
+            var array = mesher.getArray();
+            for (int i = 0; i < count; i++) {
+                int quad = array[i];
+                long data = mesher.getDataFromQuad(quad);
+                outData.add(Integer.toUnsignedLong(QuadEncoder.encodePosition(4, x, quad)) | ((data&0xFFFF)<<26) | (((data>>16)&0xFF)<<55) | (((data>>24)&0x1FF)<<46));
+            }
+        }
+
+        //East direction
+        for (int x = 0; x < 32; x++) {
+            mesher.reset();
+            for (int y = 0; y < 32; y++) {
+                for (int z = 0; z < 32; z++) {
+                    long self = this.sectionCache[WorldSection.getIndex(x, y, z)];
+                    if (Mapper.isAir(self)) continue;
+
+                    int selfBlockId = Mapper.getBlockId(self);
+                    long metadata = this.modelMan.getModelMetadata(selfBlockId);
+
+                    //If the model doesnt have a face, then just skip it
+                    if (!ModelManager.faceExists(metadata, 2)) {
+                        continue;
+                    }
+
+                    long facingState = Mapper.AIR;
+                    //Need to access the other connecting section
+                    if (x == 31) {
+
+                    } else {
+                        facingState = this.sectionCache[WorldSection.getIndex(x+1, y, z)];
+                    }
+
+                    long facingMetadata = this.modelMan.getModelMetadata(Mapper.getBlockId(facingState));
+
+                    //If face can be occluded and is occluded from the facing block, then dont render the face
+                    if (ModelManager.faceCanBeOccluded(metadata, 5) && ModelManager.faceOccludes(facingMetadata, 4)) {
+                        continue;
+                    }
+
+                    int clientModelId = this.modelMan.getModelId(selfBlockId);
+
+                    mesher.put(y, z, ((long)clientModelId) | (((long) Mapper.getLightId(facingState))<<16) | (((long) Mapper.getBiomeId(self))<<24));
+                }
+            }
+
+            //TODO: encode translucents and double sided quads to different global buffers
+            int count = mesher.process();
+            var array = mesher.getArray();
+            for (int i = 0; i < count; i++) {
+                int quad = array[i];
+                long data = mesher.getDataFromQuad(quad);
+                outData.add(Integer.toUnsignedLong(QuadEncoder.encodePosition(5, x, quad)) | ((data&0xFFFF)<<26) | (((data>>16)&0xFF)<<55) | (((data>>24)&0x1FF)<<46));
             }
         }
 
@@ -111,8 +299,18 @@ public class RenderDataFactory {
         if (outData.isEmpty()) {
             return new BuiltSection(section.getKey(), null, null);
         }
+        //outData.clear();
 
-        //outData.add(encodeRaw(3, 0,1,0,0,0,159,0, 0));
+        //int modelId = this.modelMan.getModelId(this.world.getMapper().getIdFromBlockState(Blocks.OAK_FENCE.getDefaultState()));
+        int modelId = this.modelMan.getModelId(this.world.getMapper().getIdFromBlockState(Blocks.OAK_FENCE.getDefaultState()));
+
+        //outData.add(encodeRaw(0, 0,0,0,0,0, modelId,0, 0));
+        //outData.add(encodeRaw(1, 0,0,0,0,0, modelId,0, 0));
+        //outData.add(encodeRaw(2, 0,0,0,0,0, modelId,0, 0));
+        //outData.add(encodeRaw(3, 0,0,0,0,0, modelId,0, 0));
+        //outData.add(encodeRaw(4, 0,0,0,0,0, modelId,0, 0));
+        //outData.add(encodeRaw(5, 0,0,0,0,0, modelId,0, 0));
+
         var buff = new MemoryBuffer(outData.size()*8L);
         long ptr = buff.address;
         for (long data : outData) {
@@ -126,5 +324,57 @@ public class RenderDataFactory {
     private static long encodeRaw(int face, int width, int height, int x, int y, int z, int blockId, int biomeId, int lightId) {
         return ((long)face) | (((long) width)<<3) | (((long) height)<<7) | (((long) z)<<11) | (((long) y)<<16) | (((long) x)<<21) | (((long) blockId)<<26) | (((long) biomeId)<<46) | (((long) lightId)<<55);
     }
+
+
+    /*
+    private void generateMeshForAxis() {
+
+        //Up direction
+        for (int y = 0; y < 32; y++) {
+            mesher.reset();
+            for (int x = 0; x < 32; x++) {
+                for (int z = 0; z < 32; z++) {
+                    long self = this.sectionCache[WorldSection.getIndex(x, y, z)];
+                    if (Mapper.isAir(self)) continue;
+
+                    int selfBlockId = Mapper.getBlockId(self);
+                    long metadata = this.modelMan.getModelMetadata(selfBlockId);
+
+                    //If the model doesnt have a face, then just skip it
+                    if (!ModelManager.faceExists(metadata, 1)) {
+                        continue;
+                    }
+
+                    long facingState = Mapper.AIR;
+                    //Need to access the other connecting section
+                    if (y == 31) {
+
+                    } else {
+                        facingState = this.sectionCache[WorldSection.getIndex(x, y+1, z)];
+                    }
+
+                    long facingMetadata = this.modelMan.getModelMetadata(Mapper.getBlockId(facingState));
+
+                    //If face can be occluded and is occluded from the facing block, then dont render the face
+                    if (ModelManager.faceCanBeOccluded(metadata, 1) && ModelManager.faceOccludes(facingMetadata, 0)) {
+                        continue;
+                    }
+
+                    int clientModelId = this.modelMan.getModelId(selfBlockId);
+
+                    mesher.put(x, z, ((long)clientModelId) | (((long) Mapper.getLightId(facingState))<<16) | (((long) Mapper.getBiomeId(self))<<24));
+                }
+            }
+
+            //TODO: encode translucents and double sided quads to different global buffers
+            int count = mesher.process();
+            var array = mesher.getArray();
+            for (int i = 0; i < count; i++) {
+                int quad = array[i];
+                long data = mesher.getDataFromQuad(quad);
+                outData.add(Integer.toUnsignedLong(QuadEncoder.encodePosition(1, y, quad)) | ((data&0xFFFF)<<26) | (((data>>16)&0xFF)<<55) | (((data>>24)&0x1FF)<<46));
+            }
+        }
+    }*/
 
 }

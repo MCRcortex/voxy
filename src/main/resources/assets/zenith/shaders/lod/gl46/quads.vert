@@ -83,9 +83,9 @@ void main() {
     //TODO: make the face orientated by 2x3 so that division is not a integer div and modulo isnt needed
     // as these are very slow ops
     baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3,2)*256f)));
-    uv = quadSize;// + faceOffset;//Add in the face offset for 0,0 uv
+    uv = quadSize + faceOffset;//Add in the face offset for 0,0 uv
 
-    discardAlpha = 1;
+    discardAlpha = 0;
 
     //Compute lighting
     colourTinting = getLighting(extractLightId(quad));

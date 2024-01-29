@@ -49,22 +49,27 @@ layout(binding = 2, std430) writeonly restrict buffer DrawBuffer {
     DrawCommand cmdBuffer[];
 };
 
-layout(binding = 3, std430) readonly restrict buffer SectionBuffer {
+layout(binding = 3, std430) restrict buffer DrawCommandCountBuffer {
+    uint opaqueDrawCount;
+    uint translucentDrawCount;
+};
+
+layout(binding = 4, std430) readonly restrict buffer SectionBuffer {
     SectionMeta sectionData[];
 };
 
 #ifndef VISIBILITY_ACCESS
 #define VISIBILITY_ACCESS readonly
 #endif
-layout(binding = 4, std430) VISIBILITY_ACCESS restrict buffer VisibilityBuffer {
+layout(binding = 5, std430) VISIBILITY_ACCESS restrict buffer VisibilityBuffer {
     uint visibilityData[];
 };
 
-layout(binding = 5, std430) readonly restrict buffer ModelBuffer {
+layout(binding = 6, std430) readonly restrict buffer ModelBuffer {
     BlockModel modelData[];
 };
 
-layout(binding = 6, std430) readonly restrict buffer LightingBuffer {
+layout(binding = 7, std430) readonly restrict buffer LightingBuffer {
     uint lightData[];
 };
 
