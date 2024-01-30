@@ -21,10 +21,11 @@ public class GlFramebuffer extends TrackedObject {
         glDeleteFramebuffers(this.id);
     }
 
-    public void verify() {
+    public GlFramebuffer verify() {
         int code;
         if ((code = glCheckNamedFramebufferStatus(this.id, GL_FRAMEBUFFER)) != GL_FRAMEBUFFER_COMPLETE) {
             throw new IllegalStateException("Framebuffer incomplete with error code: " + code);
         }
+        return this;
     }
 }

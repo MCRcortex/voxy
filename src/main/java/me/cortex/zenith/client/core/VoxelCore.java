@@ -5,10 +5,6 @@ import me.cortex.zenith.client.core.rendering.*;
 import me.cortex.zenith.client.core.rendering.building.RenderGenerationService;
 import me.cortex.zenith.client.core.util.DebugUtil;
 import me.cortex.zenith.common.world.WorldEngine;
-import me.cortex.zenith.client.core.other.BiomeColour;
-import me.cortex.zenith.client.core.other.BlockStateColour;
-import me.cortex.zenith.client.core.other.ColourResolver;
-import me.cortex.zenith.common.world.other.Mapper;
 import me.cortex.zenith.client.importers.WorldImporter;
 import me.cortex.zenith.common.world.storage.FragmentedStorageBackendAdaptor;
 import net.minecraft.block.Block;
@@ -16,7 +12,6 @@ import net.minecraft.block.Blocks;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.math.Direction;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 
@@ -38,18 +33,6 @@ import java.util.*;
 //There is strict forward only dataflow
 //Ingest -> world engine -> raw render data -> render data
 public class VoxelCore {
-    private static final Set<Block> biomeTintableAllFaces = new HashSet<>(List.of(Blocks.OAK_LEAVES, Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES, Blocks.DARK_OAK_LEAVES, Blocks.VINE, Blocks.MANGROVE_LEAVES,
-            Blocks.TALL_GRASS, Blocks.LARGE_FERN,
-            Blocks.SHORT_GRASS,
-
-            Blocks.SPRUCE_LEAVES,
-            Blocks.BIRCH_LEAVES,
-            Blocks.PINK_PETALS,
-            Blocks.FERN, Blocks.POTTED_FERN));
-    private static final Set<Block> biomeTintableUpFace = new HashSet<>(List.of(Blocks.GRASS_BLOCK));
-    private static final Set<Block> waterTint = new HashSet<>(List.of(Blocks.WATER));
-
-
     private final WorldEngine world;
     private final DistanceTracker distanceTracker;
     private final RenderGenerationService renderGen;
@@ -65,13 +48,13 @@ public class VoxelCore {
 
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
-        this.renderer = new Gl46FarWorldRenderer();
+        this.renderer = new Gl46FarWorldRenderer(ZenithConfig.CONFIG.geometryBufferSize, ZenithConfig.CONFIG.maxSections);
         System.out.println("Renderer initialized");
         this.world = new WorldEngine(new FragmentedStorageBackendAdaptor(new File(ZenithConfig.CONFIG.storagePath)), ZenithConfig.CONFIG.ingestThreads, ZenithConfig.CONFIG.savingThreads, ZenithConfig.CONFIG.savingCompressionLevel, 5);//"storagefile.db"//"ethoslab.db"
         System.out.println("World engine");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
-        this.renderGen = new RenderGenerationService(this.world,ZenithConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult);
+        this.renderGen = new RenderGenerationService(this.world, this.renderer.getModelManager(), ZenithConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult);
         this.world.setDirtyCallback(this.renderTracker::sectionUpdated);
         this.renderTracker.setRenderGen(this.renderGen);
         System.out.println("Render tracker and generator initialized");
@@ -82,39 +65,21 @@ public class VoxelCore {
 
         this.postProcessing = null;//new PostProcessing();
 
-        this.world.getMapper().setCallbacks(this::stateUpdate, this::biomeUpdate);
+        this.world.getMapper().setCallbacks(this.renderer::addBlockState, a->{});
+
+
+        ////Resave the db incase it failed a recovery
+        //this.world.getMapper().forceResaveStates();
+
 
         for (var state : this.world.getMapper().getStateEntries()) {
-            this.stateUpdate(state);
+            this.renderer.getModelManager().addEntry(state.id, state.state);
         }
-
-        for (var biome : this.world.getMapper().getBiomeEntries()) {
-            this.biomeUpdate(biome);
-        }
-        System.out.println("Entry updates applied");
+        //this.renderer.getModelManager().updateEntry(0, Blocks.GRASS_BLOCK.getDefaultState());
 
         System.out.println("Voxel core initialized");
     }
 
-    private void stateUpdate(Mapper.StateEntry entry) {
-        var state = entry.state;
-        int tintMsk = 0;
-        if (biomeTintableAllFaces.contains(state.getBlock())) {
-            tintMsk |= (1<<6)-1;
-        }
-        if (biomeTintableUpFace.contains(state.getBlock())) {
-            tintMsk |= 1<<Direction.UP.getId();
-        }
-        if (waterTint.contains(state.getBlock())) {
-            tintMsk |= 1<<6;
-        }
-        this.renderer.enqueueUpdate(new BlockStateColour(entry.id, tintMsk, ColourResolver.resolveColour(state)));
-    }
-
-    private void biomeUpdate(Mapper.BiomeEntry entry) {
-        long dualColour = ColourResolver.resolveBiomeColour(entry.biome);
-        this.renderer.enqueueUpdate(new BiomeColour(entry.id, (int) dualColour, (int) (dualColour>>32)));
-    }
 
 
     public void enqueueIngest(WorldChunk worldChunk) {
@@ -126,6 +91,7 @@ public class VoxelCore {
         if (this.firstTime) {
             this.distanceTracker.init(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
             this.firstTime = false;
+            //this.renderTracker.addLvl0(0,6,0);
         }
         this.distanceTracker.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
         this.renderer.setupRender(frustum, camera);
@@ -136,6 +102,10 @@ public class VoxelCore {
         matrices.translate(-cameraX, -cameraY, -cameraZ);
         DebugUtil.setPositionMatrix(matrices);
         matrices.pop();
+        //this.renderer.getModelManager().updateEntry(0, Blocks.DIRT_PATH.getDefaultState());
+
+        //this.renderer.getModelManager().updateEntry(0, Blocks.COMPARATOR.getDefaultState());
+        //this.renderer.getModelManager().updateEntry(0, Blocks.OAK_LEAVES.getDefaultState());
 
         //int boundFB = GlStateManager.getBoundFramebuffer();
         //this.postProcessing.setSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
@@ -149,11 +119,15 @@ public class VoxelCore {
         //TODO: have the renderer also render a bounding full face just like black boarders around lvl 0
         // this is cause the terrain might not exist and so all the caves are visible causing hell for the
         // occlusion culler
+
         this.renderer.renderFarAwayOpaque(matrices, cameraX, cameraY, cameraZ);
 
 
         //glBindFramebuffer(GL_FRAMEBUFFER, boundFB);
         //this.postProcessing.renderPost(boundFB);
+
+        //We can render the translucent directly after as it is the furthest translucent objects
+        this.renderer.renderFarAwayTranslucent();
     }
 
     public void addDebugInfo(List<String> debug) {

@@ -1,6 +1,8 @@
 package me.cortex.zenith.client.core.rendering.building;
 
 
+import me.cortex.zenith.client.core.model.ModelManager;
+import me.cortex.zenith.client.core.rendering.GeometryManager;
 import me.cortex.zenith.client.core.util.Mesher2D;
 import me.cortex.zenith.common.world.other.Mapper;
 import net.minecraft.client.color.block.BlockColors;

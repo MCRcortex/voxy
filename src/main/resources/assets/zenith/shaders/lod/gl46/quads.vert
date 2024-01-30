@@ -3,8 +3,13 @@
 
 #import <zenith:lod/gl46/quad_format.glsl>
 #import <zenith:lod/gl46/bindings.glsl>
+#import <zenith:lod/gl46/block_model.glsl>
+#line 8
 
-layout(location = 0) out flat vec4 colour;
+layout(location = 0) out vec2 uv;
+layout(location = 1) out flat vec2 baseUV;
+layout(location = 2) out flat vec4 colourTinting;
+layout(location = 3) out flat uint discardAlpha;
 
 uint extractLodLevel() {
     return uint(gl_BaseInstance)>>29;
@@ -20,85 +25,85 @@ vec4 uint2vec4RGBA(uint colour) {
     return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255;
 }
 
+//Gets the face offset with respect to the face direction (e.g. some will be + some will be -)
+float getDepthOffset(uint faceData, uint face) {
+    float offset = extractFaceIndentation(faceData);
+    return offset * (1-((int(face)&1)*2));
+}
+
+vec2 getFaceSizeOffset(uint faceData, uint corner) {
+    vec4 faceOffsetsSizes = extractFaceSizes(faceData);
+    return mix(faceOffsetsSizes.xz, -(1-faceOffsetsSizes.yw), bvec2(((corner>>1)&1)==1, (corner&1)==1));
+}
+
+//TODO: add a mechanism so that some quads can ignore backface culling
+// this would help alot with stuff like crops as they would look kinda weird i think,
+// same with flowers etc
 void main() {
     int cornerIdx = gl_VertexID&3;
-
     Quad quad = quadData[uint(gl_VertexID)>>2];
     vec3 innerPos = extractPos(quad);
-
     uint face = extractFace(quad);
+    uint modelId = extractStateId(quad);
+    BlockModel model = modelData[modelId];
+    uint faceData = model.faceData[face];
+
+    //Change the ordering due to backface culling
+    //NOTE: when rendering, backface culling is disabled as we simply dispatch calls for each face
+    // this has the advantage of having "unassigned" geometry, that is geometry where the backface isnt culled
+    //if (face == 0 || (face>>1 != 0 && (face&1)==1)) {
+    //    cornerIdx ^= 1;
+    //}
 
     uint lodLevel = extractLodLevel();
     ivec3 lodCorner = ((extractRelativeLodPos()<<lodLevel) - (baseSectionPos&(ivec3((1<<lodLevel)-1))))<<5;
     vec3 corner = innerPos * (1<<lodLevel) + lodCorner;
 
-    //TODO: see if backface culling is even needed, since everything (should) be back culled already
-    //Flip the quad rotation by its face (backface culling)
-    if ((face&1) != 0) {
-        cornerIdx ^= 1;
+    vec2 faceOffset = getFaceSizeOffset(faceData, cornerIdx);
+    ivec2 quadSize = extractSize(quad);
+    vec2 respectiveQuadSize = vec2(quadSize * ivec2((cornerIdx>>1)&1, cornerIdx&1));
+    vec2 size = (respectiveQuadSize + faceOffset) * (1<<lodLevel);
+
+    vec3 offset = vec3(size, (float(face&1) + getDepthOffset(faceData, face)) * (1<<lodLevel));
+
+    if ((face>>1) == 0) {//Up/down
+        offset = offset.xzy;
     }
-    if ((face>>1) == 0) {
-        cornerIdx ^= 1;
-    }
-
-    ivec2 size = extractSize(quad) * ivec2((cornerIdx>>1)&1, cornerIdx&1) * (1<<lodLevel);
-
-    vec3 pos = corner;
-
-    //NOTE: can just make instead of face, make it axis (can also make it 2 bit instead of 3 bit then)
-    // since the only reason face is needed is to ensure backface culling orientation thing
-    uint axis = face>>1;
-    if (axis == 0) {
-        pos.xz += size;
-        pos.y += (face&1)<<lodLevel;
-    } else if (axis == 1) {
-        pos.xy += size;
-        pos.z += (face&1)<<lodLevel;
-    } else {
-        pos.yz += size;
-        pos.x += (face&1)<<lodLevel;
+    //Not needed, here for readability
+    //if ((face>>1) == 1) {//north/south
+    //    offset = offset.xyz;
+    //}
+    if ((face>>1) == 2) {//west/east
+        offset = offset.zxy;
     }
 
-    gl_Position = MVP * vec4(pos,1);
+    gl_Position = MVP * vec4(corner + offset,1);
 
-    uint stateId = extractStateId(quad);
-    uint biomeId = extractBiomeId(quad);
-    State stateInfo = stateData[stateId];
-    colour = uint2vec4RGBA(stateInfo.faceColours[face]);
 
-    colour *= getLighting(extractLightId(quad));
+    //Compute the uv coordinates
+    vec2 modelUV = vec2(modelId&0xFF, (modelId>>8)&0xFF)*(1f/(256f));
+    //TODO: make the face orientated by 2x3 so that division is not a integer div and modulo isnt needed
+    // as these are very slow ops
+    baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3,2)*256f)));
+    uv = respectiveQuadSize + faceOffset;//Add in the face offset for 0,0 uv
 
-    if (((stateInfo.biomeTintMsk>>face)&1) == 1) {
-        vec4 biomeColour = uint2vec4RGBA(biomeData[biomeId].foliage);
-        colour *= biomeColour;
-    }
-    //Apply water tint
-    if (((stateInfo.biomeTintMsk>>6)&1) == 1) {
-        colour *= vec4(0.247, 0.463, 0.894, 1);
-    }
+    discardAlpha = faceHasAlphaCuttout(faceData);
+
+    //We need to have a conditional override based on if the model size is < a full face + quadSize > 1
+    discardAlpha |= uint(any(greaterThan(quadSize, ivec2(1)))) & faceHasAlphaCuttoutOverride(faceData);
+
+    //Compute lighting
+    colourTinting = getLighting(extractLightId(quad));
+
+    //Apply model colour tinting
+    colourTinting *= uint2vec4RGBA(model.colourTint).yzwx;
 
     //Apply face tint
     if (face == 0) {
-        colour.xyz *= vec3(0.75, 0.75, 0.75);
+        colourTinting.xyz *= vec3(0.75, 0.75, 0.75);
     } else if (face != 1) {
-        colour.xyz *= vec3((float(face-2)/4)*0.6 + 0.4);
+        colourTinting.xyz *= vec3((float(face-2)/4)*0.6 + 0.4);
     }
 
 
 }
-//gl_Position = MVP * vec4(vec3(((cornerIdx)&1)+10,10,((cornerIdx>>1)&1)+10),1);
-//uint i = uint(quad>>32);
-//uint i = uint(gl_BaseInstance);
-//i ^= i>>16;
-//i *= 124128573;
-//i ^= i>>16;
-//i *= 4211346123;
-//i ^= i>>16;
-//i *= 462312435;
-//i ^= i>>16;
-//i *= 542354341;
-//i ^= i>>16;
-
-//uint i = uint(lodLevel+12)*215387625;
-//colour *= vec4(vec3(float((uint(i)>>2)&7)/7,float((uint(i)>>5)&7)/7,float((uint(i)>>8)&7)/7)*0.7+0.3,1);
-//colour = vec4(vec3(float((uint(i)>>2)&7)/7,float((uint(i)>>5)&7)/7,float((uint(i)>>8)&7)/7),1);

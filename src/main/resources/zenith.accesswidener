@@ -3,3 +3,4 @@ accessWidener v1 named
 accessible field net/minecraft/client/texture/SpriteContents image Lnet/minecraft/client/texture/NativeImage;
 accessible field net/minecraft/client/render/Frustum frustumIntersection Lorg/joml/FrustumIntersection;
 accessible field net/minecraft/client/render/LightmapTextureManager texture Lnet/minecraft/client/texture/NativeImageBackedTexture;
+accessible field net/minecraft/client/color/block/BlockColors providers Lnet/minecraft/util/collection/IdList;

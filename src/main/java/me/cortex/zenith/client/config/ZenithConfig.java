@@ -21,6 +21,8 @@ public class ZenithConfig {
 
     public boolean enabled = true;
     public int qualityScale = 20;
+    public int maxSections = 200_000;
+    public int geometryBufferSize = (1<<30)/8;
     public int ingestThreads = 2;
     public int savingThreads = 10;
     public int renderThreads = 5;

@@ -51,18 +51,20 @@ public class Mapper {
     }
 
 
-    public static boolean isTranslucent(long id) {
-        //Atm hardcode to air
-        return ((id>>27)&((1<<20)-1)) == 0;
-    }
-
     public static boolean isAir(long id) {
         return ((id>>27)&((1<<20)-1)) == 0;
     }
 
-    public static boolean shouldRenderFace(int dirId, long self, long other) {
-        //TODO: fixme make it be with respect to the type itself e.g. water, glass etc
-        return isTranslucent(other);
+    public static int getBlockId(long id) {
+        return (int) ((id>>27)&((1<<20)-1));
+    }
+
+    public static int getBiomeId(long id) {
+        return (int) ((id>>47)&0x1FF);
+    }
+
+    public static int getLightId(long id) {
+        return (int) ((id>>56)&0xFF);
     }
 
     public void setCallbacks(Consumer<StateEntry> stateCallback, Consumer<BiomeEntry> biomeCallback) {
@@ -181,6 +183,14 @@ public class Mapper {
     public BlockState getBlockStateFromId(long id) {
         int blockId = (int) ((id>>27)&((1<<20)-1));
         return this.blockId2stateEntry.get(blockId).state;
+    }
+
+    public int getIdFromBlockState(BlockState state) {
+        var entry = this.block2stateEntry.get(state);
+        if (entry == null) {
+            return -1;
+        }
+        return entry.id;
     }
 
     //TODO: fixme: synchronize access to this.blockId2stateEntry

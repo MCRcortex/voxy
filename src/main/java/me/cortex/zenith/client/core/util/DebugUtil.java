@@ -7,7 +7,7 @@ import net.minecraft.util.math.Box;
 import org.joml.Matrix4f;
 
 public class DebugUtil {
-    private static Matrix4f positionMatrix = new Matrix4f().identity();
+    public static Matrix4f positionMatrix = new Matrix4f().identity();
     public static void setPositionMatrix(MatrixStack stack) {
         positionMatrix = new Matrix4f(stack.peek().getPositionMatrix());
     }

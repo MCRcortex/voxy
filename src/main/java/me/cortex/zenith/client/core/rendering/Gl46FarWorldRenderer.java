@@ -1,29 +1,41 @@
 package me.cortex.zenith.client.core.rendering;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.zenith.client.core.gl.GlBuffer;
 import me.cortex.zenith.client.core.gl.shader.Shader;
 import me.cortex.zenith.client.core.gl.shader.ShaderType;
 import me.cortex.zenith.client.core.rendering.util.UploadStream;
 import me.cortex.zenith.client.mixin.joml.AccessFrustumIntersection;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.WallMountedBlock;
+import net.minecraft.block.enums.BlockFace;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.Direction;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.lwjgl.opengl.ARBIndirectParameters;
+import org.lwjgl.opengl.GL11C;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
 
+import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
+import static org.lwjgl.opengl.ARBIndirectParameters.glMultiDrawElementsIndirectCountARB;
 import static org.lwjgl.opengl.ARBMultiDrawIndirect.glMultiDrawElementsIndirect;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_SHORT;
+import static org.lwjgl.opengl.GL11.glGetInteger;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
+import static org.lwjgl.opengl.GL30C.GL_R8UI;
+import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
 import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
 import static org.lwjgl.opengl.GL42.*;
 import static org.lwjgl.opengl.GL42.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
-import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FRAGMENT_TEST_NV;
+import static org.lwjgl.opengl.GL45C.glClearNamedBufferData;
 
 public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
     private final Shader commandGen = Shader.make()
@@ -42,11 +54,17 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
             .add(ShaderType.FRAGMENT, "zenith:lod/gl46/cull/raster.frag")
             .compile();
 
-    private final GlBuffer glCommandBuffer = new GlBuffer(200_000*5*4, 0);
-    private final GlBuffer glVisibilityBuffer = new GlBuffer(200_000*4, 0);
+    private final GlBuffer glCommandBuffer;
+    private final GlBuffer glCommandCountBuffer;
+    private final GlBuffer glVisibilityBuffer;
 
-    public Gl46FarWorldRenderer() {
-        super();
+    public Gl46FarWorldRenderer(int geometryBuffer, int maxSections) {
+        super(geometryBuffer, maxSections);
+        this.glCommandBuffer = new GlBuffer(maxSections*5L*4 * 6);
+        this.glCommandCountBuffer = new GlBuffer(4*2);
+        this.glVisibilityBuffer = new GlBuffer(maxSections*4L);
+        glClearNamedBufferData(this.glCommandBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
+        glClearNamedBufferData(this.glVisibilityBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
         setupVao();
     }
 
@@ -54,73 +72,17 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
     protected void setupVao() {
         glBindVertexArray(this.vao);
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.glCommandBuffer.id);
+        glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.glCommandCountBuffer.id);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometry.geometryId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.glCommandBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometry.metaId());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.glVisibilityBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.stateDataBuffer.id);//State LUT
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.biomeDataBuffer.id);//Biome LUT
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.glCommandCountBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.geometry.metaId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.glVisibilityBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.models.getBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.lightDataBuffer.id);//Lighting LUT
         glBindVertexArray(0);
-    }
-
-    public void renderFarAwayOpaque(MatrixStack stack, double cx, double cy, double cz) {
-        if (this.geometry.getSectionCount() == 0) {
-            return;
-        }
-        RenderLayer.getCutoutMipped().startDrawing();
-        //RenderSystem.enableBlend();
-        //RenderSystem.defaultBlendFunc();
-
-        this.updateUniformBuffer(stack, cx, cy, cz);
-
-        UploadStream.INSTANCE.commit();
-
-        glBindVertexArray(this.vao);
-        this.commandGen.bind();
-        glDispatchCompute((this.geometry.getSectionCount() + 127) / 128, 1, 1);
-        glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_UNIFORM_BARRIER_BIT);
-
-        this.lodShader.bind();
-        if (false) {//Bloody intel gpus
-            glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 1000, 0);
-
-            //int count = this.geometry.getSectionCount()/1000;
-            //for (int i = 0; i < 10; i++) {
-            //    glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, i*1000L*20, 1000, 0);
-            //}
-            //int rem = this.geometry.getSectionCount() - (count*1000);
-            //if (rem != 0) {
-            //    glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, count*1000L*20, rem, 0);
-            //}
-
-        } else {
-            //TODO: swap to a multidraw indirect counted
-            glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, this.geometry.getSectionCount(), 0);
-        }
-        //ARBIndirectParameters.glMultiDrawElementsIndirectCountARB(
-
-        glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
-        //TODO: add gpu occlusion culling here (after the lod drawing) (maybe, finish the rest of the PoC first)
-
-
-        cullShader.bind();
-        glColorMask(false, false, false, false);
-        glDepthMask(false);
-
-        //glEnable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
-        glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3, GL_UNSIGNED_BYTE, (1 << 16) * 6 * 2, this.geometry.getSectionCount());
-        //glDisable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
-
-        glDepthMask(true);
-        glColorMask(true, true, true, true);
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
-        glBindVertexArray(0);
-
-        RenderLayer.getCutoutMipped().endDrawing();
     }
 
     //FIXME: dont do something like this as it breaks multiviewport mods
@@ -143,6 +105,99 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         MemoryUtil.memPutInt(ptr, this.frameId++); ptr += 4;
     }
 
+    public void renderFarAwayOpaque(MatrixStack stack, double cx, double cy, double cz) {
+        if (this.geometry.getSectionCount() == 0) {
+            return;
+        }
+
+        //this.models.addEntry(0, Blocks.STONE.getDefaultState());
+
+
+        RenderLayer.getCutoutMipped().startDrawing();
+        int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
+        //RenderSystem.enableBlend();
+        //RenderSystem.defaultBlendFunc();
+
+        this.updateUniformBuffer(stack, cx, cy, cz);
+
+        UploadStream.INSTANCE.commit();
+
+        glBindVertexArray(this.vao);
+
+
+        //Bind the texture atlas
+        glActiveTexture(GL_TEXTURE0);
+        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
+        glBindSampler(0, this.models.getSamplerId());
+        glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
+
+        glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
+        this.commandGen.bind();
+        glDispatchCompute((this.geometry.getSectionCount() + 127) / 128, 1, 1);
+        glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_UNIFORM_BARRIER_BIT);
+
+        this.lodShader.bind();
+        glDisable(GL_CULL_FACE);
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
+        glEnable(GL_CULL_FACE);
+
+        glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
+
+        this.cullShader.bind();
+        glColorMask(false, false, false, false);
+        glDepthMask(false);
+
+        //glEnable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
+        glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3, GL_UNSIGNED_BYTE, (1 << 16) * 6 * 2, this.geometry.getSectionCount());
+        //glDisable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
+
+        glDepthMask(true);
+        glColorMask(true, true, true, true);
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+
+        //TODO: need to do temporal rasterization here
+
+        glBindVertexArray(0);
+        glBindSampler(0, 0);
+        GL11C.glBindTexture(GL_TEXTURE_2D, oldBoundTexture);
+        glActiveTexture(oldActiveTexture);
+        RenderLayer.getCutoutMipped().endDrawing();
+    }
+
+    @Override
+    public void renderFarAwayTranslucent() {
+        RenderLayer.getTranslucent().startDrawing();
+        glBindVertexArray(this.vao);
+        glDisable(GL_CULL_FACE);
+        RenderSystem.enableBlend();
+        RenderSystem.blendFuncSeparate(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
+
+        int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
+
+        glBindSampler(0, this.models.getSamplerId());
+        glActiveTexture(GL_TEXTURE0);
+        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
+        glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
+        this.lodShader.bind();
+
+        glDepthMask(false);
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 400_000 * 4 * 5, 4, this.geometry.getSectionCount(), 0);
+        glDepthMask(true);
+
+        glEnable(GL_CULL_FACE);
+        glBindVertexArray(0);
+
+
+        glBindSampler(0, 0);
+        GL11C.glBindTexture(GL_TEXTURE_2D, oldBoundTexture);
+        glActiveTexture(oldActiveTexture);
+        RenderSystem.disableBlend();
+
+        RenderLayer.getTranslucent().endDrawing();
+    }
+
+
     @Override
     public void shutdown() {
         super.shutdown();
@@ -151,10 +206,12 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         this.cullShader.free();
         this.glCommandBuffer.free();
         this.glVisibilityBuffer.free();
+        this.glCommandCountBuffer.free();
     }
 
     @Override
     public void addDebugData(List<String> debug) {
+        super.addDebugData(debug);
         debug.add("Geometry buffer usage: " + ((float)Math.round((this.geometry.getGeometryBufferUsage()*100000))/1000) + "%");
         debug.add("Render Sections: " + this.geometry.getSectionCount());
     }

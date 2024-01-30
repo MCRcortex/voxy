@@ -4,7 +4,7 @@ import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.cortex.zenith.client.core.gl.GlBuffer;
-import me.cortex.zenith.client.core.rendering.building.BuiltSectionGeometry;
+import me.cortex.zenith.client.core.rendering.building.BuiltSection;
 import me.cortex.zenith.client.core.rendering.util.BufferArena;
 import me.cortex.zenith.client.core.rendering.util.UploadStream;
 import org.lwjgl.system.MemoryUtil;
@@ -14,21 +14,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 public class GeometryManager {
     private static final int SECTION_METADATA_SIZE = 32;
 
-
-    private record SectionMeta(long position, long opaqueGeometryPtr, int opaqueQuadCount, long translucentGeometryPtr, int translucentQuadCount) {
-        public void writeMetadata(long ptr) {
-            //THIS IS DUE TO ENDIANNESS and that we are splitting a long into 2 ints
-            MemoryUtil.memPutInt(ptr, (int) (this.position>>32)); ptr += 4;
-            MemoryUtil.memPutInt(ptr, (int) this.position); ptr += 4;
-
-
-            MemoryUtil.memPutInt(ptr, (int) this.opaqueGeometryPtr); ptr += 4;
-            MemoryUtil.memPutInt(ptr, this.opaqueQuadCount); ptr += 4;
-        }
-    }
-
-    private final ConcurrentLinkedDeque<BuiltSectionGeometry> buildResults = new ConcurrentLinkedDeque<>();
-
+    private final ConcurrentLinkedDeque<BuiltSection> buildResults = new ConcurrentLinkedDeque<>();
     private int sectionCount = 0;
     private final Long2IntOpenHashMap pos2id = new Long2IntOpenHashMap();
     private final LongArrayList id2pos = new LongArrayList();
@@ -37,37 +23,16 @@ public class GeometryManager {
     private final GlBuffer sectionMetaBuffer;
     private final BufferArena geometryBuffer;
 
-
-    public GeometryManager() {
-        this.sectionMetaBuffer = new GlBuffer(1L << 23, 0);
-        this.geometryBuffer = new BufferArena((1L << 31) - 1024, 8);
+    public GeometryManager(long geometryBufferSize, int maxSections) {
+        this.sectionMetaBuffer = new GlBuffer(((long) maxSections) * SECTION_METADATA_SIZE);
+        this.geometryBuffer = new BufferArena(geometryBufferSize, 8);
         this.pos2id.defaultReturnValue(-1);
-    }
-
-    public void enqueueResult(BuiltSectionGeometry sectionGeometry) {
-        this.buildResults.add(sectionGeometry);
-    }
-
-    private SectionMeta createMeta(BuiltSectionGeometry geometry) {
-        long geometryPtr = this.geometryBuffer.upload(geometry.geometryBuffer);
-
-        //TODO: support translucent geometry
-        return new SectionMeta(geometry.position, geometryPtr, (int) (geometry.geometryBuffer.size/8), -1,0);
-    }
-
-    private void freeMeta(SectionMeta meta) {
-        if (meta.opaqueGeometryPtr != -1) {
-            this.geometryBuffer.free(meta.opaqueGeometryPtr);
-        }
-        if (meta.translucentGeometryPtr != -1) {
-            this.geometryBuffer.free(meta.translucentGeometryPtr);
-        }
     }
 
     void uploadResults() {
         while (!this.buildResults.isEmpty()) {
             var result = this.buildResults.pop();
-            boolean isDelete = result.geometryBuffer == null && result.translucentGeometryBuffer == null;
+            boolean isDelete = result.geometryBuffer == null;
             if (isDelete) {
                 int id = -1;
                 if ((id = this.pos2id.remove(result.position)) != -1) {
@@ -140,6 +105,10 @@ public class GeometryManager {
         }
     }
 
+    public void enqueueResult(BuiltSection sectionGeometry) {
+        this.buildResults.add(sectionGeometry);
+    }
+
     public int getSectionCount() {
         return this.sectionCount;
     }
@@ -160,9 +129,42 @@ public class GeometryManager {
         return this.sectionMetaBuffer.id;
     }
 
-
     public float getGeometryBufferUsage() {
         return this.geometryBuffer.usage();
+    }
+
+
+    //=========================================================================================================================================================================================
+    //=========================================================================================================================================================================================
+    //=========================================================================================================================================================================================
+
+
+    //TODO: pack the offsets of each axis so that implicit face culling can work
+    //Note! the opaquePreDataCount and translucentPreDataCount are never writen to the meta buffer, as they are indexed in reverse relative to the base opaque and translucent geometry
+    private record SectionMeta(long position, int aabb, int geometryPtr, int size, int[] offsets) {
+        public void writeMetadata(long ptr) {
+            //THIS IS DUE TO ENDIANNESS and that we are splitting a long into 2 ints
+            MemoryUtil.memPutInt(ptr, (int) (this.position>>32)); ptr += 4;
+            MemoryUtil.memPutInt(ptr, (int) this.position); ptr += 4;
+            MemoryUtil.memPutInt(ptr, (int) this.aabb); ptr += 4;
+            MemoryUtil.memPutInt(ptr, this.geometryPtr + this.offsets[0]); ptr += 4;
+
+            MemoryUtil.memPutInt(ptr, (this.offsets[1]-this.offsets[0])|((this.offsets[2]-this.offsets[1])<<16)); ptr += 4;
+            MemoryUtil.memPutInt(ptr, (this.offsets[3]-this.offsets[2])|((this.offsets[4]-this.offsets[3])<<16)); ptr += 4;
+            MemoryUtil.memPutInt(ptr, (this.offsets[5]-this.offsets[4])|((this.offsets[6]-this.offsets[5])<<16)); ptr += 4;
+            MemoryUtil.memPutInt(ptr, (this.offsets[7]-this.offsets[6])|((this.size      -this.offsets[7])<<16)); ptr += 4;
+        }
+    }
+
+    private SectionMeta createMeta(BuiltSection geometry) {
+        int geometryPtr = (int) this.geometryBuffer.upload(geometry.geometryBuffer);
+        return new SectionMeta(geometry.position, geometry.aabb, geometryPtr, (int) (geometry.geometryBuffer.size/8), geometry.offsets);
+    }
+
+    private void freeMeta(SectionMeta meta) {
+        if (meta.geometryPtr != -1) {
+            this.geometryBuffer.free(meta.geometryPtr);
+        }
     }
 
 }

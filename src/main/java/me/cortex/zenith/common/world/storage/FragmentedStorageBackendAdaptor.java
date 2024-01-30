@@ -1,6 +1,9 @@
 package me.cortex.zenith.common.world.storage;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ShortOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import me.cortex.zenith.common.world.storage.lmdb.LMDBStorageBackend;
 import net.minecraft.util.math.random.RandomSeed;
 
@@ -8,6 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
+import java.util.Arrays;
 
 //Segments the section data into multiple dbs
 public class FragmentedStorageBackendAdaptor extends StorageBackend {
@@ -57,12 +61,71 @@ public class FragmentedStorageBackendAdaptor extends StorageBackend {
 
     @Override
     public void putIdMapping(int id, ByteBuffer data) {
-        this.backends[0].putIdMapping(id, data);
+        //Replicate the mappings over all the dbs to mean the chance of recovery in case of corruption is 30x
+        for (var backend : this.backends) {
+            backend.putIdMapping(id, data);
+        }
+    }
+
+    private record EqualingArray(byte[] bytes) {
+        @Override
+        public boolean equals(Object obj) {
+            return Arrays.equals(this.bytes, ((EqualingArray)obj).bytes);
+        }
+
+        @Override
+        public int hashCode() {
+            return Arrays.hashCode(this.bytes);
+        }
     }
 
     @Override
     public Int2ObjectOpenHashMap<byte[]> getIdMappingsData() {
-        return this.backends[0].getIdMappingsData();
+        Object2IntOpenHashMap<Int2ObjectOpenHashMap<EqualingArray>> verification = new Object2IntOpenHashMap<>();
+        Int2ObjectOpenHashMap<EqualingArray> any = null;
+        for (var backend : this.backends) {
+            var mappings = backend.getIdMappingsData();
+            if (mappings.isEmpty()) {
+                //TODO: log a warning and attempt to replicate the data the other fragments
+                continue;
+            }
+            var repackaged = new Int2ObjectOpenHashMap<EqualingArray>(mappings.size());
+            for (var entry : mappings.int2ObjectEntrySet()) {
+                repackaged.put(entry.getIntKey(), new EqualingArray(entry.getValue()));
+            }
+            verification.addTo(repackaged, 1);
+            any = repackaged;
+        }
+        if (any == null) {
+            return new Int2ObjectOpenHashMap<>();
+        }
+
+        if (verification.size() != 1) {
+            System.err.println("Error id mapping not matching across all fragments, attempting to recover");
+            Object2IntMap.Entry<Int2ObjectOpenHashMap<EqualingArray>> maxEntry = null;
+            for (var entry : verification.object2IntEntrySet()) {
+                if (maxEntry == null) { maxEntry = entry; }
+                else {
+                    if (maxEntry.getIntValue() < entry.getIntValue()) {
+                        maxEntry = entry;
+                    }
+                }
+            }
+
+            var mapping = maxEntry.getKey();
+
+            var out = new Int2ObjectOpenHashMap<byte[]>(mapping.size());
+            for (var entry : mapping.int2ObjectEntrySet()) {
+                out.put(entry.getIntKey(), entry.getValue().bytes);
+            }
+            return out;
+        } else {
+            var out = new Int2ObjectOpenHashMap<byte[]>(any.size());
+            for (var entry : any.int2ObjectEntrySet()) {
+                out.put(entry.getIntKey(), entry.getValue().bytes);
+            }
+            return out;
+        }
     }
 
     @Override

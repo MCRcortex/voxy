@@ -18,7 +18,7 @@ public class BufferArena {
         }
         this.size = capacity;
         this.elementSize = elementSize;
-        this.buffer = new GlBuffer(capacity, 0);
+        this.buffer = new GlBuffer(capacity);
         this.allocationMap.setLimit(capacity/elementSize);
     }
 

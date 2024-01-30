@@ -28,15 +28,17 @@ public class DistanceTracker {
         this.minYSection = MinecraftClient.getInstance().world.getBottomSectionCoord()/2;
         this.maxYSection = MinecraftClient.getInstance().world.getTopSectionCoord()/2;
 
-        this.rings[0] = new TransitionRing2D(5, MinecraftClient.getInstance().options.getViewDistance().getValue()/2, (x, z)->{
-            for (int y = this.minYSection; y <= this.maxYSection; y++) {
-                this.tracker.remLvl0(x, y, z);
-            }
-        }, (x, z) -> {
-            for (int y = this.minYSection; y <= this.maxYSection; y++) {
-                this.tracker.addLvl0(x, y, z);
-            }
-        });
+        if (true) {
+            this.rings[0] = new TransitionRing2D(5, MinecraftClient.getInstance().options.getViewDistance().getValue() / 2, (x, z) -> {
+                for (int y = this.minYSection; y <= this.maxYSection; y++) {
+                    this.tracker.remLvl0(x, y, z);
+                }
+            }, (x, z) -> {
+                for (int y = this.minYSection; y <= this.maxYSection; y++) {
+                    this.tracker.addLvl0(x, y, z);
+                }
+            });
+        }
 
         //The rings 0+ start at 64 vanilla rd, no matter what the game is set at, that is if the game is set to 32 rd
         // there will still be 32 chunks untill the first lod drop

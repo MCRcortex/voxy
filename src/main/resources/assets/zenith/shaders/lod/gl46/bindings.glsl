@@ -11,19 +11,22 @@ layout(binding = 0, std140) uniform SceneUniform {
     uint frameId;
 };
 
-struct State {
-    uint biomeTintMsk;
-    uint faceColours[6];
-};
-
-struct Biome {
-    uint foliage;
-    uint water;
+struct BlockModel {
+    uint faceData[6];
+    uint flagsA;
+    uint colourTint;
+    uint _pad[8];
 };
 
 struct SectionMeta {
-    uvec4 header;
-    uvec4 drawdata;
+    uint posA;
+    uint posB;
+    uint AABB;
+    uint ptr;
+    uint cntA;
+    uint cntB;
+    uint cntC;
+    uint cntD;
 };
 
 //TODO: see if making the stride 2*4*4 bytes or something cause you get that 16 byte write
@@ -34,6 +37,8 @@ struct DrawCommand {
     int  baseVertex;
     uint  baseInstance;
 };
+
+layout(binding = 0) uniform sampler2D blockModelAtlas;
 
 #ifndef Quad
 #define Quad ivec2
@@ -46,23 +51,24 @@ layout(binding = 2, std430) writeonly restrict buffer DrawBuffer {
     DrawCommand cmdBuffer[];
 };
 
-layout(binding = 3, std430) readonly restrict buffer SectionBuffer {
+layout(binding = 3, std430) restrict buffer DrawCommandCountBuffer {
+    uint opaqueDrawCount;
+    uint translucentDrawCount;
+};
+
+layout(binding = 4, std430) readonly restrict buffer SectionBuffer {
     SectionMeta sectionData[];
 };
 
 #ifndef VISIBILITY_ACCESS
 #define VISIBILITY_ACCESS readonly
 #endif
-layout(binding = 4, std430) VISIBILITY_ACCESS restrict buffer VisibilityBuffer {
+layout(binding = 5, std430) VISIBILITY_ACCESS restrict buffer VisibilityBuffer {
     uint visibilityData[];
 };
 
-layout(binding = 5, std430) readonly restrict buffer StateBuffer {
-    State stateData[];
-};
-
-layout(binding = 6, std430) readonly restrict buffer BiomeBuffer {
-    Biome biomeData[];
+layout(binding = 6, std430) readonly restrict buffer ModelBuffer {
+    BlockModel modelData[];
 };
 
 layout(binding = 7, std430) readonly restrict buffer LightingBuffer {
@@ -75,3 +81,5 @@ vec4 getLighting(uint index) {
     arr = arr & uvec4(0xFF);
     return vec4(arr)*vec4(1.0f/255.0f);
 }
+
+
