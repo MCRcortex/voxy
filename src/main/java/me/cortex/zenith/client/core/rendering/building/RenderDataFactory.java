@@ -15,7 +15,6 @@ import org.lwjgl.system.MemoryUtil;
 public class RenderDataFactory {
     private final WorldEngine world;
     private final ModelManager modelMan;
-    private final QuadEncoder encoder;
 
     private final Mesher2D negativeMesher = new Mesher2D(5, 15);
     private final Mesher2D positiveMesher = new Mesher2D(5, 15);
@@ -37,7 +36,6 @@ public class RenderDataFactory {
     public RenderDataFactory(WorldEngine world, ModelManager modelManager) {
         this.world = world;
         this.modelMan = modelManager;
-        this.encoder = new QuadEncoder(world.getMapper(), MinecraftClient.getInstance().getBlockColors(), MinecraftClient.getInstance().world);
     }
 
 

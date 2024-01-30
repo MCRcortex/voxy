@@ -11,44 +11,6 @@ import net.minecraft.util.math.BlockPos;
 
 
 public class QuadEncoder {
-    private final BlockColors colourProvider;
-    private final Mapper mapper;
-    private final ClientWorld worldIn;
-    public QuadEncoder(Mapper mapper, BlockColors colourProvider, ClientWorld worldIn) {
-        this.colourProvider = colourProvider;
-        this.mapper = mapper;
-        this.worldIn = worldIn;
-    }
-
-    //Normalize block states that result in the same output state, (this improves meshing)
-    // such as the 8 different types of leaves (due to distance from wood) should get normalized to 1 type
-    // if the textures are the same
-    public long normalizeBlockState(long id) {
-        //TODO: This
-        return id;
-    }
-
-    private int getColour(long id, int x, int y, int z) {
-        //TODO: need to inject the biome somehow
-        return this.colourProvider.getColor(this.mapper.getBlockStateFromId(id), this.worldIn, new BlockPos(x, y, z), 0);
-    }
-
-    //The way it works is that, when encoding, use a local colour mapping, then it remaps later to a global colour store
-    public long encode(long id, int face, int otherAxis, int encodedMeshedData) {
-        int encodePosition = encodePosition(face, otherAxis, encodedMeshedData);//26 bits
-        int lighting = (int) ((id>>56)&0xFF);//8 bits
-
-        int biome = (int) ((id>>47)&((1<<9)-1));
-        int blockstate = (int) ((id>>20)&((1<<20)-1));
-
-        //int blockColour = this.getColour(id, -1, -1, -1);
-        // if blockColour is -1 it means it doesnt have colour
-
-        return ((id>>>27)<<26)|Integer.toUnsignedLong(encodePosition);
-    }
-
-
-
 
     //Note: the encodedMeshedData is from the Mesher2D
     public static int encodePosition(int face, int otherAxis, int encodedMeshedData) {
