@@ -71,7 +71,11 @@ layout(binding = 6, std430) readonly restrict buffer ModelBuffer {
     BlockModel modelData[];
 };
 
-layout(binding = 7, std430) readonly restrict buffer LightingBuffer {
+layout(binding = 7, std430) readonly restrict buffer ModelColourBuffer {
+    uint colourData[];
+};
+
+layout(binding = 8, std430) readonly restrict buffer LightingBuffer {
     uint lightData[];
 };
 

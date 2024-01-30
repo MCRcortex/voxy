@@ -13,6 +13,9 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 
@@ -72,6 +75,10 @@ public class VoxelCore {
         ////Resave the db incase it failed a recovery
         //this.world.getMapper().forceResaveStates();
 
+        var biomeRegistry = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME);
+        for (var biome : this.world.getMapper().getBiomeEntries()) {
+            this.renderer.getModelManager().addBiome(biome.id, biomeRegistry.get(new Identifier(biome.biome)));
+        }
 
         for (var state : this.world.getMapper().getStateEntries()) {
             this.renderer.getModelManager().addEntry(state.id, state.state);

@@ -16,6 +16,7 @@ import net.minecraft.client.render.RenderLayers;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.registry.Registries;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.Pair;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.world.BlockRenderView;
@@ -40,6 +41,7 @@ import static org.lwjgl.opengl.GL12C.GL_TEXTURE_MIN_LOD;
 import static org.lwjgl.opengl.GL33.glDeleteSamplers;
 import static org.lwjgl.opengl.GL33.glGenSamplers;
 import static org.lwjgl.opengl.GL33C.glSamplerParameteri;
+import static org.lwjgl.opengl.GL45C.glGenerateTextureMipmap;
 import static org.lwjgl.opengl.GL45C.glTextureSubImage2D;
 
 //Manages the storage and updating of model states, textures and colours
@@ -53,6 +55,7 @@ public class ModelManager {
     public static final int MODEL_SIZE = 64;
     private final ModelTextureBakery bakery;
     private final GlBuffer modelBuffer;
+    private final GlBuffer modelColourBuffer;
     private final GlTexture textures;
     private final int blockSampler = glGenSamplers();
 
@@ -91,12 +94,20 @@ public class ModelManager {
     private final int[] idMappings;
     private final Object2IntOpenHashMap<List<ColourDepthTextureData>> modelTexture2id = new Object2IntOpenHashMap<>();
 
+
+    private final List<Biome> biomes = new ArrayList<>();
+    private final List<Pair<Integer, BlockState>> modelsRequiringBiomeColours = new ArrayList<>();
+
+
     public ModelManager(int modelTextureSize) {
         this.modelTextureSize = modelTextureSize;
         this.bakery = new ModelTextureBakery(modelTextureSize, modelTextureSize);
         this.modelBuffer = new GlBuffer(MODEL_SIZE * (1<<16));
+
+        this.modelColourBuffer = new GlBuffer(4 * (1<<16));
+
         //TODO: figure out how to do mipping :blobfox_pineapple:
-        this.textures = new GlTexture().store(GL_RGBA8, 1, modelTextureSize*3*256,modelTextureSize*2*256);
+        this.textures = new GlTexture().store(GL_RGBA8, 4, modelTextureSize*3*256,modelTextureSize*2*256);
         this.metadataCache = new long[1<<16];
         this.idMappings = new int[1<<20];//Max of 1 million blockstates mapping to 65k model states
         Arrays.fill(this.idMappings, -1);
@@ -263,11 +274,18 @@ public class ModelManager {
         //Temporary override to always be non biome specific
         if (colourProvider == null) {
             MemoryUtil.memPutInt(uploadPtr + 4, -1);//Set the default to nothing so that its faster on the gpu
-        } else if ((!hasBiomeColourResolver) || true) {
+        } else if (!hasBiomeColourResolver) {
             Biome defaultBiome = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME).get(BiomeKeys.PLAINS);
             MemoryUtil.memPutInt(uploadPtr + 4, captureColourConstant(colourProvider, blockState, defaultBiome)|0xFF000000);
-        } else {
+        } else if (!this.biomes.isEmpty()) {
             //Populate the list of biomes for the model state
+            int biomeIndex = this.modelsRequiringBiomeColours.size() * this.biomes.size();
+            MemoryUtil.memPutInt(uploadPtr + 4, biomeIndex);
+            this.modelsRequiringBiomeColours.add(new Pair<>(modelId, blockState));
+            long clrUploadPtr = UploadStream.INSTANCE.upload(this.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
+            for (var biome : this.biomes) {
+                MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(colourProvider, blockState, biome)|0xFF000000); clrUploadPtr += 4;
+            }
         }
 
 
@@ -277,8 +295,20 @@ public class ModelManager {
 
 
         this.putTextures(modelId, textureData);
+
+        glGenerateTextureMipmap(this.textures.id);
         return modelId;
     }
+
+    public void addBiome(int id, Biome biome) {
+        this.biomes.add(biome);
+        if (this.biomes.size()-1 != id) {
+            throw new IllegalStateException("Biome ordering not consistent with biome id");
+        }
+
+        //TODO: Need to invalidate teh entire colour buffer and reuploadd
+    }
+
 
     //TODO: add a method to detect biome dependent colours (can do by detecting if getColor is ever called)
     // if it is, need to add it to a list and mark it as biome colour dependent or something then the shader
@@ -385,6 +415,7 @@ public class ModelManager {
         }, BlockPos.ORIGIN, 0);
         return biomeDependent[0];
     }
+
 
 
 
@@ -510,9 +541,14 @@ public class ModelManager {
         return this.blockSampler;
     }
 
+    public int getColourBufferId() {
+        return this.modelColourBuffer.id;
+    }
+
     public void free() {
         this.bakery.free();
         this.modelBuffer.free();
+        this.modelColourBuffer.free();
         this.textures.free();
         glDeleteSamplers(this.blockSampler);
     }

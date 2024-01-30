@@ -66,25 +66,25 @@ void main() {
 
     vec3 offset = vec3(size, (float(face&1) + getDepthOffset(faceData, face)) * (1<<lodLevel));
 
-    if ((face>>1) == 0) {//Up/down
+    if ((face>>1) == 0) { //Up/down
         offset = offset.xzy;
     }
     //Not needed, here for readability
     //if ((face>>1) == 1) {//north/south
     //    offset = offset.xyz;
     //}
-    if ((face>>1) == 2) {//west/east
+    if ((face>>1) == 2) { //west/east
         offset = offset.zxy;
     }
 
-    gl_Position = MVP * vec4(corner + offset,1);
+    gl_Position = MVP * vec4(corner + offset, 1);
 
 
     //Compute the uv coordinates
     vec2 modelUV = vec2(modelId&0xFF, (modelId>>8)&0xFF)*(1f/(256f));
     //TODO: make the face orientated by 2x3 so that division is not a integer div and modulo isnt needed
     // as these are very slow ops
-    baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3,2)*256f)));
+    baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3, 2)*256f)));
     uv = respectiveQuadSize + faceOffset;//Add in the face offset for 0,0 uv
 
     discardAlpha = faceHasAlphaCuttout(faceData);
@@ -96,7 +96,11 @@ void main() {
     colourTinting = getLighting(extractLightId(quad));
 
     //Apply model colour tinting
-    colourTinting *= uint2vec4RGBA(model.colourTint).yzwx;
+    uint tintColour = model.colourTint;
+    if (modelHasBiomeLUT(model)) {
+        tintColour = colourData[tintColour + extractBiomeId(quad)];
+    }
+    colourTinting *= uint2vec4RGBA(tintColour).yzwx;
 
     //Apply face tint
     if (face == 0) {

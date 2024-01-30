@@ -11,6 +11,8 @@ public class ActiveSectionTracker {
 
     private final Long2ObjectOpenHashMap<VolatileHolder<WorldSection>>[] loadedSectionCache;
     private final SectionLoader loader;
+
+    @SuppressWarnings("unchecked")
     public ActiveSectionTracker(int layers, SectionLoader loader) {
         this.loader = loader;
         this.loadedSectionCache = new Long2ObjectOpenHashMap[layers];

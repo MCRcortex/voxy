@@ -81,7 +81,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.geometry.metaId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.glVisibilityBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.models.getBufferId());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.lightDataBuffer.id);//Lighting LUT
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.models.getColourBufferId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, this.lightDataBuffer.id);//Lighting LUT
         glBindVertexArray(0);
     }
 

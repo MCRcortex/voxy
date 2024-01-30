@@ -15,3 +15,7 @@ uint faceHasAlphaCuttout(uint faceData) {
 uint faceHasAlphaCuttoutOverride(uint faceData) {
     return (faceData>>23)&1;
 }
+
+bool modelHasBiomeLUT(BlockModel model) {
+    return ((model.flagsA)&2) != 0;
+}
