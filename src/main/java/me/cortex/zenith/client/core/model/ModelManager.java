@@ -30,6 +30,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL11C.GL_NEAREST;
@@ -97,7 +98,7 @@ public class ModelManager {
         //TODO: figure out how to do mipping :blobfox_pineapple:
         this.textures = new GlTexture().store(GL_RGBA8, 1, modelTextureSize*3*256,modelTextureSize*2*256);
         this.metadataCache = new long[1<<16];
-        this.idMappings = new int[1<<16];
+        this.idMappings = new int[1<<20];//Max of 1 million blockstates mapping to 65k model states
         Arrays.fill(this.idMappings, -1);
 
 
@@ -133,10 +134,9 @@ public class ModelManager {
             } else {//Not a duplicate so create a new entry
                 modelId = this.modelTexture2id.size();
                 this.idMappings[blockId] = modelId;
-                this.modelTexture2id.put(List.of(textureData), modelId);
+                this.modelTexture2id.put(Stream.of(textureData).map(ColourDepthTextureData::clone).toList(), modelId);
             }
         }
-        this.putTextures(modelId, textureData);
 
         var colourProvider = MinecraftClient.getInstance().getBlockColors().providers.get(Registries.BLOCK.getRawId(blockState.getBlock()));
 
@@ -261,14 +261,22 @@ public class ModelManager {
         //modelFlags |= blockRenderLayer == RenderLayer.getSolid()?0:1;// should discard alpha
         MemoryUtil.memPutInt(uploadPtr, modelFlags);
         //Temporary override to always be non biome specific
-        if (colourProvider != null && ((!hasBiomeColourResolver) || true)) {
+        if (colourProvider == null) {
+            MemoryUtil.memPutInt(uploadPtr + 4, -1);//Set the default to nothing so that its faster on the gpu
+        } else if ((!hasBiomeColourResolver) || true) {
             Biome defaultBiome = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME).get(BiomeKeys.PLAINS);
             MemoryUtil.memPutInt(uploadPtr + 4, captureColourConstant(colourProvider, blockState, defaultBiome)|0xFF000000);
         } else {
-            MemoryUtil.memPutInt(uploadPtr + 4, -1);//Set the default to nothing so that its faster on the gpu
+            //Populate the list of biomes for the model state
         }
 
 
+        //Note: if the layer isSolid then need to fill all the points in the texture where alpha == 0 with the average colour
+        // of the surrounding blocks but only within the computed face size bounds
+        //TODO
+
+
+        this.putTextures(modelId, textureData);
         return modelId;
     }
 
@@ -445,7 +453,7 @@ public class ModelManager {
         while ((map = this.idMappings[blockId]) == -1) {
             Thread.onSpinWait();
             try {
-                Thread.sleep(100);
+                Thread.sleep(1000);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -459,7 +467,7 @@ public class ModelManager {
         while ((meta = this.metadataCache[map]) == 0) {
             Thread.onSpinWait();
             try {
-                Thread.sleep(100);
+                Thread.sleep(1000);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }

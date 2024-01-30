@@ -14,4 +14,9 @@ public record ColourDepthTextureData(int[] colour, int[] depth, int width, int h
     public int hashCode() {
         return (this.width * 312337173 * (Arrays.hashCode(this.colour) ^ Arrays.hashCode(this.depth))) ^ this.height;
     }
+
+    @Override
+    public ColourDepthTextureData clone() {
+        return new ColourDepthTextureData(Arrays.copyOf(this.colour, this.colour.length), Arrays.copyOf(this.depth, this.depth.length), this.width, this.height);
+    }
 }
