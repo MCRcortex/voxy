@@ -439,12 +439,32 @@ public class ModelManager {
         return res;
     }
 
+    //TODO:FIXME: if the model is not already in the cache for some reason it renders black, need to figure out why
     public long getModelMetadata(int blockId) {
-        int map = this.idMappings[blockId];
+        int map = 0;
+        while ((map = this.idMappings[blockId]) == -1) {
+            Thread.onSpinWait();
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         if (map == -1) {
             throw new IllegalArgumentException("Id hasnt been computed yet: " + blockId);
         }
-        return this.metadataCache[map];
+        long meta = 0;
+
+        while ((meta = this.metadataCache[map]) == 0) {
+            Thread.onSpinWait();
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return meta;
     }
 
     public int getModelId(int blockId) {

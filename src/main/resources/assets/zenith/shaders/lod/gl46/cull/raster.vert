@@ -21,7 +21,7 @@ void main() {
     ivec3 pos = (((ipos<<detail)-baseSectionPos)<<5);
     pos += aabbOffset;
     pos -= (1<<detail);
-    pos += (ivec3(gl_VertexID&1, (gl_VertexID>>2)&1, (gl_VertexID>>1)&1)*(size+1))*(1<<detail);
+    pos += (ivec3(gl_VertexID&1, (gl_VertexID>>2)&1, (gl_VertexID>>1)&1)*(size+2))*(1<<detail);
 
     gl_Position = MVP * vec4(vec3(pos),1);
 

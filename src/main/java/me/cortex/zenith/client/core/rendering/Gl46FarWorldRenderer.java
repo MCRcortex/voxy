@@ -115,7 +115,6 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
         RenderLayer.getCutoutMipped().startDrawing();
         int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
-        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
         //RenderSystem.enableBlend();
         //RenderSystem.defaultBlendFunc();
 
@@ -127,8 +126,9 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
 
         //Bind the texture atlas
-        glBindSampler(0, this.models.getSamplerId());
         glActiveTexture(GL_TEXTURE0);
+        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
+        glBindSampler(0, this.models.getSamplerId());
         glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
 
         glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
@@ -174,10 +174,10 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         RenderSystem.blendFuncSeparate(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
 
         int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
-        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
 
         glBindSampler(0, this.models.getSamplerId());
         glActiveTexture(GL_TEXTURE0);
+        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
         glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
         this.lodShader.bind();
 
