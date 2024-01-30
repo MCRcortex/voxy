@@ -28,8 +28,9 @@ public class DistanceTracker {
         this.minYSection = MinecraftClient.getInstance().world.getBottomSectionCoord()/2;
         this.maxYSection = MinecraftClient.getInstance().world.getTopSectionCoord()/2;
 
-        if (true) {
-            this.rings[0] = new TransitionRing2D(5, MinecraftClient.getInstance().options.getViewDistance().getValue() / 2, (x, z) -> {
+        int radius = (MinecraftClient.getInstance().options.getViewDistance().getValue() / 2) - 4;
+        if (radius > 0 && false) {
+            this.rings[0] = new TransitionRing2D(5, radius, (x, z) -> {
                 for (int y = this.minYSection; y <= this.maxYSection; y++) {
                     this.tracker.remLvl0(x, y, z);
                 }

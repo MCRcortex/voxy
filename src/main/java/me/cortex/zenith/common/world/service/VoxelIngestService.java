@@ -55,11 +55,11 @@ public class VoxelIngestService {
                             section.getBiomeContainer(),
                             (x, y, z, state) -> {
                                 if (lighting == null || ((lighting.first() != null && lighting.first().isUninitialized())&&(lighting.second()!=null&&lighting.second().isUninitialized()))) {
-                                    return (byte) 0xFF;
+                                    return (byte) 0x0f;
                                 } else {
                                     //Lighting is a piece of shit cause its done per face
-                                    int block = lighting.first()!=null?Math.min(15,lighting.first().get(x, y, z)):0xF;
-                                    int sky = lighting.second()!=null?Math.min(15,lighting.second().get(x, y, z)):0xF;
+                                    int block = lighting.first()!=null?Math.min(15,lighting.first().get(x, y, z)):0;
+                                    int sky = lighting.second()!=null?Math.min(15,lighting.second().get(x, y, z)):0;
                                     if (block<state.getLuminance()) {
                                         block = state.getLuminance();
                                     }

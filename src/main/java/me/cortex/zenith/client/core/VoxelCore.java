@@ -1,14 +1,15 @@
 package me.cortex.zenith.client.core;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import me.cortex.zenith.client.config.ZenithConfig;
 import me.cortex.zenith.client.core.rendering.*;
 import me.cortex.zenith.client.core.rendering.building.RenderGenerationService;
+import me.cortex.zenith.client.core.rendering.post.PostProcessing;
 import me.cortex.zenith.client.core.util.DebugUtil;
 import me.cortex.zenith.common.world.WorldEngine;
 import me.cortex.zenith.client.importers.WorldImporter;
 import me.cortex.zenith.common.world.storage.FragmentedStorageBackendAdaptor;
-import net.minecraft.block.Block;
-import net.minecraft.block.Blocks;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
@@ -63,7 +64,7 @@ public class VoxelCore {
         this.distanceTracker = new DistanceTracker(this.renderTracker, 5, ZenithConfig.CONFIG.qualityScale);
         System.out.println("Distance tracker initialized");
 
-        this.postProcessing = null;//new PostProcessing();
+        this.postProcessing = new PostProcessing();
 
         this.world.getMapper().setCallbacks(this.renderer::addBlockState, a->{});
 
@@ -107,9 +108,8 @@ public class VoxelCore {
         //this.renderer.getModelManager().updateEntry(0, Blocks.COMPARATOR.getDefaultState());
         //this.renderer.getModelManager().updateEntry(0, Blocks.OAK_LEAVES.getDefaultState());
 
-        //int boundFB = GlStateManager.getBoundFramebuffer();
-        //this.postProcessing.setSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
-        //this.postProcessing.bindClearFramebuffer();
+        int boundFB = GlStateManager.getBoundFramebuffer();
+        this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);
 
         //TODO: FIXME: since we just bound the post processing FB the depth information isnt
         // copied over, we must do this manually and also copy it with respect to the
@@ -121,13 +121,15 @@ public class VoxelCore {
         // occlusion culler
 
         this.renderer.renderFarAwayOpaque(matrices, cameraX, cameraY, cameraZ);
-
-
-        //glBindFramebuffer(GL_FRAMEBUFFER, boundFB);
-        //this.postProcessing.renderPost(boundFB);
+        //Compute the SSAO of the rendered terrain
+        this.postProcessing.computeSSAO();
 
         //We can render the translucent directly after as it is the furthest translucent objects
         this.renderer.renderFarAwayTranslucent();
+
+
+        this.postProcessing.renderPost(boundFB);
+
     }
 
     public void addDebugInfo(List<String> debug) {
