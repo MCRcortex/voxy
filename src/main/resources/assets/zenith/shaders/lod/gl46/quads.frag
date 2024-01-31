@@ -13,7 +13,7 @@ layout(location = 0) out vec4 outColour;
 void main() {
     vec2 uv = mod(uv, vec2(1))*(1f/(vec2(3,2)*256f));
     vec4 colour = texture(blockModelAtlas, uv + baseUV);
-    if (discardAlpha == 1 && colour.a <= 0.001f) {
+    if (discardAlpha == 1 && colour.a <= 0.25f) {
         discard;
     }
     outColour = colour * colourTinting;

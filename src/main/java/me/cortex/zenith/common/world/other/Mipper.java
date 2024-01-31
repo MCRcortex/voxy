@@ -1,5 +1,7 @@
 package me.cortex.zenith.common.world.other;
 
+import static me.cortex.zenith.common.world.other.Mapper.withLight;
+
 //Mipper for data
 public class Mipper {
     //TODO: also pass in the level its mipping from, cause at lower levels you want to preserve block details
@@ -35,6 +37,13 @@ public class Mipper {
             return I000;
         }
         //TODO: need to account for different light levels of "air"
-        return 0;
+        int blockLight = (Mapper.getLightId(I000)&0xF0)+(Mapper.getLightId(I001)&0xF0)+(Mapper.getLightId(I010)&0xF0)+(Mapper.getLightId(I011)&0xF0)+
+                         (Mapper.getLightId(I100)&0xF0)+(Mapper.getLightId(I101)&0xF0)+(Mapper.getLightId(I110)&0xF0)+(Mapper.getLightId(I111)&0xF0);
+        int skyLight   = (Mapper.getLightId(I000)&0x0F)+(Mapper.getLightId(I001)&0x0F)+(Mapper.getLightId(I010)&0x0F)+(Mapper.getLightId(I011)&0x0F)+
+                         (Mapper.getLightId(I100)&0x0F)+(Mapper.getLightId(I101)&0x0F)+(Mapper.getLightId(I110)&0x0F)+(Mapper.getLightId(I111)&0x0F);
+        blockLight = blockLight/8;
+        skyLight = (int) Math.ceil((double)skyLight/8);
+
+        return withLight(I111, (blockLight<<4)|skyLight);
     }
 }

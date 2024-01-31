@@ -252,10 +252,10 @@ public class ModelManager {
             boolean needsAlphaDiscard = ((float)writeCount)/area<0.9;//If the amount of area covered by written pixels is less than a threashold, disable discard as its not needed
 
             needsAlphaDiscard |= blockRenderLayer != RenderLayer.getSolid();
-
+            needsAlphaDiscard &= blockRenderLayer != RenderLayer.getTranslucent();//Translucent doesnt have alpha discard
             faceModelData |= needsAlphaDiscard?1<<22:0;
 
-            faceModelData |= (!faceCoversFullBlock)?1<<23:0;
+            faceModelData |= ((!faceCoversFullBlock)&&blockRenderLayer != RenderLayer.getTranslucent())?1<<23:0;//Alpha discard override, translucency doesnt have alpha discard
 
             MemoryUtil.memPutInt(faceUploadPtr, faceModelData);
         }
@@ -296,7 +296,7 @@ public class ModelManager {
 
         this.putTextures(modelId, textureData);
 
-        glGenerateTextureMipmap(this.textures.id);
+        //glGenerateTextureMipmap(this.textures.id);
         return modelId;
     }
 
@@ -517,6 +517,7 @@ public class ModelManager {
     private void putTextures(int id, ColourDepthTextureData[] textures) {
         int X = (id&0xFF) * this.modelTextureSize*3;
         int Y = ((id>>8)&0xFF) * this.modelTextureSize*2;
+
         for (int subTex = 0; subTex < 6; subTex++) {
             int x = X + (subTex%3)*this.modelTextureSize;
             int y = Y + (subTex/3)*this.modelTextureSize;
@@ -525,7 +526,25 @@ public class ModelManager {
             GlStateManager._pixelStore(GlConst.GL_UNPACK_SKIP_PIXELS, 0);
             GlStateManager._pixelStore(GlConst.GL_UNPACK_SKIP_ROWS, 0);
             GlStateManager._pixelStore(GlConst.GL_UNPACK_ALIGNMENT, 4);
-            glTextureSubImage2D(this.textures.id, 0, x, y, this.modelTextureSize, this.modelTextureSize, GL_RGBA, GL_UNSIGNED_BYTE, textures[subTex].colour());
+            var current = textures[subTex].colour();
+            var next = new int[current.length>>1];
+            for (int i = 0; i < 4; i++) {
+                glTextureSubImage2D(this.textures.id, i, x>>i, y>>i, this.modelTextureSize>>i, this.modelTextureSize>>i, GL_RGBA, GL_UNSIGNED_BYTE, current);
+
+                int size = this.modelTextureSize>>(i+1);
+                for (int pX = 0; pX < size; pX++) {
+                    for (int pY = 0; pY < size; pY++) {
+                        int C00 = current[(pY*2)*size+pX*2];
+                        int C01 = current[(pY*2+1)*size+pX*2];
+                        int C10 = current[(pY*2)*size+pX*2+1];
+                        int C11 = current[(pY*2+1)*size+pX*2+1];
+                        next[pY*size+pX] = TextureUtils.mipColours(C00, C01, C10, C11);
+                    }
+                }
+
+                current = next;
+                next = new int[current.length>>1];
+            }
         }
     }
 
