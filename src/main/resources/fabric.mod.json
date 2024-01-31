@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "id": "zenith",
+  "id": "voxy",
   "version": "${version}",
-  "name": "zenith",
+  "name": "voxy",
   "description": "",
   "authors": [
     "Cortex"
@@ -10,21 +10,21 @@
   "contact": {
   },
   "license": "All-Rights-Reserved",
-  "icon": "assets/zenith/icon.png",
+  "icon": "assets/voxy/icon.png",
   "environment": "client",
   "entrypoints": {
     "client": [
-      "me.cortex.zenith.client.Zenith"
+      "me.cortex.voxy.client.Voxy"
     ],
     "modmenu": [
-      "me.cortex.zenith.client.config.ZenithConfigScreenFactory"
+      "me.cortex.voxy.client.config.VoxyConfigScreenFactory"
     ]
   },
   "mixins": [
-    "zenith.mixins.json"
+    "voxy.mixins.json"
   ],
   "depends": {
     "fabricloader": ">=0.14.22"
   },
-  "accessWidener": "zenith.accesswidener"
+  "accessWidener": "voxy.accesswidener"
 }

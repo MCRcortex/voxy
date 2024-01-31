@@ -22,14 +22,14 @@ repositories {
 
 processResources {
     inputs.property "version", project.version
-    archivesBaseName = "zenith"
+    archivesBaseName = "voxy"
     filesMatching("fabric.mod.json") {
         expand "version": project.version
     }
 }
 
 loom {
-    accessWidenerPath = file("src/main/resources/zenith.accesswidener")
+    accessWidenerPath = file("src/main/resources/voxy.accesswidener")
 }
 
 dependencies {
