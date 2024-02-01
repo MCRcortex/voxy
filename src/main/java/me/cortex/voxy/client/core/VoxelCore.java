@@ -127,8 +127,9 @@ public class VoxelCore {
         // occlusion culler
 
         this.renderer.renderFarAwayOpaque(matrices, cameraX, cameraY, cameraZ);
+
         //Compute the SSAO of the rendered terrain
-        this.postProcessing.computeSSAO();
+        this.postProcessing.computeSSAO(matrices);
 
         //We can render the translucent directly after as it is the furthest translucent objects
         this.renderer.renderFarAwayTranslucent();

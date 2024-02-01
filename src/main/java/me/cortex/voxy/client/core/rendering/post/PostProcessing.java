@@ -1,13 +1,27 @@
 package me.cortex.voxy.client.core.rendering.post;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.GlStateCapture;
+import net.minecraft.client.util.math.MatrixStack;
+import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11C;
 
+import static org.lwjgl.opengl.ARBComputeShader.glDispatchCompute;
 import static org.lwjgl.opengl.ARBFramebufferObject.*;
+import static org.lwjgl.opengl.ARBShaderImageLoadStore.glBindImageTexture;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
+import static org.lwjgl.opengl.GL15.GL_READ_WRITE;
+import static org.lwjgl.opengl.GL15C.GL_READ_ONLY;
+import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
+import static org.lwjgl.opengl.GL20C.glGetUniformLocation;
+import static org.lwjgl.opengl.GL20C.glGetUniformfv;
+import static org.lwjgl.opengl.GL30C.GL_R32F;
+import static org.lwjgl.opengl.GL43.GL_DEPTH_STENCIL_TEXTURE_MODE;
 import static org.lwjgl.opengl.GL44C.glBindImageTextures;
 import static org.lwjgl.opengl.GL45C.glBlitNamedFramebuffer;
 
@@ -20,6 +34,15 @@ public class PostProcessing {
 
     private final FullscreenBlit emptyBlit = new FullscreenBlit("voxy:post/noop.frag");
     private final FullscreenBlit blitTexture = new FullscreenBlit("voxy:post/blit_texture_cutout.frag");
+    private final Shader ssaoComp = Shader.make()
+            .add(ShaderType.COMPUTE, "voxy:post/ssao.comp")
+            .compile();
+    private final GlStateCapture glStateCapture = GlStateCapture.make()
+            .addCapability(GL_STENCIL_TEST)
+            .addCapability(GL_DEPTH_TEST)
+            .addTexture(GL_TEXTURE0)
+            .addTexture(GL_TEXTURE1)
+            .build();
 
     public PostProcessing() {
         this.framebuffer = new GlFramebuffer();
@@ -51,9 +74,12 @@ public class PostProcessing {
         if (this.depthStencil != null) this.depthStencil.free();
         this.emptyBlit.delete();
         this.blitTexture.delete();
+        this.ssaoComp.free();
     }
 
     public void setup(int width, int height, int sourceFB) {
+        this.glStateCapture.capture();
+
         this.setSize(width, height);
         glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -95,17 +121,23 @@ public class PostProcessing {
 
     //Computes ssao on the current framebuffer data and updates it
     // this means that translucency wont be effected etc
-    public void computeSSAO() {
+    public void computeSSAO(MatrixStack stack) {
+        this.ssaoComp.bind();
+        float[] data = new float[4*4];
+        var mat = new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix());
+        mat.get(data);
+        glUniformMatrix4fv(2, false, data);//MVP
+        mat.invert();
+        mat.get(data);
+        glUniformMatrix4fv(3, false, data);//invMVP
 
-        //this.ssao.bind();
-        //glActiveTexture(GL_TEXTURE1);
-        //glBindTexture(GL_TEXTURE_2D, this.depthStencil.id);
-        //glBindImageTexture(0, this.colour.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
-        ////glDispatchCompute(this.width/32, this.height/32, 1);
-        //glTextureBarrier();
-        //glActiveTexture(GL_TEXTURE0);
-        //glBindTexture(GL_TEXTURE_2D, this.colour.id);
-        //glDrawArrays(GL11C.GL_TRIANGLES, 0, 3);
+        glBindImageTexture(0, this.colour.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
+        //glBindImageTexture(1, this.depthStencil.id, 0, false,0, GL_READ_ONLY, GL_R32F);
+        glActiveTexture(GL_TEXTURE1);
+        GL11C.glBindTexture(GL_TEXTURE_2D, this.depthStencil.id);
+        glTexParameteri (GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+
+        glDispatchCompute((this.width+31)/32, (this.height+31)/32, 1);
     }
 
 
@@ -122,16 +154,14 @@ public class PostProcessing {
 
 
 
-        int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
         glActiveTexture(GL_TEXTURE0);
-        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
         glBindTexture(GL_TEXTURE_2D, this.colour.id);
         glEnable(GL_DEPTH_TEST);
         glDepthMask(false);
         this.blitTexture.blit();
         glDisable(GL_DEPTH_TEST);
         glDepthMask(true);
-        glBindTexture(GL_TEXTURE_2D, oldBoundTexture);
-        glActiveTexture(oldActiveTexture);
+
+        this.glStateCapture.restore();
     }
 }

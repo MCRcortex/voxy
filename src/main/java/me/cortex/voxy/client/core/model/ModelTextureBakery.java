@@ -32,6 +32,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.lwjgl.opengl.ARBFramebufferObject.*;
+import static org.lwjgl.opengl.ARBImaging.GL_FUNC_ADD;
+import static org.lwjgl.opengl.ARBImaging.glBlendEquation;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glMemoryBarrier;
 import static org.lwjgl.opengl.GL11.*;
@@ -127,6 +129,9 @@ public class ModelTextureBakery {
         RenderSystem.enableDepthTest();
         RenderSystem.enableCull();
         RenderSystem.depthFunc(GL_LESS);
+
+        glBlendEquation(GL_FUNC_ADD);//TODO: reset this to the default
+
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
         glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);

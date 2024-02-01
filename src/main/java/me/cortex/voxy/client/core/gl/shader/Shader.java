@@ -23,6 +23,10 @@ public class Shader extends TrackedObject {
         return new Builder((aa,source)->source);
     }
 
+    public int id() {
+        return this.id;
+    }
+
     public void bind() {
         glUseProgram(this.id);
     }

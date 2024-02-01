@@ -23,7 +23,7 @@ public class VoxyConfig {
     public int qualityScale = 20;
     public int maxSections = 200_000;
     public int geometryBufferSize = (1<<30)/8;
-    public int ingestThreads = 2;
+    public int ingestThreads = 5;
     public int savingThreads = 10;
     public int renderThreads = 5;
     public int savingCompressionLevel = 7;
@@ -63,7 +63,7 @@ public class VoxyConfig {
     private static Path getConfigPath() {
         return FabricLoader.getInstance()
                 .getConfigDir()
-                .resolve("zenith-config.json");
+                .resolve("voxy-config.json");
     }
 
 }

@@ -1,0 +1,89 @@
+#version 460
+#extension GL_NV_compute_shader_derivatives : require
+layout(local_size_x = 32, local_size_y = 32, local_size_x = 1) in;
+
+
+layout(binding = 0, rgba8) uniform restrict image2D colourTex;
+layout(binding = 1) uniform sampler2D depthTex;
+layout(location = 2) uniform mat4 MVP;
+layout(location = 3) uniform mat4 invMVP;
+
+vec3 rev3d(vec3 clip) {
+    vec4 view = invMVP * vec4(clip*2-1,1);
+    return view.xyz/view.w;
+}
+
+vec3 proj3dscreen(vec3 pos) {
+    vec4 view = MVP * vec4(pos, 1);
+    view.xyz /= view.w;
+    return view.xyz * 0.5 + 0.5;
+}
+
+vec3 reDeProject(vec3 pos) {
+    vec4 view = MVP * vec4(pos, 1);
+    view.xy /= view.w;
+    view.z = texture(depthTex, clamp(view.xy*0.5+0.5, 0, 1)).x*2-1;
+    view.w = 1;
+    view = invMVP * view;
+    return view.xyz/view.w;
+}
+
+vec3 reDeProjectContained(vec3 pos) {
+    vec4 view = MVP * vec4(pos, 1);
+    view.xy /= view.w;
+    float depth = texture(depthTex, clamp(view.xy*0.5+0.5, 0, 1)).x*2-1;
+    view.z = min(view.z, depth);
+    view.w = 1;
+    view = invMVP * view;
+    return view.xyz/view.w;
+}
+
+vec3 computeDifference(vec3 pos, vec3 offset) {
+    return reDeProject(pos + offset) - pos - offset;
+}
+
+float computeAngleDifference(vec3 pos, vec3 offset) {
+    vec3 repro = reDeProject(pos + offset) - pos;
+    return dot(repro, offset)/(length(repro) * length(offset));
+}
+
+float computeAOAngle(vec3 pos, float testHeight, vec3 normal) {
+    vec3 repro = reDeProject(pos + normal*testHeight) - pos;
+    float len = length(repro);
+    return dot(repro, normal)/len;
+}
+
+void main() {
+    ivec2 size = imageSize(colourTex);//TODO: dont use imageSize as it is slow, swap for uniform
+    vec2 point = vec2(gl_GlobalInvocationID.xy)/size;
+    float depth = texture(depthTex, point).r;
+    if (depth == 1.0f || any(lessThanEqual(size, gl_GlobalInvocationID.xy))) {
+        return;
+    }
+    vec4 colour = imageLoad(colourTex, ivec2(gl_GlobalInvocationID.xy));
+    uint metadata = uint(colour.w*255);
+    uint face = metadata&7;
+    uint lod = (metadata>>3)&7;
+    vec3 pos = rev3d(vec3(point, depth));
+
+    //TODO: TODO: only encode the axis, then use then it as as a mask along with pos and multiply by the -sign of everything
+    vec3 viewNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (float(int(face)&1)*2-1);//normalize(cross(dFdx(pos), dFdy(pos)));
+    //vec3 viewNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (-sign(pos));//normalize(cross(dFdx(pos), dFdy(pos)));
+
+
+    float d = computeAOAngle(pos, 0.75*(1<<lod), viewNormal);//1
+//if (any(lessThan(ivec3(4), abs(repro-offset)))) {// || all(lessThan(abs(repro-offset), ivec3(0.01)))
+    //return;
+//}
+    if (d<0.1) {
+        return;
+    }
+
+    //vec4 ocolour =  vec4(max(0, d), abs(min(0,d)), 0, 1);
+    //vec4 ocolour =  vec4(repro-(viewNormal/2), 1);
+    //vec4 ocolour =  vec4(viewNormal/2+0.5, 1);
+    vec4 ocolour = colour;
+    ocolour.xyz *= ((1-d)/2+0.5);
+    ocolour.w = 1;
+    imageStore(colourTex, ivec2(gl_GlobalInvocationID.xy), ocolour);
+}

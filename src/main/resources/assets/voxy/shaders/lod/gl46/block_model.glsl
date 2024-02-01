@@ -19,3 +19,7 @@ uint faceHasAlphaCuttoutOverride(uint faceData) {
 bool modelHasBiomeLUT(BlockModel model) {
     return ((model.flagsA)&2) != 0;
 }
+
+bool modelIsTranslucent(BlockModel model) {
+    return ((model.flagsA)&4) != 0;
+}

@@ -3,7 +3,9 @@ package me.cortex.voxy.client.mixin.minecraft;
 import net.minecraft.client.render.GameRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyConstant;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(GameRenderer.class)
@@ -12,5 +14,10 @@ public class MixinGameRenderer {
     public void method_32796(CallbackInfoReturnable<Float> cir) {
         cir.setReturnValue(16 * 3000f);
         cir.cancel();
+    }
+
+    @ModifyConstant(method = "getBasicProjectionMatrix", constant = @Constant(floatValue = 0.05F))
+    public float modifyNearplane(float constant) {
+        return 10;
     }
 }

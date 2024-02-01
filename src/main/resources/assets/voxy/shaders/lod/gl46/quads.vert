@@ -8,8 +8,9 @@
 
 layout(location = 0) out vec2 uv;
 layout(location = 1) out flat vec2 baseUV;
-layout(location = 2) out flat vec4 colourTinting;
-layout(location = 3) out flat uint discardAlpha;
+layout(location = 2) out flat vec4 tinting;
+layout(location = 3) out flat vec4 addin;
+layout(location = 4) out flat uint discardAlpha;
 
 uint extractLodLevel() {
     return uint(gl_BaseInstance)>>29;
@@ -93,20 +94,25 @@ void main() {
     discardAlpha |= uint(any(greaterThan(quadSize, ivec2(1)))) & faceHasAlphaCuttoutOverride(faceData);
 
     //Compute lighting
-    colourTinting = getLighting(extractLightId(quad));
+    tinting = getLighting(extractLightId(quad));
 
     //Apply model colour tinting
     uint tintColour = model.colourTint;
     if (modelHasBiomeLUT(model)) {
         tintColour = colourData[tintColour + extractBiomeId(quad)];
     }
-    colourTinting *= uint2vec4RGBA(tintColour).yzwx;
+    tinting *= uint2vec4RGBA(tintColour).yzwx;
+    addin = vec4(0);
+    if (!modelIsTranslucent(model)) {
+        tinting.w = 0;
+        addin.w = float(face|(lodLevel<<3))/255;
+    }
 
     //Apply face tint
     if (face == 0) {
-        colourTinting.xyz *= vec3(0.75, 0.75, 0.75);
+        tinting.xyz *= vec3(0.75, 0.75, 0.75);
     } else if (face != 1) {
-        colourTinting.xyz *= vec3((float(face-2)/4)*0.6 + 0.4);
+        tinting.xyz *= vec3((float(face-2)/4)*0.7 + 0.3);
     }
 
 

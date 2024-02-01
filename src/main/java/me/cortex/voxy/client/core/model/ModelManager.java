@@ -266,7 +266,7 @@ public class ModelManager {
         int modelFlags = 0;
         modelFlags |= colourProvider != null?1:0;
         modelFlags |= hasBiomeColourResolver?2:0;//Basicly whether to use the next int as a colour or as a base index/id into a colour buffer for biome dependent colours
-
+        modelFlags |= blockRenderLayer == RenderLayer.getTranslucent()?4:0;
 
         //modelFlags |= blockRenderLayer == RenderLayer.getSolid()?0:1;// should discard alpha
         MemoryUtil.memPutInt(uploadPtr, modelFlags);

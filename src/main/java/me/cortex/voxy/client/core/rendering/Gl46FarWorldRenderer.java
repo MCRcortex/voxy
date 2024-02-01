@@ -106,6 +106,9 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
             return;
         }
 
+        glDisable(GL_BLEND);
+
+
         //this.models.addEntry(0, Blocks.STONE.getDefaultState());
 
 
@@ -140,6 +143,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
 
         this.cullShader.bind();
+
         glColorMask(false, false, false, false);
         glDepthMask(false);
 
