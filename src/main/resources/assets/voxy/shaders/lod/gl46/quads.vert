@@ -112,7 +112,7 @@ void main() {
     if (face == 0) {
         tinting.xyz *= vec3(0.75, 0.75, 0.75);
     } else if (face != 1) {
-        tinting.xyz *= vec3((float(face-2)/4)*0.7 + 0.3);
+        tinting.xyz *= vec3((float(face-2)/4)*0.3 + 0.7);
     }
 
 

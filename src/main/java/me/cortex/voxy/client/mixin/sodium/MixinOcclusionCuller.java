@@ -7,7 +7,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(value = OcclusionCuller.class, remap = false)
 public class MixinOcclusionCuller {
-    @Redirect(method = "isOutsideRenderDistance", at = @At(value = "INVOKE", target = "Ljava/lang/Math;abs(F)F"))
+    @Redirect(method = "isOutsideRenderDistance", at = @At(value = "INVOKE", target = "Ljava/lang/Math;abs(F)F"), require = 0)
     private static float redirectAbs(float a) {
         return 0;
     }

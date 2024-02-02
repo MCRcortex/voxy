@@ -1,5 +1,4 @@
 #version 460
-#extension GL_NV_compute_shader_derivatives : require
 layout(local_size_x = 32, local_size_y = 32, local_size_x = 1) in;
 
 
@@ -67,23 +66,23 @@ void main() {
     vec3 pos = rev3d(vec3(point, depth));
 
     //TODO: TODO: only encode the axis, then use then it as as a mask along with pos and multiply by the -sign of everything
-    vec3 viewNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (float(int(face)&1)*2-1);//normalize(cross(dFdx(pos), dFdy(pos)));
-    //vec3 viewNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (-sign(pos));//normalize(cross(dFdx(pos), dFdy(pos)));
+    vec3 viewNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (float(int(face)&1)*2-1);
+    //vec3 viewNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (-sign(pos));
 
 
     float d = computeAOAngle(pos, 0.75*(1<<lod), viewNormal);//1
-//if (any(lessThan(ivec3(4), abs(repro-offset)))) {// || all(lessThan(abs(repro-offset), ivec3(0.01)))
-    //return;
-//}
     if (d<0.1) {
         return;
     }
 
-    //vec4 ocolour =  vec4(max(0, d), abs(min(0,d)), 0, 1);
-    //vec4 ocolour =  vec4(repro-(viewNormal/2), 1);
-    //vec4 ocolour =  vec4(viewNormal/2+0.5, 1);
     vec4 ocolour = colour;
     ocolour.xyz *= ((1-d)/2+0.5);
     ocolour.w = 1;
     imageStore(colourTex, ivec2(gl_GlobalInvocationID.xy), ocolour);
 }
+//vec4 ocolour =  vec4(max(0, d), abs(min(0,d)), 0, 1);
+//vec4 ocolour =  vec4(repro-(viewNormal/2), 1);
+//vec4 ocolour =  vec4(viewNormal/2+0.5, 1);
+//if (any(lessThan(ivec3(4), abs(repro-offset)))) {// || all(lessThan(abs(repro-offset), ivec3(0.01)))
+//return;
+//}
