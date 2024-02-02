@@ -305,7 +305,20 @@ public class ModelManager {
             throw new IllegalStateException("Biome ordering not consistent with biome id");
         }
 
-        //TODO: Need to invalidate teh entire colour buffer and reuploadd
+        int i = 0;
+        for (var entry : this.modelsRequiringBiomeColours) {
+            var colourProvider = MinecraftClient.getInstance().getBlockColors().providers.get(Registries.BLOCK.getRawId(entry.getRight().getBlock()));
+            if (colourProvider == null) {
+                throw new IllegalStateException();
+            }
+            //Populate the list of biomes for the model state
+            int biomeIndex = (i++) * this.biomes.size();
+            MemoryUtil.memPutInt( UploadStream.INSTANCE.upload(this.modelBuffer, (entry.getLeft()*MODEL_SIZE)+ 4*6 + 4, 4), biomeIndex);
+            long clrUploadPtr = UploadStream.INSTANCE.upload(this.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
+            for (var biomeE : this.biomes) {
+                MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(colourProvider, entry.getRight(), biomeE)|0xFF000000); clrUploadPtr += 4;
+            }
+        }
     }
 
 
@@ -482,25 +495,11 @@ public class ModelManager {
         int map = 0;
         while ((map = this.idMappings[blockId]) == -1) {
             Thread.onSpinWait();
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
         }
 
-        if (map == -1) {
-            throw new IllegalArgumentException("Id hasnt been computed yet: " + blockId);
-        }
         long meta = 0;
-
         while ((meta = this.metadataCache[map]) == 0) {
             Thread.onSpinWait();
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
         }
         return meta;
     }

@@ -14,7 +14,7 @@ import java.io.File;
 
 public class WorldImportCommand {
     public static LiteralArgumentBuilder<FabricClientCommandSource> register() {
-        return ClientCommandManager.literal("zenith").then(ClientCommandManager.literal("import").then(ClientCommandManager.literal("world").then(ClientCommandManager.argument("world_name", StringArgumentType.string()).executes(WorldImportCommand::importWorld))));
+        return ClientCommandManager.literal("voxy").then(ClientCommandManager.literal("import").then(ClientCommandManager.literal("world").then(ClientCommandManager.argument("world_name", StringArgumentType.string()).executes(WorldImportCommand::importWorld))));
     }
 
     public static WorldImporter importerInstance;

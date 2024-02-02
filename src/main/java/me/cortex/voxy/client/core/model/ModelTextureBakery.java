@@ -8,6 +8,7 @@ import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.GlStateCapture;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
@@ -16,6 +17,7 @@ import net.minecraft.client.render.*;
 import net.minecraft.client.render.model.BakedModel;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.fluid.FluidState;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.RotationAxis;
@@ -37,6 +39,8 @@ import static org.lwjgl.opengl.ARBImaging.glBlendEquation;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glMemoryBarrier;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
+import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL20C.glUniformMatrix4fv;
 import static org.lwjgl.opengl.GL45C.glGetTextureImage;
@@ -48,6 +52,14 @@ public class ModelTextureBakery {
     private final GlTexture colourTex;
     private final GlTexture depthTex;
     private final GlFramebuffer framebuffer;
+    private final GlStateCapture glState = GlStateCapture.make()
+            .addCapability(GL_DEPTH_TEST)
+            .addCapability(GL_STENCIL_TEST)
+            .addCapability(GL_BLEND)
+            .addCapability(GL_CULL_FACE)
+            .addTexture(GL_TEXTURE0)
+            .build()
+            ;
     private final Shader rasterShader = Shader.make()
             .add(ShaderType.VERTEX, "voxy:bakery/position_tex.vsh")
             .add(ShaderType.FRAGMENT, "voxy:bakery/position_tex.fsh")
@@ -92,6 +104,7 @@ public class ModelTextureBakery {
     //TODO: For block entities, also somehow attempt to render the default block entity, e.g. chests and stuff
     // cause that will result in ok looking micro details in the terrain
     public ColourDepthTextureData[] renderFaces(BlockState state, long randomValue, boolean renderFluid) {
+        this.glState.capture();
         var model = MinecraftClient.getInstance()
                 .getBakedModelManager()
                 .getBlockModels()
@@ -124,11 +137,11 @@ public class ModelTextureBakery {
         renderLayer.startDrawing();
         glEnable(GL_STENCIL_TEST);
         glDepthRange(0, 1);
-        RenderSystem.depthMask(true);
-        RenderSystem.enableBlend();
-        RenderSystem.enableDepthTest();
-        RenderSystem.enableCull();
-        RenderSystem.depthFunc(GL_LESS);
+        glDepthMask(true);
+        glEnable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        //glDepthFunc(GL_LESS);
 
         glBlendEquation(GL_FUNC_ADD);//TODO: reset this to the default
 
@@ -139,9 +152,9 @@ public class ModelTextureBakery {
         glStencilMask(0xFF);
 
         this.rasterShader.bind();
-        RenderSystem.bindTexture(RenderSystem.getShaderTexture(0));
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, MinecraftClient.getInstance().getTextureManager().getTexture(new Identifier("minecraft", "textures/atlas/blocks.png")).getGlId());
         GlUniform.uniform1(0, 0);
-        RenderSystem.activeTexture(GlConst.GL_TEXTURE0);
 
         var faces = new ColourDepthTextureData[FACE_VIEWS.size()];
         for (int i = 0; i < faces.length; i++) {
@@ -159,6 +172,7 @@ public class ModelTextureBakery {
 
         //TODO: FIXME: fully revert the state of opengl
 
+        this.glState.restore();
         return faces;
     }
 
