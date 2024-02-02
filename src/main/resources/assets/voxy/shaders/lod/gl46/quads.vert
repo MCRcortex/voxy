@@ -102,17 +102,17 @@ void main() {
         tintColour = colourData[tintColour + extractBiomeId(quad)];
     }
     tinting *= uint2vec4RGBA(tintColour).yzwx;
-    addin = vec4(0);
+    addin = vec4(0.0);
     if (!modelIsTranslucent(model)) {
-        tinting.w = 0;
-        addin.w = float(face|(lodLevel<<3))/255;
+        tinting.w = 0.0;
+        addin.w = float(face|(lodLevel<<3))/255.0;
     }
 
     //Apply face tint
     if (face == 0) {
         tinting.xyz *= vec3(0.75, 0.75, 0.75);
     } else if (face != 1) {
-        tinting.xyz *= vec3((float(face-2)/4)*0.3 + 0.7);
+        tinting.xyz *= vec3((float(face-2)/4.0)*0.3 + 0.7);
     }
 
 
