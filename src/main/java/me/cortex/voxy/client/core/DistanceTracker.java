@@ -14,39 +14,38 @@ import net.minecraft.client.MinecraftClient;
 // make the rebuild range like +-5 chunks along each axis (that means at higher levels, should only need to rebuild like)
 // 4 sections or something
 public class DistanceTracker {
-    private final TransitionRing2D[] rings;
+    private final TransitionRing2D[] loDRings;
+    private final TransitionRing2D[] cacheLoadRings;
+    private final TransitionRing2D[] cacheUnloadRings;
     private final RenderTracker tracker;
-    private final int scale;
     private final int minYSection;
     private final int maxYSection;
 
-    public DistanceTracker(RenderTracker tracker, int rings, int scale) {
-        this.rings = new TransitionRing2D[rings];
+    public DistanceTracker(RenderTracker tracker, int[] lodRingScales, int cacheLoadDistance, int cacheUnloadDistance) {
+        this.loDRings = new TransitionRing2D[lodRingScales.length];
+        this.cacheLoadRings = new TransitionRing2D[lodRingScales.length];
+        this.cacheUnloadRings = new TransitionRing2D[lodRingScales.length];
         this.tracker = tracker;
-        this.scale = scale;
-
         this.minYSection = MinecraftClient.getInstance().world.getBottomSectionCoord()/2;
         this.maxYSection = MinecraftClient.getInstance().world.getTopSectionCoord()/2;
 
-        int radius = (MinecraftClient.getInstance().options.getViewDistance().getValue() / 2) - 4;
-        if (radius > 0 && false) {
-            this.rings[0] = new TransitionRing2D(5, radius, (x, z) -> {
-                for (int y = this.minYSection; y <= this.maxYSection; y++) {
-                    this.tracker.remLvl0(x, y, z);
-                }
-            }, (x, z) -> {
-                for (int y = this.minYSection; y <= this.maxYSection; y++) {
-                    this.tracker.addLvl0(x, y, z);
-                }
-            });
-        }
 
         //The rings 0+ start at 64 vanilla rd, no matter what the game is set at, that is if the game is set to 32 rd
         // there will still be 32 chunks untill the first lod drop
         // if the game is set to 16, then there will be 48 chunks until the drop
-        for (int i = 1; i < rings; i++) {
+        for (int i = 0; i < this.loDRings.length; i++) {
             int capRing = i;
-            this.rings[i] = new TransitionRing2D(5+i, scale, (x, z) -> this.dec(capRing, x, z), (x, z) -> this.inc(capRing, x, z));
+            this.loDRings[i] = new TransitionRing2D(6+i, lodRingScales[i], (x, z) -> this.dec(capRing+1, x, z), (x, z) -> this.inc(capRing+1, x, z));
+
+            //TODO:FIXME i think the radius is wrong and (lodRingScales[i]) needs to be (lodRingScales[i]<<1) since the transition ring (the thing above)
+            // acts on LoD level + 1
+            this.cacheLoadRings[i] = new TransitionRing2D(5+i, lodRingScales[i] + cacheLoadDistance, (x, z) -> {
+                //When entering a cache ring, trigger a mesh op and inject into cache
+
+            }, (x, z) -> {});
+            this.cacheUnloadRings[i] = new TransitionRing2D(5+i, lodRingScales[i] + cacheUnloadDistance, (x, z) -> {}, (x, z) -> {
+                //When exiting the cache unload ring, tell the cache to dump whatever mesh it has cached and not add any mesh from that position
+            });
         }
     }
 
@@ -69,10 +68,14 @@ public class DistanceTracker {
     //if the center suddenly changes (say more than 1<<(7+lodlvl) block) then invalidate the entire ring and recompute
     // the lod sections
     public void setCenter(int x, int y, int z) {
-        for (var ring : this.rings) {
-            if (ring != null) {
-                ring.update(x, z);
-            }
+        for (var ring : this.cacheLoadRings) {
+            ring.update(x, z);
+        }
+        for (var ring : this.loDRings) {
+            ring.update(x, z);
+        }
+        for (var ring : this.cacheUnloadRings) {
+            ring.update(x, z);
         }
     }
 
@@ -82,14 +85,18 @@ public class DistanceTracker {
         //Insert highest LOD level
         for (int ox = -SIZE; ox <= SIZE; ox++) {
             for (int oz = -SIZE; oz <= SIZE; oz++) {
-                this.inc(4, (x>>(5+this.rings.length-1)) + ox, (z>>(5+this.rings.length-1)) + oz);
+                this.inc(4, (x>>(5+this.loDRings.length)) + ox, (z>>(5+this.loDRings.length)) + oz);
             }
         }
 
 
-        for (int i = this.rings.length-1; 0 <= i; i--) {
-            if (this.rings[i] != null) {
-                this.rings[i].fill(x, z);
+        for (var ring : this.cacheLoadRings) {
+            ring.fill(x, z);
+        }
+
+        for (int i = this.loDRings.length-1; 0 <= i; i--) {
+            if (this.loDRings[i] != null) {
+                this.loDRings[i].fill(x, z);
             }
         }
     }

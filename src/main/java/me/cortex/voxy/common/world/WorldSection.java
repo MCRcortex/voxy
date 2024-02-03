@@ -12,6 +12,7 @@ public final class WorldSection {
     public final int x;
     public final int y;
     public final int z;
+    public final long key;
 
     long[] data;
     private final ActiveSectionTracker tracker;
@@ -25,6 +26,7 @@ public final class WorldSection {
         this.x = x;
         this.y = y;
         this.z = z;
+        this.key = WorldEngine.getWorldSectionId(lvl, x, y, z);
         this.tracker = tracker;
 
         this.data = new long[32*32*32];
@@ -76,10 +78,6 @@ public final class WorldSection {
         if ((this.atomicState.get() & 1) == 0) {
             throw new IllegalStateException();
         }
-    }
-
-    public long getKey() {
-        return WorldEngine.getWorldSectionId(this.lvl, this.x, this.y, this.z);
     }
 
     public static int getIndex(int x, int y, int z) {

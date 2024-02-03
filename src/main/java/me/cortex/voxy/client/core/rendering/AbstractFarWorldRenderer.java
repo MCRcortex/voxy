@@ -6,6 +6,7 @@ package me.cortex.voxy.client.core.rendering;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.client.MinecraftClient;
@@ -66,6 +67,7 @@ public abstract class AbstractFarWorldRenderer {
         // once per frame when using multi viewport mods
         //it shouldent matter if its called multiple times a frame however, as its synced with fences
         UploadStream.INSTANCE.tick();
+        DownloadStream.INSTANCE.tick();
 
         //Update the lightmap
         {

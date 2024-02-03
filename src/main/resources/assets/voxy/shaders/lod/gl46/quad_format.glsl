@@ -58,7 +58,7 @@ uint extractFace(ivec2 quad) {
 
 uint extractStateId(ivec2 quad) {
     //Eu32(quad, 20, 26);
-    return 1;
+    return Eu32v(quad, 6, 26)|(Eu32v(quad, 14, 32)<<6);
 }
 
 uint extractBiomeId(ivec2 quad) {

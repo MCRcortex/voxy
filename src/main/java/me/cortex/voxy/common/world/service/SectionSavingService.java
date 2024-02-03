@@ -43,7 +43,7 @@ public class SectionSavingService {
             section.inSaveQueue.set(false);
 
             var saveData = SaveLoadSystem.serialize(section, this.compressionLevel);
-            this.world.storage.setSectionData(section.getKey(), saveData);
+            this.world.storage.setSectionData(section.key, saveData);
             MemoryUtil.memFree(saveData);
 
             section.release();

@@ -33,18 +33,19 @@ public class WorldEngine {
         this.maxMipLevels = maxMipLayers;
         this.storage = storageBackend;
         this.mapper = new Mapper(this.storage);
-        this.sectionTracker = new ActiveSectionTracker(maxMipLayers, this::unsafeLoadSection);
+        //4 cache size bits means that the section tracker has 16 separate maps that it uses
+        this.sectionTracker = new ActiveSectionTracker(4, this::unsafeLoadSection);
 
         this.savingService = new SectionSavingService(this, savingServiceWorkers, compressionLevel);
         this.ingestService  = new VoxelIngestService(this, ingestWorkers);
     }
 
     private int unsafeLoadSection(WorldSection into) {
-        var data = this.storage.getSectionData(into.getKey());
+        var data = this.storage.getSectionData(into.key);
         if (data != null) {
             try {
                 if (!SaveLoadSystem.deserialize(into, data)) {
-                    this.storage.deleteSectionData(into.getKey());
+                    this.storage.deleteSectionData(into.key);
                     //TODO: regenerate the section from children
                     Arrays.fill(into.data, Mapper.AIR);
                     System.err.println("Section " + into.lvl + ", " + into.x + ", " + into.y + ", " + into.z + " was unable to load, setting to air");

@@ -35,7 +35,7 @@ public class RenderTracker {
     //Adds a lvl 0 section into the world renderer
     public void addLvl0(int x, int y, int z) {
         this.activeSections.put(WorldEngine.getWorldSectionId(0, x, y, z), O);
-        this.renderGen.enqueueTask(0, x, y, z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+        this.renderGen.enqueueTask(0, x, y, z, this::shouldStillBuild);
     }
 
     //Removes a lvl 0 section from the world renderer
@@ -61,7 +61,7 @@ public class RenderTracker {
         // concurrent hashmap or something, this is so that e.g. the build data position
         // can be updated
 
-        this.renderGen.enqueueTask(lvl, x, y, z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+        this.renderGen.enqueueTask(lvl, x, y, z, this::shouldStillBuild);
 
         this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1))));
         this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1)+1)));
@@ -98,35 +98,35 @@ public class RenderTracker {
         this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl, x, y, z)));
         this.renderGen.removeTask(lvl, x, y, z);
 
-        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1), this::shouldStillBuild, this::getBuildFlagsOrAbort);
-        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1)+1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
-        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1)+1, (z<<1), this::shouldStillBuild, this::getBuildFlagsOrAbort);
-        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1)+1, (z<<1)+1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
-        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1), (z<<1), this::shouldStillBuild, this::getBuildFlagsOrAbort);
-        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1), (z<<1)+1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
-        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1)+1, (z<<1), this::shouldStillBuild, this::getBuildFlagsOrAbort);
-        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1)+1, (z<<1)+1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1), this::shouldStillBuild);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1)+1, this::shouldStillBuild);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1)+1, (z<<1), this::shouldStillBuild);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1)+1, (z<<1)+1, this::shouldStillBuild);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1), (z<<1), this::shouldStillBuild);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1), (z<<1)+1, this::shouldStillBuild);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1)+1, (z<<1), this::shouldStillBuild);
+        this.renderGen.enqueueTask(lvl - 1, (x<<1)+1, (y<<1)+1, (z<<1)+1, this::shouldStillBuild);
+    }
+
+    //Enqueues a renderTask for a section to cache the result
+    public void addCache() {
 
     }
 
-    //Updates a sections direction mask (e.g. if the player goes past the axis, the chunk must be updated)
-    public void updateDirMask(int lvl, int x, int y, int z, int newMask) {
-
-    }
 
 
     //Called by the world engine when a section gets dirtied
     public void sectionUpdated(WorldSection section) {
-        if (this.activeSections.containsKey(section.getKey())) {
+        if (this.activeSections.containsKey(section.key)) {
             //TODO:FIXME: if the section gets updated, that means that its neighbors might need to be updated aswell
             // (due to block occlusion)
 
             //TODO: FIXME: REBUILDING THE ENTIRE NEIGHBORS when probably only the internal layout changed is NOT SMART
-            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
-            this.renderGen.enqueueTask(section.lvl, section.x-1, section.y, section.z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
-            this.renderGen.enqueueTask(section.lvl, section.x+1, section.y, section.z, this::shouldStillBuild, this::getBuildFlagsOrAbort);
-            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z-1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
-            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z+1, this::shouldStillBuild, this::getBuildFlagsOrAbort);
+            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z, this::shouldStillBuild);
+            this.renderGen.enqueueTask(section.lvl, section.x-1, section.y, section.z, this::shouldStillBuild);
+            this.renderGen.enqueueTask(section.lvl, section.x+1, section.y, section.z, this::shouldStillBuild);
+            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z-1, this::shouldStillBuild);
+            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z+1, this::shouldStillBuild);
         }
         //this.renderGen.enqueueTask(section);
     }
@@ -141,32 +141,6 @@ public class RenderTracker {
         } else {
             section.free();
         }
-    }
-
-    public int getBuildFlagsOrAbort(WorldSection section) {
-        var cam = MinecraftClient.getInstance().cameraEntity;
-        if (cam == null) {
-            return 0;
-        }
-        var holder = this.activeSections.get(section.getKey());
-        int buildMask = 0;
-        if (holder != null) {
-            if (section.z<(((int)cam.getPos().z)>>(5+section.lvl))+1) {
-                buildMask |= 1<< Direction.SOUTH.getId();
-            }
-            if (section.z>(((int)cam.getPos().z)>>(5+section.lvl))-1) {
-                buildMask |= 1<<Direction.NORTH.getId();
-            }
-            if (section.x<(((int)cam.getPos().x)>>(5+section.lvl))+1) {
-                buildMask |= 1<<Direction.EAST.getId();
-            }
-            if (section.x>(((int)cam.getPos().x)>>(5+section.lvl))-1) {
-                buildMask |= 1<<Direction.WEST.getId();
-            }
-            buildMask |= 1<<Direction.UP.getId();
-            buildMask |= ((1<<6)-1)^(1);
-        }
-        return buildMask;
     }
 
     public boolean shouldStillBuild(int lvl, int x, int y, int z) {

@@ -63,7 +63,8 @@ public class VoxelCore {
         System.out.println("Render tracker and generator initialized");
 
         //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
-        this.distanceTracker = new DistanceTracker(this.renderTracker, 5, VoxyConfig.CONFIG.qualityScale);
+        int q = VoxyConfig.CONFIG.qualityScale;
+        this.distanceTracker = new DistanceTracker(this.renderTracker, new int[]{q,q,q,q}, 2, 4);
         System.out.println("Distance tracker initialized");
 
         this.postProcessing = new PostProcessing();

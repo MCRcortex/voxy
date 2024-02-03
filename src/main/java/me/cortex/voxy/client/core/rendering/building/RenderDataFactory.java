@@ -46,7 +46,7 @@ public class RenderDataFactory {
 
     //buildMask in the lower 6 bits contains the faces to build, the next 6 bits are whether the edge face builds against
     // its neigbor or not (0 if it does 1 if it doesnt (0 is default behavior))
-    public BuiltSection generateMesh(WorldSection section, int buildMask) {
+    public BuiltSection generateMesh(WorldSection section) {
         section.copyDataTo(this.sectionCache);
         this.translucentQuadCollector.clear();
         this.doubleSidedQuadCollector.clear();
@@ -75,7 +75,7 @@ public class RenderDataFactory {
         }
 
         if (quadCount == 0) {
-            return new BuiltSection(section.getKey());
+            return new BuiltSection(section.key);
         }
 
         var buff = new MemoryBuffer(quadCount*8L);
@@ -109,7 +109,7 @@ public class RenderDataFactory {
         aabb |= (this.maxY-this.minY)<<20;
         aabb |= (this.maxZ-this.minZ)<<25;
 
-        return new BuiltSection(section.getKey(), aabb, buff, offsets);
+        return new BuiltSection(section.key, aabb, buff, offsets);
     }
 
 

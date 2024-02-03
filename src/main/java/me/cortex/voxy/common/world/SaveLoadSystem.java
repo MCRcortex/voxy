@@ -25,8 +25,8 @@ public class SaveLoadSystem {
         long[] lut = LUTVAL.toLongArray();
         ByteBuffer raw = MemoryUtil.memAlloc(compressed.length*2+lut.length*8+512);
 
-        long hash = section.getKey()^(lut.length*1293481298141L);
-        raw.putLong(section.getKey());
+        long hash = section.key^(lut.length*1293481298141L);
+        raw.putLong(section.key);
         raw.putInt(lut.length);
         for (long id : lut) {
             raw.putLong(id);
@@ -74,8 +74,8 @@ public class SaveLoadSystem {
             hash ^= lut[i];
         }
 
-        if (section.getKey() != key) {
-            throw new IllegalStateException("Decompressed section not the same as requested. got: " + key + " expected: " + section.getKey());
+        if (section.key != key) {
+            throw new IllegalStateException("Decompressed section not the same as requested. got: " + key + " expected: " + section.key);
         }
 
         for (int i = 0; i < section.data.length; i++) {

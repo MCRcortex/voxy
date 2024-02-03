@@ -14,7 +14,7 @@ import java.util.function.ToIntFunction;
 //TODO: Add a render cache
 public class RenderGenerationService {
     public interface TaskChecker {boolean check(int lvl, int x, int y, int z);}
-    private record BuildTask(Supplier<WorldSection> sectionSupplier, ToIntFunction<WorldSection> flagSupplier) {}
+    private record BuildTask(Supplier<WorldSection> sectionSupplier) {}
 
     private volatile boolean running = true;
     private final Thread[] workers;
@@ -25,6 +25,7 @@ public class RenderGenerationService {
     private final WorldEngine world;
     private final ModelManager modelManager;
     private final Consumer<BuiltSection> resultConsumer;
+    private final BuiltSectionMeshCache meshCache = new BuiltSectionMeshCache();
 
     public RenderGenerationService(WorldEngine world, ModelManager modelManager, int workers, Consumer<BuiltSection> consumer) {
         this.world = world;
@@ -38,8 +39,6 @@ public class RenderGenerationService {
             this.workers[i].start();
         }
     }
-
-    private final ConcurrentHashMap<Long, BuiltSection> renderCache = new ConcurrentHashMap<>(1000,0.75f,10);
 
     //TODO: add a generated render data cache
     private void renderWorker() {
@@ -57,23 +56,12 @@ public class RenderGenerationService {
                 continue;
             }
             section.assertNotFree();
-            int buildFlags = task.flagSupplier.applyAsInt(section);
-            if (buildFlags != 0) {
-                var mesh = factory.generateMesh(section, buildFlags);
-                section.release();
+            var mesh = factory.generateMesh(section);
+            section.release();
 
-                this.resultConsumer.accept(mesh.clone());
-
-                if (false) {
-                    var prevCache = this.renderCache.put(mesh.position, mesh);
-                    if (prevCache != null) {
-                        prevCache.free();
-                    }
-                } else {
-                    mesh.free();
-                }
-            } else {
-                section.release();
+            this.resultConsumer.accept(mesh.clone());
+            if (!this.meshCache.putMesh(mesh)) {
+                mesh.free();
             }
         }
     }
@@ -94,14 +82,14 @@ public class RenderGenerationService {
     // like if its in the render queue and if we should abort building the render data
     //1 proposal fix is a Long2ObjectLinkedOpenHashMap<WorldSection> which means we can abort if needed,
     // also gets rid of dependency on a WorldSection (kinda)
-    public void enqueueTask(int lvl, int x, int y, int z, ToIntFunction<WorldSection> flagSupplier) {
-        this.enqueueTask(lvl, x, y, z, (l,x1,y1,z1)->true, flagSupplier);
+    public void enqueueTask(int lvl, int x, int y, int z) {
+        this.enqueueTask(lvl, x, y, z, (l,x1,y1,z1)->true);
     }
 
-    public void enqueueTask(int lvl, int x, int y, int z, TaskChecker checker, ToIntFunction<WorldSection> flagSupplier) {
+    public void enqueueTask(int lvl, int x, int y, int z, TaskChecker checker) {
         long ikey = WorldEngine.getWorldSectionId(lvl, x, y, z);
         {
-            var cache = this.renderCache.get(ikey);
+            var cache = this.meshCache.getMesh(ikey);
             if (cache != null) {
                 this.resultConsumer.accept(cache.clone());
                 return;
@@ -116,7 +104,7 @@ public class RenderGenerationService {
                     } else {
                         return null;
                     }
-                }, flagSupplier);
+                });
             });
         }
     }
@@ -159,6 +147,6 @@ public class RenderGenerationService {
         while (!this.taskQueue.isEmpty()) {
             this.taskQueue.removeFirst();
         }
-        this.renderCache.values().forEach(BuiltSection::free);
+        this.meshCache.free();
     }
 }

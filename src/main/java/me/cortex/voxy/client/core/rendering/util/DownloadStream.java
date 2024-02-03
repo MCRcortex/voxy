@@ -1,12 +1,15 @@
 package me.cortex.voxy.client.core.rendering.util;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongConsumer;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlFence;
 import me.cortex.voxy.client.core.gl.GlPersistentMappedBuffer;
 import me.cortex.voxy.client.core.util.AllocationArena;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 
 import static me.cortex.voxy.client.core.util.AllocationArena.SIZE_LIMIT;
@@ -19,23 +22,27 @@ import static org.lwjgl.opengl.GL42C.GL_BUFFER_UPDATE_BARRIER_BIT;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BARRIER_BIT;
 import static org.lwjgl.opengl.GL44.GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT;
 
-public class UploadStream {
+public class DownloadStream {
+    public interface DownloadResultConsumer {
+        void consume(long ptr, long size);
+    }
+
     private final AllocationArena allocationArena = new AllocationArena();
-    private final GlPersistentMappedBuffer uploadBuffer;
+    private final GlPersistentMappedBuffer downloadBuffer;
 
-    private final Deque<UploadFrame> frames = new ArrayDeque<>();
+    private final Deque<DownloadFrame> frames = new ArrayDeque<>();
     private final LongArrayList thisFrameAllocations = new LongArrayList();
-    private final Deque<UploadData> uploadList = new ArrayDeque<>();
-    private final LongArrayList flushList = new LongArrayList();
+    private final Deque<DownloadData> downloadList = new ArrayDeque<>();
+    private final ArrayList<DownloadData> thisFrameDownloadList = new ArrayList<>();
 
-    public UploadStream(long size) {
-        this.uploadBuffer = new GlPersistentMappedBuffer(size,GL_MAP_WRITE_BIT|GL_MAP_UNSYNCHRONIZED_BIT|GL_MAP_FLUSH_EXPLICIT_BIT);
+    public DownloadStream(long size) {
+        this.downloadBuffer = new GlPersistentMappedBuffer(size, GL_MAP_READ_BIT);
         this.allocationArena.setLimit(size);
     }
 
     private long caddr = -1;
     private long offset = 0;
-    public long upload(GlBuffer buffer, long destOffset, long size) {
+    public void download(GlBuffer buffer, long destOffset, long size, DownloadResultConsumer resultConsumer) {
         if (size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException();
         }
@@ -55,7 +62,7 @@ public class UploadStream {
                     throw new IllegalStateException("Could not allocate memory segment big enough for upload even after force flush");
                 }
             }
-            this.flushList.add(this.caddr);
+            this.thisFrameAllocations.add(this.caddr);
             this.offset = size;
             addr = this.caddr;
         } else {//Could expand the allocation so just update it
@@ -63,34 +70,21 @@ public class UploadStream {
             this.offset += size;
         }
 
-        if (this.caddr + size > this.uploadBuffer.size()) {
+        if (this.caddr + size > this.downloadBuffer.size()) {
             throw new IllegalStateException();
         }
 
-        this.uploadList.add(new UploadData(buffer, addr, destOffset, size));
-
-        return this.uploadBuffer.addr() + addr;
+        this.downloadList.add(new DownloadData(buffer, addr, destOffset, size, resultConsumer));
     }
 
 
     public void commit() {
-        //First flush all the allocations and enqueue them to be freed
-        {
-            for (long alloc : flushList) {
-                glFlushMappedNamedBufferRange(this.uploadBuffer.id, alloc, this.allocationArena.getSize(alloc));
-                this.thisFrameAllocations.add(alloc);
-            }
-            this.flushList.clear();
+        //Copies all the data from target buffers into the download stream
+        for (var entry : this.downloadList) {
+            glCopyNamedBufferSubData(entry.target.id, this.downloadBuffer.id, entry.downloadOffset, entry.targetOffset, entry.size);
         }
-        glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
-
-        //Execute all the copies
-        for (var entry : this.uploadList) {
-            glCopyNamedBufferSubData(this.uploadBuffer.id, entry.target.id, entry.uploadOffset, entry.targetOffset, entry.size);
-        }
-        this.uploadList.clear();
-
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
+        thisFrameDownloadList.addAll(this.downloadList);
+        this.downloadList.clear();
 
         this.caddr = -1;
         this.offset = 0;
@@ -99,8 +93,10 @@ public class UploadStream {
     public void tick() {
         this.commit();
         if (!this.thisFrameAllocations.isEmpty()) {
-            this.frames.add(new UploadFrame(new GlFence(), new LongArrayList(this.thisFrameAllocations)));
+            glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
+            this.frames.add(new DownloadFrame(new GlFence(), new LongArrayList(this.thisFrameAllocations), new ArrayList<>(this.thisFrameDownloadList)));
             this.thisFrameAllocations.clear();
+            this.thisFrameDownloadList.clear();
         }
 
         while (!this.frames.isEmpty()) {
@@ -111,16 +107,21 @@ public class UploadStream {
             }
             //Release all the allocations from the frame
             var frame = this.frames.pop();
+
+            //Apply all the callbacks
+            for (var data : frame.data) {
+                data.resultConsumer.consume(this.downloadBuffer.addr() + data.downloadOffset, data.size);
+            }
+
             frame.allocations.forEach(this.allocationArena::free);
             frame.fence.free();
         }
     }
 
-    private record UploadFrame(GlFence fence, LongArrayList allocations) {}
-    private record UploadData(GlBuffer target, long uploadOffset, long targetOffset, long size) {}
+    private record DownloadFrame(GlFence fence, LongArrayList allocations, ArrayList<DownloadData> data) {}
+    private record DownloadData(GlBuffer target, long downloadOffset, long targetOffset, long size, DownloadResultConsumer resultConsumer) {}
 
-    //A upload instance instead of passing one around by reference
-    // MUST ONLY BE USED ON THE RENDER THREAD
-    public static final UploadStream INSTANCE = new UploadStream(1<<25);//32 mb upload buffer
 
+    // Global download stream
+    public static final DownloadStream INSTANCE = new DownloadStream(1<<25);//32 mb download buffer
 }

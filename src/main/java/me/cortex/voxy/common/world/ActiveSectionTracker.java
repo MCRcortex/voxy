@@ -13,17 +13,17 @@ public class ActiveSectionTracker {
     private final SectionLoader loader;
 
     @SuppressWarnings("unchecked")
-    public ActiveSectionTracker(int layers, SectionLoader loader) {
+    public ActiveSectionTracker(int cacheSizeBits, SectionLoader loader) {
         this.loader = loader;
-        this.loadedSectionCache = new Long2ObjectOpenHashMap[layers];
-        for (int i = 0; i < layers; i++) {
-            this.loadedSectionCache[i] = new Long2ObjectOpenHashMap<>(1<<(16-i));
+        this.loadedSectionCache = new Long2ObjectOpenHashMap[1<<cacheSizeBits];
+        for (int i = 0; i < this.loadedSectionCache.length; i++) {
+            this.loadedSectionCache[i] = new Long2ObjectOpenHashMap<>(1024);
         }
     }
 
     public WorldSection acquire(int lvl, int x, int y, int z, boolean nullOnEmpty) {
         long key = WorldEngine.getWorldSectionId(lvl, x, y, z);
-        var cache = this.loadedSectionCache[lvl];
+        var cache = this.loadedSectionCache[this.getCacheArrayIndex(key)];
         VolatileHolder<WorldSection> holder = null;
         boolean isLoader = false;
         synchronized (cache) {
@@ -69,16 +69,25 @@ public class ActiveSectionTracker {
     }
 
     void tryUnload(WorldSection section) {
-        var cache = this.loadedSectionCache[section.lvl];
+        var cache = this.loadedSectionCache[this.getCacheArrayIndex(section.key)];
         synchronized (cache) {
             if (section.trySetFreed()) {
-                if (cache.remove(section.getKey()).obj != section) {
+                if (cache.remove(section.key).obj != section) {
                     throw new IllegalStateException("Removed section not the same as the referenced section in the cache");
                 }
             }
         }
     }
 
+    private int getCacheArrayIndex(long pos) {
+        return (int) (mixStafford13(pos) & (this.loadedSectionCache.length-1));
+    }
+
+    public static long mixStafford13(long seed) {
+        seed = (seed ^ seed >>> 30) * -4658895280553007687L;
+        seed = (seed ^ seed >>> 27) * -7723592293110705685L;
+        return seed ^ seed >>> 31;
+    }
 
     public int[] getCacheCounts() {
         int[] res = new int[this.loadedSectionCache.length];

@@ -490,18 +490,31 @@ public class ModelManager {
         return res;
     }
 
-    //TODO:FIXME: if the model is not already in the cache for some reason it renders black, need to figure out why
+    //TODO:FIXME: DONT DO SPIN LOCKS :WAA:
     public long getModelMetadata(int blockId) {
-        int map = 0;
-        while ((map = this.idMappings[blockId]) == -1) {
-            Thread.onSpinWait();
+        int map = this.idMappings[blockId];
+        if (map == -1) {
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            map = this.idMappings[blockId];
         }
+        if (map == -1) {
+            throw new IllegalArgumentException("Id hasnt been computed yet: " + blockId);
+        }
+        return this.metadataCache[map];
+        //int map = 0;
+        //int i = 10;
+        //while ((map = this.idMappings[blockId]) == -1) {
+        //    Thread.onSpinWait();
+        //}
 
-        long meta = 0;
-        while ((meta = this.metadataCache[map]) == 0) {
-            Thread.onSpinWait();
-        }
-        return meta;
+        //long meta = 0;
+        //while ((meta = this.metadataCache[map]) == 0) {
+        //    Thread.onSpinWait();
+        //}
     }
 
     public int getModelId(int blockId) {
