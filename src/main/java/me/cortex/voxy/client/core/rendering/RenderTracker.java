@@ -11,9 +11,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 //Tracks active sections, dispatches updates to the build system, everything related to rendering flows through here
 public class RenderTracker {
-    private static final class ActiveSectionObject {
-        private int buildFlags;
-    }
     private final WorldEngine world;
     private RenderGenerationService renderGen;
     private final AbstractFarWorldRenderer renderer;
@@ -109,8 +106,14 @@ public class RenderTracker {
     }
 
     //Enqueues a renderTask for a section to cache the result
-    public void addCache() {
+    public void addCache(int lvl, int x, int y, int z) {
+        this.renderGen.markCache(lvl, x, y, z);
+        this.renderGen.enqueueTask(lvl, x, y, z, ((lvl1, x1, y1, z1) -> true));//TODO: replace the true identity lambda with a callback check to the render cache
+    }
 
+    //Removes the position from the cache
+    public void removeCache(int lvl, int x, int y, int z) {
+        this.renderGen.unmarkCache(lvl, x, y, z);
     }
 
 
@@ -127,6 +130,11 @@ public class RenderTracker {
             this.renderGen.enqueueTask(section.lvl, section.x+1, section.y, section.z, this::shouldStillBuild);
             this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z-1, this::shouldStillBuild);
             this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z+1, this::shouldStillBuild);
+            this.renderGen.clearCache(section.lvl, section.x, section.y, section.z);
+            this.renderGen.clearCache(section.lvl, section.x-1, section.y, section.z);
+            this.renderGen.clearCache(section.lvl, section.x+1, section.y, section.z);
+            this.renderGen.clearCache(section.lvl, section.x, section.y, section.z-1);
+            this.renderGen.clearCache(section.lvl, section.x, section.y, section.z+1);
         }
         //this.renderGen.enqueueTask(section);
     }

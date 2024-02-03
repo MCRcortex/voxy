@@ -91,7 +91,7 @@ public class RenderGenerationService {
         {
             var cache = this.meshCache.getMesh(ikey);
             if (cache != null) {
-                this.resultConsumer.accept(cache.clone());
+                this.resultConsumer.accept(cache);
                 return;
             }
         }
@@ -107,6 +107,21 @@ public class RenderGenerationService {
                 });
             });
         }
+    }
+
+    //Tells the render cache that the mesh at the specified position should be cached
+    public void markCache(int lvl, int x, int y, int z) {
+        this.meshCache.markCache(WorldEngine.getWorldSectionId(lvl, x, y, z));
+    }
+
+    //Tells the render cache that the mesh at the specified position should not be cached/any previous cache result, freed
+    public void unmarkCache(int lvl, int x, int y, int z) {
+        this.meshCache.unmarkCache(WorldEngine.getWorldSectionId(lvl, x, y, z));
+    }
+
+    //Resets a chunks cache mesh
+    public void clearCache(int lvl, int x, int y, int z) {
+        this.meshCache.clearMesh(WorldEngine.getWorldSectionId(lvl, x, y, z));
     }
 
     public void removeTask(int lvl, int x, int y, int z) {

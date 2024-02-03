@@ -34,7 +34,7 @@ public class WorldEngine {
         this.storage = storageBackend;
         this.mapper = new Mapper(this.storage);
         //4 cache size bits means that the section tracker has 16 separate maps that it uses
-        this.sectionTracker = new ActiveSectionTracker(4, this::unsafeLoadSection);
+        this.sectionTracker = new ActiveSectionTracker(3, this::unsafeLoadSection);
 
         this.savingService = new SectionSavingService(this, savingServiceWorkers, compressionLevel);
         this.ingestService  = new VoxelIngestService(this, ingestWorkers);

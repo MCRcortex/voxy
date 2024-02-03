@@ -34,17 +34,23 @@ public class DistanceTracker {
         // there will still be 32 chunks untill the first lod drop
         // if the game is set to 16, then there will be 48 chunks until the drop
         for (int i = 0; i < this.loDRings.length; i++) {
+            //TODO: FIXME: check that the level shift is right when inc/dec
             int capRing = i;
             this.loDRings[i] = new TransitionRing2D(6+i, lodRingScales[i], (x, z) -> this.dec(capRing+1, x, z), (x, z) -> this.inc(capRing+1, x, z));
 
             //TODO:FIXME i think the radius is wrong and (lodRingScales[i]) needs to be (lodRingScales[i]<<1) since the transition ring (the thing above)
             // acts on LoD level + 1
-            this.cacheLoadRings[i] = new TransitionRing2D(5+i, lodRingScales[i] + cacheLoadDistance, (x, z) -> {
+            this.cacheLoadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheLoadDistance, (x, z) -> {
                 //When entering a cache ring, trigger a mesh op and inject into cache
-
+                for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
+                    this.tracker.addCache(capRing, x, y, z);
+                }
             }, (x, z) -> {});
-            this.cacheUnloadRings[i] = new TransitionRing2D(5+i, lodRingScales[i] + cacheUnloadDistance, (x, z) -> {}, (x, z) -> {
+            this.cacheUnloadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheUnloadDistance, (x, z) -> {}, (x, z) -> {
                 //When exiting the cache unload ring, tell the cache to dump whatever mesh it has cached and not add any mesh from that position
+                for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
+                    this.tracker.removeCache(capRing, x, y, z);
+                }
             });
         }
     }
