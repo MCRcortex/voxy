@@ -1,4 +1,4 @@
-package me.cortex.voxy.common.world.storage.lmdb;
+package me.cortex.voxy.common.storage.lmdb;
 
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
@@ -6,7 +6,7 @@ import org.lwjgl.util.lmdb.MDBVal;
 
 import java.nio.ByteBuffer;
 
-import static me.cortex.voxy.common.world.storage.lmdb.LMDBInterface.E;
+import static me.cortex.voxy.common.storage.lmdb.LMDBInterface.E;
 import static org.lwjgl.system.MemoryStack.stackPush;
 import static org.lwjgl.util.lmdb.LMDB.*;
 

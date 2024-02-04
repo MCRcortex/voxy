@@ -1,4 +1,4 @@
-package me.cortex.voxy.common.world.storage;
+package me.cortex.voxy.common.storage;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 

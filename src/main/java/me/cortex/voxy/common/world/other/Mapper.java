@@ -1,7 +1,7 @@
 package me.cortex.voxy.common.world.other;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import me.cortex.voxy.common.world.storage.StorageBackend;
+import me.cortex.voxy.common.storage.StorageBackend;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;

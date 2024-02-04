@@ -1,4 +1,4 @@
-package me.cortex.voxy.common.world.storage.lmdb;
+package me.cortex.voxy.common.storage.lmdb;
 
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;

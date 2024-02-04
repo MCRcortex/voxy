@@ -1,7 +1,7 @@
-package me.cortex.voxy.common.world.storage.lmdb;
+package me.cortex.voxy.common.storage.lmdb;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import me.cortex.voxy.common.world.storage.StorageBackend;
+import me.cortex.voxy.common.storage.StorageBackend;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.util.lmdb.MDBVal;
 

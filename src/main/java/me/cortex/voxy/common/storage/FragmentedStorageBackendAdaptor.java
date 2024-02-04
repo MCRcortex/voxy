@@ -1,9 +1,9 @@
-package me.cortex.voxy.common.world.storage;
+package me.cortex.voxy.common.storage;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import me.cortex.voxy.common.world.storage.lmdb.LMDBStorageBackend;
+import me.cortex.voxy.common.storage.lmdb.LMDBStorageBackend;
 import net.minecraft.util.math.random.RandomSeed;
 
 import java.io.File;

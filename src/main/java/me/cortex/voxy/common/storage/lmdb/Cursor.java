@@ -1,8 +1,8 @@
-package me.cortex.voxy.common.world.storage.lmdb;
+package me.cortex.voxy.common.storage.lmdb;
 
 import org.lwjgl.util.lmdb.MDBVal;
 
-import static me.cortex.voxy.common.world.storage.lmdb.LMDBInterface.E;
+import static me.cortex.voxy.common.storage.lmdb.LMDBInterface.E;
 import static org.lwjgl.util.lmdb.LMDB.*;
 
 public class Cursor implements AutoCloseable {

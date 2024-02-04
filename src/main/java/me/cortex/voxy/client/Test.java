@@ -1,8 +1,8 @@
 package me.cortex.voxy.client;
 
-import me.cortex.voxy.common.world.storage.lmdb.LMDBInterface;
+import me.cortex.voxy.common.storage.lmdb.LMDBInterface;
 import me.cortex.voxy.client.importers.WorldImporter;
-import me.cortex.voxy.common.world.storage.lmdb.LMDBStorageBackend;
+import me.cortex.voxy.common.storage.lmdb.LMDBStorageBackend;
 import org.lwjgl.system.MemoryUtil;
 
 import java.io.File;

@@ -4,7 +4,7 @@ import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.service.SectionSavingService;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
-import me.cortex.voxy.common.world.storage.StorageBackend;
+import me.cortex.voxy.common.storage.StorageBackend;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.Arrays;
