@@ -73,12 +73,12 @@ void main() {
 
         //TODO:FIXME: Figure out why these are in such a weird order
         uint msk = 0;
-        msk |= uint(relative.y>-1)<<0;
-        msk |= uint(relative.y<1 )<<1;
-        msk |= uint(relative.z>-1)<<2;
-        msk |= uint(relative.z<1 )<<3;
-        msk |= uint(relative.x>-1)<<4;
-        msk |= uint(relative.x<1 )<<5;
+        msk |= uint(((meta.cntB      &0xFFFF)!=0) && (relative.y>-1))<<0;
+        msk |= uint((((meta.cntB>>16)&0xFFFF)!=0) && (relative.y<1 ))<<1;
+        msk |= uint(((meta.cntC      &0xFFFF)!=0) && (relative.z>-1))<<2;
+        msk |= uint((((meta.cntC>>16)&0xFFFF)!=0) && (relative.z<1 ))<<3;
+        msk |= uint(((meta.cntD      &0xFFFF)!=0) && (relative.x>-1))<<4;
+        msk |= uint((((meta.cntD>>16)&0xFFFF)!=0) && (relative.x<1 ))<<5;
 
 
         uint cmdPtr = atomicAdd(opaqueDrawCount, bitCount(msk)+1);
@@ -100,7 +100,7 @@ void main() {
 
         //Down
         count = (meta.cntB)&0xFFFF;
-        if ((msk&(1<<0))!=0) {
+        if (((msk&(1<<0))!=0)) {
             writeCmd(cmdPtr++, encodedPos, ptr, count);
         }
         ptr += count;
