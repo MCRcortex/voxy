@@ -47,7 +47,7 @@ void main() {
 
     float d = computeAOAngle(pos, 0.75*(1<<lod), viewNormal);//1
     if (d<0.1) {
-        return;
+        d = 0f;
     }
 
     vec4 ocolour = colour;

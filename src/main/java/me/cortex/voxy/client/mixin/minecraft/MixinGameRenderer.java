@@ -18,6 +18,7 @@ public class MixinGameRenderer {
 
     @ModifyConstant(method = "getBasicProjectionMatrix", constant = @Constant(floatValue = 0.05F))
     public float modifyNearplane(float constant) {
-        return 10;
+        //return 10;
+        return constant;
     }
 }

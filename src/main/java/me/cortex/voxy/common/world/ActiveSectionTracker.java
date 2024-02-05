@@ -11,11 +11,12 @@ public class ActiveSectionTracker {
 
     private final Long2ObjectOpenHashMap<VolatileHolder<WorldSection>>[] loadedSectionCache;
     private final SectionLoader loader;
+    //private final SectionDataCache dataCache;
 
     @SuppressWarnings("unchecked")
-    public ActiveSectionTracker(int cacheSizeBits, SectionLoader loader) {
+    public ActiveSectionTracker(int numSlicesBits, SectionLoader loader) {
         this.loader = loader;
-        this.loadedSectionCache = new Long2ObjectOpenHashMap[1<<cacheSizeBits];
+        this.loadedSectionCache = new Long2ObjectOpenHashMap[1<<numSlicesBits];
         for (int i = 0; i < this.loadedSectionCache.length; i++) {
             this.loadedSectionCache[i] = new Long2ObjectOpenHashMap<>(1024);
         }
@@ -42,7 +43,11 @@ public class ActiveSectionTracker {
         //If this thread was the one to create the reference then its the thread to load the section
         if (isLoader) {
             var section = new WorldSection(lvl, x, y, z, this);
-            int status = this.loader.load(section);
+            int status = -1;//this.dataCache.load(section);
+            if (status == -1) {//Cache miss
+                status = this.loader.load(section);
+            }
+
             if (status < 0) {
                 //TODO: Instead if throwing an exception do something better
                 throw new IllegalStateException("Unable to load section");

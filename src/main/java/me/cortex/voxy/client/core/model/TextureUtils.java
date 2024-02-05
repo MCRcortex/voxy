@@ -32,7 +32,8 @@ public class TextureUtils {
         } else if (mode == WRITE_CHECK_DEPTH) {
             return (data.depth()[index]>>>8)!=((1<<24)-1);
         } else if (mode == WRITE_CHECK_ALPHA) {
-            return ((data.colour()[index]>>>24)&0xff)!=0;
+            //TODO:FIXME: for some reason it has an alpha of 1 even if its ment to be 0
+            return ((data.colour()[index]>>>24)&0xff)>1;
         }
         throw new IllegalArgumentException();
     }

@@ -78,14 +78,14 @@ void main() {
         offset = offset.zxy;
     }
 
-    gl_Position = MVP * vec4(corner + offset, 1);
+    gl_Position = MVP * vec4(corner + offset, 1f);
 
 
     //Compute the uv coordinates
     vec2 modelUV = vec2(modelId&0xFF, (modelId>>8)&0xFF)*(1f/(256f));
     //TODO: make the face orientated by 2x3 so that division is not a integer div and modulo isnt needed
     // as these are very slow ops
-    baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3, 2)*256f)));
+    baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3f, 2f)*256f)));
     uv = respectiveQuadSize + faceOffset;//Add in the face offset for 0,0 uv
 
     discardAlpha = faceHasAlphaCuttout(faceData);

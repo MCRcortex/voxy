@@ -12,6 +12,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinSodiumWorldRender {
     @Inject(method = "drawChunkLayer", at = @At("HEAD"), cancellable = true, require = 0)
     private void cancelRender(RenderLayer renderLayer, MatrixStack matrixStack, double x, double y, double z, CallbackInfo ci) {
-        //ci.cancel();
+        ci.cancel();
     }
 }
