@@ -231,7 +231,7 @@ public class RenderDataFactory {
         long otherFlags = 0;
         otherFlags |= ModelManager.isTranslucent(metadata)?1L<<33:0;
         otherFlags |= ModelManager.isDoubleSided(metadata)?1L<<34:0;
-        mesher.put(a, b, ((long)clientModelId) | (((long) Mapper.getLightId(facingState))<<16) | ((((long) Mapper.getBiomeId(self))<<24) * (ModelManager.isBiomeColoured(metadata)?1:0)) | otherFlags);
+        mesher.put(a, b, ((long)clientModelId) | (((long) Mapper.getLightId(ModelManager.faceUsesSelfLighting(metadata, face)?self:facingState))<<16) | ((((long) Mapper.getBiomeId(self))<<24) * (ModelManager.isBiomeColoured(metadata)?1:0)) | otherFlags);
         return true;
     }
 

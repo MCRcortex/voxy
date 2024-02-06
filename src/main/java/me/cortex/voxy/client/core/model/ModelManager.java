@@ -6,7 +6,9 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
 import net.minecraft.block.FluidBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
@@ -28,9 +30,7 @@ import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static org.lwjgl.opengl.GL11.*;
@@ -122,6 +122,8 @@ public class ModelManager {
 
 
 
+    private static final Set<Block> NO_RENDER = new HashSet<>(List.of(Blocks.SHORT_GRASS, Blocks.TALL_GRASS));
+
     //TODO: what i need to do is seperate out fluid states from blockStates
 
 
@@ -135,6 +137,11 @@ public class ModelManager {
         boolean isFluid = blockState.getBlock() instanceof FluidBlock;
         int modelId = -1;
         var textureData = this.bakery.renderFaces(blockState, 123456, isFluid);
+        if (NO_RENDER.contains(blockState.getBlock())) {
+            this.idMappings[blockId] = 0;
+            return 0;
+        }
+
         {//Deduplicate same entries
             int possibleDuplicate = this.modelTexture2id.getInt(List.of(textureData));
             if (possibleDuplicate != -1) {//Duplicate found
@@ -234,6 +241,9 @@ public class ModelManager {
 
             metadata |= canBeOccluded?4:0;
 
+            //Face uses its own lighting if its not flat against the adjacent block & isnt traslucent
+            metadata |= (offset != 0 || blockRenderLayer == RenderLayer.getTranslucent())?0b1000:0;
+
 
 
             //Scale face size from 0->this.modelTextureSize-1 to 0->15
@@ -256,6 +266,8 @@ public class ModelManager {
 
             faceModelData |= ((!faceCoversFullBlock)&&blockRenderLayer != RenderLayer.getTranslucent())?1<<23:0;//Alpha discard override, translucency doesnt have alpha discard
 
+
+
             MemoryUtil.memPutInt(faceUploadPtr, faceModelData);
         }
         this.metadataCache[modelId] = metadata;
@@ -267,6 +279,7 @@ public class ModelManager {
         modelFlags |= colourProvider != null?1:0;
         modelFlags |= hasBiomeColourResolver?2:0;//Basicly whether to use the next int as a colour or as a base index/id into a colour buffer for biome dependent colours
         modelFlags |= blockRenderLayer == RenderLayer.getTranslucent()?4:0;
+        modelFlags |= blockRenderLayer == RenderLayer.getCutout()?0:8;
 
         //modelFlags |= blockRenderLayer == RenderLayer.getSolid()?0:1;// should discard alpha
         MemoryUtil.memPutInt(uploadPtr, modelFlags);
@@ -441,6 +454,10 @@ public class ModelManager {
 
     public static boolean faceOccludes(long metadata, int face) {
         return faceExists(metadata, face) && ((metadata>>(8*face))&0b1)==0b1;
+    }
+
+    public static boolean faceUsesSelfLighting(long metadata, int face) {
+        return ((metadata>>(8*face))&0b1000) != 0;
     }
 
     public static boolean isColoured(long metadata) {

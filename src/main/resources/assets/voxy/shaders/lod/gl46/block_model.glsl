@@ -24,3 +24,7 @@ bool modelHasBiomeLUT(BlockModel model) {
 bool modelIsTranslucent(BlockModel model) {
     return ((model.flagsA)&4) != 0;
 }
+
+bool modelHasMipmaps(BlockModel model) {
+    return ((model.flagsA)&8) != 0;
+}

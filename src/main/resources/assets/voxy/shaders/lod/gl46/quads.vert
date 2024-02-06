@@ -10,7 +10,7 @@ layout(location = 0) out vec2 uv;
 layout(location = 1) out flat vec2 baseUV;
 layout(location = 2) out flat vec4 tinting;
 layout(location = 3) out flat vec4 addin;
-layout(location = 4) out flat uint discardAlpha;
+layout(location = 4) out flat uint flags;
 
 uint extractLodLevel() {
     return uint(gl_BaseInstance)>>29;
@@ -88,10 +88,12 @@ void main() {
     baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3f, 2f)*256f)));
     uv = respectiveQuadSize + faceOffset;//Add in the face offset for 0,0 uv
 
-    discardAlpha = faceHasAlphaCuttout(faceData);
+    flags = faceHasAlphaCuttout(faceData);
 
     //We need to have a conditional override based on if the model size is < a full face + quadSize > 1
-    discardAlpha |= uint(any(greaterThan(quadSize, ivec2(1)))) & faceHasAlphaCuttoutOverride(faceData);
+    flags |= uint(any(greaterThan(quadSize, ivec2(1)))) & faceHasAlphaCuttoutOverride(faceData);
+
+    flags |= uint(!modelHasMipmaps(model))<<1;
 
     //Compute lighting
     tinting = getLighting(extractLightId(quad));
