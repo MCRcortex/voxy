@@ -23,18 +23,18 @@ ivec3 extractRelativeLodPos() {
 }
 
 vec4 uint2vec4RGBA(uint colour) {
-    return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255;
+    return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255f;
 }
 
 //Gets the face offset with respect to the face direction (e.g. some will be + some will be -)
 float getDepthOffset(uint faceData, uint face) {
     float offset = extractFaceIndentation(faceData);
-    return offset * (1-((int(face)&1)*2));
+    return offset * (1f-((int(face)&1)*2f));
 }
 
 vec2 getFaceSizeOffset(uint faceData, uint corner) {
     vec4 faceOffsetsSizes = extractFaceSizes(faceData);
-    return mix(faceOffsetsSizes.xz, -(1-faceOffsetsSizes.yw), bvec2(((corner>>1)&1)==1, (corner&1)==1));
+    return mix(faceOffsetsSizes.xz, -(1f-faceOffsetsSizes.yw), bvec2(((corner>>1)&1)==1, (corner&1)==1));
 }
 
 //TODO: add a mechanism so that some quads can ignore backface culling

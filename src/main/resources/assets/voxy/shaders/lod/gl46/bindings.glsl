@@ -1,3 +1,4 @@
+#line 1
 struct Frustum {
     vec4 planes[6];
 };

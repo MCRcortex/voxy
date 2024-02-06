@@ -7,8 +7,10 @@ import org.rocksdb.*;
 import redis.clients.jedis.JedisPool;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -22,6 +24,16 @@ public class RocksDBStorageBackend extends StorageBackend {
     private final List<AbstractImmutableNativeReference> closeList = new ArrayList<>();
 
     public RocksDBStorageBackend(File path) {
+        try {
+            var lockPath = path.toPath().resolve("LOCK");
+            if (Files.exists(lockPath)) {
+                System.err.println("WARNING, deleting rocksdb LOCK file");
+                Files.delete(lockPath);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions().optimizeUniversalStyleCompaction();
 
         final List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(

@@ -14,6 +14,7 @@ import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.FrustumIntersection;
+import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
@@ -92,7 +93,7 @@ public abstract class AbstractFarWorldRenderer {
         }
     }
 
-    public abstract void renderFarAwayOpaque(MatrixStack stack, double cx, double cy, double cz);
+    public abstract void renderFarAwayOpaque(Matrix4f projection, MatrixStack stack, double cx, double cy, double cz);
 
     public abstract void renderFarAwayTranslucent();
 

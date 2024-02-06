@@ -7,7 +7,6 @@
     "minecraft.MixinBackgroundRenderer",
     "minecraft.MixinClientChunkManager",
     "minecraft.MixinDebugHud",
-    "minecraft.MixinGameRenderer",
     "minecraft.MixinMinecraftClient",
     "minecraft.MixinWorldRenderer"
   ],

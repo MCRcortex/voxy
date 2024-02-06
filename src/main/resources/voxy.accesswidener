@@ -4,3 +4,8 @@ accessible field net/minecraft/client/texture/SpriteContents image Lnet/minecraf
 accessible field net/minecraft/client/render/Frustum frustumIntersection Lorg/joml/FrustumIntersection;
 accessible field net/minecraft/client/render/LightmapTextureManager texture Lnet/minecraft/client/texture/NativeImageBackedTexture;
 accessible field net/minecraft/client/color/block/BlockColors providers Lnet/minecraft/util/collection/IdList;
+accessible field net/minecraft/client/render/GameRenderer zoomX F
+accessible field net/minecraft/client/render/GameRenderer zoomY F
+accessible field net/minecraft/client/render/GameRenderer zoom F
+
+accessible method net/minecraft/client/render/GameRenderer getFov (Lnet/minecraft/client/render/Camera;FZ)D

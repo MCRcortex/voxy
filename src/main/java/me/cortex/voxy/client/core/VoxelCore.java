@@ -18,6 +18,7 @@ import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
+import org.joml.Matrix4f;
 
 import java.io.File;
 import java.util.*;
@@ -107,6 +108,23 @@ public class VoxelCore {
         this.renderer.setupRender(frustum, camera);
     }
 
+    private Matrix4f getProjectionMatrix() {
+
+        var projection = new Matrix4f();
+        var client = MinecraftClient.getInstance();
+        var gameRenderer = client.gameRenderer;
+
+        float fov = (float) gameRenderer.getFov(gameRenderer.getCamera(), client.getTickDelta(), true);
+
+        projection.setPerspective(fov * 0.01745329238474369f,
+                (float) client.getWindow().getFramebufferWidth() / (float)client.getWindow().getFramebufferHeight(),
+                64F, 16 * 3000f);
+        var transform = new Matrix4f().identity();
+        transform.translate(gameRenderer.zoomX, -gameRenderer.zoomY, 0.0F);
+        transform.scale(gameRenderer.zoom, gameRenderer.zoom, 1.0F);
+        return transform.mul(projection);
+    }
+
     public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
         matrices.push();
         matrices.translate(-cameraX, -cameraY, -cameraZ);
@@ -129,10 +147,12 @@ public class VoxelCore {
         // this is cause the terrain might not exist and so all the caves are visible causing hell for the
         // occlusion culler
 
-        this.renderer.renderFarAwayOpaque(matrices, cameraX, cameraY, cameraZ);
+        var projection = this.getProjectionMatrix();
+
+        this.renderer.renderFarAwayOpaque(projection, matrices, cameraX, cameraY, cameraZ);
 
         //Compute the SSAO of the rendered terrain
-        this.postProcessing.computeSSAO(matrices);
+        //this.postProcessing.computeSSAO(projection, matrices);
 
         //We can render the translucent directly after as it is the furthest translucent objects
         this.renderer.renderFarAwayTranslucent();

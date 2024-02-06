@@ -121,10 +121,10 @@ public class PostProcessing {
 
     //Computes ssao on the current framebuffer data and updates it
     // this means that translucency wont be effected etc
-    public void computeSSAO(MatrixStack stack) {
+    public void computeSSAO(Matrix4f projection, MatrixStack stack) {
         this.ssaoComp.bind();
         float[] data = new float[4*4];
-        var mat = new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix());
+        var mat = new Matrix4f(projection).mul(stack.peek().getPositionMatrix());
         mat.get(data);
         glUniformMatrix4fv(2, false, data);//MVP
         mat.invert();

@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
@@ -83,9 +84,10 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
     //FIXME: dont do something like this as it breaks multiviewport mods
     private int frameId = 0;
-    private void updateUniformBuffer(MatrixStack stack, double cx, double cy, double cz) {
+    private void updateUniformBuffer(Matrix4f projection, MatrixStack stack, double cx, double cy, double cz) {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, this.uniformBuffer.size());
-        var mat = new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix());
+
+        var mat = new Matrix4f(projection).mul(stack.peek().getPositionMatrix());
         var innerTranslation = new Vector3f((float) (cx-(this.sx<<5)), (float) (cy-(this.sy<<5)), (float) (cz-(this.sz<<5)));
         mat.translate(-innerTranslation.x, -innerTranslation.y, -innerTranslation.z);
         mat.getToAddress(ptr); ptr += 4*4*4;
@@ -101,7 +103,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         MemoryUtil.memPutInt(ptr, this.frameId++); ptr += 4;
     }
 
-    public void renderFarAwayOpaque(MatrixStack stack, double cx, double cy, double cz) {
+    public void renderFarAwayOpaque(Matrix4f projection, MatrixStack stack, double cx, double cy, double cz) {
         if (this.geometry.getSectionCount() == 0) {
             return;
         }
@@ -117,7 +119,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         //RenderSystem.enableBlend();
         //RenderSystem.defaultBlendFunc();
 
-        this.updateUniformBuffer(stack, cx, cy, cz);
+        this.updateUniformBuffer(projection, stack, cx, cy, cz);
 
         UploadStream.INSTANCE.commit();
 
