@@ -52,7 +52,7 @@ import static org.lwjgl.opengl.GL45C.glTextureSubImage2D;
 // as leaves and such will be able to be merged
 public class ModelManager {
     public static final int MODEL_SIZE = 64;
-    private final ModelTextureBakery bakery;
+    public final ModelTextureBakery bakery;
     private final GlBuffer modelBuffer;
     private final GlBuffer modelColourBuffer;
     private final GlTexture textures;
@@ -122,7 +122,6 @@ public class ModelManager {
 
 
 
-    private static final Set<Block> NO_RENDER = new HashSet<>(List.of(Blocks.SHORT_GRASS, Blocks.TALL_GRASS));
 
     //TODO: what i need to do is seperate out fluid states from blockStates
 
@@ -137,10 +136,6 @@ public class ModelManager {
         boolean isFluid = blockState.getBlock() instanceof FluidBlock;
         int modelId = -1;
         var textureData = this.bakery.renderFaces(blockState, 123456, isFluid);
-        if (NO_RENDER.contains(blockState.getBlock())) {
-            this.idMappings[blockId] = 0;
-            return 0;
-        }
 
         {//Deduplicate same entries
             int possibleDuplicate = this.modelTexture2id.getInt(List.of(textureData));
@@ -495,7 +490,7 @@ public class ModelManager {
         float[] res = new float[6];
         for (var dir : Direction.values()) {
             var data = textures[dir.getId()];
-            float fd = TextureUtils.computeDepth(data, TextureUtils.DEPTH_MODE_MIN, checkMode);//Compute the min float depth, smaller means closer to the camera, range 0-1
+            float fd = TextureUtils.computeDepth(data, TextureUtils.DEPTH_MODE_AVG, checkMode);//Compute the min float depth, smaller means closer to the camera, range 0-1
             int depth = Math.round(fd * this.modelTextureSize);
             //If fd is -1, it means that there was nothing rendered on that face and it should be discarded
             if (fd < -0.1) {

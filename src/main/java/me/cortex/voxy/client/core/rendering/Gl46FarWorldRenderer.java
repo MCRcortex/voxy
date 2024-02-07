@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
@@ -111,7 +112,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glDisable(GL_BLEND);
 
 
-        //this.models.addEntry(0, Blocks.STONE.getDefaultState());
+        //this.models.bakery.renderFaces(Blocks.OAK_LEAVES.getDefaultState(), 1234, false);
 
 
         RenderLayer.getCutoutMipped().startDrawing();
@@ -150,9 +151,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glColorMask(false, false, false, false);
         glDepthMask(false);
 
-        //glEnable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
         glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3, GL_UNSIGNED_BYTE, (1 << 16) * 6 * 2, this.geometry.getSectionCount());
-        //glDisable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
 
         glDepthMask(true);
         glColorMask(true, true, true, true);

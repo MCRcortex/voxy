@@ -11,6 +11,7 @@ layout(location = 1) out flat vec2 baseUV;
 layout(location = 2) out flat vec4 tinting;
 layout(location = 3) out flat vec4 addin;
 layout(location = 4) out flat uint flags;
+layout(location = 5) out flat vec4 conditionalTinting;
 
 uint extractLodLevel() {
     return uint(gl_BaseInstance)>>29;
@@ -23,18 +24,18 @@ ivec3 extractRelativeLodPos() {
 }
 
 vec4 uint2vec4RGBA(uint colour) {
-    return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255f;
+    return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255.0;
 }
 
 //Gets the face offset with respect to the face direction (e.g. some will be + some will be -)
 float getDepthOffset(uint faceData, uint face) {
     float offset = extractFaceIndentation(faceData);
-    return offset * (1f-((int(face)&1)*2f));
+    return offset * (1.0-((int(face)&1)*2.0));
 }
 
 vec2 getFaceSizeOffset(uint faceData, uint corner) {
     vec4 faceOffsetsSizes = extractFaceSizes(faceData);
-    return mix(faceOffsetsSizes.xz, -(1f-faceOffsetsSizes.yw), bvec2(((corner>>1)&1)==1, (corner&1)==1));
+    return mix(faceOffsetsSizes.xz, -(1.0-faceOffsetsSizes.yw), bvec2(((corner>>1)&1)==1, (corner&1)==1));
 }
 
 //TODO: add a mechanism so that some quads can ignore backface culling
@@ -78,14 +79,16 @@ void main() {
         offset = offset.zxy;
     }
 
-    gl_Position = MVP * vec4(corner + offset, 1f);
+    gl_Position = MVP * vec4(corner + offset, 1.0);
 
 
     //Compute the uv coordinates
-    vec2 modelUV = vec2(modelId&0xFF, (modelId>>8)&0xFF)*(1f/(256f));
+    vec2 modelUV = vec2(modelId&0xFF, (modelId>>8)&0xFF)*(1.0/(256.0));
     //TODO: make the face orientated by 2x3 so that division is not a integer div and modulo isnt needed
     // as these are very slow ops
-    baseUV = modelUV + (vec2(face%3, face/3) * (1f/(vec2(3f, 2f)*256f)));
+    baseUV = modelUV + (vec2(face%3, face/3) * (1.0/(vec2(3.0, 2.0)*256.0)));
+    //TODO: add an option to scale the quad size by the lod level so that
+    // e.g. at lod level 2 a face will have 2x2
     uv = respectiveQuadSize + faceOffset;//Add in the face offset for 0,0 uv
 
     flags = faceHasAlphaCuttout(faceData);
@@ -103,19 +106,30 @@ void main() {
     if (modelHasBiomeLUT(model)) {
         tintColour = colourData[tintColour + extractBiomeId(quad)];
     }
-    tinting *= uint2vec4RGBA(tintColour).yzwx;
+
+    conditionalTinting = vec4(0);
+    if (tintColour != uint(-1)) {
+        flags |= 1u<<2;
+        conditionalTinting = uint2vec4RGBA(tintColour).yzwx;
+    }
+
     addin = vec4(0.0);
     if (!modelIsTranslucent(model)) {
         tinting.w = 0.0;
-        addin.w = float(face|(lodLevel<<3))/255.0;
+        //Encode the face, the lod level and
+        uint encodedData = 0;
+        encodedData |= face;
+        encodedData |= (lodLevel<<3);
+        encodedData |= uint(modelHasMipmaps(model))<<6;//TODO: add if the face has AO as a face property instead of just using if it has mipmaps
+        addin.w = float(encodedData)/255.0;
     }
 
     //Apply face tint
-    if (face == 0) {
-        tinting.xyz *= vec3(0.75, 0.75, 0.75);
-    } else if (face != 1) {
-        tinting.xyz *= vec3((float(face-2)/4.0)*0.3 + 0.7);
+    if ((face>>1) == 0) {
+        tinting.xyz *= 1.0;
+    } else if ((face>>1) == 1) {
+        tinting.xyz *= 0.8;
+    } else {
+        tinting.xyz *= 0.6;
     }
-
-
 }
