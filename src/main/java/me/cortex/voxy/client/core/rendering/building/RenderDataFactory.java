@@ -213,16 +213,27 @@ public class RenderDataFactory {
         // fluid face of type this.world.getMapper().getBlockStateFromId(self).getFluidState() and block type
         // this.world.getMapper().getBlockStateFromId(self).getFluidState().getBlockState()
 
-        //If we are a fluid and the oposing face is also a fluid need to make a closer check
-        if (ModelManager.containsFluid(metadata) && ModelManager.containsFluid(facingMetadata)) {
-            //if (this.world.getMapper().getBlockStateFromId(self).getFluidState() != this.world.getMapper().getBlockStateFromId(facingState).getFluidState()) {
-            //  TODO: need to inject a face here of type fluid, how? i have no god damn idea, probably add an auxilery mesher just for this
-            //}
-
-            //Hackfix
+        //If we are a fluid
+        if (ModelManager.containsFluid(metadata)) {
             var selfBS = this.world.getMapper().getBlockStateFromId(self);
-            if (selfBS.getBlock() instanceof FluidBlock && selfBS.getFluidState().getBlockState().getBlock() == this.world.getMapper().getBlockStateFromId(facingState).getFluidState().getBlockState().getBlock()) {
-                return false;
+            if (ModelManager.containsFluid(facingMetadata)) {//and the oposing face is also a fluid need to make a closer check
+                var faceBS = this.world.getMapper().getBlockStateFromId(facingState);
+
+                //If we are a fluid block that means our face is a fluid face, waterlogged blocks dont include fluid faces in the model data
+                if (selfBS.getBlock() instanceof FluidBlock) {
+                    //If the fluid state of both blocks are the same we dont emit extra geometry
+                    if (selfBS.getFluidState().getBlockState().equals(faceBS.getFluidState().getBlockState())) {
+                        return false;
+                    }
+                } else {//If we are not a fluid block, we might need to emit extra geometry (fluid faces) to the auxliery mesher
+                    boolean shouldEmitFluidFace = !selfBS.getFluidState().getBlockState().equals(faceBS.getFluidState().getBlockState());
+                    //TODO: THIS
+                    int aa = 0;
+                }
+            } else if (!(selfBS.getBlock() instanceof FluidBlock)) {//If we are not a fluid block but we contain a fluid we might need to emit extra geometry
+                //Basicly need to get the fluid state and run putFaceIfCan using the fluid state as the self state and keep the same facing state
+                //TODO: THIS
+                int aa = 0;
             }
         }
 

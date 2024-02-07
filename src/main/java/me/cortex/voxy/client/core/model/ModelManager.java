@@ -51,6 +51,14 @@ import static org.lwjgl.opengl.GL45C.glTextureSubImage2D;
 // to all other models already loaded, if it is a duplicate, create a mapping from the id to the already loaded id, this will help with meshing aswell
 // as leaves and such will be able to be merged
 public class ModelManager {
+    //TODO: replace the fluid BlockState with a client model id integer of the fluidState, requires looking up
+    // the fluid state in the mipper
+    private record ModelEntry(List<ColourDepthTextureData> textures, BlockState fluidBlockState){
+        private ModelEntry(ColourDepthTextureData[] textures, BlockState fluidBlockState) {
+            this(Stream.of(textures).map(ColourDepthTextureData::clone).toList(), fluidBlockState);
+        }
+    }
+
     public static final int MODEL_SIZE = 64;
     public final ModelTextureBakery bakery;
     private final GlBuffer modelBuffer;
@@ -91,7 +99,7 @@ public class ModelManager {
 
     //Provides a map from id -> model id as multiple ids might have the same internal model id
     private final int[] idMappings;
-    private final Object2IntOpenHashMap<List<ColourDepthTextureData>> modelTexture2id = new Object2IntOpenHashMap<>();
+    private final Object2IntOpenHashMap<ModelEntry> modelTexture2id = new Object2IntOpenHashMap<>();
 
 
     private final List<Biome> biomes = new ArrayList<>();
@@ -138,7 +146,8 @@ public class ModelManager {
         var textureData = this.bakery.renderFaces(blockState, 123456, isFluid);
 
         {//Deduplicate same entries
-            int possibleDuplicate = this.modelTexture2id.getInt(List.of(textureData));
+            var entry = new ModelEntry(textureData, isFluid||blockState.getFluidState().isEmpty()?null:blockState.getFluidState().getBlockState());
+            int possibleDuplicate = this.modelTexture2id.getInt(entry);
             if (possibleDuplicate != -1) {//Duplicate found
                 this.idMappings[blockId] = possibleDuplicate;
                 modelId = possibleDuplicate;
@@ -146,7 +155,7 @@ public class ModelManager {
             } else {//Not a duplicate so create a new entry
                 modelId = this.modelTexture2id.size();
                 this.idMappings[blockId] = modelId;
-                this.modelTexture2id.put(Stream.of(textureData).map(ColourDepthTextureData::clone).toList(), modelId);
+                this.modelTexture2id.put(entry, modelId);
             }
         }
 
