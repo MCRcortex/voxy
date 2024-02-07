@@ -1,5 +1,6 @@
 package me.cortex.voxy.common.world;
 
+import me.cortex.voxy.common.storage.StorageCompressor;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.service.SectionSavingService;
@@ -13,7 +14,6 @@ import java.util.function.Consumer;
 //Use an LMDB backend to store the world, use a local inmemory cache for lod sections
 // automatically manages and invalidates sections of the world as needed
 public class WorldEngine {
-
     public final StorageBackend storage;
     private final Mapper mapper;
     private final ActiveSectionTracker sectionTracker;
@@ -29,14 +29,14 @@ public class WorldEngine {
 
     public Mapper getMapper() {return this.mapper;}
 
-    public WorldEngine(StorageBackend storageBackend, int ingestWorkers, int savingServiceWorkers, int compressionLevel, int maxMipLayers) {
+    public WorldEngine(StorageBackend storageBackend, int ingestWorkers, int savingServiceWorkers, int maxMipLayers) {
         this.maxMipLevels = maxMipLayers;
         this.storage = storageBackend;
         this.mapper = new Mapper(this.storage);
         //4 cache size bits means that the section tracker has 16 separate maps that it uses
         this.sectionTracker = new ActiveSectionTracker(3, this::unsafeLoadSection);
 
-        this.savingService = new SectionSavingService(this, savingServiceWorkers, compressionLevel);
+        this.savingService = new SectionSavingService(this, savingServiceWorkers);
         this.ingestService  = new VoxelIngestService(this, ingestWorkers);
     }
 

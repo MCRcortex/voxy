@@ -1,5 +1,6 @@
 package me.cortex.voxy.common.world.service;
 
+import me.cortex.voxy.common.storage.StorageCompressor;
 import me.cortex.voxy.common.world.SaveLoadSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
@@ -15,13 +16,13 @@ public class SectionSavingService {
     private volatile boolean running = true;
     private final Thread[] workers;
 
-    private final int compressionLevel;
     private final ConcurrentLinkedDeque<WorldSection> saveQueue = new ConcurrentLinkedDeque<>();
     private final Semaphore saveCounter = new Semaphore(0);
 
     private final WorldEngine world;
 
-    public SectionSavingService(WorldEngine worldEngine, int workers, int compressionLevel) {
+
+    public SectionSavingService(WorldEngine worldEngine, int workers) {
         this.workers = new Thread[workers];
         for (int i = 0; i < workers; i++) {
             var worker = new Thread(this::saveWorker);
@@ -30,7 +31,6 @@ public class SectionSavingService {
             worker.start();
             this.workers[i] = worker;
         }
-        this.compressionLevel = compressionLevel;
         this.world = worldEngine;
     }
 
@@ -42,7 +42,7 @@ public class SectionSavingService {
             section.assertNotFree();
             section.inSaveQueue.set(false);
 
-            var saveData = SaveLoadSystem.serialize(section, this.compressionLevel);
+            var saveData = SaveLoadSystem.serialize(section);
             this.world.storage.setSectionData(section.key, saveData);
             MemoryUtil.memFree(saveData);
 

@@ -6,6 +6,8 @@ import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.util.DebugUtil;
+import me.cortex.voxy.common.storage.CompressionStorageAdaptor;
+import me.cortex.voxy.common.storage.ZSTDCompressor;
 import me.cortex.voxy.common.storage.rocksdb.RocksDBStorageBackend;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
@@ -55,7 +57,7 @@ public class VoxelCore {
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
         System.out.println("Renderer initialized");
-        this.world = new WorldEngine(new RocksDBStorageBackend(new File(VoxyConfig.CONFIG.storagePath)), VoxyConfig.CONFIG.ingestThreads, VoxyConfig.CONFIG.savingThreads, VoxyConfig.CONFIG.savingCompressionLevel, 5);//"storagefile.db"//"ethoslab.db"
+        this.world = new WorldEngine(new CompressionStorageAdaptor(new ZSTDCompressor(VoxyConfig.CONFIG.savingCompressionLevel), new RocksDBStorageBackend(new File(VoxyConfig.CONFIG.storagePath))), VoxyConfig.CONFIG.ingestThreads, VoxyConfig.CONFIG.savingThreads, 5);
         System.out.println("World engine");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
