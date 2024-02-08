@@ -87,7 +87,7 @@ public class DistanceTracker {
 
     public void init(int x, int z) {
         //Radius of chunks to enqueue
-        int SIZE = 40;
+        int SIZE = 64;
         //Insert highest LOD level
         for (int ox = -SIZE; ox <= SIZE; ox++) {
             for (int oz = -SIZE; oz <= SIZE; oz++) {

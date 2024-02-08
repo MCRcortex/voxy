@@ -67,7 +67,9 @@ public class SaveLoadSystem {
         }
 
         if (section.key != key) {
-            throw new IllegalStateException("Decompressed section not the same as requested. got: " + key + " expected: " + section.key);
+            //throw new IllegalStateException("Decompressed section not the same as requested. got: " + key + " expected: " + section.key);
+            System.err.println("Decompressed section not the same as requested. got: " + key + " expected: " + section.key);
+            return false;
         }
 
         for (int i = 0; i < section.data.length; i++) {

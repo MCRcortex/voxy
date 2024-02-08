@@ -10,6 +10,9 @@ import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.block.FluidBlock;
 import org.lwjgl.system.MemoryUtil;
 
+import java.lang.reflect.Array;
+import java.util.Arrays;
+
 
 public class RenderDataFactory {
     private final WorldEngine world;
@@ -148,9 +151,13 @@ public class RenderDataFactory {
                         //Need to access the other connecting section
                         if (primary == 0) {
                             if (!obtainedOppositeSection0) {
-                                var connectedSection = this.world.acquire(section.lvl, section.x - aX, section.y - aY, section.z - aZ);
-                                connectedSection.copyDataTo(this.connectedSectionCache);
-                                connectedSection.release();
+                                var connectedSection = this.world.acquireIfExists(section.lvl, section.x - aX, section.y - aY, section.z - aZ);
+                                if (connectedSection != null) {
+                                    connectedSection.copyDataTo(this.connectedSectionCache);
+                                    connectedSection.release();
+                                } else {
+                                    Arrays.fill(this.connectedSectionCache, 0);
+                                }
                                 obtainedOppositeSection0 = true;
                             }
                             facingState = this.connectedSectionCache[WorldSection.getIndex(x*(1-aX)+(31*aX), y*(1-aY)+(31*aY), z*(1-aZ)+(31*aZ))];
@@ -165,9 +172,13 @@ public class RenderDataFactory {
                         //Need to access the other connecting section
                         if (primary == 31) {
                             if (!obtainedOppositeSection31) {
-                                var connectedSection = this.world.acquire(section.lvl, section.x + aX, section.y + aY, section.z + aZ);
-                                connectedSection.copyDataTo(this.connectedSectionCache);
-                                connectedSection.release();
+                                var connectedSection = this.world.acquireIfExists(section.lvl, section.x + aX, section.y + aY, section.z + aZ);
+                                if (connectedSection != null) {
+                                    connectedSection.copyDataTo(this.connectedSectionCache);
+                                    connectedSection.release();
+                                } else {
+                                    Arrays.fill(this.connectedSectionCache, 0);
+                                }
                                 obtainedOppositeSection31 = true;
                             }
                             facingState = this.connectedSectionCache[WorldSection.getIndex(x*(1-aX), y*(1-aY), z*(1-aZ))];
