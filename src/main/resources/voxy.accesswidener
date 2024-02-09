@@ -7,5 +7,6 @@ accessible field net/minecraft/client/color/block/BlockColors providers Lnet/min
 accessible field net/minecraft/client/render/GameRenderer zoomX F
 accessible field net/minecraft/client/render/GameRenderer zoomY F
 accessible field net/minecraft/client/render/GameRenderer zoom F
+accessible field net/minecraft/client/world/ClientWorld worldRenderer Lnet/minecraft/client/render/WorldRenderer;
 
 accessible method net/minecraft/client/render/GameRenderer getFov (Lnet/minecraft/client/render/Camera;FZ)D

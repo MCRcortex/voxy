@@ -13,6 +13,10 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.biome.Biome;
+import net.minecraft.world.biome.BiomeKeys;
 import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
@@ -48,6 +52,7 @@ public abstract class AbstractFarWorldRenderer {
     protected FrustumIntersection frustum;
 
     private final ConcurrentLinkedDeque<Mapper.StateEntry> blockStateUpdates = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeUpdates = new ConcurrentLinkedDeque<>();
     public AbstractFarWorldRenderer(int geometrySize, int maxSections) {
         this.uniformBuffer  = new GlBuffer(1024);
         this.lightDataBuffer  = new GlBuffer(256*4);//256 of uint
@@ -85,12 +90,28 @@ public abstract class AbstractFarWorldRenderer {
 
         //Upload any new geometry
         this.geometry.uploadResults();
+        {
+            boolean didHaveBiomeChange = false;
 
-        //Do any BlockChanges
-        while (!this.blockStateUpdates.isEmpty()) {
-            var update = this.blockStateUpdates.pop();
-            this.models.addEntry(update.id, update.state);
+            //Do any BiomeChanges
+            while (!this.biomeUpdates.isEmpty()) {
+                var update = this.biomeUpdates.pop();
+                var biomeReg = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME);
+                this.models.addBiome(update.id, biomeReg.get(new Identifier(update.biome)));
+                didHaveBiomeChange = true;
+            }
+
+            if (didHaveBiomeChange) {
+                UploadStream.INSTANCE.commit();
+            }
+
+            //Do any BlockChanges
+            while (!this.blockStateUpdates.isEmpty()) {
+                var update = this.blockStateUpdates.pop();
+                this.models.addEntry(update.id, update.state);
+            }
         }
+
     }
 
     public abstract void renderFarAwayOpaque(Matrix4f projection, MatrixStack stack, double cx, double cy, double cz);
@@ -103,6 +124,10 @@ public abstract class AbstractFarWorldRenderer {
 
     public void addBlockState(Mapper.StateEntry entry) {
         this.blockStateUpdates.add(entry);
+    }
+
+    public void addBiome(Mapper.BiomeEntry entry) {
+        this.biomeUpdates.add(entry);
     }
 
     public void addDebugData(List<String> debug) {

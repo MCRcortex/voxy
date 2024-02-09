@@ -3,7 +3,7 @@ package me.cortex.voxy.client.terrain;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import me.cortex.voxy.client.IGetVoxelCore;
+import me.cortex.voxy.client.core.IGetVoxelCore;
 import me.cortex.voxy.client.importers.WorldImporter;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;

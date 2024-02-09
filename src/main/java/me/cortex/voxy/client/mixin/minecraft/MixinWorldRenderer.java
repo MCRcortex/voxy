@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
-import me.cortex.voxy.client.IGetVoxelCore;
+import me.cortex.voxy.client.Voxy;
+import me.cortex.voxy.client.core.IGetVoxelCore;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.VoxelCore;
 import net.minecraft.client.render.*;
@@ -42,6 +43,14 @@ public abstract class MixinWorldRenderer implements IGetVoxelCore {
         }
     }
 
+    @Unique
+    public void populateCore() {
+        if (this.core != null) {
+            throw new IllegalStateException("Trying to create new core while a core already exists");
+        }
+        this.core = Voxy.createVoxelCore(this.world);
+    }
+
     public VoxelCore getVoxelCore() {
         return this.core;
     }
@@ -50,7 +59,10 @@ public abstract class MixinWorldRenderer implements IGetVoxelCore {
     private void resetVoxelCore(CallbackInfo ci) {
         if (this.world != null && this.core != null) {
             this.core.shutdown();
-            this.core = new VoxelCore();
+            this.core = null;
+            if (VoxyConfig.CONFIG.enabled) {
+                this.populateCore();
+            }
         }
     }
 
@@ -69,7 +81,7 @@ public abstract class MixinWorldRenderer implements IGetVoxelCore {
             this.core = null;
         }
         if (VoxyConfig.CONFIG.enabled) {
-            this.core = new VoxelCore();
+            this.populateCore();
         }
     }
 
@@ -80,7 +92,7 @@ public abstract class MixinWorldRenderer implements IGetVoxelCore {
             this.core = null;
         }
         if (this.world != null && VoxyConfig.CONFIG.enabled) {
-            this.core = new VoxelCore();
+            this.populateCore();
         }
     }
 

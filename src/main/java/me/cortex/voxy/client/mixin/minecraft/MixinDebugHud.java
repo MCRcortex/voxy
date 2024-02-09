@@ -1,6 +1,6 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
-import me.cortex.voxy.client.IGetVoxelCore;
+import me.cortex.voxy.client.core.IGetVoxelCore;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.DebugHud;
 import org.spongepowered.asm.mixin.Mixin;

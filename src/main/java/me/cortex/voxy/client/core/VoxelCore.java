@@ -50,15 +50,14 @@ public class VoxelCore {
 
     //private final Thread shutdownThread = new Thread(this::shutdown);
 
-    public VoxelCore() {
+    public VoxelCore(WorldEngine engine) {
+        this.world = engine;
         System.out.println("Initializing voxy core");
 
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
         System.out.println("Renderer initialized");
-        this.world = new WorldEngine(new CompressionStorageAdaptor(new ZSTDCompressor(VoxyConfig.CONFIG.savingCompressionLevel), new FragmentedStorageBackendAdaptor(new File(VoxyConfig.CONFIG.storagePath))), VoxyConfig.CONFIG.ingestThreads, VoxyConfig.CONFIG.savingThreads, 5);
-        System.out.println("World engine");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
         this.renderGen = new RenderGenerationService(this.world, this.renderer.getModelManager(), VoxyConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult);
@@ -74,7 +73,7 @@ public class VoxelCore {
 
         this.postProcessing = new PostProcessing();
 
-        this.world.getMapper().setCallbacks(this.renderer::addBlockState, a->{});
+        this.world.getMapper().setCallbacks(this.renderer::addBlockState, this.renderer::addBiome);
 
 
         ////Resave the db incase it failed a recovery
