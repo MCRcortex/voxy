@@ -176,12 +176,7 @@ public class Mapper {
     //TODO:FIXME: IS VERY SLOW NEED TO MAKE IT LOCK FREE, or at minimum use a concurrent map
     public long getBaseId(byte light, BlockState state, RegistryEntry<Biome> biome) {
         if (state.isAir()) return ((long)light)<<56;//Special case and fast return for air, dont care about the biome
-        StateEntry sentry = this.block2stateEntry.computeIfAbsent(state, this::registerNewBlockState);
-
-        String biomeId = biome.getKey().get().getValue().toString();
-        BiomeEntry bentry = this.biome2biomeEntry.computeIfAbsent(biomeId, this::registerNewBiome);
-
-        return (Byte.toUnsignedLong(light)<<56)|(Integer.toUnsignedLong(bentry.id) << 47)|(Integer.toUnsignedLong(sentry.id)<<27);
+        return composeMappingId(light, this.getIdForBlockState(state), this.getIdForBiome(biome));
     }
 
     public BlockState getBlockStateFromId(long id) {
@@ -189,12 +184,20 @@ public class Mapper {
         return this.blockId2stateEntry.get(blockId).state;
     }
 
-    public int getIdFromBlockState(BlockState state) {
-        var entry = this.block2stateEntry.get(state);
-        if (entry == null) {
-            return -1;
+    public int getIdForBlockState(BlockState state) {
+        return this.block2stateEntry.computeIfAbsent(state, this::registerNewBlockState).id;
+    }
+
+    public int getIdForBiome(RegistryEntry<Biome> biome) {
+        String biomeId = biome.getKey().get().getValue().toString();
+        return this.biome2biomeEntry.computeIfAbsent(biomeId, this::registerNewBiome).id;
+    }
+
+    public static long composeMappingId(byte light, int blockId, int biomeId) {
+        if (blockId == AIR) {//Dont care about biome for air
+            return Byte.toUnsignedLong(light)<<56;
         }
-        return entry.id;
+        return (Byte.toUnsignedLong(light)<<56)|(Integer.toUnsignedLong(blockId) << 47)|(Integer.toUnsignedLong(biomeId)<<27);
     }
 
     //TODO: fixme: synchronize access to this.blockId2stateEntry
