@@ -142,6 +142,8 @@ public class RenderDataFactory {
                     int selfBlockId = Mapper.getBlockId(self);
                     long selfMetadata = this.modelMan.getModelMetadata(selfBlockId);
 
+
+
                     boolean putFace = false;
 
                     //Branch into 2 paths, the + direction and -direction, doing it at once makes it much faster as it halves the number of loops
@@ -247,6 +249,7 @@ public class RenderDataFactory {
                 int aa = 0;
             }
         }
+
 
 
         int clientModelId = this.modelMan.getModelId(selfBlockId);

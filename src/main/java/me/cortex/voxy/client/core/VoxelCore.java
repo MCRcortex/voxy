@@ -57,7 +57,7 @@ public class VoxelCore {
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
         System.out.println("Renderer initialized");
-        this.world = new WorldEngine(new CompressionStorageAdaptor(new ZSTDCompressor(VoxyConfig.CONFIG.savingCompressionLevel), new RocksDBStorageBackend(new File(VoxyConfig.CONFIG.storagePath))), VoxyConfig.CONFIG.ingestThreads, VoxyConfig.CONFIG.savingThreads, 5);
+        this.world = new WorldEngine(new CompressionStorageAdaptor(new ZSTDCompressor(VoxyConfig.CONFIG.savingCompressionLevel), new FragmentedStorageBackendAdaptor(new File(VoxyConfig.CONFIG.storagePath))), VoxyConfig.CONFIG.ingestThreads, VoxyConfig.CONFIG.savingThreads, 5);
         System.out.println("World engine");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);

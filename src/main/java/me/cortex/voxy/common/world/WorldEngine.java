@@ -48,7 +48,9 @@ public class WorldEngine {
                     this.storage.deleteSectionData(into.key);
                     //TODO: regenerate the section from children
                     Arrays.fill(into.data, Mapper.AIR);
-                    System.err.println("Section " + into.lvl + ", " + into.x + ", " + into.y + ", " + into.z + " was unable to load, setting to air");
+                    System.err.println("Section " + into.lvl + ", " + into.x + ", " + into.y + ", " + into.z + " was unable to load, removing");
+
+                    this.storage.deleteSectionData(into.key);
                     return -1;
                 } else {
                     return 0;

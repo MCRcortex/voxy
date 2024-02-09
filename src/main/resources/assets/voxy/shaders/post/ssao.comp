@@ -8,18 +8,18 @@ layout(location = 2) uniform mat4 MVP;
 layout(location = 3) uniform mat4 invMVP;
 
 vec3 rev3d(vec3 clip) {
-    vec4 view = invMVP * vec4(clip*2-1,1);
+    vec4 view = invMVP * vec4(clip*2.0-1.0,1.0);
     return view.xyz/view.w;
 }
 
 vec3 reDeProject(vec3 pos) {
-    vec4 view = MVP * vec4(pos, 1);
+    vec4 view = MVP * vec4(pos, 1.0);
     view.xy /= view.w;
-    vec2 UV = clamp(view.xy*0.5+0.5, 0, 1);
+    vec2 UV = clamp(view.xy*0.5+0.5, 0.0, 1.0);
     //TODO: sample the colour texture and check if the alpha has the hasAO flag
 
-    view.z = texture(depthTex, UV).x*2-1;
-    view.w = 1;
+    view.z = texture(depthTex, UV).x*2.0-1.0;
+    view.w = 1.0;
     view = invMVP * view;
     return view.xyz/view.w;
 }
@@ -38,7 +38,7 @@ void main() {
         return;
     }
     vec4 colour = imageLoad(colourTex, ivec2(gl_GlobalInvocationID.xy));
-    uint metadata = uint(colour.w*255f);
+    uint metadata = uint(colour.w*255.0f);
     uint face = metadata&7;
     uint lod = (metadata>>3)&7;
     bool hasAO = (metadata>>6)!=0;
@@ -50,15 +50,15 @@ void main() {
 
     float d = 0.0;
     if (hasAO) {
-        d = computeAOAngle(pos, 1*(1<<lod), viewNormal);//1
+        d = computeAOAngle(pos, 1.0*(1<<lod), viewNormal);//1
         if (d<0.1) {
-            d = 0f;
+            d = 0.0f;
         }
     }
 
     vec4 ocolour = colour;
-    ocolour.xyz *= ((1f-d)/3f+0.666666f);
-    ocolour.w = 1f;
+    ocolour.xyz *= ((1.0f-d)/3.0f+0.666666f);
+    ocolour.w = 1.0f;
     imageStore(colourTex, ivec2(gl_GlobalInvocationID.xy), ocolour);
 }
 //vec4 ocolour =  vec4(max(0, d), abs(min(0,d)), 0, 1);
