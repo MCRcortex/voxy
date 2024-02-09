@@ -122,9 +122,6 @@ public class ModelTextureBakery {
                 -1,-1,0,1,
         }), VertexSorter.BY_Z);
 
-        glClearColor(0,0,0,0);
-        glClearDepth(1);
-        glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id);
 
 
         RenderLayer renderLayer = null;
@@ -136,6 +133,10 @@ public class ModelTextureBakery {
 
 
         renderLayer.startDrawing();
+        glClearColor(0,0,0,0);
+        glClearDepth(1);
+        glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id);
+
         glEnable(GL_STENCIL_TEST);
         glDepthRange(0, 1);
         glDepthMask(true);

@@ -105,8 +105,8 @@ dependencies {
     include(runtimeOnly "org.lwjgl:lwjgl-lmdb:$lwjglVersion:natives-linux")
     include(runtimeOnly "org.lwjgl:lwjgl-zstd:$lwjglVersion:natives-linux")
 
-    //include(implementation 'org.rocksdb:rocksdbjni:8.10.0')
-    //include(implementation 'redis.clients:jedis:5.1.0')
-    implementation 'org.rocksdb:rocksdbjni:8.10.0'
-    implementation 'redis.clients:jedis:5.1.0'
+    include(implementation 'org.rocksdb:rocksdbjni:8.10.0')
+    include(implementation 'redis.clients:jedis:5.1.0')
+    //implementation 'org.rocksdb:rocksdbjni:8.10.0'
+    //implementation 'redis.clients:jedis:5.1.0'
 }
