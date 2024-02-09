@@ -144,9 +144,18 @@ public class ModelTextureBakery {
         glEnable(GL_CULL_FACE);
         //glDepthFunc(GL_LESS);
 
-        glBlendEquation(GL_FUNC_ADD);//TODO: reset this to the default
 
-        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        //TODO: Find a better solution
+        if (renderLayer == RenderLayer.getTranslucent()) {
+            //Very hacky blend function to retain the effect of the applied alpha since we dont really want to apply alpha
+            // this is because we apply the alpha again when rendering the terrain meaning the alpha is being double applied
+            glBlendFuncSeparate(GL_ONE_MINUS_DST_ALPHA, GL_DST_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        } else {
+            glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        }
+
+
+        //glBlendFunc(GL_ONE, GL_ONE);
 
         glStencilOp(GL_KEEP, GL_KEEP, GL_INCR);
         glStencilFunc(GL_ALWAYS, 1, 0xFF);

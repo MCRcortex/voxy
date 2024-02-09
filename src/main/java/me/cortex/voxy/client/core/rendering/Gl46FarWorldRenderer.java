@@ -24,6 +24,7 @@ import static org.lwjgl.opengl.ARBMultiDrawIndirect.glMultiDrawElementsIndirect;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_SHORT;
 import static org.lwjgl.opengl.GL11.glGetInteger;
+import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL30C.GL_R8UI;
 import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
@@ -172,15 +173,18 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         RenderLayer.getTranslucent().startDrawing();
         glBindVertexArray(this.vao);
         glDisable(GL_CULL_FACE);
-        RenderSystem.enableBlend();
-        RenderSystem.blendFuncSeparate(GlStateManager.SrcFactor.SRC_ALPHA, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA, GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE_MINUS_SRC_ALPHA);
+        glEnable(GL_BLEND);
 
-        int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
+        //TODO: maybe change this so the alpha isnt applied in the same way or something?? since atm the texture bakery uses a very hacky
+        // blend equation to make it avoid double applying translucency
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
 
         glBindSampler(0, this.models.getSamplerId());
         glActiveTexture(GL_TEXTURE0);
-        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
         glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
+
+        //RenderSystem.blendFunc(GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE);
         this.lodShader.bind();
 
         glDepthMask(false);
@@ -192,9 +196,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
 
         glBindSampler(0, 0);
-        GL11C.glBindTexture(GL_TEXTURE_2D, oldBoundTexture);
-        glActiveTexture(oldActiveTexture);
-        RenderSystem.disableBlend();
+        glDisable(GL_BLEND);
 
         RenderLayer.getTranslucent().endDrawing();
     }
