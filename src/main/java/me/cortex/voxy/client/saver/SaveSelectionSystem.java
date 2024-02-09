@@ -22,6 +22,16 @@ public class SaveSelectionSystem {
     }
 
     public WorldEngine createWorldEngine() {
+        //TODO: have basicly a recursive config tree for StorageBackend
+        // with a .build() method
+        // also have a way for the config to specify and create a config "screen"
+
+        // e.g. CompressionStorageAdaptorConfig(StorageCompressorConfig, StorageBackendConfig)
+        // FragmentedStorageBackendAdaptorConfig(File)
+        // RocksDBStorageBackendConfig(File)
+        // RedisStorageBackendConfig(String, int, String)
+
+
         var storage = new CompressionStorageAdaptor(new ZSTDCompressor(VoxyConfig.CONFIG.savingCompressionLevel), new FragmentedStorageBackendAdaptor(new File(VoxyConfig.CONFIG.storagePath)));
         return new WorldEngine(storage, VoxyConfig.CONFIG.ingestThreads, VoxyConfig.CONFIG.savingThreads, 5);
     }

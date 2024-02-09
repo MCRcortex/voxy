@@ -190,7 +190,7 @@ public class ModelTextureBakery {
     private ColourDepthTextureData captureView(BlockState state, BakedModel model, MatrixStack stack, long randomValue, int face, boolean renderFluid) {
         var vc = Tessellator.getInstance().getBuffer();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-        vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+        vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR_TEXTURE);
 
         if (!renderFluid) {
             renderQuads(vc, state, model, new MatrixStack(), randomValue);
@@ -281,7 +281,9 @@ public class ModelTextureBakery {
         for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null}) {
             var quads = model.getQuads(state, direction, new LocalRandom(randomValue));
             for (var quad : quads) {
-                builder.quad(stack.peek(), quad, 0, 0, 0, 0, 0);
+                //TODO: mark pixels that have
+                int meta = quad.hasColor()?1:0;
+                builder.quad(stack.peek(), quad, (meta>>16)&0xff, (meta>>8)&0xff, meta&0xff, 0, 0);
             }
         }
     }
