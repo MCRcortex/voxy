@@ -197,7 +197,7 @@ public class Mapper {
         if (blockId == AIR) {//Dont care about biome for air
             return Byte.toUnsignedLong(light)<<56;
         }
-        return (Byte.toUnsignedLong(light)<<56)|(Integer.toUnsignedLong(blockId) << 47)|(Integer.toUnsignedLong(biomeId)<<27);
+        return (Byte.toUnsignedLong(light)<<56)|(Integer.toUnsignedLong(biomeId) << 47)|(Integer.toUnsignedLong(blockId)<<27);
     }
 
     //TODO: fixme: synchronize access to this.blockId2stateEntry
