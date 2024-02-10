@@ -2,6 +2,8 @@ package me.cortex.voxy.common.storage.redis;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.storage.StorageBackend;
+import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.storage.config.StorageConfig;
 import org.lwjgl.system.MemoryUtil;
 import redis.clients.jedis.JedisPool;
 
@@ -9,17 +11,31 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 public class RedisStorageBackend extends StorageBackend {
-    private final JedisPool pool = new JedisPool("localhost", 6379);
-    private final byte[] WORLD = "world_sections".getBytes(StandardCharsets.UTF_8);
-    private final byte[] MAPPINGS = "id_mappings".getBytes(StandardCharsets.UTF_8);
+    private final JedisPool pool;
+    private final String user;
+    private final String password;
+    private final byte[] WORLD;
+    private final byte[] MAPPINGS;
 
-    public RedisStorageBackend() {
+    public RedisStorageBackend(String host, int port, String prefix) {
+        this(host, port, prefix, null, null);
+    }
 
+    public RedisStorageBackend(String host, int port, String prefix, String user, String password) {
+        this.pool = new JedisPool(host, port);
+        this.user = user;
+        this.password = password;
+        this.WORLD = (prefix+"world_sections").getBytes(StandardCharsets.UTF_8);
+        this.MAPPINGS = (prefix+"id_mappings").getBytes(StandardCharsets.UTF_8);
     }
 
     @Override
     public ByteBuffer getSectionData(long key) {
         try (var jedis = this.pool.getResource()) {
+            if (this.user != null) {
+                jedis.auth(this.user, this.password);
+            }
+
             var result = jedis.hget(WORLD, longToBytes(key));
             if (result == null) {
                 return null;
@@ -35,6 +51,10 @@ public class RedisStorageBackend extends StorageBackend {
     @Override
     public void setSectionData(long key, ByteBuffer data) {
         try (var jedis = this.pool.getResource()) {
+            if (this.user != null) {
+                jedis.auth(this.user, this.password);
+            }
+
             var buffer = new byte[data.remaining()];
             data.get(buffer);
             data.rewind();
@@ -45,6 +65,10 @@ public class RedisStorageBackend extends StorageBackend {
     @Override
     public void deleteSectionData(long key) {
         try (var jedis = this.pool.getResource()) {
+            if (this.user != null) {
+                jedis.auth(this.user, this.password);
+            }
+
             jedis.hdel(WORLD, longToBytes(key));
         }
     }
@@ -52,6 +76,10 @@ public class RedisStorageBackend extends StorageBackend {
     @Override
     public void putIdMapping(int id, ByteBuffer data) {
         try (var jedis = this.pool.getResource()) {
+            if (this.user != null) {
+                jedis.auth(this.user, this.password);
+            }
+
             var buffer = new byte[data.remaining()];
             data.get(buffer);
             data.rewind();
@@ -62,6 +90,10 @@ public class RedisStorageBackend extends StorageBackend {
     @Override
     public Int2ObjectOpenHashMap<byte[]> getIdMappingsData() {
         try (var jedis = this.pool.getResource()) {
+            if (this.user != null) {
+                jedis.auth(this.user, this.password);
+            }
+
             var mappings = jedis.hgetAll(MAPPINGS);
             var out = new Int2ObjectOpenHashMap<byte[]>();
             if (mappings == null) {
@@ -107,5 +139,20 @@ public class RedisStorageBackend extends StorageBackend {
             result |= (b[i] & 0xFF);
         }
         return result;
+    }
+
+    public static class Config extends StorageConfig {
+        public String host;
+        public int port;
+        public String prefix;
+
+        @Override
+        public StorageBackend build(ConfigBuildCtx ctx) {
+            return new RedisStorageBackend(this.host, this.port, ctx.substituteString(this.prefix));
+        }
+
+        public static String getConfigTypeName() {
+            return "Redis";
+        }
     }
 }

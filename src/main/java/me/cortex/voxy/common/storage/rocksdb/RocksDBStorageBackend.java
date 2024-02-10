@@ -2,14 +2,14 @@ package me.cortex.voxy.common.storage.rocksdb;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.storage.StorageBackend;
+import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.storage.config.StorageConfig;
 import org.lwjgl.system.MemoryUtil;
 import org.rocksdb.*;
-import redis.clients.jedis.JedisPool;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,9 +23,9 @@ public class RocksDBStorageBackend extends StorageBackend {
     //NOTE: closes in order
     private final List<AbstractImmutableNativeReference> closeList = new ArrayList<>();
 
-    public RocksDBStorageBackend(File path) {
+    public RocksDBStorageBackend(String path) {
         try {
-            var lockPath = path.toPath().resolve("LOCK");
+            var lockPath = new File(path).toPath().resolve("LOCK");
             if (Files.exists(lockPath)) {
                 System.err.println("WARNING, deleting rocksdb LOCK file");
                 Files.delete(lockPath);
@@ -50,7 +50,7 @@ public class RocksDBStorageBackend extends StorageBackend {
 
         try {
             this.db = RocksDB.open(options,
-                    path.getPath(), cfDescriptors,
+                    path, cfDescriptors,
                     handles);
 
             this.closeList.addAll(handles);
@@ -163,5 +163,18 @@ public class RocksDBStorageBackend extends StorageBackend {
             result |= (b[i] & 0xFF);
         }
         return result;
+    }
+
+    public static class Config extends StorageConfig {
+        public String path;
+
+        @Override
+        public StorageBackend build(ConfigBuildCtx ctx) {
+            return new RocksDBStorageBackend(ctx.ensurePathExists(ctx.substituteString(ctx.resolvePath(this.path))));
+        }
+
+        public static String getConfigTypeName() {
+            return "RocksDB";
+        }
     }
 }

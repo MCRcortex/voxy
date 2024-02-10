@@ -1,17 +1,14 @@
-package me.cortex.voxy.common.storage;
+package me.cortex.voxy.common.storage.other;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import me.cortex.voxy.common.storage.lmdb.LMDBStorageBackend;
-import net.minecraft.util.math.random.RandomSeed;
+import me.cortex.voxy.common.storage.StorageBackend;
+import me.cortex.voxy.common.storage.StorageCompressor;
+import me.cortex.voxy.common.storage.config.CompressorConfig;
+import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.storage.config.StorageConfig;
 import org.lwjgl.system.MemoryUtil;
 
-import java.io.File;
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Files;
-import java.util.Arrays;
 
 //Compresses the section data
 public class CompressionStorageAdaptor extends StorageBackend {
@@ -64,5 +61,19 @@ public class CompressionStorageAdaptor extends StorageBackend {
     public void close() {
         this.compressor.close();
         this.child.close();
+    }
+
+    public static class Config extends StorageConfig {
+        public CompressorConfig compressor;
+        public StorageConfig backend;
+
+        @Override
+        public StorageBackend build(ConfigBuildCtx ctx) {
+            return new CompressionStorageAdaptor(this.compressor.build(ctx), this.backend.build(ctx));
+        }
+
+        public static String getConfigTypeName() {
+            return "CompressionAdaptor";
+        }
     }
 }

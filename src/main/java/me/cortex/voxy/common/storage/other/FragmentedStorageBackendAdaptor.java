@@ -1,42 +1,32 @@
-package me.cortex.voxy.common.storage;
+package me.cortex.voxy.common.storage.other;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import me.cortex.voxy.common.storage.lmdb.LMDBStorageBackend;
+import me.cortex.voxy.common.storage.StorageBackend;
+import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.storage.config.StorageConfig;
 import net.minecraft.util.math.random.RandomSeed;
 
-import java.io.File;
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 //Segments the section data into multiple dbs
 public class FragmentedStorageBackendAdaptor extends StorageBackend {
-    private final StorageBackend[] backends = new StorageBackend[32];
+    private final StorageBackend[] backends;
 
-    public FragmentedStorageBackendAdaptor(File directory) {
-        try {
-            Files.createDirectories(directory.toPath());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        for (int i = 0; i < this.backends.length; i++) {
-            this.backends[i] = new LMDBStorageBackend(directory.toPath().resolve("storage-db-"+i+".db").toFile());//
+    public FragmentedStorageBackendAdaptor(StorageBackend... backends) {
+        this.backends = backends;
+        int len = backends.length;
+        if ((len&(len-1)) != (len-1)) {
+            throw new IllegalArgumentException("Backend count not a power of 2");
         }
     }
 
-
-    //public static long getWorldSectionId(int lvl, int x, int y, int z) {
-    //        return ((long)lvl<<60)|((long)(y&0xFF)<<52)|((long)(z&((1<<24)-1))<<28)|((long)(x&((1<<24)-1))<<4);//NOTE: 4 bits spare for whatever
-    //    }
-    //private int getSegmentId(long key) {
-    //    return (int) (((key>>4)&1)|((key>>27)&0b10)|((key>>50)&0b100));
-    //}
-
     private int getSegmentId(long key) {
-        return (int) (RandomSeed.mixStafford13(RandomSeed.mixStafford13(key)^key)&0x1F);
+        return (int) (RandomSeed.mixStafford13(RandomSeed.mixStafford13(key)^key)&(this.backends.length-1));
     }
 
     //TODO: reencode the key to be shifted one less OR
@@ -138,6 +128,24 @@ public class FragmentedStorageBackendAdaptor extends StorageBackend {
     public void close() {
         for (var db : this.backends) {
             db.close();
+        }
+    }
+
+    public static class Config extends StorageConfig {
+        public List<StorageConfig> backends = new ArrayList<>();
+
+        @Override
+        public StorageBackend build(ConfigBuildCtx ctx) {
+            StorageBackend[] builtBackends = new StorageBackend[this.backends.size()];
+            for (int i = 0; i < this.backends.size(); i++) {
+                //TODO: put each backend in a different folder?
+                builtBackends[i] = this.backends.get(i).build(ctx);
+            }
+            return new FragmentedStorageBackendAdaptor(builtBackends);
+        }
+
+        public static String getConfigTypeName() {
+            return "FragmentationAdaptor";
         }
     }
 }

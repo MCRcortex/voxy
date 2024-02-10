@@ -2,10 +2,11 @@ package me.cortex.voxy.common.storage.lmdb;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.storage.StorageBackend;
+import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.storage.config.StorageConfig;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.util.lmdb.MDBVal;
 
-import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,10 +25,10 @@ public class LMDBStorageBackend extends StorageBackend {
     private final LMDBInterface dbi;
     private final LMDBInterface.Database sectionDatabase;
     private final LMDBInterface.Database idMappingDatabase;
-    public LMDBStorageBackend(File file) {
+    public LMDBStorageBackend(String file) {
         this.dbi = new LMDBInterface.Builder()
                 .setMaxDbs(2)
-                .open(file.getAbsolutePath(), MDB_NOSUBDIR)//MDB_NOLOCK (IF I DO THIS, must sync the db manually)// TODO: THIS
+                .open(file, MDB_NOSUBDIR)//MDB_NOLOCK (IF I DO THIS, must sync the db manually)// TODO: THIS
                 .fetch();
         this.dbi.setMapSize(GROW_SIZE);
         this.sectionDatabase = this.dbi.createDb("world_sections");
@@ -155,5 +156,18 @@ public class LMDBStorageBackend extends StorageBackend {
         this.sectionDatabase.close();
         this.idMappingDatabase.close();
         this.dbi.close();
+    }
+
+    public static class Config extends StorageConfig {
+        public String path;
+
+        @Override
+        public StorageBackend build(ConfigBuildCtx ctx) {
+            return new LMDBStorageBackend(ctx.ensurePathExists(ctx.substituteString(ctx.resolvePath(this.path))));
+        }
+
+        public static String getConfigTypeName() {
+            return "LMDB";
+        }
     }
 }

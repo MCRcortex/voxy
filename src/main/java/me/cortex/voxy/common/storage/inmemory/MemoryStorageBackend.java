@@ -6,12 +6,13 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import me.cortex.voxy.common.storage.StorageBackend;
+import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.storage.config.StorageConfig;
 import net.minecraft.util.math.random.RandomSeed;
 import org.apache.commons.lang3.stream.Streams;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
-import java.util.stream.Stream;
 
 public class MemoryStorageBackend extends StorageBackend {
     private final Long2ObjectMap<ByteBuffer>[] maps;
@@ -104,5 +105,16 @@ public class MemoryStorageBackend extends StorageBackend {
     public void close() {
         Streams.of(this.maps).map(Long2ObjectMap::values).flatMap(ObjectCollection::stream).forEach(MemoryUtil::memFree);
         this.idMappings.values().forEach(MemoryUtil::memFree);
+    }
+
+    public static class Config extends StorageConfig {
+        @Override
+        public StorageBackend build(ConfigBuildCtx ctx) {
+            return new MemoryStorageBackend();
+        }
+
+        public static String getConfigTypeName() {
+            return "Memory";
+        }
     }
 }

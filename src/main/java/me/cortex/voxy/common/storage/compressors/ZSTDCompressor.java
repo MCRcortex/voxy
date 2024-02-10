@@ -1,5 +1,8 @@
-package me.cortex.voxy.common.storage;
+package me.cortex.voxy.common.storage.compressors;
 
+import me.cortex.voxy.common.storage.StorageCompressor;
+import me.cortex.voxy.common.storage.config.CompressorConfig;
+import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -33,5 +36,18 @@ public class ZSTDCompressor implements StorageCompressor {
     @Override
     public void close() {
 
+    }
+
+    public static class Config extends CompressorConfig {
+        public int compressionLevel;
+
+        @Override
+        public StorageCompressor build(ConfigBuildCtx ctx) {
+            return new ZSTDCompressor(this.compressionLevel);
+        }
+
+        public static String getConfigTypeName() {
+            return "ZSTD";
+        }
     }
 }

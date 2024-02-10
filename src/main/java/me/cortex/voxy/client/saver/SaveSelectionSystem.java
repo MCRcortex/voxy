@@ -1,11 +1,10 @@
 package me.cortex.voxy.client.saver;
 
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.common.storage.CompressionStorageAdaptor;
-import me.cortex.voxy.common.storage.FragmentedStorageBackendAdaptor;
-import me.cortex.voxy.common.storage.ZSTDCompressor;
+import me.cortex.voxy.common.storage.other.CompressionStorageAdaptor;
+import me.cortex.voxy.common.storage.other.FragmentedStorageBackendAdaptor;
+import me.cortex.voxy.common.storage.compressors.ZSTDCompressor;
 import me.cortex.voxy.common.world.WorldEngine;
-import net.minecraft.client.MinecraftClient;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -30,9 +29,6 @@ public class SaveSelectionSystem {
         // FragmentedStorageBackendAdaptorConfig(File)
         // RocksDBStorageBackendConfig(File)
         // RedisStorageBackendConfig(String, int, String)
-
-
-        var storage = new CompressionStorageAdaptor(new ZSTDCompressor(VoxyConfig.CONFIG.savingCompressionLevel), new FragmentedStorageBackendAdaptor(new File(VoxyConfig.CONFIG.storagePath)));
-        return new WorldEngine(storage, VoxyConfig.CONFIG.ingestThreads, VoxyConfig.CONFIG.savingThreads, 5);
+        return null;
     }
 }

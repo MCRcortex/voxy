@@ -29,14 +29,6 @@ public class VoxyConfig {
     public int savingCompressionLevel = 7;
     public String storagePath = "voxy_db";
 
-    transient StorageConfig storageConfig;
-    public static abstract class StorageConfig { }
-    public static class FragmentedStorageConfig extends StorageConfig { }
-    public static class LmdbStorageConfig extends StorageConfig { }
-
-
-
-
 
     public static VoxyConfig loadOrCreate() {
         var path = getConfigPath();
