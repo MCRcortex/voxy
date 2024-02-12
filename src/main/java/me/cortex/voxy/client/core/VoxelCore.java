@@ -200,4 +200,8 @@ public class VoxelCore {
         });
         return importer;
     }
+
+    public WorldEngine getWorldEngine() {
+        return this.world;
+    }
 }
