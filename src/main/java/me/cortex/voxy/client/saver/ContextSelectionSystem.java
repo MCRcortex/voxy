@@ -42,24 +42,26 @@ public class ContextSelectionSystem {
             if (Files.exists(json)) {
                 try {
                     this.storageConfig = Serialization.GSON.fromJson(Files.readString(json), StorageConfig.class);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+                    return;
+                } catch (Exception e) {
+                    System.err.println("Failed to load the storage configuration file, resetting it to default");
+                    e.printStackTrace();
                 }
-            } else {
-                //Load the default config
-                var baseDB = new RocksDBStorageBackend.Config();
-
-                var compressor = new ZSTDCompressor.Config();
-                compressor.compressionLevel = 7;
-
-                var compression = new CompressionStorageAdaptor.Config();
-                compression.delegate = baseDB;
-                compression.compressor = compressor;
-
-                this.storageConfig = compression;
-
-                this.save();
             }
+
+            //Load the default config
+            var baseDB = new RocksDBStorageBackend.Config();
+
+            var compressor = new ZSTDCompressor.Config();
+            compressor.compressionLevel = 7;
+
+            var compression = new CompressionStorageAdaptor.Config();
+            compression.delegate = baseDB;
+            compression.compressor = compressor;
+
+            this.storageConfig = compression;
+
+            this.save();
         }
 
         public StorageBackend createStorageBackend() {

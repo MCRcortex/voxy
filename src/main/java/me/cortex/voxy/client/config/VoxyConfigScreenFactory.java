@@ -48,6 +48,7 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
         ConfigCategory category = builder.getOrCreateCategory(Text.translatable("voxy.config.general"));
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
 
+        /*
         category.addEntry(entryBuilder.startSubCategory(Text.translatable("aaa"), List.of(entryBuilder.startBooleanToggle(Text.translatable("voxy.config.general.enabled"), config.enabled)
                 .setTooltip(Text.translatable("voxy.config.general.enabled.tooltip"))
                 .setSaveConsumer(val -> config.enabled = val)
@@ -58,7 +59,7 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                         .setDefaultValue(DEFAULT.geometryBufferSize)
                         .build())).build()
                 )).build());
-
+        */
 
         category.addEntry(entryBuilder.startBooleanToggle(Text.translatable("voxy.config.general.enabled"), config.enabled)
                 .setTooltip(Text.translatable("voxy.config.general.enabled.tooltip"))

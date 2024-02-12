@@ -6,6 +6,7 @@ import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
+import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -13,9 +14,13 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Method;
 import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
+import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
 
 public class Serialization {
     public static final Set<Class<?>> CONFIG_TYPES = new HashSet<>();
@@ -89,8 +94,14 @@ public class Serialization {
 
     static {
         Map<Class<?>, GsonConfigSerialization<?>> serializers = new HashMap<>();
+
+        Set<String> clazzs = new LinkedHashSet<>();
+        var path = FabricLoader.getInstance().getModContainer("voxy").get().getRootPaths().get(0);
+        clazzs.addAll(collectAllClasses(path, "me.cortex.voxy.common.storage"));
+        clazzs.addAll(collectAllClasses("me.cortex.voxy.common.storage"));
+
         outer:
-        for (var clzName : collectAllClasses("me.cortex.voxy.common.storage")) {
+        for (var clzName : clazzs) {
             if (clzName.equals(Serialization.class.getName())) {
                 continue;//Dont want to load ourselves
             }
@@ -143,6 +154,22 @@ public class Serialization {
                 return Stream.of();
             }
         }).collect(Collectors.toList());
+    }
+    private static List<String> collectAllClasses(Path base, String pack) {
+        try {
+            return Files.list(base.resolve(pack.replaceAll("[.]", "/"))).flatMap(inner -> {
+                if (inner.getFileName().toString().endsWith(".class")) {
+                    return Stream.of(pack + "." + inner.getFileName().toString().replace(".class", ""));
+                } else if (Files.isDirectory(inner)) {
+                    return collectAllClasses(base, pack + "." + inner.getFileName()).stream();
+                } else {
+                    return Stream.of();
+                }
+            }).collect(Collectors.toList());
+        } catch (
+                IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static void init() {}
