@@ -523,7 +523,7 @@ public class ModelManager {
             map = this.idMappings[blockId];
         }
         if (map == -1) {
-            throw new IllegalArgumentException("Id hasnt been computed yet: " + blockId);
+            throw new IdNotYetComputedException(blockId);
         }
         return this.metadataCache[map];
         //int map = 0;
@@ -541,7 +541,7 @@ public class ModelManager {
     public int getModelId(int blockId) {
         int map = this.idMappings[blockId];
         if (map == -1) {
-            throw new IllegalArgumentException("Id hasnt been computed yet: " + blockId);
+            throw new IdNotYetComputedException(blockId);
         }
         return map;
     }

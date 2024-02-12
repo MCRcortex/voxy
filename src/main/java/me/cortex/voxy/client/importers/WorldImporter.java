@@ -5,12 +5,15 @@ import me.cortex.voxy.client.core.util.ByteBufferBackedInputStream;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.common.world.other.Mipper;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.nbt.*;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.util.collection.IndexedIterable;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeKeys;
@@ -28,14 +31,16 @@ import java.nio.file.StandardOpenOption;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class WorldImporter {
     public record ImportUpdate(){}
 
     private final WorldEngine world;
     private final World mcWorld;
-    private final RegistryEntry<Biome> defaultBiome;
+    private final ReadableContainer<RegistryEntry<Biome>> defaultBiomeProvider;
     private final Codec<ReadableContainer<RegistryEntry<Biome>>> biomeCodec;
     private final AtomicInteger totalRegions = new AtomicInteger();
     private final AtomicInteger regionsProcessed = new AtomicInteger();
@@ -46,7 +51,49 @@ public class WorldImporter {
         this.mcWorld = mcWorld;
 
         var biomeRegistry = mcWorld.getRegistryManager().get(RegistryKeys.BIOME);
-        this.defaultBiome = biomeRegistry.entryOf(BiomeKeys.PLAINS);
+        var defaultBiome = biomeRegistry.entryOf(BiomeKeys.PLAINS);
+        this.defaultBiomeProvider = new ReadableContainer<RegistryEntry<Biome>>() {
+            @Override
+            public RegistryEntry<Biome> get(int x, int y, int z) {
+                return defaultBiome;
+            }
+
+            @Override
+            public void forEachValue(Consumer<RegistryEntry<Biome>> action) {
+
+            }
+
+            @Override
+            public void writePacket(PacketByteBuf buf) {
+
+            }
+
+            @Override
+            public int getPacketSize() {
+                return 0;
+            }
+
+            @Override
+            public boolean hasAny(Predicate<RegistryEntry<Biome>> predicate) {
+                return false;
+            }
+
+            @Override
+            public void count(PalettedContainer.Counter<RegistryEntry<Biome>> counter) {
+
+            }
+
+            @Override
+            public PalettedContainer<RegistryEntry<Biome>> slice() {
+                return null;
+            }
+
+            @Override
+            public Serialized<RegistryEntry<Biome>> serialize(IndexedIterable<RegistryEntry<Biome>> idList, PalettedContainer.PaletteProvider paletteProvider) {
+                return null;
+            }
+        };
+
         this.biomeCodec = PalettedContainer.createReadableContainerCodec(biomeRegistry.getIndexedEntries(), biomeRegistry.createEntryCodec(), PalettedContainer.PaletteProvider.BIOME, biomeRegistry.entryOf(BiomeKeys.PLAINS));
     }
 
@@ -209,7 +256,7 @@ public class WorldImporter {
         }
 
         var blockStates = BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states")).result().get();
-        var biomes = this.biomeCodec.parse(NbtOps.INSTANCE, section.getCompound("biomes")).result().orElse(null);
+        var biomes = this.biomeCodec.parse(NbtOps.INSTANCE, section.getCompound("biomes")).result().orElse(this.defaultBiomeProvider);
         VoxelizedSection csec = WorldConversionFactory.convert(
                 this.world.getMapper(),
                 blockStates,
@@ -228,9 +275,10 @@ public class WorldImporter {
                 },
                 x,
                 y,
-                z,
-                this.defaultBiome
+                z
         );
+
+        WorldConversionFactory.mipSection(csec, this.world.getMapper());
 
         this.world.insertUpdate(csec);
         while (this.world.savingService.getTaskCount() > 4000) {

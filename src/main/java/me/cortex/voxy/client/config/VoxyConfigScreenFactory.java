@@ -39,7 +39,7 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
             VoxyConfig.CONFIG.save();
         });
 
-        return ClothConfigDemo.getConfigBuilderWithDemo().build();
+        return builder.build();//ClothConfigDemo.getConfigBuilderWithDemo().build();
     }
 
     private static void addGeneralCategory(ConfigBuilder builder, VoxyConfig config) {
@@ -84,11 +84,11 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setDefaultValue(DEFAULT.maxSections)
                 .build());
 
-        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.compression"), config.savingCompressionLevel, 1, 21)
-                .setTooltip(Text.translatable("voxy.config.general.compression.tooltip"))
-                .setSaveConsumer(val -> config.savingCompressionLevel = val)
-                .setDefaultValue(DEFAULT.savingCompressionLevel)
-                .build());
+        //category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.compression"), config.savingCompressionLevel, 1, 21)
+        //        .setTooltip(Text.translatable("voxy.config.general.compression.tooltip"))
+        //        .setSaveConsumer(val -> config.savingCompressionLevel = val)
+        //        .setDefaultValue(DEFAULT.savingCompressionLevel)
+        //        .build());
     }
 
     private static void addThreadsCategory(ConfigBuilder builder, VoxyConfig config) {
@@ -118,12 +118,12 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
         ConfigCategory category = builder.getOrCreateCategory(Text.translatable("voxy.config.storage"));
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
 
-        //Temporary until i figure out how to do more complex multi layer configuration for storage
-        category.addEntry(entryBuilder.startStrField(Text.translatable("voxy.config.storage.path"), config.storagePath)
-                .setTooltip(Text.translatable("voxy.config.storage.path.tooltip"))
-                .setSaveConsumer(val -> config.storagePath = val)
-                .setDefaultValue(DEFAULT.storagePath)
-                .build());
+        ////Temporary until i figure out how to do more complex multi layer configuration for storage
+        //category.addEntry(entryBuilder.startStrField(Text.translatable("voxy.config.storage.path"), config.storagePath)
+        //        .setTooltip(Text.translatable("voxy.config.storage.path.tooltip"))
+        //        .setSaveConsumer(val -> config.storagePath = val)
+        //        .setDefaultValue(DEFAULT.storagePath)
+        //        .build());
     }
 
 }

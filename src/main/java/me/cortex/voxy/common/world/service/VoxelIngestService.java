@@ -69,10 +69,9 @@ public class VoxelIngestService {
                             },
                             chunk.getPos().x,
                             i,
-                            chunk.getPos().z,
-                            null
+                            chunk.getPos().z
                     );
-
+                    WorldConversionFactory.mipSection(csec, this.world.getMapper());
                     this.world.insertUpdate(csec);
                 }
             }

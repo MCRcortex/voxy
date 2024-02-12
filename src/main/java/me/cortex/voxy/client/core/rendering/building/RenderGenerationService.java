@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering.building;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
+import me.cortex.voxy.client.core.model.IdNotYetComputedException;
 import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
@@ -56,12 +57,22 @@ public class RenderGenerationService {
                 continue;
             }
             section.assertNotFree();
-            var mesh = factory.generateMesh(section);
+            BuiltSection mesh = null;
+            try {
+                mesh = factory.generateMesh(section);
+            } catch (IdNotYetComputedException e) {
+                //We need to reinsert the build task into the queue
+                System.err.println("Render task failed to complete due to un-computed client id");
+                synchronized (this.taskQueue) {
+                    this.taskQueue.computeIfAbsent(section.key, key->{this.taskCounter.release(); return task;});
+                }
+            }
             section.release();
-
-            this.resultConsumer.accept(mesh.clone());
-            if (!this.meshCache.putMesh(mesh)) {
-                mesh.free();
+            if (mesh != null) {
+                this.resultConsumer.accept(mesh.clone());
+                if (!this.meshCache.putMesh(mesh)) {
+                    mesh.free();
+                }
             }
         }
     }

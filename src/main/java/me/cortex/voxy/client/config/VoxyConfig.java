@@ -26,8 +26,6 @@ public class VoxyConfig {
     public int ingestThreads = 5;
     public int savingThreads = 10;
     public int renderThreads = 5;
-    public int savingCompressionLevel = 7;
-    public String storagePath = "voxy_db";
 
 
     public static VoxyConfig loadOrCreate() {

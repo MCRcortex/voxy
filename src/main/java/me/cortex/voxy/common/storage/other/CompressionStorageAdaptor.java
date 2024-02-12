@@ -43,18 +43,12 @@ public class CompressionStorageAdaptor extends DelegatingStorageAdaptor {
         super.close();
     }
 
-    public static class Config extends StorageConfig {
+    public static class Config extends DelegateStorageConfig {
         public CompressorConfig compressor;
-        public StorageConfig delegate;
 
         @Override
         public StorageBackend build(ConfigBuildCtx ctx) {
             return new CompressionStorageAdaptor(this.compressor.build(ctx), this.delegate.build(ctx));
-        }
-
-        @Override
-        public List<StorageConfig> getChildStorageConfigs() {
-            return List.of(this.delegate);
         }
 
         public static String getConfigTypeName() {

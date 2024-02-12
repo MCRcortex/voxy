@@ -14,14 +14,17 @@ import java.io.File;
 
 public class WorldImportCommand {
     public static LiteralArgumentBuilder<FabricClientCommandSource> register() {
-        return ClientCommandManager.literal("voxy").then(ClientCommandManager.literal("import").then(ClientCommandManager.literal("world").then(ClientCommandManager.argument("world_name", StringArgumentType.string()).executes(WorldImportCommand::importWorld))));
+        return ClientCommandManager.literal("voxy").then(
+                ClientCommandManager.literal("import")
+                        .then(ClientCommandManager.literal("world")
+                                .then(ClientCommandManager.argument("world_name", StringArgumentType.string()).executes(WorldImportCommand::importWorld))));
     }
 
     public static WorldImporter importerInstance;
 
     private static int importWorld(CommandContext<FabricClientCommandSource> ctx) {
         var instance = MinecraftClient.getInstance();
-        var file = new File(ctx.getArgument("world_name", String.class));
+        var file = new File("saves").toPath().resolve(ctx.getArgument("world_name", String.class)).resolve("region").toFile();
         importerInstance = ((IGetVoxelCore)instance.worldRenderer).getVoxelCore().createWorldImporter(MinecraftClient.getInstance().player.clientWorld, file);
         return 0;
     }
