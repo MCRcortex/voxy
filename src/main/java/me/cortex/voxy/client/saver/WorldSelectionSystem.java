@@ -4,6 +4,8 @@ import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.storage.compressors.ZSTDCompressor;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.storage.config.Serialization;
+import me.cortex.voxy.common.storage.config.StorageConfig;
 import me.cortex.voxy.common.storage.other.CompressionStorageAdaptor;
 import me.cortex.voxy.common.storage.other.TranslocatingStorageAdaptor;
 import me.cortex.voxy.common.storage.rocksdb.RocksDBStorageBackend;
@@ -17,7 +19,9 @@ import java.util.List;
 // this is a bit tricky as each world has its own config, e.g. storage configuration
 public class WorldSelectionSystem {
     public static class Selection {
-        public WorldEngine createEngine() {
+        private VoxyConfig config;
+
+        public StorageBackend createStorageBackend() {
             var baseDB = new RocksDBStorageBackend.Config();
             baseDB.path = VoxyConfig.CONFIG.storagePath;
 
@@ -33,13 +37,15 @@ public class WorldSelectionSystem {
             translocator.transforms.add(new TranslocatingStorageAdaptor.BoxTransform(0,5,0, 200, 64, 200, 0, -5, 0));
 
             var ctx = new ConfigBuildCtx();
-            var storage = translocator.build(ctx);
-            return new WorldEngine(storage, VoxyConfig.CONFIG.ingestThreads, VoxyConfig.CONFIG.savingThreads, 5);
+            return translocator.build(ctx);
 
             //StorageBackend storage = new RocksDBStorageBackend(VoxyConfig.CONFIG.storagePath);
             ////StorageBackend storage = new FragmentedStorageBackendAdaptor(new File(VoxyConfig.CONFIG.storagePath));
-            //storage = new CompressionStorageAdaptor(new ZSTDCompressor(VoxyConfig.CONFIG.savingCompressionLevel), storage);
-            //return new WorldEngine(storage, VoxyConfig.CONFIG.ingestThreads, VoxyConfig.CONFIG.savingThreads, 5);
+            //return new CompressionStorageAdaptor(new ZSTDCompressor(VoxyConfig.CONFIG.savingCompressionLevel), storage);
+        }
+
+        public WorldEngine createEngine() {
+            return new WorldEngine(this.createStorageBackend(), VoxyConfig.CONFIG.ingestThreads, VoxyConfig.CONFIG.savingThreads, 5);
         }
 
         //Saves the config for the world selection or something, need to figure out how to make it work with dimensional configs maybe?

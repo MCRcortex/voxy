@@ -44,7 +44,7 @@ public class WorldEngine {
         var data = this.storage.getSectionData(into.key);
         if (data != null) {
             try {
-                if (!SaveLoadSystem.deserialize(into, data)) {
+                if (!SaveLoadSystem.deserialize(into, data, true)) {
                     this.storage.deleteSectionData(into.key);
                     //TODO: regenerate the section from children
                     Arrays.fill(into.data, Mapper.AIR);

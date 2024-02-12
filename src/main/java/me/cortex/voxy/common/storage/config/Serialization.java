@@ -1,8 +1,10 @@
 package me.cortex.voxy.common.storage.config;
 
 import com.google.gson.*;
+import com.google.gson.internal.bind.JsonTreeWriter;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 
 import java.io.BufferedReader;
@@ -19,8 +21,8 @@ public class Serialization {
     public static final Set<Class<?>> CONFIG_TYPES = new HashSet<>();
     public static final Gson GSON;
 
-    private static final class GsonConfigSerialization <T> {
-        private final String typeField = "config_type";
+    private static final class GsonConfigSerialization <T> implements TypeAdapterFactory {
+        private final String typeField = "TYPE";
         private final Class<T> clz;
 
         private final Map<String, Class<? extends T>> name2type = new HashMap<>();
@@ -38,6 +40,50 @@ public class Serialization {
                 throw new IllegalStateException("Class already registered with type name: " + typeName + ", " + cls);
             }
             return this;
+        }
+
+
+        private T deserialize(Gson gson, JsonElement json) {
+            var retype = this.name2type.get(json.getAsJsonObject().remove(this.typeField).getAsString());
+            return gson.getDelegateAdapter(this, TypeToken.get(retype)).fromJsonTree(json);
+        }
+
+        private JsonElement serialize(Gson gson, T value) {
+            String name = this.type2name.get(value.getClass());
+            if (name == null) {
+                name = "UNKNOWN_TYPE_{" + value.getClass().getName() + "}";
+            }
+
+            var vjson = gson
+                    .getDelegateAdapter(this, TypeToken.get((Class<T>) value.getClass()))
+                    .toJsonTree(value);
+            //All of this is so that the config_type is at the top :blob_face:
+            var json = new JsonObject();
+            json.addProperty(this.typeField, name);
+            vjson.getAsJsonObject().asMap().forEach(json::add);
+            return json;
+        }
+
+
+        @Override
+        public <X> TypeAdapter<X> create(Gson gson, TypeToken<X> type) {
+            if (this.clz.isAssignableFrom(type.getRawType())) {
+                var jsonObjectAdapter = gson.getAdapter(JsonElement.class);
+
+                return (TypeAdapter<X>) new TypeAdapter<T>() {
+                    @Override
+                    public void write(JsonWriter out, T value) throws IOException {
+                        jsonObjectAdapter.write(out, GsonConfigSerialization.this.serialize(gson, value));
+                    }
+
+                    @Override
+                    public T read(JsonReader in) throws IOException {
+                        var obj = jsonObjectAdapter.read(in);
+                        return GsonConfigSerialization.this.deserialize(gson, obj);
+                    }
+                };
+            }
+            return null;
         }
     }
 
@@ -77,9 +123,9 @@ public class Serialization {
         }
 
         var builder = new GsonBuilder();
-        //for (var entry : serializers.entrySet()) {
-        //    builder.registerTypeHierarchyAdapter(entry.getKey(), entry.getValue());
-        //}
+        for (var entry : serializers.entrySet()) {
+            builder.registerTypeAdapterFactory(entry.getValue());
+        }
 
         GSON = builder.create();
     }

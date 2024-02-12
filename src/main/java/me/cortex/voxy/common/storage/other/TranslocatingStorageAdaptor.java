@@ -55,12 +55,26 @@ public class TranslocatingStorageAdaptor extends DelegatingStorageAdaptor {
 
     @Override
     public void setSectionData(long key, ByteBuffer data) {
-        super.setSectionData(this.transformPosition(key), data);
+        //Dont save data if its a transformed position
+        for (var transform : this.transforms) {
+            long tpos = transform.transformIfInBox(key);
+            if (tpos != -1) {
+                return;
+            }
+        }
+        super.setSectionData(key, data);
     }
 
     @Override
     public void deleteSectionData(long key) {
-        super.deleteSectionData(this.transformPosition(key));
+        //Dont delete save data if its a transformed position
+        for (var transform : this.transforms) {
+            long tpos = transform.transformIfInBox(key);
+            if (tpos != -1) {
+                return;
+            }
+        }
+        super.deleteSectionData(key);
     }
 
     public static class Config extends StorageConfig {

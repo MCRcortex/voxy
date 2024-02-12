@@ -3,13 +3,31 @@ package me.cortex.voxy.common.storage.config;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Stack;
 
 public class ConfigBuildCtx {
     //List of tokens
     public static final String BASE_LEVEL_PATH = "{base_level_path}";
 
+
+    private final Map<String, String> properties = new HashMap<>();
     private final Stack<String> pathStack = new Stack<>();
+
+    /**
+     * Sets a builder property
+     * @param property property name
+     * @param value property value
+     * @return the builder context
+     */
+    public ConfigBuildCtx setProperty(String property, String value) {
+        if (!(property.startsWith("{") && property.endsWith("}"))) {
+            throw new IllegalArgumentException("Property name doesnt start with { and end with }");
+        }
+        this.properties.put(property, value);
+        return this;
+    }
 
     /**
      * Pushes a path to the build context so that when resolvePath is called it is with respect to the added path
@@ -76,7 +94,9 @@ public class ConfigBuildCtx {
      * @return substituted string
      */
     public String substituteString(String string) {
-        //TODO: this
+        for (var entry : this.properties.entrySet()) {
+            string = string.replace(entry.getKey(), entry.getValue());
+        }
         return string;
     }
 
