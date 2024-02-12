@@ -159,11 +159,9 @@ public class LMDBStorageBackend extends StorageBackend {
     }
 
     public static class Config extends StorageConfig {
-        public String path;
-
         @Override
         public StorageBackend build(ConfigBuildCtx ctx) {
-            return new LMDBStorageBackend(ctx.ensurePathExists(ctx.substituteString(ctx.resolvePath(this.path))));
+            return new LMDBStorageBackend(ctx.ensurePathExists(ctx.substituteString(ctx.resolvePath())));
         }
 
         public static String getConfigTypeName() {

@@ -6,7 +6,7 @@ import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.util.DebugUtil;
-import me.cortex.voxy.client.saver.WorldSelectionSystem;
+import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
 import net.minecraft.client.MinecraftClient;
@@ -47,7 +47,7 @@ public class VoxelCore {
 
     //private final Thread shutdownThread = new Thread(this::shutdown);
 
-    public VoxelCore(WorldSelectionSystem.Selection worldSelection) {
+    public VoxelCore(ContextSelectionSystem.Selection worldSelection) {
         this.world = worldSelection.createEngine();
         System.out.println("Initializing voxy core");
 

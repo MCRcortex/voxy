@@ -159,16 +159,16 @@ public class RenderTracker {
             // (due to block occlusion)
 
             //TODO: FIXME: REBUILDING THE ENTIRE NEIGHBORS when probably only the internal layout changed is NOT SMART
-            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z, this::shouldStillBuild);
-            this.renderGen.enqueueTask(section.lvl, section.x-1, section.y, section.z, this::shouldStillBuild);
-            this.renderGen.enqueueTask(section.lvl, section.x+1, section.y, section.z, this::shouldStillBuild);
-            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z-1, this::shouldStillBuild);
-            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z+1, this::shouldStillBuild);
             this.renderGen.clearCache(section.lvl, section.x, section.y, section.z);
             this.renderGen.clearCache(section.lvl, section.x-1, section.y, section.z);
             this.renderGen.clearCache(section.lvl, section.x+1, section.y, section.z);
             this.renderGen.clearCache(section.lvl, section.x, section.y, section.z-1);
             this.renderGen.clearCache(section.lvl, section.x, section.y, section.z+1);
+            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z, this::shouldStillBuild);
+            this.renderGen.enqueueTask(section.lvl, section.x-1, section.y, section.z, this::shouldStillBuild);
+            this.renderGen.enqueueTask(section.lvl, section.x+1, section.y, section.z, this::shouldStillBuild);
+            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z-1, this::shouldStillBuild);
+            this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z+1, this::shouldStillBuild);
         }
         //this.renderGen.enqueueTask(section);
     }

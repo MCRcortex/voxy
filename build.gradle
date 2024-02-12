@@ -18,6 +18,8 @@ repositories {
             includeGroup "maven.modrinth"
         }
     }
+    maven { url "https://maven.shedaniel.me/" }
+    maven { url "https://maven.terraformersmc.com/releases/" }
 }
 
 processResources {

@@ -9,7 +9,9 @@ import java.util.Stack;
 
 public class ConfigBuildCtx {
     //List of tokens
-    public static final String BASE_LEVEL_PATH = "{base_level_path}";
+    public static final String BASE_SAVE_PATH = "{base_save_path}";
+    public static final String WORLD_IDENTIFIER = "{world_identifier}";
+    public static final String DEFAULT_STORAGE_PATH = BASE_SAVE_PATH+"/"+WORLD_IDENTIFIER+"/storage/";
 
 
     private final Map<String, String> properties = new HashMap<>();
@@ -74,17 +76,19 @@ public class ConfigBuildCtx {
     }
 
     /**
-     * Resolves a path with the current build context path
-     * @param other path to resolve against
+     * Resolves the current path stack recursively
      * @return resolved path
      */
-    public String resolvePath(String other) {
-        this.pathStack.push(other);
+    public String resolvePath() {
+        String prev = "";
         String path = "";
-        for (var part : this.pathStack) {
-            path = concatPath(path, part);
-        }
-        this.pathStack.pop();
+        do {
+            prev = path;
+            path = "";
+            for (var part : this.pathStack) {
+                path = concatPath(path, part);
+            }
+        } while (!prev.equals(path));
         return path;
     }
 

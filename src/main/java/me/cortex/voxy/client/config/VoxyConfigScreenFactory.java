@@ -3,12 +3,15 @@ package me.cortex.voxy.client.config;
 import com.terraformersmc.modmenu.api.ConfigScreenFactory;
 import com.terraformersmc.modmenu.api.ModMenuApi;
 import me.cortex.voxy.client.core.IGetVoxelCore;
+import me.shedaniel.clothconfig2.ClothConfigDemo;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+
+import java.util.List;
 
 public class VoxyConfigScreenFactory implements ModMenuApi {
     private static final VoxyConfig DEFAULT = new VoxyConfig();
@@ -36,12 +39,25 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
             VoxyConfig.CONFIG.save();
         });
 
-        return builder.build();
+        return ClothConfigDemo.getConfigBuilderWithDemo().build();
     }
 
     private static void addGeneralCategory(ConfigBuilder builder, VoxyConfig config) {
+
+
         ConfigCategory category = builder.getOrCreateCategory(Text.translatable("voxy.config.general"));
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
+
+        category.addEntry(entryBuilder.startSubCategory(Text.translatable("aaa"), List.of(entryBuilder.startBooleanToggle(Text.translatable("voxy.config.general.enabled"), config.enabled)
+                .setTooltip(Text.translatable("voxy.config.general.enabled.tooltip"))
+                .setSaveConsumer(val -> config.enabled = val)
+                .setDefaultValue(DEFAULT.enabled)
+                .build(), entryBuilder.startSubCategory(Text.translatable("bbb"), List.of(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.geometryBuffer"), config.geometryBufferSize, (1<<27)/8, ((1<<31)-1)/8)
+                        .setTooltip(Text.translatable("voxy.config.general.geometryBuffer.tooltip"))
+                        .setSaveConsumer(val -> config.geometryBufferSize = val)
+                        .setDefaultValue(DEFAULT.geometryBufferSize)
+                        .build())).build()
+                )).build());
 
 
         category.addEntry(entryBuilder.startBooleanToggle(Text.translatable("voxy.config.general.enabled"), config.enabled)
