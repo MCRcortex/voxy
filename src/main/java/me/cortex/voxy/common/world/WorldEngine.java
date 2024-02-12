@@ -49,8 +49,6 @@ public class WorldEngine {
                     //TODO: regenerate the section from children
                     Arrays.fill(into.data, Mapper.AIR);
                     System.err.println("Section " + into.lvl + ", " + into.x + ", " + into.y + ", " + into.z + " was unable to load, removing");
-
-                    this.storage.deleteSectionData(into.key);
                     return -1;
                 } else {
                     return 0;
@@ -78,6 +76,23 @@ public class WorldEngine {
     // depending on the lvl, which should optimize colisions and whatnot
     public static long getWorldSectionId(int lvl, int x, int y, int z) {
         return ((long)lvl<<60)|((long)(y&0xFF)<<52)|((long)(z&((1<<24)-1))<<28)|((long)(x&((1<<24)-1))<<4);//NOTE: 4 bits spare for whatever
+    }
+
+    public static int getLevel(long id) {
+        return (int) ((id>>60)&0xf);
+    }
+
+    //TODO: check these shifts are correct for all the gets
+    public static int getX(long id) {
+        return (int) ((id<<36)>>40);
+    }
+
+    public static int getY(long id) {
+        return (int) ((id<<4)>>56);
+    }
+
+    public static int getZ(long id) {
+        return (int) ((id<<12)>>40);
     }
 
     //Marks a section as dirty, enqueuing it for saving and or render data rebuilding

@@ -3,18 +3,56 @@ package me.cortex.voxy.common.storage.config;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Stack;
 
 public class ConfigBuildCtx {
     //List of tokens
     public static final String BASE_LEVEL_PATH = "{base_level_path}";
 
-    //Pushes a path to the BuildCtx path stack so that when resolving with resolvePath it uses the entire path stack
+    private final Stack<String> pathStack = new Stack<>();
+
+    /**
+     * Pushes a path to the build context so that when resolvePath is called it is with respect to the added path
+     * @param path the path to add to the stack
+     * @return the build context
+     */
     public ConfigBuildCtx pushPath(String path) {
+        this.pathStack.push(path);
         return this;
     }
 
+    /**
+     * Pops a path from the build context path stack
+     * @return the build context
+     */
     public ConfigBuildCtx popPath() {
+        this.pathStack.pop();
         return this;
+    }
+
+    //TODO: FINISH THIS and check and test
+    private static String concatPath(String a, String b) {
+        if (b.contains("..")) {
+            throw new IllegalStateException("Relative resolving not supported");
+        }
+
+        if ((!a.isBlank()) && !a.endsWith("/")) {
+            a += "/";
+        }
+
+        if (b.startsWith("/")) {//Absolute path
+            return b;
+        }
+
+        if (b.startsWith("./")) {
+            b = b.substring(2);
+        }
+
+        if (b.startsWith(":", 1)) {//Drive path
+            return b;
+        }
+
+        return a+b;
     }
 
     /**
@@ -23,7 +61,13 @@ public class ConfigBuildCtx {
      * @return resolved path
      */
     public String resolvePath(String other) {
-        return null;
+        this.pathStack.push(other);
+        String path = "";
+        for (var part : this.pathStack) {
+            path = concatPath(path, part);
+        }
+        this.pathStack.pop();
+        return path;
     }
 
     /**
@@ -32,8 +76,8 @@ public class ConfigBuildCtx {
      * @return substituted string
      */
     public String substituteString(String string) {
-        //This is e.g. so you can have dbs spread across multiple disks if you want
-        return null;
+        //TODO: this
+        return string;
     }
 
     /**

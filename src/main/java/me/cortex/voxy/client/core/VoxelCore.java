@@ -6,6 +6,7 @@ import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.util.DebugUtil;
+import me.cortex.voxy.client.saver.WorldSelectionSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
 import net.minecraft.client.MinecraftClient;
@@ -46,8 +47,8 @@ public class VoxelCore {
 
     //private final Thread shutdownThread = new Thread(this::shutdown);
 
-    public VoxelCore(WorldEngine engine) {
-        this.world = engine;
+    public VoxelCore(WorldSelectionSystem.Selection worldSelection) {
+        this.world = worldSelection.createEngine();
         System.out.println("Initializing voxy core");
 
         //Trigger the shared index buffer loading
@@ -106,6 +107,7 @@ public class VoxelCore {
     }
 
     private Matrix4f getProjectionMatrix() {
+        //TODO: use the existing projection matrix use mulLocal by the inverse of the projection and then mulLocal our projection
 
         var projection = new Matrix4f();
         var client = MinecraftClient.getInstance();
@@ -115,7 +117,7 @@ public class VoxelCore {
 
         projection.setPerspective(fov * 0.01745329238474369f,
                 (float) client.getWindow().getFramebufferWidth() / (float)client.getWindow().getFramebufferHeight(),
-                64F, 16 * 3000f);
+                16F, 16 * 3000f);
         var transform = new Matrix4f().identity();
         transform.translate(gameRenderer.zoomX, -gameRenderer.zoomY, 0.0F);
         transform.scale(gameRenderer.zoom, gameRenderer.zoom, 1.0F);

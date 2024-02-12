@@ -98,4 +98,6 @@ public class Serialization {
             }
         }).collect(Collectors.toList());
     }
+
+    public static void init() {}
 }

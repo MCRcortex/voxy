@@ -87,7 +87,7 @@ public class DistanceTracker {
 
     public void init(int x, int z) {
         //Radius of chunks to enqueue
-        int SIZE = 64;
+        int SIZE = 128;
         //Insert highest LOD level
         for (int ox = -SIZE; ox <= SIZE; ox++) {
             for (int oz = -SIZE; oz <= SIZE; oz++) {
@@ -265,8 +265,8 @@ public class DistanceTracker {
 
             this.currentX = cx;
             this.currentZ = cz;
-            this.lastUpdateX = x;
-            this.lastUpdateZ = z;
+            this.lastUpdateX = x + (((int)(Math.random()*4))<<(this.shiftSize-4));
+            this.lastUpdateZ = z + (((int)(Math.random()*4))<<(this.shiftSize-4));
         }
     }
 }

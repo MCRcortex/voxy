@@ -36,7 +36,7 @@ public class Mipper {
         if (!Mapper.isAir(I000)) {
             return I000;
         }
-        //TODO: need to account for different light levels of "air"
+
         int blockLight = (Mapper.getLightId(I000)&0xF0)+(Mapper.getLightId(I001)&0xF0)+(Mapper.getLightId(I010)&0xF0)+(Mapper.getLightId(I011)&0xF0)+
                          (Mapper.getLightId(I100)&0xF0)+(Mapper.getLightId(I101)&0xF0)+(Mapper.getLightId(I110)&0xF0)+(Mapper.getLightId(I111)&0xF0);
         int skyLight   = (Mapper.getLightId(I000)&0x0F)+(Mapper.getLightId(I001)&0x0F)+(Mapper.getLightId(I010)&0x0F)+(Mapper.getLightId(I011)&0x0F)+

@@ -131,8 +131,18 @@ public class FragmentedStorageBackendAdaptor extends StorageBackend {
         }
     }
 
+    @Override
+    public List<StorageBackend> getChildBackends() {
+        return List.of(this.backends);
+    }
+
     public static class Config extends StorageConfig {
         public List<StorageConfig> backends = new ArrayList<>();
+
+        @Override
+        public List<StorageConfig> getChildStorageConfigs() {
+            return new ArrayList<>(this.backends);
+        }
 
         @Override
         public StorageBackend build(ConfigBuildCtx ctx) {
