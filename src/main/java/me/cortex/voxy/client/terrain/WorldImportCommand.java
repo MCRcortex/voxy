@@ -17,10 +17,28 @@ public class WorldImportCommand {
         return ClientCommandManager.literal("voxy").then(
                 ClientCommandManager.literal("import")
                         .then(ClientCommandManager.literal("world")
-                                .then(ClientCommandManager.argument("world_name", StringArgumentType.string()).executes(WorldImportCommand::importWorld))));
+                                .then(ClientCommandManager.argument("world_name", StringArgumentType.string()).executes(WorldImportCommand::importWorld)))
+                        .then(ClientCommandManager.literal("bobby")
+                                .then(ClientCommandManager.argument("world_name", StringArgumentType.string()).executes(WorldImportCommand::importBobby)))
+                        .then(ClientCommandManager.literal("raw")
+                                .then(ClientCommandManager.argument("path", StringArgumentType.string()).executes(WorldImportCommand::importRaw))));
     }
 
     public static WorldImporter importerInstance;
+
+    private static int importRaw(CommandContext<FabricClientCommandSource> ctx) {
+        var instance = MinecraftClient.getInstance();
+        var file = new File(ctx.getArgument("path", String.class));
+        importerInstance = ((IGetVoxelCore)instance.worldRenderer).getVoxelCore().createWorldImporter(MinecraftClient.getInstance().player.clientWorld, file);
+        return 0;
+    }
+
+    private static int importBobby(CommandContext<FabricClientCommandSource> ctx) {
+        var instance = MinecraftClient.getInstance();
+        var file = new File(".bobby").toPath().resolve(ctx.getArgument("world_name", String.class)).toFile();
+        importerInstance = ((IGetVoxelCore)instance.worldRenderer).getVoxelCore().createWorldImporter(MinecraftClient.getInstance().player.clientWorld, file);
+        return 0;
+    }
 
     private static int importWorld(CommandContext<FabricClientCommandSource> ctx) {
         var instance = MinecraftClient.getInstance();

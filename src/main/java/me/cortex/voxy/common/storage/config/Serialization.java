@@ -156,6 +156,9 @@ public class Serialization {
         }).collect(Collectors.toList());
     }
     private static List<String> collectAllClasses(Path base, String pack) {
+        if (!Files.exists(base.resolve(pack.replaceAll("[.]", "/")))) {
+            return List.of();
+        }
         try {
             return Files.list(base.resolve(pack.replaceAll("[.]", "/"))).flatMap(inner -> {
                 if (inner.getFileName().toString().endsWith(".class")) {
