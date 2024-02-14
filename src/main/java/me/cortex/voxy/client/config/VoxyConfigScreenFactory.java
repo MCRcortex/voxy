@@ -67,6 +67,12 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setDefaultValue(DEFAULT.enabled)
                 .build());
 
+        category.addEntry(entryBuilder.startBooleanToggle(Text.translatable("voxy.config.general.ingest"), config.ingestEnabled)
+                .setTooltip(Text.translatable("voxy.config.general.ingest.tooltip"))
+                .setSaveConsumer(val -> config.ingestEnabled = val)
+                .setDefaultValue(DEFAULT.ingestEnabled)
+                .build());
+
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.quality"), config.qualityScale, 8, 50)
                 .setTooltip(Text.translatable("voxy.config.general.quality.tooltip"))
                 .setSaveConsumer(val -> config.qualityScale = val)

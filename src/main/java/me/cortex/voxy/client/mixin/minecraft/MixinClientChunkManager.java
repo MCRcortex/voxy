@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
+import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxelCore;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientChunkManager;
@@ -21,7 +22,7 @@ public class MixinClientChunkManager {
     @Inject(require = 0, method = "unload", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/world/ClientChunkManager$ClientChunkMap;compareAndSet(ILnet/minecraft/world/chunk/WorldChunk;Lnet/minecraft/world/chunk/WorldChunk;)Lnet/minecraft/world/chunk/WorldChunk;", shift = At.Shift.BEFORE), locals = LocalCapture.CAPTURE_FAILHARD)
     private void injectUnload(ChunkPos pos, CallbackInfo ci, int index, WorldChunk worldChunk) {
         var core = ((IGetVoxelCore)(world.worldRenderer)).getVoxelCore();
-        if (core != null) {
+        if (core != null && VoxyConfig.CONFIG.ingestEnabled) {
             core.enqueueIngest(worldChunk);
         }
     }

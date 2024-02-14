@@ -20,6 +20,7 @@ public class VoxyConfig {
     public static VoxyConfig CONFIG = loadOrCreate();
 
     public boolean enabled = true;
+    public boolean ingestEnabled = true;
     public int qualityScale = 20;
     public int maxSections = 200_000;
     public int geometryBufferSize = (1<<30)/8;

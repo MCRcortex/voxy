@@ -78,11 +78,13 @@ public class VoxelCore {
 
         var biomeRegistry = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME);
         for (var biome : this.world.getMapper().getBiomeEntries()) {
-            this.renderer.getModelManager().addBiome(biome.id, biomeRegistry.get(new Identifier(biome.biome)));
+            //this.renderer.getModelManager().addBiome(biome.id, biomeRegistry.get(new Identifier(biome.biome)));
+            this.renderer.addBiome(biome);
         }
 
         for (var state : this.world.getMapper().getStateEntries()) {
-            this.renderer.getModelManager().addEntry(state.id, state.state);
+            //this.renderer.getModelManager().addEntry(state.id, state.state);
+            this.renderer.addBlockState(state);
         }
         //this.renderer.getModelManager().updateEntry(0, Blocks.GRASS_BLOCK.getDefaultState());
 
