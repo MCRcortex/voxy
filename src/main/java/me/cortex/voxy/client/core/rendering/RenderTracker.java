@@ -141,8 +141,8 @@ public class RenderTracker {
 
     //Enqueues a renderTask for a section to cache the result
     public void addCache(int lvl, int x, int y, int z) {
-        this.renderGen.markCache(lvl, x, y, z);
-        this.renderGen.enqueueTask(lvl, x, y, z, ((lvl1, x1, y1, z1) -> true));//TODO: replace the true identity lambda with a callback check to the render cache
+        //this.renderGen.markCache(lvl, x, y, z);
+        //this.renderGen.enqueueTask(lvl, x, y, z, ((lvl1, x1, y1, z1) -> true));//TODO: replace the true identity lambda with a callback check to the render cache
     }
 
     //Removes the position from the cache

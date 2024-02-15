@@ -14,5 +14,8 @@
   ],
   "injectors": {
     "defaultRequire": 1
-  }
+  },
+  "mixins": [
+    "sodium.MixinRenderSectionManager"
+  ]
 }

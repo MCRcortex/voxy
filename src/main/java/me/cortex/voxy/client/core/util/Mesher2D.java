@@ -10,6 +10,7 @@ public class Mesher2D {
     private final long[] data;
     private final BitSet setset;
     private int[] quadCache;
+    private boolean isEmpty = true;
     public Mesher2D(int sizeBits, int maxSize) {
         this.size = sizeBits;
         this.maxSize = maxSize;
@@ -27,6 +28,7 @@ public class Mesher2D {
     }
 
     public Mesher2D put(int x, int z, long data) {
+        this.isEmpty = false;
         int idx = this.getIdx(x, z);
         this.data[idx] = data;
         this.setset.set(idx);
@@ -61,6 +63,10 @@ public class Mesher2D {
 
     //Returns the number of compacted quads
     public int process() {
+        if (this.isEmpty) {
+            return 0;
+        }
+
         int[] quads = this.quadCache;
         int idxCount = 0;
 
@@ -144,8 +150,11 @@ public class Mesher2D {
     }
 
     public void reset() {
-        this.setset.clear();
-        Arrays.fill(this.data, 0);
+        if (!this.isEmpty) {
+            this.isEmpty = true;
+            this.setset.clear();
+            Arrays.fill(this.data, 0);
+        }
     }
 
     public long getDataFromQuad(int quad) {

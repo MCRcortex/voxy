@@ -23,7 +23,7 @@ public class MixinClientChunkManager {
     private void injectUnload(ChunkPos pos, CallbackInfo ci, int index, WorldChunk worldChunk) {
         var core = ((IGetVoxelCore)(world.worldRenderer)).getVoxelCore();
         if (core != null && VoxyConfig.CONFIG.ingestEnabled) {
-            core.enqueueIngest(worldChunk);
+            //core.enqueueIngest(worldChunk);
         }
     }
 }

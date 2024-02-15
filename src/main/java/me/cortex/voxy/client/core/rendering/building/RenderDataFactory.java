@@ -20,6 +20,8 @@ public class RenderDataFactory {
 
     private final Mesher2D negativeMesher = new Mesher2D(5, 15);
     private final Mesher2D positiveMesher = new Mesher2D(5, 15);
+    private final Mesher2D negativeFluidMesher = new Mesher2D(5, 15);
+    private final Mesher2D positiveFluidMesher = new Mesher2D(5, 15);
 
     private final long[] sectionCache = new long[32*32*32];
     private final long[] connectedSectionCache = new long[32*32*32];
@@ -45,10 +47,12 @@ public class RenderDataFactory {
     // instead of needing to regen the entire thing
 
 
-    //section is already acquired and gets released by the parent
+    //Ok so the idea for fluid rendering is to make it use a seperate mesher and use a different code path for it
+    // since fluid states are explicitly overlays over the base block
+    // can do funny stuff like double rendering
 
-    //buildMask in the lower 6 bits contains the faces to build, the next 6 bits are whether the edge face builds against
-    // its neigbor or not (0 if it does 1 if it doesnt (0 is default behavior))
+
+    //section is already acquired and gets released by the parent
     public BuiltSection generateMesh(WorldSection section) {
         section.copyDataTo(this.sectionCache);
         this.translucentQuadCollector.clear();
@@ -116,6 +120,7 @@ public class RenderDataFactory {
     }
 
 
+    //TODO: FIXME: a block can have a face even if it doesnt, cause of if it has a fluid state
     private void generateMeshForAxis(WorldSection section, int axisId) {
         int aX = axisId==2?1:0;
         int aY = axisId==0?1:0;
@@ -130,6 +135,8 @@ public class RenderDataFactory {
         for (int primary = 0; primary < 32; primary++) {
             this.negativeMesher.reset();
             this.positiveMesher.reset();
+            this.negativeFluidMesher.reset();
+            this.positiveFluidMesher.reset();
 
             for (int a = 0; a < 32; a++) {
                 for (int b = 0; b < 32; b++) {
@@ -147,8 +154,7 @@ public class RenderDataFactory {
                     boolean putFace = false;
 
                     //Branch into 2 paths, the + direction and -direction, doing it at once makes it much faster as it halves the number of loops
-
-                    if (ModelManager.faceExists(selfMetadata, axisId<<1)) {//- direction
+                    if (ModelManager.faceExists(selfMetadata, axisId<<1) || ModelManager.containsFluid(selfMetadata)) {//- direction
                         long facingState = Mapper.AIR;
                         //Need to access the other connecting section
                         if (primary == 0) {
@@ -167,9 +173,14 @@ public class RenderDataFactory {
                             facingState = this.sectionCache[WorldSection.getIndex(x-aX, y-aY, z-aZ)];
                         }
 
-                        putFace |= this.putFaceIfCan(this.negativeMesher, (axisId<<1), (axisId<<1)|1, self, selfMetadata, selfBlockId, facingState, a, b);
+                        if (!ModelManager.isFluid(selfMetadata)) {
+                            putFace |= this.putFaceIfCan(this.negativeMesher, (axisId << 1), (axisId << 1)|1, self, selfMetadata, selfBlockId, facingState, a, b);
+                        }
+                        if (ModelManager.containsFluid(selfMetadata)) {
+                            putFace |= this.putFluidFaceIfCan(this.negativeFluidMesher, (axisId << 1), (axisId << 1)|1, self, selfMetadata, selfBlockId, facingState, a, b);
+                        }
                     }
-                    if (ModelManager.faceExists(selfMetadata, axisId<<1)) {//+ direction
+                    if (ModelManager.faceExists(selfMetadata, (axisId<<1)|1) || ModelManager.containsFluid(selfMetadata)) {//+ direction
                         long facingState = Mapper.AIR;
                         //Need to access the other connecting section
                         if (primary == 31) {
@@ -187,8 +198,12 @@ public class RenderDataFactory {
                         } else {
                             facingState = this.sectionCache[WorldSection.getIndex(x+aX, y+aY, z+aZ)];
                         }
-
-                        putFace |= this.putFaceIfCan(this.positiveMesher, (axisId<<1)|1, (axisId<<1), self, selfMetadata, selfBlockId, facingState, a, b);
+                        if (!ModelManager.isFluid(selfMetadata)) {
+                            putFace |= this.putFaceIfCan(this.positiveMesher, (axisId << 1) | 1, (axisId << 1), self, selfMetadata, selfBlockId, facingState, a, b);
+                        }
+                        if (ModelManager.containsFluid(selfMetadata)) {
+                            putFace |= this.putFluidFaceIfCan(this.positiveFluidMesher, (axisId << 1) | 1, (axisId << 1), self, selfMetadata, selfBlockId, facingState, a, b);
+                        }
                     }
 
                     if (putFace) {
@@ -204,7 +219,52 @@ public class RenderDataFactory {
 
             processMeshedFace(this.negativeMesher, axisId<<1,     primary, this.directionalQuadCollectors[(axisId<<1)]);
             processMeshedFace(this.positiveMesher, (axisId<<1)|1, primary, this.directionalQuadCollectors[(axisId<<1)|1]);
+
+            processMeshedFace(this.negativeFluidMesher, axisId<<1,     primary, this.directionalQuadCollectors[(axisId<<1)]);
+            processMeshedFace(this.positiveFluidMesher, (axisId<<1)|1, primary, this.directionalQuadCollectors[(axisId<<1)|1]);
         }
+    }
+
+
+
+    //Returns true if a face was placed
+    private boolean putFluidFaceIfCan(Mesher2D mesher, int face, int opposingFace, long self, long metadata, int selfBlockId, long facingState, int a, int b) {
+        long facingMetadata = this.modelMan.getModelMetadata(Mapper.getBlockId(facingState));
+
+        int selfFluidClientId = this.modelMan.getFluidClientStateId(this.modelMan.getModelId(selfBlockId));
+        long selfFluidMetadata = this.modelMan.getModelMetadataFromClientId(selfFluidClientId);
+
+        int facingFluidClientId = -1;
+        if (ModelManager.containsFluid(facingMetadata)) {
+            facingFluidClientId = this.modelMan.getFluidClientStateId(this.modelMan.getModelId(Mapper.getBlockId(facingState)));
+        }
+
+        //If both of the states are the same, then dont render the fluid face
+        if (selfFluidClientId == facingFluidClientId) {
+            return false;
+        }
+
+        if (facingFluidClientId != -1) {
+            if (this.world.getMapper().getBlockStateFromId(selfBlockId).getFluidState().getFluid() == this.world.getMapper().getBlockStateFromId(facingState).getFluidState().getFluid()) {
+                return false;
+            }
+        }
+
+        if (ModelManager.faceOccludes(facingMetadata, opposingFace)) {
+            return false;
+        }
+
+        //NOTE: if the model has a fluid state but is not a liquid need to see if the solid state had a face rendered and that face is occluding, if so, dont render the fluid state face
+
+        //TODO:FIXME FINISH
+
+
+
+        long otherFlags = 0;
+        otherFlags |= ModelManager.isTranslucent(selfFluidMetadata)?1L<<33:0;
+        otherFlags |= ModelManager.isDoubleSided(selfFluidMetadata)?1L<<34:0;
+        mesher.put(a, b, ((long)selfFluidClientId) | (((long) Mapper.getLightId(ModelManager.faceUsesSelfLighting(selfFluidMetadata, face)?self:facingState))<<16) | ((((long) Mapper.getBiomeId(self))<<24) * (ModelManager.isBiomeColoured(selfFluidMetadata)?1:0)) | otherFlags);
+        return true;
     }
 
     //Returns true if a face was placed
@@ -220,36 +280,6 @@ public class RenderDataFactory {
             //If we are facing a block, and are translucent and it is the same block as us, cull the quad
             return false;
         }
-
-
-        //TODO: if the model has a fluid state, it should compute if a fluid face needs to be injected
-        // fluid face of type this.world.getMapper().getBlockStateFromId(self).getFluidState() and block type
-        // this.world.getMapper().getBlockStateFromId(self).getFluidState().getBlockState()
-
-        //If we are a fluid
-        if (ModelManager.containsFluid(metadata)) {
-            var selfBS = this.world.getMapper().getBlockStateFromId(self);
-            if (ModelManager.containsFluid(facingMetadata)) {//and the oposing face is also a fluid need to make a closer check
-                var faceBS = this.world.getMapper().getBlockStateFromId(facingState);
-
-                //If we are a fluid block that means our face is a fluid face, waterlogged blocks dont include fluid faces in the model data
-                if (selfBS.getBlock() instanceof FluidBlock) {
-                    //If the fluid state of both blocks are the same we dont emit extra geometry
-                    if (selfBS.getFluidState().getBlockState().equals(faceBS.getFluidState().getBlockState())) {
-                        return false;
-                    }
-                } else {//If we are not a fluid block, we might need to emit extra geometry (fluid faces) to the auxliery mesher
-                    boolean shouldEmitFluidFace = !selfBS.getFluidState().getBlockState().equals(faceBS.getFluidState().getBlockState());
-                    //TODO: THIS
-                    int aa = 0;
-                }
-            } else if (!(selfBS.getBlock() instanceof FluidBlock)) {//If we are not a fluid block but we contain a fluid we might need to emit extra geometry
-                //Basicly need to get the fluid state and run putFaceIfCan using the fluid state as the self state and keep the same facing state
-                //TODO: THIS
-                int aa = 0;
-            }
-        }
-
 
 
         int clientModelId = this.modelMan.getModelId(selfBlockId);

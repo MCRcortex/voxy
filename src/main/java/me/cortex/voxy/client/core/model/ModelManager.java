@@ -3,9 +3,11 @@ package me.cortex.voxy.client.core.model;
 import com.mojang.blaze3d.platform.GlConst;
 import com.mojang.blaze3d.platform.GlStateManager;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import me.cortex.voxy.client.core.IGetVoxelCore;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -53,9 +55,9 @@ import static org.lwjgl.opengl.GL45C.glTextureSubImage2D;
 public class ModelManager {
     //TODO: replace the fluid BlockState with a client model id integer of the fluidState, requires looking up
     // the fluid state in the mipper
-    private record ModelEntry(List<ColourDepthTextureData> textures, BlockState fluidBlockState){
-        private ModelEntry(ColourDepthTextureData[] textures, BlockState fluidBlockState) {
-            this(Stream.of(textures).map(ColourDepthTextureData::clone).toList(), fluidBlockState);
+    private record ModelEntry(List<ColourDepthTextureData> textures, int fluidBlockStateId){
+        private ModelEntry(ColourDepthTextureData[] textures, int fluidBlockStateId) {
+            this(Stream.of(textures).map(ColourDepthTextureData::clone).toList(), fluidBlockStateId);
         }
     }
 
@@ -96,6 +98,7 @@ public class ModelManager {
 
     // this has an issue with scaffolding i believe tho, so maybe make it a probability to render??? idk
     private final long[] metadataCache;
+    private final int[] fluidStateLUT;
 
     //Provides a map from id -> model id as multiple ids might have the same internal model id
     private final int[] idMappings;
@@ -116,8 +119,10 @@ public class ModelManager {
         //TODO: figure out how to do mipping :blobfox_pineapple:
         this.textures = new GlTexture().store(GL_RGBA8, 4, modelTextureSize*3*256,modelTextureSize*2*256);
         this.metadataCache = new long[1<<16];
+        this.fluidStateLUT = new int[1<<16];
         this.idMappings = new int[1<<20];//Max of 1 million blockstates mapping to 65k model states
         Arrays.fill(this.idMappings, -1);
+        Arrays.fill(this.fluidStateLUT, -1);
 
 
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
@@ -145,8 +150,24 @@ public class ModelManager {
         int modelId = -1;
         var textureData = this.bakery.renderFaces(blockState, 123456, isFluid);
 
+        int clientFluidStateId = -1;
+
+        if ((!isFluid) && (!blockState.getFluidState().isEmpty())) {
+            //Insert into the fluid LUT
+            var fluidState = blockState.getFluidState().getBlockState();
+
+            //TODO:FIXME: PASS IN THE Mapper instead of grabbing it!!! THIS IS CRTICIAL TO FIX
+            int fluidStateId = ((IGetVoxelCore)MinecraftClient.getInstance().worldRenderer).getVoxelCore().getWorldEngine().getMapper().getIdForBlockState(fluidState);
+
+
+            clientFluidStateId = this.idMappings[fluidStateId];
+            if (clientFluidStateId == -1) {
+                clientFluidStateId = this.addEntry(fluidStateId, fluidState);
+            }
+        }
+
         {//Deduplicate same entries
-            var entry = new ModelEntry(textureData, isFluid||blockState.getFluidState().isEmpty()?null:blockState.getFluidState().getBlockState());
+            var entry = new ModelEntry(textureData, clientFluidStateId);
             int possibleDuplicate = this.modelTexture2id.getInt(entry);
             if (possibleDuplicate != -1) {//Duplicate found
                 this.idMappings[blockId] = possibleDuplicate;
@@ -157,6 +178,12 @@ public class ModelManager {
                 this.idMappings[blockId] = modelId;
                 this.modelTexture2id.put(entry, modelId);
             }
+        }
+
+        if (isFluid) {
+            this.fluidStateLUT[modelId] = modelId;
+        } else if (clientFluidStateId != -1) {
+            this.fluidStateLUT[modelId] = clientFluidStateId;
         }
 
         var colourProvider = MinecraftClient.getInstance().getBlockColors().providers.get(Registries.BLOCK.getRawId(blockState.getBlock()));
@@ -205,6 +232,7 @@ public class ModelManager {
         metadata |= blockRenderLayer == RenderLayer.getTranslucent()?2:0;
         metadata |= needsDoubleSidedQuads?4:0;
         metadata |= (!blockState.getFluidState().isEmpty())?8:0;//Has a fluid state accosiacted with it
+        metadata |= isFluid?16:0;//Is a fluid
 
         //TODO: add a bunch of control config options for overriding/setting options of metadata for each face of each type
         for (int face = 5; face != -1; face--) {//In reverse order to make indexing into the metadata long easier
@@ -464,11 +492,6 @@ public class ModelManager {
         return ((metadata>>(8*face))&0b1000) != 0;
     }
 
-    public static boolean isColoured(long metadata) {
-        //TODO: THIS
-        return false;
-    }
-
     public static boolean isDoubleSided(long metadata) {
         return ((metadata>>(8*6))&4) != 0;
     }
@@ -479,6 +502,10 @@ public class ModelManager {
 
     public static boolean containsFluid(long metadata) {
         return ((metadata>>(8*6))&8) != 0;
+    }
+
+    public static boolean isFluid(long metadata) {
+        return ((metadata>>(8*6))&16) != 0;
     }
 
     public static boolean isBiomeColoured(long metadata) {
@@ -538,10 +565,22 @@ public class ModelManager {
         //}
     }
 
+    public long getModelMetadataFromClientId(int clientId) {
+        return this.metadataCache[clientId];
+    }
+
     public int getModelId(int blockId) {
         int map = this.idMappings[blockId];
         if (map == -1) {
             throw new IdNotYetComputedException(blockId);
+        }
+        return map;
+    }
+
+    public int getFluidClientStateId(int clientBlockStateId) {
+        int map = this.fluidStateLUT[clientBlockStateId];
+        if (map == -1) {
+            throw new IdNotYetComputedException(clientBlockStateId);
         }
         return map;
     }

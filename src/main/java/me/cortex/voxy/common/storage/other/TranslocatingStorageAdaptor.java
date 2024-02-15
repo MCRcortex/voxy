@@ -10,7 +10,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class TranslocatingStorageAdaptor extends DelegatingStorageAdaptor {
-    public record BoxTransform(int x1, int y1, int z1, int x2, int y2, int z2, int dx, int dy, int dz) {
+    public enum Mode {
+        BOX_ONLY,
+        PRIORITY_BOX,
+        PRIORITY_ORIGINAL
+    }
+    public record BoxTransform(int x1, int y1, int z1, int x2, int y2, int z2, int dx, int dy, int dz, Mode mode) {
+        public BoxTransform(int x1, int y1, int z1, int x2, int y2, int z2, int dx, int dy, int dz) {
+            this(x1, y1, z1, x2, y2, z2, dx, dy, dz, Mode.BOX_ONLY);
+        }
         public long transformIfInBox(long pos) {
             int lvl = WorldEngine.getLevel(pos);
             int x = WorldEngine.getX(pos);
@@ -38,19 +46,29 @@ public class TranslocatingStorageAdaptor extends DelegatingStorageAdaptor {
         this.transforms = transforms;
     }
 
-    private long transformPosition(long pos) {
-        for (var transform : this.transforms) {
-            long tpos = transform.transformIfInBox(pos);
-            if (tpos != -1) {
-                return tpos;
-            }
-        }
-        return pos;
-    }
-
     @Override
     public ByteBuffer getSectionData(long key) {
-        return super.getSectionData(this.transformPosition(key));
+        for (var transform : this.transforms) {
+            long tpos = transform.transformIfInBox(key);
+            if (tpos != -1) {
+                if (transform.mode == Mode.BOX_ONLY || transform.mode == null) {
+                    return super.getSectionData(tpos);
+                } else if (transform.mode == Mode.PRIORITY_BOX) {
+                    var data = super.getSectionData(tpos);
+                    if (data == null) {
+                        return super.getSectionData(key);
+                    }
+                } else if (transform.mode == Mode.PRIORITY_ORIGINAL) {
+                    var data = super.getSectionData(key);
+                    if (data == null) {
+                        return super.getSectionData(tpos);
+                    }
+                } else {
+                    throw new IllegalStateException();
+                }
+            }
+        }
+        return super.getSectionData(key);
     }
 
     @Override
