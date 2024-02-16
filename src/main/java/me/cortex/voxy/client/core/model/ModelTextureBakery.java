@@ -164,7 +164,8 @@ public class ModelTextureBakery {
 
         this.rasterShader.bind();
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, MinecraftClient.getInstance().getTextureManager().getTexture(new Identifier("minecraft", "textures/atlas/blocks.png")).getGlId());
+        int texId = MinecraftClient.getInstance().getTextureManager().getTexture(new Identifier("minecraft", "textures/atlas/blocks.png")).getGlId();
+        glBindTexture(GL_TEXTURE_2D, texId);
         GlUniform.uniform1(0, 0);
 
         var faces = new ColourDepthTextureData[FACE_VIEWS.size()];
@@ -191,6 +192,23 @@ public class ModelTextureBakery {
         var vc = Tessellator.getInstance().getBuffer();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR_TEXTURE);
+
+
+        //if (state.hasBlockEntity() && state.getBlock() == Blocks.CHEST) {
+        //    //TODO: finish BlockEntity raster
+        //    var entity = ((BlockEntityProvider)state.getBlock()).createBlockEntity(BlockPos.ORIGIN, state);
+        //    var renderer = MinecraftClient.getInstance().getBlockEntityRenderDispatcher().get(entity);
+        //    if (renderer != null) {
+        //        entity.setWorld(MinecraftClient.getInstance().world);
+        //        renderer.render(entity, 0.0f, new MatrixStack(), (layer) -> {
+        //            //glBindTexture(GL_TEXTURE_2D);
+        //            return vc;
+        //        }, 0, 0);
+        //    }
+        //    entity.markRemoved();
+        //}
+
+
 
         if (!renderFluid) {
             renderQuads(vc, state, model, new MatrixStack(), randomValue);
@@ -258,15 +276,6 @@ public class ModelTextureBakery {
         new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix()).get(mat);
         glUniformMatrix4fv(1, false, mat);
         BufferRenderer.draw(vc.end());
-
-
-        if (state.hasBlockEntity()) {
-            //TODO: finish BlockEntity raster
-            //var entity = ((BlockEntityProvider)state).createBlockEntity(BlockPos.ORIGIN, state);
-            //var renderer = MinecraftClient.getInstance().getBlockEntityRenderDispatcher().get(entity);
-            //renderer.render();
-            //entity.markRemoved();
-        }
 
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);

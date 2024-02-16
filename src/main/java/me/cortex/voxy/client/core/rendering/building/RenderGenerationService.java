@@ -61,6 +61,11 @@ public class RenderGenerationService {
             try {
                 mesh = factory.generateMesh(section);
             } catch (IdNotYetComputedException e) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException ex) {
+                    throw new RuntimeException(ex);
+                }
                 //We need to reinsert the build task into the queue
                 //System.err.println("Render task failed to complete due to un-computed client id");
                 synchronized (this.taskQueue) {

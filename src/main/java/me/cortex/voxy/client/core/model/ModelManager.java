@@ -347,7 +347,7 @@ public class ModelManager {
     public void addBiome(int id, Biome biome) {
         this.biomes.add(biome);
         if (this.biomes.size()-1 != id) {
-            throw new IllegalStateException("Biome ordering not consistent with biome id");
+            throw new IllegalStateException("Biome ordering not consistent with biome id for biome " + biome + " expected id: " + (this.biomes.size()-1) + " got id: " + id);
         }
 
         int i = 0;

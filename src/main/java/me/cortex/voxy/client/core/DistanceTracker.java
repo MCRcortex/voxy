@@ -8,6 +8,8 @@ import me.cortex.voxy.client.core.rendering.RenderTracker;
 import me.cortex.voxy.client.core.util.RingUtil;
 import net.minecraft.client.MinecraftClient;
 
+import java.util.stream.IntStream;
+
 //Can use ring logic
 // i.e. when a player moves the rings of each lod change (how it was doing in the original attempt)
 // also have it do directional quad culling and rebuild the chunk if needed (this shouldent happen very often) (the reason is to significantly reduce draw calls)
@@ -26,8 +28,8 @@ public class DistanceTracker {
         this.cacheLoadRings = new TransitionRing2D[lodRingScales.length];
         this.cacheUnloadRings = new TransitionRing2D[lodRingScales.length];
         this.tracker = tracker;
-        this.minYSection = MinecraftClient.getInstance().world.getBottomSectionCoord()/2;
-        this.maxYSection = MinecraftClient.getInstance().world.getTopSectionCoord()/2;
+        this.minYSection = MinecraftClient.getInstance().world.getBottomSectionCoord()/2;//-128;
+        this.maxYSection = MinecraftClient.getInstance().world.getTopSectionCoord()/2;//128;
 
 
         //The rings 0+ start at 64 vanilla rd, no matter what the game is set at, that is if the game is set to 32 rd
@@ -40,18 +42,20 @@ public class DistanceTracker {
 
             //TODO:FIXME i think the radius is wrong and (lodRingScales[i]) needs to be (lodRingScales[i]<<1) since the transition ring (the thing above)
             // acts on LoD level + 1
-            this.cacheLoadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheLoadDistance, (x, z) -> {
-                //When entering a cache ring, trigger a mesh op and inject into cache
-                for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
-                    this.tracker.addCache(capRing, x, y, z);
-                }
-            }, (x, z) -> {});
-            this.cacheUnloadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheUnloadDistance, (x, z) -> {}, (x, z) -> {
-                //When exiting the cache unload ring, tell the cache to dump whatever mesh it has cached and not add any mesh from that position
-                for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
-                    this.tracker.removeCache(capRing, x, y, z);
-                }
-            });
+
+            //TODO: check this is actually working lmao and make it generate parent level lods on the exit instead of entry so it looks correct when flying backwards
+            //this.cacheLoadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheLoadDistance, (x, z) -> {
+            //    //When entering a cache ring, trigger a mesh op and inject into cache
+            //    for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
+            //        this.tracker.addCache(capRing, x, y, z);
+            //    }
+            //}, (x, z) -> {});
+            //this.cacheUnloadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheUnloadDistance, (x, z) -> {}, (x, z) -> {
+            //    //When exiting the cache unload ring, tell the cache to dump whatever mesh it has cached and not add any mesh from that position
+            //    for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
+            //        this.tracker.removeCache(capRing, x, y, z);
+            //    }
+            //});
         }
     }
 
@@ -75,36 +79,64 @@ public class DistanceTracker {
     // the lod sections
     public void setCenter(int x, int y, int z) {
         for (var ring : this.cacheLoadRings) {
-            ring.update(x, z);
+            if (ring!=null)
+                ring.update(x, z);
         }
         for (var ring : this.loDRings) {
             ring.update(x, z);
         }
         for (var ring : this.cacheUnloadRings) {
-            ring.update(x, z);
+            if (ring!=null)
+                ring.update(x, z);
         }
     }
 
     public void init(int x, int z) {
-        //Radius of chunks to enqueue
-        int SIZE = 128;
-        //Insert highest LOD level
-        for (int ox = -SIZE; ox <= SIZE; ox++) {
-            for (int oz = -SIZE; oz <= SIZE; oz++) {
-                this.inc(4, (x>>(5+this.loDRings.length)) + ox, (z>>(5+this.loDRings.length)) + oz);
-            }
-        }
-
-
         for (var ring : this.cacheLoadRings) {
-            ring.fill(x, z);
+            if (ring != null)
+                ring.setCenter(x, z);
         }
 
-        for (int i = this.loDRings.length-1; 0 <= i; i--) {
-            if (this.loDRings[i] != null) {
-                this.loDRings[i].fill(x, z);
-            }
+        for (var ring : this.cacheUnloadRings) {
+            if (ring != null)
+                ring.setCenter(x, z);
         }
+
+        for (var ring : this.loDRings) {
+            if (ring != null)
+                ring.setCenter(x, z);
+        }
+
+        var thread = new Thread(()-> {
+            //Radius of chunks to enqueue
+            int SIZE = 128;
+            //Insert highest LOD level
+            for (int ox = -SIZE; ox <= SIZE; ox++) {
+                for (int oz = -SIZE; oz <= SIZE; oz++) {
+                    this.inc(4, (x >> (5 + this.loDRings.length)) + ox, (z >> (5 + this.loDRings.length)) + oz);
+                }
+            }
+
+
+            for (var ring : this.cacheLoadRings) {
+                if (ring != null)
+                    ring.fill(x, z);
+            }
+
+            for (var ring : this.cacheUnloadRings) {
+                if (ring != null)
+                    ring.fill(x, z);
+            }
+
+            for (int i = this.loDRings.length - 1; 0 <= i; i--) {
+                if (this.loDRings[i] != null) {
+                    this.loDRings[i].fill(x, z);
+                }
+            }
+        });
+        thread.setName("LoD Ring Initializer");
+        thread.start();
+        //TODO: FIXME: need to destory on shutdown
     }
 
 
@@ -248,6 +280,7 @@ public class DistanceTracker {
 
             int r2 = this.radius*this.radius;
             for (int a = -this.radius; a <= this.radius; a++) {
+            //IntStream.range(-this.radius, this.radius+1).parallel().forEach(a->{
                 int b = (int) Math.floor(Math.sqrt(r2-(a*a)));
                 for (int c = -b; c <= b; c++) {
                     this.enter.callback(a + cx, c + cz);
@@ -261,8 +294,12 @@ public class DistanceTracker {
                         outsideCallback.callback(a + cx, c + cz);
                     }
                 }
-            }
+            }//);
+        }
 
+        public void setCenter(int x, int z) {
+            int cx = x>>this.shiftSize;
+            int cz = z>>this.shiftSize;
             this.currentX = cx;
             this.currentZ = cz;
             this.lastUpdateX = x + (((int)(Math.random()*4))<<(this.shiftSize-4));

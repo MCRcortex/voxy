@@ -95,7 +95,8 @@ public class TextureUtils {
         // due to this and the unsigned bullshit, i believe the depth value needs to get multiplied by 2
         depthF *= 2;
         if (depthF > 1.00001f) {
-            throw new IllegalArgumentException("Depth greater than 1");
+            System.err.println("Warning: Depth greater than 1");
+            depthF = 1.0f;
         }
         return depthF;
     }
