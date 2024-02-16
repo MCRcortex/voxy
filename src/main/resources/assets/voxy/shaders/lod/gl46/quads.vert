@@ -86,7 +86,7 @@ void main() {
     vec2 modelUV = vec2(modelId&0xFF, (modelId>>8)&0xFF)*(1.0/(256.0));
     //TODO: make the face orientated by 2x3 so that division is not a integer div and modulo isnt needed
     // as these are very slow ops
-    baseUV = modelUV + (vec2(face%3, face/3) * (1.0/(vec2(3.0, 2.0)*256.0)));
+    baseUV = modelUV + (vec2(face>>1, face&1) * (1.0/(vec2(3.0, 2.0)*256.0)));
     //TODO: add an option to scale the quad size by the lod level so that
     // e.g. at lod level 2 a face will have 2x2
     uv = respectiveQuadSize + faceOffset;//Add in the face offset for 0,0 uv

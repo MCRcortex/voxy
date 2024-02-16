@@ -36,6 +36,9 @@ public class UploadStream {
     private long caddr = -1;
     private long offset = 0;
     public long upload(GlBuffer buffer, long destOffset, long size) {
+        if (destOffset<0) {
+            throw new IllegalArgumentException();
+        }
         if (size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException();
         }

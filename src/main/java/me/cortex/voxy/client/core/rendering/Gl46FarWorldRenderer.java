@@ -8,6 +8,7 @@ import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.FluidBlock;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
@@ -113,7 +114,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glDisable(GL_BLEND);
 
 
-        //this.models.bakery.renderFaces(Blocks.OAK_LEAVES.getDefaultState(), 1234, false);
+        //this.models.bakery.renderFaces(Blocks.WATER.getDefaultState().with(FluidBlock.LEVEL, 1), 1234, true);
+        //this.models.bakery.renderFaces(Blocks.CHEST.getDefaultState(), 1234, false);
 
 
         RenderLayer.getCutoutMipped().startDrawing();
@@ -141,8 +143,9 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
         this.lodShader.bind();
         glDisable(GL_CULL_FACE);
-        glPointSize(10);
+        //glPointSize(10);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
+        //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
         glEnable(GL_CULL_FACE);
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);

@@ -105,7 +105,7 @@ public abstract class AbstractFarWorldRenderer {
                 UploadStream.INSTANCE.commit();
             }
 
-            int maxUpdatesPerFrame = 10;
+            int maxUpdatesPerFrame = 40;
 
             //Do any BlockChanges
             while ((!this.blockStateUpdates.isEmpty()) && (maxUpdatesPerFrame-- > 0)) {

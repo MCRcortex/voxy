@@ -102,6 +102,7 @@ public class ModelTextureBakery {
     }
 
 
+
     //TODO: For block entities, also somehow attempt to render the default block entity, e.g. chests and stuff
     // cause that will result in ok looking micro details in the terrain
     public ColourDepthTextureData[] renderFaces(BlockState state, long randomValue, boolean renderFluid) {
@@ -110,6 +111,8 @@ public class ModelTextureBakery {
                 .getBakedModelManager()
                 .getBlockModels()
                 .getModel(state);
+
+        var entityModel = state.hasBlockEntity()?BakedBlockEntityModel.bake(state):null;
 
         int oldFB = GlStateManager.getBoundFramebuffer();
         var oldProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
@@ -165,13 +168,12 @@ public class ModelTextureBakery {
         this.rasterShader.bind();
         glActiveTexture(GL_TEXTURE0);
         int texId = MinecraftClient.getInstance().getTextureManager().getTexture(new Identifier("minecraft", "textures/atlas/blocks.png")).getGlId();
-        glBindTexture(GL_TEXTURE_2D, texId);
         GlUniform.uniform1(0, 0);
 
         var faces = new ColourDepthTextureData[FACE_VIEWS.size()];
         for (int i = 0; i < faces.length; i++) {
-            faces[i] = captureView(state, model, FACE_VIEWS.get(i), randomValue, i, renderFluid);
-            //glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,300*(i%3),300*(i/3),300*(i%3)+256,300*(i/3)+256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            faces[i] = captureView(state, model, entityModel, FACE_VIEWS.get(i), randomValue, i, renderFluid, texId);
+            //glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,300*(i>>1),300*(i&1),300*(i>>1)+256,300*(i&1)+256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         }
 
         renderLayer.endDrawing();
@@ -188,28 +190,21 @@ public class ModelTextureBakery {
         return faces;
     }
 
-    private ColourDepthTextureData captureView(BlockState state, BakedModel model, MatrixStack stack, long randomValue, int face, boolean renderFluid) {
+
+    private ColourDepthTextureData captureView(BlockState state, BakedModel model, BakedBlockEntityModel blockEntityModel, MatrixStack stack, long randomValue, int face, boolean renderFluid, int textureId) {
         var vc = Tessellator.getInstance().getBuffer();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+        float[] mat = new float[4*4];
+        new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix()).get(mat);
+        glUniformMatrix4fv(1, false, mat);
+
+
+        if (blockEntityModel != null && !renderFluid) {
+            blockEntityModel.renderOut();
+        }
+
         vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR_TEXTURE);
-
-
-        //if (state.hasBlockEntity() && state.getBlock() == Blocks.CHEST) {
-        //    //TODO: finish BlockEntity raster
-        //    var entity = ((BlockEntityProvider)state.getBlock()).createBlockEntity(BlockPos.ORIGIN, state);
-        //    var renderer = MinecraftClient.getInstance().getBlockEntityRenderDispatcher().get(entity);
-        //    if (renderer != null) {
-        //        entity.setWorld(MinecraftClient.getInstance().world);
-        //        renderer.render(entity, 0.0f, new MatrixStack(), (layer) -> {
-        //            //glBindTexture(GL_TEXTURE_2D);
-        //            return vc;
-        //        }, 0, 0);
-        //    }
-        //    entity.markRemoved();
-        //}
-
-
-
         if (!renderFluid) {
             renderQuads(vc, state, model, new MatrixStack(), randomValue);
         } else {
@@ -240,13 +235,21 @@ public class ModelTextureBakery {
                     return null;
                 }
 
-                //TODO: make it so it returns air on some positions, e.g. so from UP,
                 @Override
                 public BlockState getBlockState(BlockPos pos) {
-                    //TODO:FIXME: Dont hardcode
                     if (pos.equals(Direction.byId(face).getVector())) {
                         return Blocks.AIR.getDefaultState();
                     }
+
+                    //Fixme:
+                    // This makes it so that the top face of water is always air, if this is commented out
+                    //  the up block will be a liquid state which makes the sides full
+                    // if this is uncommented, that issue is fixed but e.g. stacking water layers ontop of eachother
+                    //  doesnt fill the side of the block
+
+                    //if (pos.getY() == 1) {
+                    //    return Blocks.AIR.getDefaultState();
+                    //}
                     return state;
                 }
 
@@ -255,6 +258,9 @@ public class ModelTextureBakery {
                     if (pos.equals(Direction.byId(face).getVector())) {
                         return Blocks.AIR.getDefaultState().getFluidState();
                     }
+                    //if (pos.getY() == 1) {
+                    //    return Blocks.AIR.getDefaultState().getFluidState();
+                    //}
                     return state.getFluidState();
                 }
 
@@ -270,11 +276,7 @@ public class ModelTextureBakery {
             }, vc, state, state.getFluidState());
         }
 
-
-
-        float[] mat = new float[4*4];
-        new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix()).get(mat);
-        glUniformMatrix4fv(1, false, mat);
+        glBindTexture(GL_TEXTURE_2D, textureId);
         BufferRenderer.draw(vc.end());
 
 

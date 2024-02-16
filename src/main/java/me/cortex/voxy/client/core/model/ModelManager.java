@@ -3,6 +3,9 @@ package me.cortex.voxy.client.core.model;
 import com.mojang.blaze3d.platform.GlConst;
 import com.mojang.blaze3d.platform.GlStateManager;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectOpenCustomHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
 import me.cortex.voxy.client.core.IGetVoxelCore;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
@@ -53,6 +56,7 @@ import static org.lwjgl.opengl.GL45C.glTextureSubImage2D;
 // to all other models already loaded, if it is a duplicate, create a mapping from the id to the already loaded id, this will help with meshing aswell
 // as leaves and such will be able to be merged
 public class ModelManager {
+
     //TODO: replace the fluid BlockState with a client model id integer of the fluidState, requires looking up
     // the fluid state in the mipper
     private record ModelEntry(List<ColourDepthTextureData> textures, int fluidBlockStateId){
@@ -108,6 +112,7 @@ public class ModelManager {
     private final List<Biome> biomes = new ArrayList<>();
     private final List<Pair<Integer, BlockState>> modelsRequiringBiomeColours = new ArrayList<>();
 
+    private static final ObjectSet<BlockState> LOGGED_SELF_CULLING_WARNING = new ObjectOpenHashSet<>();
 
     public ModelManager(int modelTextureSize) {
         this.modelTextureSize = modelTextureSize;
@@ -225,6 +230,31 @@ public class ModelManager {
         boolean needsDoubleSidedQuads = (sizes[0] < -0.1 && sizes[1] < -0.1) || (sizes[2] < -0.1 && sizes[3] < -0.1) || (sizes[4] < -0.1 && sizes[5] < -0.1);
 
 
+        boolean cullsSame = false;
+
+        {
+            //TODO: Could also move this into the RenderDataFactory and do it on the actual blockstates instead of a guestimation
+            boolean allTrue = true;
+            boolean allFalse = true;
+            //Guestimation test for if the block culls itself
+            for (var dir : Direction.values()) {
+                if (blockState.isSideInvisible(blockState, dir)) {
+                    allFalse = false;
+                } else {
+                    allTrue = false;
+                }
+            }
+
+            if (allFalse == allTrue) {//If only some sides where self culled then abort
+                cullsSame = false;
+                if (LOGGED_SELF_CULLING_WARNING.add(blockState)) System.err.println("Warning! blockstate: " + blockState + " only culled against its self some of the time");
+            }
+
+            if (allTrue) {
+                cullsSame = true;
+            }
+        }
+
 
         //Each face gets 1 byte, with the top 2 bytes being for whatever
         long metadata = 0;
@@ -233,6 +263,8 @@ public class ModelManager {
         metadata |= needsDoubleSidedQuads?4:0;
         metadata |= (!blockState.getFluidState().isEmpty())?8:0;//Has a fluid state accosiacted with it
         metadata |= isFluid?16:0;//Is a fluid
+
+        metadata |= cullsSame?32:0;
 
         //TODO: add a bunch of control config options for overriding/setting options of metadata for each face of each type
         for (int face = 5; face != -1; face--) {//In reverse order to make indexing into the metadata long easier
@@ -512,6 +544,10 @@ public class ModelManager {
         return ((metadata>>(8*6))&1) != 0;
     }
 
+    //NOTE: this might need to be moved to per face
+    public static boolean cullsSame(long metadata) {
+        return ((metadata>>(8*6))&32) != 0;
+    }
 
 
 
@@ -590,8 +626,8 @@ public class ModelManager {
         int Y = ((id>>8)&0xFF) * this.modelTextureSize*2;
 
         for (int subTex = 0; subTex < 6; subTex++) {
-            int x = X + (subTex%3)*this.modelTextureSize;
-            int y = Y + (subTex/3)*this.modelTextureSize;
+            int x = X + (subTex>>1)*this.modelTextureSize;
+            int y = Y + (subTex&1)*this.modelTextureSize;
 
             GlStateManager._pixelStore(GlConst.GL_UNPACK_ROW_LENGTH, 0);
             GlStateManager._pixelStore(GlConst.GL_UNPACK_SKIP_PIXELS, 0);

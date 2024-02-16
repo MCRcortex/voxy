@@ -179,8 +179,7 @@ public class Mapper {
         return composeMappingId(light, this.getIdForBlockState(state), this.getIdForBiome(biome));
     }
 
-    public BlockState getBlockStateFromId(long id) {
-        int blockId = (int) ((id>>27)&((1<<20)-1));
+    public BlockState getBlockStateFromBlockId(int blockId) {
         return this.blockId2stateEntry.get(blockId).state;
     }
 

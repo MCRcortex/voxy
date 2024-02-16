@@ -28,6 +28,9 @@ public class BufferArena {
         }
         int size = (int) (buffer.size/this.elementSize);
         long addr = this.allocationMap.alloc(size);
+        if (addr == -1) {
+            throw new IllegalStateException("Buffer arena out of memory");
+        }
         long uploadPtr = UploadStream.INSTANCE.upload(this.buffer, addr * this.elementSize, buffer.size);
         MemoryUtil.memCopy(buffer.address, uploadPtr, buffer.size);
         this.used += size;

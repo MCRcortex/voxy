@@ -245,18 +245,29 @@ public class RenderDataFactory {
         }
 
         if (facingFluidClientId != -1) {
-            if (this.world.getMapper().getBlockStateFromId(selfBlockId).getFluidState().getFluid() == this.world.getMapper().getBlockStateFromId(facingState).getFluidState().getFluid()) {
-                return false;
+            if (this.world.getMapper().getBlockStateFromBlockId(selfBlockId).getBlock() == this.world.getMapper().getBlockStateFromBlockId(Mapper.getBlockId(facingState)).getBlock()) {
+               return false;
             }
         }
+
 
         if (ModelManager.faceOccludes(facingMetadata, opposingFace)) {
             return false;
         }
 
-        //NOTE: if the model has a fluid state but is not a liquid need to see if the solid state had a face rendered and that face is occluding, if so, dont render the fluid state face
+        //if the model has a fluid state but is not a liquid need to see if the solid state had a face rendered and that face is occluding, if so, dont render the fluid state face
+        if (ModelManager.faceOccludes(metadata, face)) {
+            return false;
+        }
 
-        //TODO:FIXME FINISH
+
+
+
+        //TODO:FIXME SOMEHOW THIS IS CRITICAL!!!!!!!!!!!!!!!!!!
+        // so there is one more issue need to be fixed, if water is layered ontop of eachother, the side faces depend on the water state ontop
+        // this has been hackfixed in the model texture bakery but a proper solution that doesnt explode the sides of the water textures needs to be done
+        // the issue is that the fluid rendering depends on the up state aswell not just the face state which is really really painful to account for
+        // e.g the sides of a full water is 8 high or something, not the full block height, this results in a gap between water layers
 
 
 
@@ -276,8 +287,8 @@ public class RenderDataFactory {
             return false;
         }
 
-        if (ModelManager.isTranslucent(metadata) && selfBlockId == Mapper.getBlockId(facingState)) {
-            //If we are facing a block, and are translucent and it is the same block as us, cull the quad
+        if (ModelManager.cullsSame(metadata) && selfBlockId == Mapper.getBlockId(facingState)) {
+            //If we are facing a block, and we are both the same state, dont render that face
             return false;
         }
 
