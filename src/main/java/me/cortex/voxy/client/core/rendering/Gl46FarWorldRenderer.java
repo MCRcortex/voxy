@@ -146,8 +146,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glDisable(GL_CULL_FACE);
         //glPointSize(10);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
-        //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 100, 0);
         glEnable(GL_CULL_FACE);
+
 
         /*
         glFinish();
@@ -158,6 +158,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         DownloadStream.INSTANCE.commit();
         DownloadStream.INSTANCE.tick();
          */
+
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
 

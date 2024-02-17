@@ -71,7 +71,6 @@ void main() {
 
 
 
-        //TODO:FIXME: Figure out why these are in such a weird order
         uint msk = 0;
         msk |= uint(((meta.cntB      &0xFFFF)!=0) && (relative.y>-1))<<0;
         msk |= uint((((meta.cntB>>16)&0xFFFF)!=0) && (relative.y<1 ))<<1;
@@ -80,8 +79,10 @@ void main() {
         msk |= uint(((meta.cntD      &0xFFFF)!=0) && (relative.x>-1))<<4;
         msk |= uint((((meta.cntD>>16)&0xFFFF)!=0) && (relative.x<1 ))<<5;
 
+        msk |= uint(((meta.cntA>>16)&0xFFFF)!=0)<<6;
 
-        uint cmdPtr = atomicAdd(opaqueDrawCount, bitCount(msk)+1);
+
+        uint cmdPtr = atomicAdd(opaqueDrawCount, bitCount(msk));
 
 
         uint count = 0;
@@ -95,7 +96,9 @@ void main() {
 
         //Double sided quads
         count = (meta.cntA>>16)&0xFFFF;
-        writeCmd(cmdPtr++, encodedPos, ptr, count);
+        if (count != 0) {
+            writeCmd(cmdPtr++, encodedPos, ptr, count);
+        }
         ptr += count;
 
         //Down
