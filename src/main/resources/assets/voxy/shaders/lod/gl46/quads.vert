@@ -14,13 +14,13 @@ layout(location = 4) out flat uint flags;
 layout(location = 5) out flat vec4 conditionalTinting;
 
 uint extractLodLevel() {
-    return uint(gl_BaseInstance)>>29;
+    return uint(gl_BaseInstance)>>27;
 }
 
 //Note the last 2 bits of gl_BaseInstance are unused
 //Gives a relative position of +-255 relative to the player center in its respective lod
 ivec3 extractRelativeLodPos() {
-    return (ivec3(gl_BaseInstance)<<ivec3(3,12,21))>>ivec3(23);
+    return (ivec3(gl_BaseInstance)<<ivec3(5,14,23))>>ivec3(23);
 }
 
 vec4 uint2vec4RGBA(uint colour) {
@@ -35,7 +35,7 @@ float getDepthOffset(uint faceData, uint face) {
 
 vec2 getFaceSizeOffset(uint faceData, uint corner) {
     vec4 faceOffsetsSizes = extractFaceSizes(faceData);
-    return mix(faceOffsetsSizes.xz, -(1.0-faceOffsetsSizes.yw), bvec2(((corner>>1)&1)==1, (corner&1)==1));
+    return mix(faceOffsetsSizes.xz, -(1.0-faceOffsetsSizes.yw), bvec2(((corner>>1)&1u)==1, (corner&1u)==1));
 }
 
 //TODO: add a mechanism so that some quads can ignore backface culling
@@ -66,7 +66,7 @@ void main() {
     vec2 respectiveQuadSize = vec2(quadSize * ivec2((cornerIdx>>1)&1, cornerIdx&1));
     vec2 size = (respectiveQuadSize + faceOffset) * (1<<lodLevel);
 
-    vec3 offset = vec3(size, (float(face&1) + getDepthOffset(faceData, face)) * (1<<lodLevel));
+    vec3 offset = vec3(size, (float(face&1u) + getDepthOffset(faceData, face)) * (1<<lodLevel));
 
     if ((face>>1) == 0) { //Up/down
         offset = offset.xzy;
@@ -83,10 +83,10 @@ void main() {
 
 
     //Compute the uv coordinates
-    vec2 modelUV = vec2(modelId&0xFF, (modelId>>8)&0xFF)*(1.0/(256.0));
+    vec2 modelUV = vec2(modelId&0xFFu, (modelId>>8)&0xFFu)*(1.0/(256.0));
     //TODO: make the face orientated by 2x3 so that division is not a integer div and modulo isnt needed
     // as these are very slow ops
-    baseUV = modelUV + (vec2(face>>1, face&1) * (1.0/(vec2(3.0, 2.0)*256.0)));
+    baseUV = modelUV + (vec2(face>>1, face&1u) * (1.0/(vec2(3.0, 2.0)*256.0)));
     //TODO: add an option to scale the quad size by the lod level so that
     // e.g. at lod level 2 a face will have 2x2
     uv = respectiveQuadSize + faceOffset;//Add in the face offset for 0,0 uv

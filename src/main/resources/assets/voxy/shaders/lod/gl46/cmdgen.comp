@@ -24,7 +24,7 @@ layout(local_size_x = 128, local_size_y = 1, local_size_x = 1) in;
 
 uint encodeLocalLodPos(uint detail, ivec3 pos) {
     uvec3 detla = (pos - (baseSectionPos >> detail))&((1<<9)-1);
-    return (detail<<29)|(detla.x<<20)|(detla.y<<11)|(detla.z<<2);
+    return (detail<<27)|(detla.x<<18)|(detla.y<<9)|(detla.z);
 }
 
 
@@ -100,42 +100,42 @@ void main() {
 
         //Down
         count = (meta.cntB)&0xFFFF;
-        if (((msk&(1<<0))!=0)) {
+        if (((msk&(1u<<0))!=0)) {
             writeCmd(cmdPtr++, encodedPos, ptr, count);
         }
         ptr += count;
 
         //Up
         count = (meta.cntB>>16)&0xFFFF;
-        if ((msk&(1<<1))!=0) {
+        if ((msk&(1u<<1))!=0) {
             writeCmd(cmdPtr++, encodedPos, ptr, count);
         }
         ptr += count;
 
         //North
         count = (meta.cntC)&0xFFFF;
-        if ((msk&(1<<2))!=0) {
+        if ((msk&(1u<<2))!=0) {
             writeCmd(cmdPtr++, encodedPos, ptr, count);
         }
         ptr += count;
 
         //South
         count = (meta.cntC>>16)&0xFFFF;
-        if ((msk&(1<<3))!=0) {
+        if ((msk&(1u<<3))!=0) {
             writeCmd(cmdPtr++, encodedPos, ptr, count);
         }
         ptr += count;
 
         //West
         count = (meta.cntD)&0xFFFF;
-        if ((msk&(1<<4))!=0) {
+        if ((msk&(1u<<4))!=0) {
             writeCmd(cmdPtr++, encodedPos, ptr, count);
         }
         ptr += count;
 
         //East
         count = (meta.cntD>>16)&0xFFFF;
-        if ((msk&(1<<5))!=0) {
+        if ((msk&(1u<<5))!=0) {
             writeCmd(cmdPtr++, encodedPos, ptr, count);
         }
         ptr += count;

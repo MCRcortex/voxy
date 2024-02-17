@@ -70,6 +70,9 @@ public class ModelTextureBakery {
 
 
     public ModelTextureBakery(int width, int height) {
+        //TODO: Make this run in a seperate opengl context so that it can run in a seperate thread
+
+
         this.width = width;
         this.height = height;
         this.colourTex = new GlTexture().store(GL_RGBA8, 1, width, height);
