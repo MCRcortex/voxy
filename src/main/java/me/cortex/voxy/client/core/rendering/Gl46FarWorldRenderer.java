@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import net.minecraft.block.Blocks;
@@ -138,15 +139,25 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
         glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
         this.commandGen.bind();
-        glDispatchCompute((this.geometry.getSectionCount() + 127) / 128, 1, 1);
+        glDispatchCompute((this.geometry.getSectionCount()+127)/128, 1, 1);
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_UNIFORM_BARRIER_BIT);
 
         this.lodShader.bind();
         glDisable(GL_CULL_FACE);
         //glPointSize(10);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
-        //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
+        //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 100, 0);
         glEnable(GL_CULL_FACE);
+
+        /*
+        glFinish();
+        DownloadStream.INSTANCE.download(this.glCommandCountBuffer, 0, 4, (ptr, siz) -> {
+            int cnt = MemoryUtil.memGetInt(ptr);
+            System.out.println(cnt);
+        });
+        DownloadStream.INSTANCE.commit();
+        DownloadStream.INSTANCE.tick();
+         */
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
 

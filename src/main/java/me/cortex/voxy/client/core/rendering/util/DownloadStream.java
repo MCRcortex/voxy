@@ -81,7 +81,7 @@ public class DownloadStream {
     public void commit() {
         //Copies all the data from target buffers into the download stream
         for (var entry : this.downloadList) {
-            glCopyNamedBufferSubData(entry.target.id, this.downloadBuffer.id, entry.downloadOffset, entry.targetOffset, entry.size);
+            glCopyNamedBufferSubData(entry.target.id, this.downloadBuffer.id, entry.targetOffset, entry.downloadStreamOffset, entry.size);
         }
         thisFrameDownloadList.addAll(this.downloadList);
         this.downloadList.clear();
@@ -110,7 +110,7 @@ public class DownloadStream {
 
             //Apply all the callbacks
             for (var data : frame.data) {
-                data.resultConsumer.consume(this.downloadBuffer.addr() + data.downloadOffset, data.size);
+                data.resultConsumer.consume(this.downloadBuffer.addr() + data.downloadStreamOffset, data.size);
             }
 
             frame.allocations.forEach(this.allocationArena::free);
@@ -119,7 +119,7 @@ public class DownloadStream {
     }
 
     private record DownloadFrame(GlFence fence, LongArrayList allocations, ArrayList<DownloadData> data) {}
-    private record DownloadData(GlBuffer target, long downloadOffset, long targetOffset, long size, DownloadResultConsumer resultConsumer) {}
+    private record DownloadData(GlBuffer target, long downloadStreamOffset, long targetOffset, long size, DownloadResultConsumer resultConsumer) {}
 
 
     // Global download stream
