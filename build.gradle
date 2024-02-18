@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.2-SNAPSHOT'
+    id 'fabric-loom' version "1.5.7"
     id 'maven-publish'
 }
 
@@ -49,11 +49,12 @@ dependencies {
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
     //TODO: this is to eventually not need sodium installed as atm its just used for parsing shaders
-    modRuntimeOnly "maven.modrinth:sodium:mc1.20.3-0.5.5"
-    modCompileOnly "maven.modrinth:sodium:mc1.20.3-0.5.5"
+    modRuntimeOnly "maven.modrinth:sodium:mc1.20.4-0.5.8"
+    modCompileOnly "maven.modrinth:sodium:mc1.20.4-0.5.8"
 
     modImplementation("maven.modrinth:cloth-config:13.0.121+fabric")
     modImplementation("maven.modrinth:modmenu:9.0.0")
+    modImplementation("maven.modrinth:iris:1.6.17+1.20.4")
 }
 
 

@@ -33,7 +33,8 @@ public class PostProcessing {
     private GlTexture depthStencil;
 
     private final FullscreenBlit emptyBlit = new FullscreenBlit("voxy:post/noop.frag");
-    private final FullscreenBlit blitTexture = new FullscreenBlit("voxy:post/blit_texture_cutout.frag");
+    //private final FullscreenBlit blitTexture = new FullscreenBlit("voxy:post/blit_texture_cutout.frag");
+    private final FullscreenBlit blitTexture = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag");
     private final Shader ssaoComp = Shader.make()
             .add(ShaderType.COMPUTE, "voxy:post/ssao.comp")
             .compile();
@@ -134,7 +135,7 @@ public class PostProcessing {
 
 
     //Executes the post processing and emits to whatever framebuffer is currently bound via a blit
-    public void renderPost(int outputFB) {
+    public void renderPost(Matrix4f fromProjection, Matrix4f tooProjection, int outputFB) {
         glDisable(GL_STENCIL_TEST);
 
 
@@ -145,11 +146,23 @@ public class PostProcessing {
         //glBlitNamedFramebuffer(this.framebuffer.id, outputFB, 0,0, this.width, this.height, 0,0, this.width, this.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
 
+        this.blitTexture.bind();
 
+        float[] data = new float[4*4];
+        var mat = new Matrix4f(fromProjection).invert();
+        mat.get(data);
+        glUniformMatrix4fv(2, false, data);//inverse fromProjection
+        tooProjection.get(data);
+        glUniformMatrix4fv(3, false, data);//tooProjection
+
+
+        glActiveTexture(GL_TEXTURE1);
+        GL11C.glBindTexture(GL_TEXTURE_2D, this.depthStencil.id);
+        glTexParameteri (GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, this.colour.id);
         glEnable(GL_DEPTH_TEST);
-        glDepthMask(false);
+        glDepthMask(true);
         this.blitTexture.blit();
         glDisable(GL_DEPTH_TEST);
         glDepthMask(true);

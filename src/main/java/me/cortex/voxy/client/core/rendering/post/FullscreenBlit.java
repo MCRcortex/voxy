@@ -19,6 +19,10 @@ public class FullscreenBlit {
                 .compile();
     }
 
+    public void bind() {
+        this.shader.bind();
+    }
+
     public void blit() {
         glBindVertexArray(EMPTY_VAO);
         this.shader.bind();

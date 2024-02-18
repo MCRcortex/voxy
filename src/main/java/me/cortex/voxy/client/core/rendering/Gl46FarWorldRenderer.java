@@ -113,6 +113,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         }
 
         glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
 
 
         //this.models.bakery.renderFaces(Blocks.WATER.getDefaultState().with(FluidBlock.LEVEL, 1), 1234, true);

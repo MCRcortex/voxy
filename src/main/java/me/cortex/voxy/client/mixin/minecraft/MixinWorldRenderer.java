@@ -39,7 +39,7 @@ public abstract class MixinWorldRenderer implements IGetVoxelCore {
     private void injectOpaqueRender(MatrixStack matrices, float tickDelta, long limitTime, boolean renderBlockOutline, Camera camera, GameRenderer gameRenderer, LightmapTextureManager lightmapTextureManager, Matrix4f projectionMatrix, CallbackInfo ci) {
         if (this.core != null) {
             var cam = camera.getPos();
-            this.core.renderOpaque(matrices, cam.x, cam.y, cam.z);
+            //this.core.renderOpaque(matrices, cam.x, cam.y, cam.z);
         }
     }
 

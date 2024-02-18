@@ -13,6 +13,7 @@ uint faceHasAlphaCuttout(uint faceData) {
     return (faceData>>22)&1u;
 }
 
+//TODO: try and get rid of
 uint faceHasAlphaCuttoutOverride(uint faceData) {
     return (faceData>>23)&1u;
 }

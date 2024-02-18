@@ -16,6 +16,7 @@
     "defaultRequire": 1
   },
   "mixins": [
+    "sodium.MixinDefaultChunkRenderer",
     "sodium.MixinRenderSectionManager"
   ]
 }

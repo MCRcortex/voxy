@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core;
 
 import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
@@ -9,6 +10,7 @@ import me.cortex.voxy.client.core.util.DebugUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
+import net.coderbot.iris.Iris;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
@@ -136,6 +138,9 @@ public class VoxelCore {
         //this.renderer.getModelManager().updateEntry(0, Blocks.COMPARATOR.getDefaultState());
         //this.renderer.getModelManager().updateEntry(0, Blocks.OAK_LEAVES.getDefaultState());
 
+        var fb = Iris.getPipelineManager().getPipelineNullable().getSodiumTerrainPipeline().getTerrainSolidFramebuffer();
+        fb.bind();
+
         int boundFB = GlStateManager.getBoundFramebuffer();
         this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);
 
@@ -159,7 +164,7 @@ public class VoxelCore {
         this.renderer.renderFarAwayTranslucent();
 
 
-        this.postProcessing.renderPost(boundFB);
+        this.postProcessing.renderPost(projection, RenderSystem.getProjectionMatrix(), boundFB);
 
     }
 

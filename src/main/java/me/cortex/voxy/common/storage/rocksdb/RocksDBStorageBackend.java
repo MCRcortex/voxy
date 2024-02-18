@@ -24,14 +24,25 @@ public class RocksDBStorageBackend extends StorageBackend {
     private final List<AbstractImmutableNativeReference> closeList = new ArrayList<>();
 
     public RocksDBStorageBackend(String path) {
-        try {
-            var lockPath = new File(path).toPath().resolve("LOCK");
-            if (Files.exists(lockPath)) {
-                System.err.println("WARNING, deleting rocksdb LOCK file");
-                Files.delete(lockPath);
+        var lockPath = new File(path).toPath().resolve("LOCK");
+        if (Files.exists(lockPath)) {
+            System.err.println("WARNING, deleting rocksdb LOCK file");
+            int attempts = 10;
+            while (attempts-- != 0) {
+                try {
+                    Files.delete(lockPath);
+                    break;
+                } catch (IOException e) {
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
             }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
+            if (Files.exists(lockPath)) {
+                throw new RuntimeException("Unable to delete rocksdb lock file");
+            }
         }
 
         final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions().optimizeUniversalStyleCompaction();
