@@ -20,9 +20,13 @@ import net.minecraft.util.Identifier;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
 
 import java.io.File;
 import java.util.*;
+
+import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
+import static org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER;
 
 //Core class that ingests new data from sources and updates the required systems
 
@@ -138,10 +142,10 @@ public class VoxelCore {
         //this.renderer.getModelManager().updateEntry(0, Blocks.COMPARATOR.getDefaultState());
         //this.renderer.getModelManager().updateEntry(0, Blocks.OAK_LEAVES.getDefaultState());
 
-        var fb = Iris.getPipelineManager().getPipelineNullable().getSodiumTerrainPipeline().getTerrainSolidFramebuffer();
-        fb.bind();
+        //var fb = Iris.getPipelineManager().getPipelineNullable().getSodiumTerrainPipeline().getTerrainSolidFramebuffer();
+        //fb.bind();
 
-        int boundFB = GlStateManager.getBoundFramebuffer();
+        int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);
 
         //TODO: FIXME: since we just bound the post processing FB the depth information isnt
