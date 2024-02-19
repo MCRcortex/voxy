@@ -9,7 +9,7 @@ out vec4 colour;
 in vec2 UV;
 
 vec3 rev3d(vec3 clip) {
-    vec4 view = invProjMat * vec4(clip*2.0-1.0,1.0);
+    vec4 view = invProjMat * vec4(clip*2.0f-1.0f,1.0f);
     return view.xyz/view.w;
 }
 float projDepth(vec3 pos) {
@@ -25,7 +25,7 @@ void main() {
 
     float depth = texture(depthTex, UV.xy).r;
     depth = projDepth(rev3d(vec3(UV.xy, depth)));
-    depth = min(1f-(2f/((1<<24)-1)), depth);
+    depth = min(1.0f-(2.0f/((1<<24)-1)), depth);
     depth = depth * 0.5f + 0.5f;
     depth = gl_DepthRange.diff * depth + gl_DepthRange.near;
     gl_FragDepth = depth;

@@ -54,7 +54,8 @@ dependencies {
 
     modImplementation("maven.modrinth:cloth-config:13.0.121+fabric")
     modImplementation("maven.modrinth:modmenu:9.0.0")
-    modImplementation("maven.modrinth:iris:1.6.17+1.20.4")
+    modCompileOnly("maven.modrinth:iris:1.6.17+1.20.4")
+    //modRuntimeOnly("maven.modrinth:iris:1.6.17+1.20.4")
 }
 
 
