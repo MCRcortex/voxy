@@ -181,6 +181,123 @@ public class DistanceTracker {
         }
 
         public void update(int x, int z) {
+            long dx = this.lastUpdateX - x;
+            long dz = this.lastUpdateZ - z;
+            long distSquared =  dx*dx + dz*dz;
+            if (distSquared < this.triggerRangeSquared) {
+                return;
+            }
+
+            //Update the last update position
+            int maxStep = this.triggerRangeSquared/2;
+            this.lastUpdateX += Math.min(maxStep,Math.max(-maxStep, x-this.lastUpdateX));
+            this.lastUpdateZ += Math.min(maxStep,Math.max(-maxStep, z-this.lastUpdateZ));
+
+            //Compute movement if it happened
+            int nx = x>>this.shiftSize;
+            int nz = z>>this.shiftSize;
+
+            if (nx == this.currentX && nz == this.currentZ) {
+                //No movement
+                return;
+            }
+
+
+            //FIXME: not right, needs to only call load/unload on entry and exit, cause atm its acting like a loaded circle
+
+            Long2IntOpenHashMap ops = new Long2IntOpenHashMap();
+            while (true) {
+                int dir = nz < this.currentZ ? -1 : 1;
+                if (nz != this.currentZ) {
+                    for (int corner : this.cornerPoints) {
+                        int cx = corner >>> 16;
+                        int cz = corner & 0xFFFF;
+
+                        ops.addTo(Prel(cx, cz + Math.max(0, dir)), dir);
+                        ops.addTo(Prel(cx, -cz + Math.min(0, dir)), -dir);
+                        if (cx != 0) {
+                            ops.addTo(Prel(-cx, cz + Math.max(0, dir)), dir);
+                            ops.addTo(Prel(-cx, -cz + Math.min(0, dir)), -dir);
+                        }
+                    }
+
+                    this.currentZ += dir;
+                }
+
+                dir = nx < this.currentX ? -1 : 1;
+                if (nx != this.currentX) {
+                    for (int corner : this.cornerPoints) {
+                        int cx = corner & 0xFFFF;
+                        int cz = corner >>> 16;
+
+                        ops.addTo(Prel(cx + Math.max(0, dir), cz), dir);
+                        ops.addTo(Prel(-cx + Math.min(0, dir), cz), -dir);
+                        if (cz != 0) {
+                            ops.addTo(Prel(cx + Math.max(0, dir), -cz), dir);
+                            ops.addTo(Prel(-cx + Math.min(0, dir), -cz), -dir);
+                        }
+                    }
+
+                    this.currentX += dir;
+                }
+
+                //Only break once the coords match
+                if (nx == this.currentX && nz == this.currentZ) {
+                    break;
+                }
+            }
+
+
+            ops.forEach((pos,val)->{
+                if (val > 0) {
+                    this.enter.callback((int) (long)pos, (int) (pos>>32));
+                }
+                if (val < 0) {
+                    this.exit.callback((int) (long)pos, (int) (pos>>32));
+                }
+            });
+            ops.clear();
+        }
+
+        public void fill(int x, int z) {
+            this.fill(x, z, null);
+        }
+
+        public void fill(int x, int z, Transition2DCallback outsideCallback) {
+            int cx = x>>this.shiftSize;
+            int cz = z>>this.shiftSize;
+
+            int r2 = this.radius*this.radius;
+            for (int a = -this.radius; a <= this.radius; a++) {
+            //IntStream.range(-this.radius, this.radius+1).parallel().forEach(a->{
+                int b = (int) Math.floor(Math.sqrt(r2-(a*a)));
+                for (int c = -b; c <= b; c++) {
+                    this.enter.callback(a + cx, c + cz);
+                }
+                if (outsideCallback != null) {
+                    for (int c = -this.radius; c < -b; c++) {
+                        outsideCallback.callback(a + cx, c + cz);
+                    }
+
+                    for (int c = b+1; c <= this.radius; c++) {
+                        outsideCallback.callback(a + cx, c + cz);
+                    }
+                }
+            }//);
+        }
+
+        public void setCenter(int x, int z) {
+            int cx = x>>this.shiftSize;
+            int cz = z>>this.shiftSize;
+            this.currentX = cx;
+            this.currentZ = cz;
+            this.lastUpdateX = x + (((int)(Math.random()*4))<<(this.shiftSize-4));
+            this.lastUpdateZ = z + (((int)(Math.random()*4))<<(this.shiftSize-4));
+        }
+    }
+}
+/*
+        public void update(int x, int z) {
             int MAX_STEPS_PER_UPDATE = 1;
 
 
@@ -268,42 +385,4 @@ public class DistanceTracker {
                 }
             });
             ops.clear();
-        }
-
-        public void fill(int x, int z) {
-            this.fill(x, z, null);
-        }
-
-        public void fill(int x, int z, Transition2DCallback outsideCallback) {
-            int cx = x>>this.shiftSize;
-            int cz = z>>this.shiftSize;
-
-            int r2 = this.radius*this.radius;
-            for (int a = -this.radius; a <= this.radius; a++) {
-            //IntStream.range(-this.radius, this.radius+1).parallel().forEach(a->{
-                int b = (int) Math.floor(Math.sqrt(r2-(a*a)));
-                for (int c = -b; c <= b; c++) {
-                    this.enter.callback(a + cx, c + cz);
-                }
-                if (outsideCallback != null) {
-                    for (int c = -this.radius; c < -b; c++) {
-                        outsideCallback.callback(a + cx, c + cz);
-                    }
-
-                    for (int c = b+1; c <= this.radius; c++) {
-                        outsideCallback.callback(a + cx, c + cz);
-                    }
-                }
-            }//);
-        }
-
-        public void setCenter(int x, int z) {
-            int cx = x>>this.shiftSize;
-            int cz = z>>this.shiftSize;
-            this.currentX = cx;
-            this.currentZ = cz;
-            this.lastUpdateX = x + (((int)(Math.random()*4))<<(this.shiftSize-4));
-            this.lastUpdateZ = z + (((int)(Math.random()*4))<<(this.shiftSize-4));
-        }
-    }
-}
+        }*/
