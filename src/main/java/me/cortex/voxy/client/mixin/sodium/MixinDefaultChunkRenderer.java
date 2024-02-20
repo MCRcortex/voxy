@@ -28,7 +28,7 @@ public class MixinDefaultChunkRenderer {
     private void injectRender(ChunkRenderMatrices matrices, CommandList commandList, ChunkRenderListIterable renderLists, TerrainRenderPass renderPass, CameraTransform camera, CallbackInfo ci) {
         if (renderPass == DefaultTerrainRenderPasses.CUTOUT) {
             var core = ((IGetVoxelCore) MinecraftClient.getInstance().worldRenderer).getVoxelCore();
-            if (core != null && !IrisUtil.irisShadowActive()) {
+            if (core != null) {
                 var stack = new MatrixStack();
                 stack.loadIdentity();
                 stack.multiplyPositionMatrix(new Matrix4f(matrices.modelView()));

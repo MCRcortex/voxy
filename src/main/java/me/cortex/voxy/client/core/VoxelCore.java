@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.util.DebugUtil;
+import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
@@ -131,6 +132,9 @@ public class VoxelCore {
     }
 
     public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
+        if (IrisUtil.irisShadowActive()) {
+            return;
+        }
         matrices.push();
         matrices.translate(-cameraX, -cameraY, -cameraZ);
         DebugUtil.setPositionMatrix(matrices);

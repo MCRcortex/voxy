@@ -1,0 +1,25 @@
+{
+  "voxy.config.title": "Voxy config",
+
+  "voxy.config.general": "General",
+  "voxy.config.threads": "Threads",
+  "voxy.config.storage": "Storage",
+
+  "voxy.config.general.enabled": "Enable Voxy",
+  "voxy.config.general.enabled.tooltip": "Fully enables or disables voxy",
+  "voxy.config.general.ingest": "Chunk Ingest",
+  "voxy.config.general.ingest.tooltip": "Enables or disables voxies ability to convert new chunks into LoDs",
+  "voxy.config.general.quality": "LoD Quality",
+  "voxy.config.general.quality.tooltip": "How far each LoD ring lasts before its downgraded to a lower detail level",
+  "voxy.config.general.geometryBuffer": "Geometry Buffer Quads",
+  "voxy.config.general.geometryBuffer.tooltip": "How many quads the geometry buffer can hold",
+  "voxy.config.general.maxSections": "Max Sections",
+  "voxy.config.general.maxSections.tooltip": "The max number of sections the renderer can contain",
+
+  "voxy.config.threads.ingest": "Ingest",
+  "voxy.config.threads.ingest.tooltip": "How many threads voxy will use for ingesting new chunks",
+  "voxy.config.threads.saving": "Saving",
+  "voxy.config.threads.saving.tooltip": "How many threads voxy will use for saving sections to the storage backend",
+  "voxy.config.threads.render": "Render",
+  "voxy.config.threads.render.tooltip": "How many threads voxy will use for generating render data"
+}

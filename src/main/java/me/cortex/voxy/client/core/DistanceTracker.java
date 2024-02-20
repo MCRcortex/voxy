@@ -44,18 +44,18 @@ public class DistanceTracker {
             // acts on LoD level + 1
 
             //TODO: check this is actually working lmao and make it generate parent level lods on the exit instead of entry so it looks correct when flying backwards
-            //this.cacheLoadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheLoadDistance, (x, z) -> {
-            //    //When entering a cache ring, trigger a mesh op and inject into cache
-            //    for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
-            //        this.tracker.addCache(capRing, x, y, z);
-            //    }
-            //}, (x, z) -> {});
-            //this.cacheUnloadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheUnloadDistance, (x, z) -> {}, (x, z) -> {
-            //    //When exiting the cache unload ring, tell the cache to dump whatever mesh it has cached and not add any mesh from that position
-            //    for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
-            //        this.tracker.removeCache(capRing, x, y, z);
-            //    }
-            //});
+            this.cacheLoadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheLoadDistance, (x, z) -> {
+                //When entering a cache ring, trigger a mesh op and inject into cache
+                for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
+                    this.tracker.addCache(capRing, x, y, z);
+                }
+            }, (x, z) -> {});
+            this.cacheUnloadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheUnloadDistance, (x, z) -> {}, (x, z) -> {
+                //When exiting the cache unload ring, tell the cache to dump whatever mesh it has cached and not add any mesh from that position
+                for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
+                    this.tracker.removeCache(capRing, x, y, z);
+                }
+            });
         }
     }
 
