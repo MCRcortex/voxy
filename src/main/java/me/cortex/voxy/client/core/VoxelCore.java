@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core;
 
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
+import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
@@ -113,7 +114,7 @@ public class VoxelCore {
         this.renderer.setupRender(frustum, camera);
     }
 
-    private Matrix4f getProjectionMatrix() {
+    private static Matrix4f makeProjectionMatrix(float near, float far) {
         //TODO: use the existing projection matrix use mulLocal by the inverse of the projection and then mulLocal our projection
 
         var projection = new Matrix4f();
@@ -124,11 +125,14 @@ public class VoxelCore {
 
         projection.setPerspective(fov * 0.01745329238474369f,
                 (float) client.getWindow().getFramebufferWidth() / (float)client.getWindow().getFramebufferHeight(),
-                16F, 16 * 3000f);
-        var transform = new Matrix4f().identity();
-        transform.translate(gameRenderer.zoomX, -gameRenderer.zoomY, 0.0F);
-        transform.scale(gameRenderer.zoom, gameRenderer.zoom, 1.0F);
-        return transform.mul(projection);
+                near, far);
+        return projection;
+    }
+
+    private static Matrix4f computeProjectionMat() {
+        return new Matrix4f(RenderSystem.getProjectionMatrix()).mulLocal(
+                makeProjectionMatrix(0.05f, MinecraftClient.getInstance().gameRenderer.getFarPlaneDistance()).invert()
+        ).mulLocal(makeProjectionMatrix(16, 16*3000));
     }
 
     public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {
@@ -159,7 +163,7 @@ public class VoxelCore {
         // this is cause the terrain might not exist and so all the caves are visible causing hell for the
         // occlusion culler
 
-        var projection = this.getProjectionMatrix();
+        var projection = computeProjectionMat();
 
         this.renderer.renderFarAwayOpaque(projection, matrices, cameraX, cameraY, cameraZ);
 
@@ -177,7 +181,7 @@ public class VoxelCore {
     public void addDebugInfo(List<String> debug) {
         debug.add("");
         debug.add("");
-        debug.add("Voxy Core");
+        debug.add("Voxy Core: " + Voxy.VERSION);
         debug.add("Ingest service tasks: " + this.world.ingestService.getTaskCount());
         debug.add("Saving service tasks: " + this.world.savingService.getTaskCount());
         debug.add("Render service tasks: " + this.renderGen.getTaskCount());
@@ -208,7 +212,7 @@ public class VoxelCore {
 
     public WorldImporter createWorldImporter(World mcWorld, File worldPath) {
         var importer = new WorldImporter(this.world, mcWorld);
-        importer.importWorldAsyncStart(worldPath, 15, null, ()->{
+        importer.importWorldAsyncStart(worldPath, 4, null, ()->{
             System.err.println("DONE IMPORT");
         });
         return importer;

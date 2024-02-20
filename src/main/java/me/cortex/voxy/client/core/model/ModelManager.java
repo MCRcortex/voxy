@@ -148,7 +148,8 @@ public class ModelManager {
     // while the depth is computed from the depth buffer data
     public int addEntry(int blockId, BlockState blockState) {
         if (this.idMappings[blockId] != -1) {
-            throw new IllegalArgumentException("Trying to add entry for duplicate id");
+            System.err.println("Block id already added: " + blockId + " for state: " + blockState);
+            return this.idMappings[blockId];
         }
 
         boolean isFluid = blockState.getBlock() instanceof FluidBlock;

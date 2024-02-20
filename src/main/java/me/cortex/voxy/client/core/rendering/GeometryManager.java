@@ -7,6 +7,8 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.BufferArena;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.Text;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -79,6 +81,9 @@ public class GeometryManager {
 
                     //Create the new meta
                     meta = this.createMeta(result);
+                    if (meta == null) {
+                        continue;
+                    }
                     this.sectionMetadata.set(id, meta);
                     long ptr = UploadStream.INSTANCE.upload(this.sectionMetaBuffer, (long)SECTION_METADATA_SIZE * id, SECTION_METADATA_SIZE);
                     meta.writeMetadata(ptr);
@@ -90,6 +95,9 @@ public class GeometryManager {
 
                     //Create the new meta
                     var meta = this.createMeta(result);
+                    if (meta == null) {
+                        continue;
+                    }
                     this.sectionMetadata.add(meta);
                     long ptr = UploadStream.INSTANCE.upload(this.sectionMetaBuffer, (long)SECTION_METADATA_SIZE * id, SECTION_METADATA_SIZE);
                     meta.writeMetadata(ptr);
@@ -158,6 +166,12 @@ public class GeometryManager {
 
     private SectionMeta createMeta(BuiltSection geometry) {
         int geometryPtr = (int) this.geometryBuffer.upload(geometry.geometryBuffer);
+        if (geometryPtr == -1) {
+            String msg = "Buffer arena out of memory, please increase it in settings or decrease LoD quality";
+            MinecraftClient.getInstance().inGameHud.getChatHud().addMessage(Text.literal(msg));
+            System.err.println(msg);
+            return null;
+        }
         return new SectionMeta(geometry.position, geometry.aabb, geometryPtr, (int) (geometry.geometryBuffer.size/8), geometry.offsets);
     }
 

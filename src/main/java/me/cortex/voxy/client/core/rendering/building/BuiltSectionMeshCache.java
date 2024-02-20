@@ -14,7 +14,7 @@ public class BuiltSectionMeshCache {
     public BuiltSection getMesh(long key) {
         BuiltSection[] res = new BuiltSection[1];
         this.renderCache.computeIfPresent(key, (a, value) -> {
-            if (value == null || value == HOLDER) {
+            if (value == HOLDER) {
                 return value;
             }
             res[0] = value.clone();

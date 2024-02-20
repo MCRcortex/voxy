@@ -9,13 +9,13 @@
     "minecraft.MixinDebugHud",
     "minecraft.MixinMinecraftClient",
     "minecraft.MixinWorldRenderer",
-    "sodium.MixinOcclusionCuller",
     "sodium.MixinSodiumWorldRender"
   ],
   "injectors": {
     "defaultRequire": 1
   },
   "mixins": [
+    "nvidium.MixinRenderPipeline",
     "sodium.MixinDefaultChunkRenderer",
     "sodium.MixinRenderSectionManager"
   ]

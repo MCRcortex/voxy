@@ -142,18 +142,23 @@ public class Serialization {
     }
 
     private static List<String> collectAllClasses(String pack) {
-        InputStream stream = Serialization.class.getClassLoader()
-                .getResourceAsStream(pack.replaceAll("[.]", "/"));
-        BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
-        return reader.lines().flatMap(inner -> {
-            if (inner.endsWith(".class")) {
-                return Stream.of(pack + "." + inner.replace(".class", ""));
-            } else if (!inner.contains(".")) {
-                return collectAllClasses(pack + "." + inner).stream();
-            } else {
-                return Stream.of();
-            }
-        }).collect(Collectors.toList());
+        try {
+            InputStream stream = Serialization.class.getClassLoader()
+                    .getResourceAsStream(pack.replaceAll("[.]", "/"));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
+            return reader.lines().flatMap(inner -> {
+                if (inner.endsWith(".class")) {
+                    return Stream.of(pack + "." + inner.replace(".class", ""));
+                } else if (!inner.contains(".")) {
+                    return collectAllClasses(pack + "." + inner).stream();
+                } else {
+                    return Stream.of();
+                }
+            }).collect(Collectors.toList());
+        } catch (Exception e) {
+            System.err.println("Failed to collect classes in package: " + pack);
+            return List.of();
+        }
     }
     private static List<String> collectAllClasses(Path base, String pack) {
         if (!Files.exists(base.resolve(pack.replaceAll("[.]", "/")))) {

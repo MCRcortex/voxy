@@ -73,7 +73,7 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setDefaultValue(DEFAULT.ingestEnabled)
                 .build());
 
-        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.quality"), config.qualityScale, 8, 50)
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.quality"), config.qualityScale, 8, 32)
                 .setTooltip(Text.translatable("voxy.config.general.quality.tooltip"))
                 .setSaveConsumer(val -> config.qualityScale = val)
                 .setDefaultValue(DEFAULT.qualityScale)
@@ -103,19 +103,19 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
 
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.threads.ingest"), config.ingestThreads, 1, Runtime.getRuntime().availableProcessors())
-                .setTooltip(Text.translatable("voxy.config.general.ingest.tooltip"))
+                .setTooltip(Text.translatable("voxy.config.ingest.tooltip"))
                 .setSaveConsumer(val -> config.ingestThreads = val)
                 .setDefaultValue(DEFAULT.ingestThreads)
                 .build());
 
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.threads.saving"), config.savingThreads, 1, Runtime.getRuntime().availableProcessors())
-                .setTooltip(Text.translatable("voxy.config.general.saving.tooltip"))
+                .setTooltip(Text.translatable("voxy.config.saving.tooltip"))
                 .setSaveConsumer(val -> config.savingThreads = val)
                 .setDefaultValue(DEFAULT.savingThreads)
                 .build());
 
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.threads.render"), config.renderThreads, 1, Runtime.getRuntime().availableProcessors())
-                .setTooltip(Text.translatable("voxy.config.general.render.tooltip"))
+                .setTooltip(Text.translatable("voxy.config.render.tooltip"))
                 .setSaveConsumer(val -> config.renderThreads = val)
                 .setDefaultValue(DEFAULT.renderThreads)
                 .build());
