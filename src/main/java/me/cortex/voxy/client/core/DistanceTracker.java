@@ -82,8 +82,9 @@ public class DistanceTracker {
             if (ring!=null)
                 ring.update(x, z);
         }
-        for (var ring : this.loDRings) {
-            ring.update(x, z);
+        //Update in reverse order (biggest lod to smallest lod)
+        for (int i = this.loDRings.length-1; -1<i; i-- ) {
+            this.loDRings[i].update(x, z);
         }
         for (var ring : this.cacheUnloadRings) {
             if (ring!=null)
