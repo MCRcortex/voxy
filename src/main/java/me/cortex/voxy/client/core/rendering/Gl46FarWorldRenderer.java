@@ -1,16 +1,10 @@
 package me.cortex.voxy.client.core.rendering;
 
-import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
-import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
-import net.minecraft.block.Blocks;
-import net.minecraft.block.FluidBlock;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
@@ -22,7 +16,6 @@ import java.util.List;
 
 import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
 import static org.lwjgl.opengl.ARBIndirectParameters.glMultiDrawElementsIndirectCountARB;
-import static org.lwjgl.opengl.ARBMultiDrawIndirect.glMultiDrawElementsIndirect;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_SHORT;
 import static org.lwjgl.opengl.GL11.glGetInteger;
@@ -87,7 +80,12 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
     }
 
     //FIXME: dont do something like this as it breaks multiviewport mods
-    private int frameId = 0;
+    // the issue is that voxy expects the counter to be incremented by one each frame (the compute shader generating the commands)
+    // checks `frameId - 1`, this means in a multiviewport, effectivly only the stuff that was marked visible by the last viewport
+    // would be visible in the current viewport (if there are 2 viewports)
+
+    //To fix the issue, need to make a viewport api, that independently tracks the frameId and has its own glVisibilityBuffer buffer
+    private int frameId;
     private void updateUniformBuffer(Matrix4f projection, MatrixStack stack, double cx, double cy, double cz) {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, this.uniformBuffer.size());
 
