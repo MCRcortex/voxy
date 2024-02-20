@@ -46,6 +46,10 @@ public final class WorldSection {
         return state>>1;
     }
 
+    public int getRefCount() {
+        return this.atomicState.get()>>1;
+    }
+
     public int release() {
         int state = this.atomicState.addAndGet(-2);
         if (state < 1) {
