@@ -12,20 +12,28 @@ vec3 rev3d(vec3 clip) {
     return view.xyz/view.w;
 }
 
-vec3 reDeProject(vec3 pos) {
+vec4 reDeProject(vec3 pos) {
     vec4 view = MVP * vec4(pos, 1.0);
     view.xy /= view.w;
     vec2 UV = clamp(view.xy*0.5+0.5, 0.0, 1.0);
     //TODO: sample the colour texture and check if the alpha has the hasAO flag
 
-    view.z = texture(depthTex, UV).x*2.0-1.0;
+    float depth = texture(depthTex, UV).x;
+    if (depth == 1.0f) {
+        return vec4(-1.0f);
+    }
+    view.z = depth*2.0-1.0;
     view.w = 1.0;
     view = invMVP * view;
-    return view.xyz/view.w;
+    return vec4(view.xyz/view.w, 1.0f);
 }
 
 float computeAOAngle(vec3 pos, float testHeight, vec3 normal) {
-    vec3 repro = reDeProject(pos + normal*testHeight) - pos;
+    vec4 reproData = reDeProject(pos + normal*testHeight);
+    if (reproData.w < 0.0f) {
+        return 0.0f;
+    }
+    vec3 repro = reproData.xyz - pos;
     float len = length(repro);
     return dot(repro, normal)/len;
 }
@@ -57,7 +65,7 @@ void main() {
     }
 
     vec4 ocolour = colour;
-    ocolour.xyz *= ((1.0f-d)/3.0f+0.666666f);
+    ocolour.xyz *= ((1.0f-d)/3.0f+(2.0f/3.0f));
     ocolour.w = 1.0f;
     imageStore(colourTex, ivec2(gl_GlobalInvocationID.xy), ocolour);
 }
