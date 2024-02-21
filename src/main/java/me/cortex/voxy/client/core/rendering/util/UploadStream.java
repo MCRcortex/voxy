@@ -14,6 +14,7 @@ import static org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData;
 import static org.lwjgl.opengl.ARBDirectStateAccess.glFlushMappedNamedBufferRange;
 import static org.lwjgl.opengl.ARBMapBufferRange.*;
 import static org.lwjgl.opengl.GL11.glFinish;
+import static org.lwjgl.opengl.GL42.GL_ALL_BARRIER_BITS;
 import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL42C.GL_BUFFER_UPDATE_BARRIER_BIT;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BARRIER_BIT;
@@ -86,6 +87,7 @@ public class UploadStream {
             this.flushList.clear();
         }
         glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
+        glMemoryBarrier(GL_ALL_BARRIER_BITS);
 
         //Execute all the copies
         for (var entry : this.uploadList) {

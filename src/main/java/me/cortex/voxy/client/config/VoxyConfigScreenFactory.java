@@ -91,11 +91,11 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setDefaultValue(DEFAULT.maxSections)
                 .build());
 
-        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.renderDistance"), config.maxSections, 16, 2048)
-                .setTooltip(Text.translatable("voxy.config.general.renderDistance.tooltip"))
-                .setSaveConsumer(val -> config.renderDistance = val)
-                .setDefaultValue(DEFAULT.renderDistance)
-                .build());
+        //category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.renderDistance"), config.maxSections, 16, 2048)
+        //        .setTooltip(Text.translatable("voxy.config.general.renderDistance.tooltip"))
+        //        .setSaveConsumer(val -> config.renderDistance = val)
+        //        .setDefaultValue(DEFAULT.renderDistance)
+        //        .build());
 
         //category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.compression"), config.savingCompressionLevel, 1, 21)
         //        .setTooltip(Text.translatable("voxy.config.general.compression.tooltip"))
