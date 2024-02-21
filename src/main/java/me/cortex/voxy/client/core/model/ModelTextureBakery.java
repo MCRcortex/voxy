@@ -39,8 +39,7 @@ import static org.lwjgl.opengl.ARBImaging.glBlendEquation;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glMemoryBarrier;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
-import static org.lwjgl.opengl.GL13.glActiveTexture;
+import static org.lwjgl.opengl.GL13.*;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL20C.glUniformMatrix4fv;
 import static org.lwjgl.opengl.GL45C.glBlitNamedFramebuffer;
@@ -59,6 +58,7 @@ public class ModelTextureBakery {
             .addCapability(GL_BLEND)
             .addCapability(GL_CULL_FACE)
             .addTexture(GL_TEXTURE0)
+            .addTexture(GL_TEXTURE1)
             .build()
             ;
     private final Shader rasterShader = Shader.make()
@@ -138,7 +138,8 @@ public class ModelTextureBakery {
         }
 
 
-        renderLayer.startDrawing();
+        //TODO: figure out why calling this makes minecraft render black
+        //renderLayer.startDrawing();
         glClearColor(0,0,0,0);
         glClearDepth(1);
         glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id);

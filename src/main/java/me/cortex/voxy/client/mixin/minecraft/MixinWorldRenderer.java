@@ -19,10 +19,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(WorldRenderer.class)
 public abstract class MixinWorldRenderer implements IGetVoxelCore {
-    @Shadow protected abstract void renderLayer(RenderLayer renderLayer, MatrixStack matrices, double cameraX, double cameraY, double cameraZ, Matrix4f positionMatrix);
-
-    @Shadow protected abstract void setupTerrain(Camera camera, Frustum frustum, boolean hasForcedFrustum, boolean spectator);
-
     @Shadow private Frustum frustum;
 
     @Shadow private @Nullable ClientWorld world;
@@ -102,16 +98,5 @@ public abstract class MixinWorldRenderer implements IGetVoxelCore {
             this.core.shutdown();
             this.core = null;
         }
-    }
-
-    @Redirect(method = "render", at = @At(value = "INVOKE", target = "Ljava/lang/Math;max(FF)F"), require = 0)
-    private float redirectMax(float a, float b) {
-        return a;
-    }
-
-    @Redirect(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/GameRenderer;getViewDistance()F"), require = 0)
-    private float changeRD(GameRenderer instance) {
-        float viewDistance = instance.getViewDistance();
-        return 16*5120;
     }
 }

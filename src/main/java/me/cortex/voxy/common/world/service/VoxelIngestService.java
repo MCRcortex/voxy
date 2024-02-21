@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.Pair;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.common.world.other.LightingFetcher;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.LightType;
 import net.minecraft.world.chunk.ChunkNibbleArray;
@@ -79,24 +80,7 @@ public class VoxelIngestService {
     }
 
     public void enqueueIngest(WorldChunk chunk) {
-        var lp = chunk.getWorld().getLightingProvider();
-        var blockLight = lp.get(LightType.BLOCK);
-        var skyLight = lp.get(LightType.SKY);
-        int i = chunk.getBottomSectionCoord() - 1;
-        for (var section : chunk.getSectionArray()) {
-            i++;
-            if (section == null) continue;
-            if (section.isEmpty()) continue;
-            var pos = ChunkSectionPos.from(chunk.getPos(), i);
-            if (lp.getStatus(LightType.BLOCK, pos) == LightStorage.Status.EMPTY)
-                continue;
-            var bl = blockLight.getLightSection(pos);
-            var sl = skyLight.getLightSection(pos);
-            if (bl == null && sl == null) continue;
-            bl = bl==null?null:bl.copy();
-            sl = sl==null?null:sl.copy();
-            this.captureLightMap.put(pos.asLong(), Pair.of(bl, sl));
-        }
+        LightingFetcher.fetchLightingData(this.captureLightMap, chunk);
         this.ingestQueue.add(chunk);
         this.ingestCounter.release();
     }

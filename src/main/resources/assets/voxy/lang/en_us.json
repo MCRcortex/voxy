@@ -15,6 +15,8 @@
   "voxy.config.general.geometryBuffer.tooltip": "How many quads the geometry buffer can hold",
   "voxy.config.general.maxSections": "Max Sections",
   "voxy.config.general.maxSections.tooltip": "The max number of sections the renderer can contain",
+  "voxy.config.general.renderDistance": "Render Distance",
+  "voxy.config.general.renderDistance.tooltip": "The render distance in chunks",
 
   "voxy.config.threads.ingest": "Ingest",
   "voxy.config.threads.ingest.tooltip": "How many threads voxy will use for ingesting new chunks",

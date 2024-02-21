@@ -3,12 +3,14 @@ package me.cortex.voxy.client.core.rendering;
 //NOTE: an idea on how to do it is so that any render section, we _keep_ aquired (yes this will be very memory intensive)
 // could maybe tosomething else
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.world.other.Mapper;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
@@ -36,13 +38,15 @@ import static org.lwjgl.opengl.GL30.*;
 
 
 //Todo: tinker with having the compute shader where each thread is a position to render? maybe idk
-public abstract class AbstractFarWorldRenderer {
+public abstract class AbstractFarWorldRenderer <T extends Viewport> {
     protected final int vao = glGenVertexArrays();
 
     protected final GlBuffer uniformBuffer;
     protected final GeometryManager geometry;
     protected final ModelManager models;
     protected final GlBuffer lightDataBuffer;
+
+    protected final int maxSections;
 
     //Current camera base level section position
     protected int sx;
@@ -54,6 +58,7 @@ public abstract class AbstractFarWorldRenderer {
     private final ConcurrentLinkedDeque<Mapper.StateEntry> blockStateUpdates = new ConcurrentLinkedDeque<>();
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeUpdates = new ConcurrentLinkedDeque<>();
     public AbstractFarWorldRenderer(int geometrySize, int maxSections) {
+        this.maxSections = maxSections;
         this.uniformBuffer  = new GlBuffer(1024);
         this.lightDataBuffer  = new GlBuffer(256*4);//256 of uint
         this.geometry = new GeometryManager(geometrySize*8L, maxSections);
@@ -112,11 +117,14 @@ public abstract class AbstractFarWorldRenderer {
                 var update = this.blockStateUpdates.pop();
                 this.models.addEntry(update.id, update.state);
             }
+            //this.models.bakery.renderFaces(Blocks.LAVA.getDefaultState(), 1234, true);
         }
 
+        //TODO: fix this in a better way than this ungodly hacky stuff
+        RenderSystem.setShaderFogColor(1f, 1f, 1f, 0f);
     }
 
-    public abstract void renderFarAwayOpaque(Matrix4f projection, MatrixStack stack, double cx, double cy, double cz);
+    public abstract void renderFarAwayOpaque(T viewport);
 
     public abstract void renderFarAwayTranslucent();
 
@@ -147,4 +155,6 @@ public abstract class AbstractFarWorldRenderer {
     public ModelManager getModelManager() {
         return this.models;
     }
+
+    public abstract T createViewport();
 }

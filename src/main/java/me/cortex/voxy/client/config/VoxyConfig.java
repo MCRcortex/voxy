@@ -23,6 +23,7 @@ public class VoxyConfig {
     public boolean ingestEnabled = true;
     public int qualityScale = 12;
     public int maxSections = 200_000;
+    public int renderDistance = 128;
     public int geometryBufferSize = (1<<30)/8;
     public int ingestThreads = 2;
     public int savingThreads = 4;

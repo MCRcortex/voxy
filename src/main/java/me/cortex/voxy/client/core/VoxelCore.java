@@ -49,9 +49,11 @@ public class VoxelCore {
     private final RenderTracker renderTracker;
 
     private final AbstractFarWorldRenderer renderer;
+    private Viewport viewport;
     private final PostProcessing postProcessing;
 
     //private final Thread shutdownThread = new Thread(this::shutdown);
+
 
     public VoxelCore(ContextSelectionSystem.Selection worldSelection) {
         this.world = worldSelection.createEngine();
@@ -60,6 +62,7 @@ public class VoxelCore {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+        this.viewport = this.renderer.createViewport();
         System.out.println("Renderer initialized");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
@@ -71,7 +74,7 @@ public class VoxelCore {
         //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
         int q = VoxyConfig.CONFIG.qualityScale;
         //TODO: add an option for cache load and unload distance
-        this.distanceTracker = new DistanceTracker(this.renderTracker, new int[]{q,q,q,q}, 8, 16);
+        this.distanceTracker = new DistanceTracker(this.renderTracker, new int[]{q,q,q,q}, VoxyConfig.CONFIG.renderDistance/2, 6, 6);
         System.out.println("Distance tracker initialized");
 
         this.postProcessing = new PostProcessing();
@@ -151,21 +154,13 @@ public class VoxelCore {
         //var fb = Iris.getPipelineManager().getPipelineNullable().getSodiumTerrainPipeline().getTerrainSolidFramebuffer();
         //fb.bind();
 
+        var projection = computeProjectionMat();
+        this.viewport.setProjection(projection).setModelView(matrices.peek().getPositionMatrix()).setCamera(cameraX, cameraY, cameraZ);
+
         int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);
 
-        //TODO: FIXME: since we just bound the post processing FB the depth information isnt
-        // copied over, we must do this manually and also copy it with respect to the
-        // near/far planes
-
-
-        //TODO: have the renderer also render a bounding full face just like black boarders around lvl 0
-        // this is cause the terrain might not exist and so all the caves are visible causing hell for the
-        // occlusion culler
-
-        var projection = computeProjectionMat();
-
-        this.renderer.renderFarAwayOpaque(projection, matrices, cameraX, cameraY, cameraZ);
+        this.renderer.renderFarAwayOpaque(this.viewport);
 
         //Compute the SSAO of the rendered terrain
         this.postProcessing.computeSSAO(projection, matrices);
@@ -204,7 +199,7 @@ public class VoxelCore {
         System.out.println("Render gen shut down");
         try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
         System.out.println("World engine shut down");
-        try {this.renderer.shutdown();} catch (Exception e) {System.err.println(e);}
+        try {this.renderer.shutdown(); if (viewport!=null)this.viewport.delete();} catch (Exception e) {System.err.println(e);}
         System.out.println("Renderer shut down");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}}
         System.out.println("Voxel core shut down");

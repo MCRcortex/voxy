@@ -5,6 +5,7 @@ import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
+import net.minecraft.block.Blocks;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
@@ -30,7 +31,7 @@ import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
 import static org.lwjgl.opengl.GL45C.glClearNamedBufferData;
 
-public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
+public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport> {
     private final Shader commandGen = Shader.make()
             .add(ShaderType.COMPUTE, "voxy:lod/gl46/cmdgen.comp")
             .compile();
@@ -49,15 +50,12 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
 
     private final GlBuffer glCommandBuffer;
     private final GlBuffer glCommandCountBuffer;
-    private final GlBuffer glVisibilityBuffer;
 
     public Gl46FarWorldRenderer(int geometryBuffer, int maxSections) {
         super(geometryBuffer, maxSections);
         this.glCommandBuffer = new GlBuffer(maxSections*5L*4 * 6);
         this.glCommandCountBuffer = new GlBuffer(4*2);
-        this.glVisibilityBuffer = new GlBuffer(maxSections*4L);
         glClearNamedBufferData(this.glCommandBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
-        glClearNamedBufferData(this.glVisibilityBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
         setupVao();
     }
 
@@ -72,7 +70,6 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.glCommandBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.glCommandCountBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.geometry.metaId());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.glVisibilityBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.models.getBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.models.getColourBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, this.lightDataBuffer.id);//Lighting LUT
@@ -85,12 +82,11 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
     // would be visible in the current viewport (if there are 2 viewports)
 
     //To fix the issue, need to make a viewport api, that independently tracks the frameId and has its own glVisibilityBuffer buffer
-    private int frameId;
-    private void updateUniformBuffer(Matrix4f projection, MatrixStack stack, double cx, double cy, double cz) {
+    private void updateUniformBuffer(Gl46Viewport viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, this.uniformBuffer.size());
 
-        var mat = new Matrix4f(projection).mul(stack.peek().getPositionMatrix());
-        var innerTranslation = new Vector3f((float) (cx-(this.sx<<5)), (float) (cy-(this.sy<<5)), (float) (cz-(this.sz<<5)));
+        var mat = new Matrix4f(viewport.projection).mul(viewport.modelView);
+        var innerTranslation = new Vector3f((float) (viewport.cameraX-(this.sx<<5)), (float) (viewport.cameraY-(this.sy<<5)), (float) (viewport.cameraZ-(this.sz<<5)));
         mat.translate(-innerTranslation.x, -innerTranslation.y, -innerTranslation.z);
         mat.getToAddress(ptr); ptr += 4*4*4;
         MemoryUtil.memPutInt(ptr, this.sx); ptr += 4;
@@ -102,10 +98,10 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
             plane.getToAddress(ptr); ptr += 4*4;
         }
         innerTranslation.getToAddress(ptr); ptr += 4*3;
-        MemoryUtil.memPutInt(ptr, this.frameId++); ptr += 4;
+        MemoryUtil.memPutInt(ptr, viewport.frameId++); ptr += 4;
     }
 
-    public void renderFarAwayOpaque(Matrix4f projection, MatrixStack stack, double cx, double cy, double cz) {
+    public void renderFarAwayOpaque(Gl46Viewport viewport) {
         if (this.geometry.getSectionCount() == 0) {
             return;
         }
@@ -123,11 +119,12 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         //RenderSystem.enableBlend();
         //RenderSystem.defaultBlendFunc();
 
-        this.updateUniformBuffer(projection, stack, cx, cy, cz);
+        this.updateUniformBuffer(viewport);
 
         UploadStream.INSTANCE.commit();
 
         glBindVertexArray(this.vao);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.visibilityBuffer.id);
 
 
         //Bind the texture atlas
@@ -215,6 +212,10 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         RenderLayer.getTranslucent().endDrawing();
     }
 
+    @Override
+    public Gl46Viewport createViewport() {
+        return new Gl46Viewport(this.maxSections);
+    }
 
     @Override
     public void shutdown() {
@@ -223,7 +224,6 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer {
         this.lodShader.free();
         this.cullShader.free();
         this.glCommandBuffer.free();
-        this.glVisibilityBuffer.free();
         this.glCommandCountBuffer.free();
     }
 

@@ -256,7 +256,7 @@ public class RenderDataFactory {
         }
 
         //if the model has a fluid state but is not a liquid need to see if the solid state had a face rendered and that face is occluding, if so, dont render the fluid state face
-        if (ModelManager.faceOccludes(metadata, face)) {
+        if ((!ModelManager.isFluid(metadata)) && ModelManager.faceOccludes(metadata, face)) {
             return false;
         }
 

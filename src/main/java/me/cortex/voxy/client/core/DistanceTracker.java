@@ -22,14 +22,16 @@ public class DistanceTracker {
     private final RenderTracker tracker;
     private final int minYSection;
     private final int maxYSection;
+    private final int renderDistance;
 
-    public DistanceTracker(RenderTracker tracker, int[] lodRingScales, int cacheLoadDistance, int cacheUnloadDistance) {
+    public DistanceTracker(RenderTracker tracker, int[] lodRingScales, int renderDistance, int cacheLoadDistance, int cacheUnloadDistance) {
         this.loDRings = new TransitionRing2D[lodRingScales.length];
         this.cacheLoadRings = new TransitionRing2D[lodRingScales.length];
         this.cacheUnloadRings = new TransitionRing2D[lodRingScales.length];
         this.tracker = tracker;
         this.minYSection = MinecraftClient.getInstance().world.getBottomSectionCoord()/2;//-128;
         this.maxYSection = MinecraftClient.getInstance().world.getTopSectionCoord()/2;//128;
+        this.renderDistance = renderDistance;
 
 
         //The rings 0+ start at 64 vanilla rd, no matter what the game is set at, that is if the game is set to 32 rd
