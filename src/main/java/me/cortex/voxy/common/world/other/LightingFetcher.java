@@ -17,7 +17,7 @@ import java.util.Map;
 public class LightingFetcher {
     //TODO: FIXME: I dont think the 2 codepaths are needed, just do what you do for starlight for vanilla and it should work just fine
 
-    private static boolean STARLIGHT_INSTALLED = FabricLoader.getInstance().isModLoaded("starlight");
+    private static final boolean STARLIGHT_INSTALLED = FabricLoader.getInstance().isModLoaded("starlight");
     private static void fetchLightingDataVanilla(Map<Long, Pair<ChunkNibbleArray, ChunkNibbleArray>> out, WorldChunk chunk) {
         var lp = chunk.getWorld().getLightingProvider();
         var blockLight = lp.get(LightType.BLOCK);
