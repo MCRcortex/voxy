@@ -11,6 +11,7 @@ import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11C;
 
 import static org.lwjgl.opengl.ARBComputeShader.glDispatchCompute;
+import static org.lwjgl.opengl.ARBCopyImage.glCopyImageSubData;
 import static org.lwjgl.opengl.ARBFramebufferObject.*;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glBindImageTexture;
 import static org.lwjgl.opengl.GL11.*;
@@ -24,12 +25,14 @@ import static org.lwjgl.opengl.GL30C.GL_R32F;
 import static org.lwjgl.opengl.GL43.GL_DEPTH_STENCIL_TEXTURE_MODE;
 import static org.lwjgl.opengl.GL44C.glBindImageTextures;
 import static org.lwjgl.opengl.GL45C.glBlitNamedFramebuffer;
+import static org.lwjgl.opengl.GL45C.glCopyTextureSubImage2D;
 
 public class PostProcessing {
     private final GlFramebuffer framebuffer;
     private int width;
     private int height;
     private GlTexture colour;
+    private GlTexture colourCopy;
     private GlTexture depthStencil;
 
     private final FullscreenBlit emptyBlit = new FullscreenBlit("voxy:post/noop.frag");
@@ -43,6 +46,7 @@ public class PostProcessing {
             .addCapability(GL_DEPTH_TEST)
             .addTexture(GL_TEXTURE0)
             .addTexture(GL_TEXTURE1)
+            .addTexture(GL_TEXTURE2)
             .build();
 
     public PostProcessing() {
@@ -54,11 +58,15 @@ public class PostProcessing {
             this.width = width;
             this.height = height;
             if (this.colour != null) {
+                if (this.colourCopy != null) {
+                    this.colourCopy.free();
+                }
                 this.colour.free();
                 this.depthStencil.free();
             }
 
             this.colour = new GlTexture().store(GL_RGBA8, 1, width, height);
+            this.colourCopy = new GlTexture().store(GL_RGBA8, 1, width, height);
             this.depthStencil = new GlTexture().store(GL_DEPTH24_STENCIL8, 1, width, height);
 
             this.framebuffer.bind(GL_COLOR_ATTACHMENT0, this.colour);
@@ -71,6 +79,7 @@ public class PostProcessing {
 
     public void shutdown() {
         this.framebuffer.free();
+        if (this.colourCopy != null) this.colourCopy.free();
         if (this.colour != null) this.colour.free();
         if (this.depthStencil != null) this.depthStencil.free();
         this.emptyBlit.delete();
@@ -115,20 +124,26 @@ public class PostProcessing {
     //Computes ssao on the current framebuffer data and updates it
     // this means that translucency wont be effected etc
     public void computeSSAO(Matrix4f projection, MatrixStack stack) {
+        glCopyImageSubData(this.colour.id, GL_TEXTURE_2D, 0, 0, 0, 0,
+                this.colourCopy.id, GL_TEXTURE_2D, 0, 0, 0, 0,
+                this.width, this.height, 1);
+
         this.ssaoComp.bind();
         float[] data = new float[4*4];
         var mat = new Matrix4f(projection).mul(stack.peek().getPositionMatrix());
         mat.get(data);
-        glUniformMatrix4fv(2, false, data);//MVP
+        glUniformMatrix4fv(3, false, data);//MVP
         mat.invert();
         mat.get(data);
-        glUniformMatrix4fv(3, false, data);//invMVP
+        glUniformMatrix4fv(4, false, data);//invMVP
 
         glBindImageTexture(0, this.colour.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
         //glBindImageTexture(1, this.depthStencil.id, 0, false,0, GL_READ_ONLY, GL_R32F);
         glActiveTexture(GL_TEXTURE1);
         GL11C.glBindTexture(GL_TEXTURE_2D, this.depthStencil.id);
         glTexParameteri (GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+        glActiveTexture(GL_TEXTURE2);
+        GL11C.glBindTexture(GL_TEXTURE_2D, this.colourCopy.id);
 
         glDispatchCompute((this.width+31)/32, (this.height+31)/32, 1);
     }

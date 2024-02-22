@@ -4,8 +4,9 @@ layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(binding = 0, rgba8) uniform restrict image2D colourTex;
 layout(binding = 1) uniform sampler2D depthTex;
-layout(location = 2) uniform mat4 MVP;
-layout(location = 3) uniform mat4 invMVP;
+layout(binding = 2) uniform sampler2D colourTexCpy;
+layout(location = 3) uniform mat4 MVP;
+layout(location = 4) uniform mat4 invMVP;
 
 vec3 rev3d(vec3 clip) {
     vec4 view = invMVP * vec4(clip*2.0-1.0,1.0);
@@ -20,6 +21,10 @@ vec4 reDeProject(vec3 pos) {
 
     float depth = texture(depthTex, UV).x;
     if (depth == 1.0f) {
+        return vec4(-1.0f);
+    }
+    uint meta = uint(255.0f*texture(colourTexCpy, UV).w);
+    if ((meta>>6)==0) {
         return vec4(-1.0f);
     }
     view.z = depth*2.0-1.0;
