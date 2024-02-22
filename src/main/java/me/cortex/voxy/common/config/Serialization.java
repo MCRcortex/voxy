@@ -106,6 +106,9 @@ public class Serialization {
             if (clzName.contains("mixin")) {
                 continue;//Dont want to load mixins
             }
+            if (clzName.contains("VoxyConfigScreenFactory")) {
+                continue;//Dont want to modmenu incase it doesnt exist
+            }
 
             if (clzName.equals(Serialization.class.getName())) {
                 continue;//Dont want to load ourselves
