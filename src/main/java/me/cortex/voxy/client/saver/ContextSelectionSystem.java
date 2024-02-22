@@ -4,17 +4,15 @@ import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.storage.compressors.ZSTDCompressor;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
-import me.cortex.voxy.common.storage.config.Serialization;
+import me.cortex.voxy.common.config.Serialization;
 import me.cortex.voxy.common.storage.config.StorageConfig;
 import me.cortex.voxy.common.storage.other.CompressionStorageAdaptor;
-import me.cortex.voxy.common.storage.other.TranslocatingStorageAdaptor;
 import me.cortex.voxy.common.storage.rocksdb.RocksDBStorageBackend;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.WorldSavePath;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

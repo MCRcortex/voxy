@@ -39,7 +39,7 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
             VoxyConfig.CONFIG.save();
         });
 
-        return builder.build();//ClothConfigDemo.getConfigBuilderWithDemo().build();
+        return builder.build();//
     }
 
     private static void addGeneralCategory(ConfigBuilder builder, VoxyConfig config) {

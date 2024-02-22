@@ -1,10 +1,8 @@
-package me.cortex.voxy.common.storage.config;
+package me.cortex.voxy.common.config;
 
 import com.google.gson.*;
-import com.google.gson.internal.bind.JsonTreeWriter;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 import net.fabricmc.loader.api.FabricLoader;
 
@@ -13,14 +11,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Method;
-import java.lang.reflect.Type;
+import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
 
 public class Serialization {
     public static final Set<Class<?>> CONFIG_TYPES = new HashSet<>();
@@ -93,21 +89,34 @@ public class Serialization {
     }
 
     static {
+        String BASE_SEARCH_PACKAGE = "me.cortex.voxy";
+
         Map<Class<?>, GsonConfigSerialization<?>> serializers = new HashMap<>();
 
         Set<String> clazzs = new LinkedHashSet<>();
         var path = FabricLoader.getInstance().getModContainer("voxy").get().getRootPaths().get(0);
-        clazzs.addAll(collectAllClasses(path, "me.cortex.voxy.common.storage"));
-        clazzs.addAll(collectAllClasses("me.cortex.voxy.common.storage"));
+        clazzs.addAll(collectAllClasses(path, BASE_SEARCH_PACKAGE));
+        clazzs.addAll(collectAllClasses(BASE_SEARCH_PACKAGE));
 
         outer:
         for (var clzName : clazzs) {
+            if (!clzName.toLowerCase().contains("config")) {
+                continue;//Only load classes that contain the word config
+            }
+            if (clzName.contains("mixin")) {
+                continue;//Dont want to load mixins
+            }
+
             if (clzName.equals(Serialization.class.getName())) {
                 continue;//Dont want to load ourselves
             }
 
             try {
                 var clz = Class.forName(clzName);
+                if (Modifier.isAbstract(clz.getModifiers())) {
+                    //Dont want to register abstract classes
+                    continue;
+                }
                 var original = clz;
                 while ((clz = clz.getSuperclass()) != null) {
                     if (CONFIG_TYPES.contains(clz)) {
