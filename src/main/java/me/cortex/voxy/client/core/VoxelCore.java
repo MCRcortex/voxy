@@ -57,6 +57,7 @@ public class VoxelCore {
 
     public VoxelCore(ContextSelectionSystem.Selection worldSelection) {
         this.world = worldSelection.createEngine();
+        var cfg = worldSelection.getConfig();
         System.out.println("Initializing voxy core");
 
         //Trigger the shared index buffer loading
@@ -73,8 +74,20 @@ public class VoxelCore {
 
         //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
         int q = VoxyConfig.CONFIG.qualityScale;
-        //TODO: add an option for cache load and unload distance
-        this.distanceTracker = new DistanceTracker(this.renderTracker, new int[]{q,q,q,q}, (VoxyConfig.CONFIG.renderDistance<0?VoxyConfig.CONFIG.renderDistance:((VoxyConfig.CONFIG.renderDistance+1)/2)), 3);
+        int minY = MinecraftClient.getInstance().world.getBottomSectionCoord()/2;
+        int maxY = MinecraftClient.getInstance().world.getTopSectionCoord()/2;
+
+        if (cfg.minYOverride != Integer.MAX_VALUE) {
+            minY = cfg.minYOverride;
+        }
+
+        if (cfg.maxYOverride != Integer.MIN_VALUE) {
+            maxY = cfg.maxYOverride;
+        }
+
+        this.distanceTracker = new DistanceTracker(this.renderTracker, new int[]{q,q,q,q},
+                (VoxyConfig.CONFIG.renderDistance<0?VoxyConfig.CONFIG.renderDistance:((VoxyConfig.CONFIG.renderDistance+1)/2)),
+                3, minY, maxY);
         System.out.println("Distance tracker initialized");
 
         this.postProcessing = new PostProcessing();

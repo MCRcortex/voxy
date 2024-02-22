@@ -23,13 +23,13 @@ public class DistanceTracker {
     private final int maxYSection;
     private final int renderDistance;
 
-    public DistanceTracker(RenderTracker tracker, int[] lodRingScales, int renderDistance, int cacheDistance) {
+    public DistanceTracker(RenderTracker tracker, int[] lodRingScales, int renderDistance, int cacheDistance, int minY, int maxY) {
         this.loDRings = new TransitionRing2D[lodRingScales.length];
         this.cacheLoadRings = new TransitionRing2D[lodRingScales.length];
         this.cacheUnloadRings = new TransitionRing2D[lodRingScales.length];
         this.tracker = tracker;
-        this.minYSection = MinecraftClient.getInstance().world.getBottomSectionCoord()/2;//-128;
-        this.maxYSection = MinecraftClient.getInstance().world.getTopSectionCoord()/2;//128;
+        this.minYSection = minY;
+        this.maxYSection = maxY;
         this.renderDistance = renderDistance;
 
 

@@ -22,11 +22,17 @@ import java.security.NoSuchAlgorithmException;
 //Sets up a world engine with respect to the world the client is currently loaded into
 // this is a bit tricky as each world has its own config, e.g. storage configuration
 public class ContextSelectionSystem {
+    public static class WorldConfig {
+        public int minYOverride = Integer.MAX_VALUE;
+        public int maxYOverride = Integer.MIN_VALUE;
+        public StorageConfig storageConfig;
+    }
+
     public static class Selection {
         private final Path selectionFolder;
         private final String worldId;
 
-        private StorageConfig storageConfig;
+        private WorldConfig config;
 
         public Selection(Path selectionFolder, String worldId) {
             this.selectionFolder = selectionFolder;
@@ -35,17 +41,18 @@ public class ContextSelectionSystem {
         }
 
         private void loadStorageConfigOrDefault() {
-            var json = this.selectionFolder.resolve("storage_config.json");
+            var json = this.selectionFolder.resolve("config.json");
 
             if (Files.exists(json)) {
                 try {
-                    this.storageConfig = Serialization.GSON.fromJson(Files.readString(json), StorageConfig.class);
+                    this.config = Serialization.GSON.fromJson(Files.readString(json), WorldConfig.class);
                     return;
                 } catch (Exception e) {
                     System.err.println("Failed to load the storage configuration file, resetting it to default");
                     e.printStackTrace();
                 }
             }
+            this.config = new WorldConfig();
 
             //Load the default config
             var baseDB = new RocksDBStorageBackend.Config();
@@ -57,7 +64,7 @@ public class ContextSelectionSystem {
             compression.delegate = baseDB;
             compression.compressor = compressor;
 
-            this.storageConfig = compression;
+            this.config.storageConfig = compression;
 
             this.save();
         }
@@ -67,18 +74,7 @@ public class ContextSelectionSystem {
             ctx.setProperty(ConfigBuildCtx.BASE_SAVE_PATH, this.selectionFolder.toString());
             ctx.setProperty(ConfigBuildCtx.WORLD_IDENTIFIER, this.worldId);
             ctx.pushPath(ConfigBuildCtx.DEFAULT_STORAGE_PATH);
-            return this.storageConfig.build(ctx);
-
-            /*
-            var translocator = new TranslocatingStorageAdaptor.Config();
-            translocator.delegate = compression;
-            translocator.transforms.add(new TranslocatingStorageAdaptor.BoxTransform(0,5,0, 200, 64, 200, 0, -5, 0));
-             */
-
-
-            //StorageBackend storage = new RocksDBStorageBackend(VoxyConfig.CONFIG.storagePath);
-            ////StorageBackend storage = new FragmentedStorageBackendAdaptor(new File(VoxyConfig.CONFIG.storagePath));
-            //return new CompressionStorageAdaptor(new ZSTDCompressor(VoxyConfig.CONFIG.savingCompressionLevel), storage);
+            return this.config.storageConfig.build(ctx);
         }
 
         public WorldEngine createEngine() {
@@ -89,13 +85,17 @@ public class ContextSelectionSystem {
         // or just have per world config, cause when creating the world engine doing the string substitution would
         // make it automatically select the right id
         public void save() {
-            var file = this.selectionFolder.resolve("storage_config.json");
-            var json = Serialization.GSON.toJson(this.storageConfig);
+            var file = this.selectionFolder.resolve("config.json");
+            var json = Serialization.GSON.toJson(this.config);
             try {
                 Files.writeString(file, json);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+        }
+
+        public WorldConfig getConfig() {
+            return this.config;
         }
     }
 
