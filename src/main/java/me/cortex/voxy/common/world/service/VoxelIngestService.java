@@ -4,13 +4,13 @@ import it.unimi.dsi.fastutil.Pair;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.common.world.other.LightingFetcher;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.LightType;
 import net.minecraft.world.chunk.ChunkNibbleArray;
 import net.minecraft.world.chunk.WorldChunk;
 import net.minecraft.world.chunk.light.LightStorage;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Semaphore;
@@ -79,8 +79,38 @@ public class VoxelIngestService {
         }
     }
 
+    private static void fetchLightingData(Map<Long, Pair<ChunkNibbleArray, ChunkNibbleArray>> out, WorldChunk chunk) {
+        var lightingProvider = chunk.getWorld().getLightingProvider();
+        var blp = lightingProvider.get(LightType.BLOCK);
+        var slp = lightingProvider.get(LightType.SKY);
+
+        int i = chunk.getBottomSectionCoord() - 1;
+        for (var section : chunk.getSectionArray()) {
+            i++;
+            if (section == null) continue;
+            if (section.isEmpty()) continue;
+            var pos = ChunkSectionPos.from(chunk.getPos(), i);
+            var bl = blp.getLightSection(pos);
+            if (!(bl == null || bl.isUninitialized())) {
+                bl = bl.copy();
+            } else {
+                bl = null;
+            }
+            var sl = slp.getLightSection(pos);
+            if (!(sl == null || sl.isUninitialized())) {
+                sl = sl.copy();
+            } else {
+                sl = null;
+            }
+            if (bl == null && sl == null) {
+                continue;
+            }
+            out.put(pos.asLong(), Pair.of(bl, sl));
+        }
+    }
+
     public void enqueueIngest(WorldChunk chunk) {
-        LightingFetcher.fetchLightingData(this.captureLightMap, chunk);
+        fetchLightingData(this.captureLightMap, chunk);
         this.ingestQueue.add(chunk);
         this.ingestCounter.release();
     }
