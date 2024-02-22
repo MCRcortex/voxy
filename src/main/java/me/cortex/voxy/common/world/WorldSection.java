@@ -1,20 +1,26 @@
 package me.cortex.voxy.common.world;
 
 
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 //Represents a loaded world section at a specific detail level
 // holds a 32x32x32 region of detail
 public final class WorldSection {
+    private static final int ARRAY_REUSE_CACHE_SIZE = 256;
+    private static final Deque<long[]> ARRAY_REUSE_CACHE = new ArrayDeque<>(1024);
+
+
     public final int lvl;
     public final int x;
     public final int y;
     public final int z;
     public final long key;
 
-    long[] data;
+    long[] data = null;
     private final ActiveSectionTracker tracker;
     public final AtomicBoolean inSaveQueue = new AtomicBoolean();
 
@@ -29,7 +35,14 @@ public final class WorldSection {
         this.key = WorldEngine.getWorldSectionId(lvl, x, y, z);
         this.tracker = tracker;
 
-        this.data = new long[32*32*32];
+        if (!ARRAY_REUSE_CACHE.isEmpty()) {
+            synchronized (ARRAY_REUSE_CACHE) {
+                this.data = ARRAY_REUSE_CACHE.poll();
+            }
+        }
+        if (this.data == null) {
+            this.data = new long[32 * 32 * 32];
+        }
     }
 
     @Override
@@ -73,6 +86,11 @@ public final class WorldSection {
         }
         boolean isFreed = witness == 1;
         if (isFreed) {
+            if (ARRAY_REUSE_CACHE.size() < ARRAY_REUSE_CACHE_SIZE) {
+                synchronized (ARRAY_REUSE_CACHE) {
+                    ARRAY_REUSE_CACHE.add(this.data);
+                }
+            }
             this.data = null;
         }
         return isFreed;

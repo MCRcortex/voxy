@@ -2,6 +2,9 @@ package me.cortex.voxy.common.world;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import me.cortex.voxy.common.util.VolatileHolder;
+import me.cortex.voxy.common.world.other.Mapper;
+
+import java.util.Arrays;
 
 public class ActiveSectionTracker {
     //Deserialize into the supplied section, returns true on success, false on failure
@@ -59,6 +62,10 @@ public class ActiveSectionTracker {
             if (nullOnEmpty && status == 1) {//If its air return null as stated, release the section aswell
                 section.release();
                 return null;
+            }
+            if (status == 1) {
+                //We need to set the data to air as it is undefined state
+                Arrays.fill(section.data, Mapper.AIR);
             }
             return section;
         } else {
