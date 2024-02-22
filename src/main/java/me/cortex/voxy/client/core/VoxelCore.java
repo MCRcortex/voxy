@@ -74,7 +74,7 @@ public class VoxelCore {
         //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
         int q = VoxyConfig.CONFIG.qualityScale;
         //TODO: add an option for cache load and unload distance
-        this.distanceTracker = new DistanceTracker(this.renderTracker, new int[]{q,q,q,q}, VoxyConfig.CONFIG.renderDistance/2, 6, 6);
+        this.distanceTracker = new DistanceTracker(this.renderTracker, new int[]{q,q,q,q}, (VoxyConfig.CONFIG.renderDistance<0?VoxyConfig.CONFIG.renderDistance:((VoxyConfig.CONFIG.renderDistance+1)/2)), 3);
         System.out.println("Distance tracker initialized");
 
         this.postProcessing = new PostProcessing();
@@ -182,6 +182,7 @@ public class VoxelCore {
         debug.add("Saving service tasks: " + this.world.savingService.getTaskCount());
         debug.add("Render service tasks: " + this.renderGen.getTaskCount());
         debug.add("Loaded cache sizes: " + Arrays.toString(this.world.getLoadedSectionCacheSizes()));
+        debug.add("Mesh cache count: " + this.renderGen.getMeshCacheCount());
         this.renderer.addDebugData(debug);
     }
 

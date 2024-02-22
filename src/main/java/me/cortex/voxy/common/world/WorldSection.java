@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 // holds a 32x32x32 region of detail
 public final class WorldSection {
     private static final int ARRAY_REUSE_CACHE_SIZE = 256;
+    //TODO: maybe just swap this to a ConcurrentLinkedDeque
     private static final Deque<long[]> ARRAY_REUSE_CACHE = new ArrayDeque<>(1024);
 
 

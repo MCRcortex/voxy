@@ -8,8 +8,6 @@ import me.cortex.voxy.client.core.rendering.RenderTracker;
 import me.cortex.voxy.client.core.util.RingUtil;
 import net.minecraft.client.MinecraftClient;
 
-import java.util.stream.IntStream;
-
 //Can use ring logic
 // i.e. when a player moves the rings of each lod change (how it was doing in the original attempt)
 // also have it do directional quad culling and rebuild the chunk if needed (this shouldent happen very often) (the reason is to significantly reduce draw calls)
@@ -19,12 +17,13 @@ public class DistanceTracker {
     private final TransitionRing2D[] loDRings;
     private final TransitionRing2D[] cacheLoadRings;
     private final TransitionRing2D[] cacheUnloadRings;
+    private final TransitionRing2D mostOuterNonClampedRing;
     private final RenderTracker tracker;
     private final int minYSection;
     private final int maxYSection;
     private final int renderDistance;
 
-    public DistanceTracker(RenderTracker tracker, int[] lodRingScales, int renderDistance, int cacheLoadDistance, int cacheUnloadDistance) {
+    public DistanceTracker(RenderTracker tracker, int[] lodRingScales, int renderDistance, int cacheDistance) {
         this.loDRings = new TransitionRing2D[lodRingScales.length];
         this.cacheLoadRings = new TransitionRing2D[lodRingScales.length];
         this.cacheUnloadRings = new TransitionRing2D[lodRingScales.length];
@@ -34,30 +33,87 @@ public class DistanceTracker {
         this.renderDistance = renderDistance;
 
 
+        boolean wasRdClamped = false;
         //The rings 0+ start at 64 vanilla rd, no matter what the game is set at, that is if the game is set to 32 rd
         // there will still be 32 chunks untill the first lod drop
         // if the game is set to 16, then there will be 48 chunks until the drop
         for (int i = 0; i < this.loDRings.length; i++) {
+            int scaleP = lodRingScales[i];
+            boolean isTerminatingRing = ((lodRingScales[i]+2)<<(1+i) >= renderDistance)&&renderDistance>0;
+            if (isTerminatingRing) {
+                scaleP = Math.max(renderDistance >> (1+i), 1);
+                wasRdClamped = true;
+            }
+            int scale = scaleP;
+
             //TODO: FIXME: check that the level shift is right when inc/dec
             int capRing = i;
-            this.loDRings[i] = new TransitionRing2D(6+i, lodRingScales[i], (x, z) -> this.dec(capRing+1, x, z), (x, z) -> this.inc(capRing+1, x, z));
+            this.loDRings[i] = new TransitionRing2D((isTerminatingRing?5:6)+i, isTerminatingRing?scale<<1:scale, (x, z) -> {
+                if (isTerminatingRing) {
+                    add(capRing, x, z);
+                } else
+                    this.dec(capRing+1, x, z);
+            }, (x, z) -> {
+                if (isTerminatingRing) {
+                    remove(capRing, x, z);
+                    //remove(capRing, (x<<1), (z<<1));
+                } else
+                    this.inc(capRing+1, x, z);
+            });
 
             //TODO:FIXME i think the radius is wrong and (lodRingScales[i]) needs to be (lodRingScales[i]<<1) since the transition ring (the thing above)
             // acts on LoD level + 1
 
             //TODO: check this is actually working lmao and make it generate parent level lods on the exit instead of entry so it looks correct when flying backwards
-            this.cacheLoadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheLoadDistance, (x, z) -> {
-                //When entering a cache ring, trigger a mesh op and inject into cache
-                for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
-                    this.tracker.addCache(capRing, x, y, z);
-                }
-            }, (x, z) -> {});
-            this.cacheUnloadRings[i] = new TransitionRing2D(5+i, (lodRingScales[i]<<1) + cacheUnloadDistance, (x, z) -> {}, (x, z) -> {
-                //When exiting the cache unload ring, tell the cache to dump whatever mesh it has cached and not add any mesh from that position
-                for (int y = this.minYSection>>capRing; y <= this.maxYSection>>capRing; y++) {
-                    this.tracker.removeCache(capRing, x, y, z);
+            if (!isTerminatingRing) {
+                //TODO: COMPLETLY REDO THE CACHING SYSTEM CAUSE THE LOGIC IS COMPLETLY INCORRECT
+                // we want basicly 2 rings offset by an amount such that when a position is near an lod transition point
+                // it will be meshed (both the higher and lower quality lods), enabling semless loading
+                // the issue is when to uncache these methods
+
+
+                /*
+                this.cacheLoadRings[i] = new TransitionRing2D(5 + i, (scale << 1) + cacheDistance, (x, z) -> {
+                    //When entering a cache ring, trigger a mesh op and inject into cache
+                    for (int y = this.minYSection >> capRing; y <= this.maxYSection >> capRing; y++) {
+                        this.tracker.addCache(capRing, x, y, z);
+                    }
+                }, (x, z) -> {
+                    int shift = capRing+1;
+                    if (shift <= this.loDRings.length) {
+                        for (int y = this.minYSection >> shift; y <= this.maxYSection >> shift; y++) {
+                            this.tracker.removeCache(shift, x>>1, y, z>>1);
+                        }
+                    }
+                });
+                this.cacheUnloadRings[i] = new TransitionRing2D(5 + i, Math.max(1, (scale << 1) + cacheDistance), (x, z) -> {
+                    int shift = capRing+1;
+                    if (shift <= this.loDRings.length) {
+                        for (int y = this.minYSection >> shift; y <= this.maxYSection >> shift; y++) {
+                            this.tracker.addCache(shift, x>>1, y, z>>1);
+                        }
+                    }
+                }, (x, z) -> {
+                    //When exiting the cache unload ring, tell the cache to dump whatever mesh it has cached and not add any mesh from that position
+                    for (int y = this.minYSection >> capRing; y <= this.maxYSection >> capRing; y++) {
+                        this.tracker.removeCache(capRing, x, y, z);
+                    }
+                });*/
+            }
+
+            if (isTerminatingRing) {
+                break;
+            }
+        }
+        if (!wasRdClamped) {
+            this.mostOuterNonClampedRing = new TransitionRing2D(5+this.loDRings.length, Math.max(renderDistance, 2048)>>this.loDRings.length, (x,z)->
+                    add(this.loDRings.length, x, z), (x,z)->{
+                if (renderDistance > 0) {
+                    remove(this.loDRings.length,x,z);
                 }
             });
+        } else {
+            this.mostOuterNonClampedRing = null;
         }
     }
 
@@ -73,6 +129,19 @@ public class DistanceTracker {
         }
     }
 
+    private void add(int lvl, int x, int z) {
+        for (int y = this.minYSection>>lvl; y <= this.maxYSection>>lvl; y++) {
+            this.tracker.add(lvl, x, y, z);
+        }
+    }
+
+    private void remove(int lvl, int x, int z) {
+        for (int y = this.minYSection>>lvl; y <= this.maxYSection>>lvl; y++) {
+            this.tracker.remove(lvl, x, y, z);
+            this.tracker.removeCache(lvl, x, y, z);
+        }
+    }
+
     //How it works is there are N ring zones (one zone for each lod boundary)
     // the transition zone is what determines what lods are rendered etc (and it biases higher lod levels cause its easier)
     // the transition zone is only ever checked when the player moves 1<<(4+lodlvl) blocks, its position is set
@@ -84,9 +153,14 @@ public class DistanceTracker {
             if (ring!=null)
                 ring.update(x, z);
         }
+        if (this.mostOuterNonClampedRing!=null)
+            this.mostOuterNonClampedRing.update(x, z);
+
         //Update in reverse order (biggest lod to smallest lod)
         for (int i = this.loDRings.length-1; -1<i; i-- ) {
-            this.loDRings[i].update(x, z);
+            var ring = this.loDRings[i];
+            if (ring != null)
+                ring.update(x, z);
         }
         for (var ring : this.cacheUnloadRings) {
             if (ring!=null)
@@ -109,18 +183,10 @@ public class DistanceTracker {
             if (ring != null)
                 ring.setCenter(x, z);
         }
+        if (this.mostOuterNonClampedRing!=null)
+            this.mostOuterNonClampedRing.setCenter(x, z);
 
         var thread = new Thread(()-> {
-            //Radius of chunks to enqueue
-            int SIZE = 128;
-            //Insert highest LOD level
-            for (int ox = -SIZE; ox <= SIZE; ox++) {
-                for (int oz = -SIZE; oz <= SIZE; oz++) {
-                    this.inc(4, (x >> (5 + this.loDRings.length)) + ox, (z >> (5 + this.loDRings.length)) + oz);
-                }
-            }
-
-
             for (var ring : this.cacheLoadRings) {
                 if (ring != null)
                     ring.fill(x, z);
@@ -130,6 +196,14 @@ public class DistanceTracker {
                 if (ring != null)
                     ring.fill(x, z);
             }
+
+            //This is an ungodly terrible hack to make the lods load in a semi ok order
+            for (var ring : this.loDRings)
+                if (ring != null)
+                    ring.fill(x, z);
+
+            if (this.mostOuterNonClampedRing!=null)
+                this.mostOuterNonClampedRing.fill(x, z);
 
             for (int i = this.loDRings.length - 1; 0 <= i; i--) {
                 if (this.loDRings[i] != null) {

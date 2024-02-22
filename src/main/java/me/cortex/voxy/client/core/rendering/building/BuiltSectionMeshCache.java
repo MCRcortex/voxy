@@ -62,4 +62,8 @@ public class BuiltSectionMeshCache {
             }
         }
     }
+
+    public int getCount() {
+        return this.renderCache.size();
+    }
 }

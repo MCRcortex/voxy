@@ -150,6 +150,15 @@ public class RenderTracker {
         this.renderGen.unmarkCache(lvl, x, y, z);
     }
 
+    public void remove(int lvl, int x, int y, int z) {
+        this.remove(WorldEngine.getWorldSectionId(lvl, x, y, z));
+        this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl, x, y, z)));
+    }
+
+    public void add(int lvl, int x, int y, int z) {
+        this.put(WorldEngine.getWorldSectionId(lvl, x, y, z));
+        this.renderGen.enqueueTask(lvl, x, y, z, this::shouldStillBuild);
+    }
 
 
     //Called by the world engine when a section gets dirtied

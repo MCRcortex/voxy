@@ -14,6 +14,7 @@ import java.util.function.ToIntFunction;
 
 //TODO: Add a render cache
 public class RenderGenerationService {
+
     public interface TaskChecker {boolean check(int lvl, int x, int y, int z);}
     private record BuildTask(Supplier<WorldSection> sectionSupplier) {}
 
@@ -82,6 +83,10 @@ public class RenderGenerationService {
         }
     }
 
+    public int getMeshCacheCount() {
+        return this.meshCache.getCount();
+    }
+
     //TODO: Add a priority system, higher detail sections must always be updated before lower detail
     // e.g. priorities NONE->lvl0 and lvl1 -> lvl0 over lvl0 -> lvl1
 
@@ -101,6 +106,7 @@ public class RenderGenerationService {
     public void enqueueTask(int lvl, int x, int y, int z) {
         this.enqueueTask(lvl, x, y, z, (l,x1,y1,z1)->true);
     }
+
 
     public void enqueueTask(int lvl, int x, int y, int z, TaskChecker checker) {
         long ikey = WorldEngine.getWorldSectionId(lvl, x, y, z);

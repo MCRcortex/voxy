@@ -88,16 +88,17 @@ public class GeometryManager {
                     long ptr = UploadStream.INSTANCE.upload(this.sectionMetaBuffer, (long)SECTION_METADATA_SIZE * id, SECTION_METADATA_SIZE);
                     meta.writeMetadata(ptr);
                 } else {
-                    //Add to the end of the array
-                    id = this.sectionCount++;
-                    this.pos2id.put(result.position, id);
-                    this.id2pos.add(result.position);
-
                     //Create the new meta
                     var meta = this.createMeta(result);
                     if (meta == null) {
                         continue;
                     }
+
+                    //Add to the end of the array
+                    id = this.sectionCount++;
+                    this.pos2id.put(result.position, id);
+                    this.id2pos.add(result.position);
+
                     this.sectionMetadata.add(meta);
                     long ptr = UploadStream.INSTANCE.upload(this.sectionMetaBuffer, (long)SECTION_METADATA_SIZE * id, SECTION_METADATA_SIZE);
                     meta.writeMetadata(ptr);
