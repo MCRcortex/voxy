@@ -49,7 +49,7 @@ public class VoxelCore {
     private final RenderTracker renderTracker;
 
     private final AbstractFarWorldRenderer renderer;
-    private Viewport viewport;
+    private final ViewportSelector viewportSelector;
     private final PostProcessing postProcessing;
 
     //private final Thread shutdownThread = new Thread(this::shutdown);
@@ -62,7 +62,7 @@ public class VoxelCore {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         this.renderer = new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-        this.viewport = this.renderer.createViewport();
+        this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
         System.out.println("Renderer initialized");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
@@ -155,12 +155,13 @@ public class VoxelCore {
         //fb.bind();
 
         var projection = computeProjectionMat();
-        this.viewport.setProjection(projection).setModelView(matrices.peek().getPositionMatrix()).setCamera(cameraX, cameraY, cameraZ);
+        var viewport = this.viewportSelector.getViewport();
+        viewport.setProjection(projection).setModelView(matrices.peek().getPositionMatrix()).setCamera(cameraX, cameraY, cameraZ);
 
         int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);
 
-        this.renderer.renderFarAwayOpaque(this.viewport);
+        this.renderer.renderFarAwayOpaque(viewport);
 
         //Compute the SSAO of the rendered terrain
         this.postProcessing.computeSSAO(projection, matrices);
@@ -199,7 +200,7 @@ public class VoxelCore {
         System.out.println("Render gen shut down");
         try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
         System.out.println("World engine shut down");
-        try {this.renderer.shutdown(); if (viewport!=null)this.viewport.delete();} catch (Exception e) {System.err.println(e);}
+        try {this.renderer.shutdown(); this.viewportSelector.free();} catch (Exception e) {System.err.println(e);}
         System.out.println("Renderer shut down");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}}
         System.out.println("Voxel core shut down");
