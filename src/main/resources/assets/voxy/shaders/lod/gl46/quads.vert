@@ -49,7 +49,8 @@ void main() {
     uint modelId = extractStateId(quad);
     BlockModel model = modelData[modelId];
     uint faceData = model.faceData[face];
-
+    bool hasAO = modelHasMipmaps(model);//TODO: replace with per face AO flag
+    bool isShaded = hasAO;//TODO: make this a per face flag
     //Change the ordering due to backface culling
     //NOTE: when rendering, backface culling is disabled as we simply dispatch calls for each face
     // this has the advantage of having "unassigned" geometry, that is geometry where the backface isnt culled
@@ -120,16 +121,21 @@ void main() {
         uint encodedData = 0;
         encodedData |= face;
         encodedData |= (lodLevel<<3);
-        encodedData |= uint(modelHasMipmaps(model))<<6;//TODO: add if the face has AO as a face property instead of just using if it has mipmaps
+        encodedData |= uint(hasAO)<<6;
         addin.w = float(encodedData)/255.0;
     }
 
     //Apply face tint
-    if ((face>>1) == 0) {
-        tinting.xyz *= 1.0;
-    } else if ((face>>1) == 1) {
-        tinting.xyz *= 0.8;
-    } else {
-        tinting.xyz *= 0.6;
+    if (isShaded) {
+        if ((face>>1) == 1) {
+            tinting.xyz *= 0.8f;
+        } else if ((face>>1) == 2) {
+            tinting.xyz *= 0.6f;
+        } else if (face == 0){
+            tinting.xyz *= 0.5f;
+        } else {
+            //TODO: FIXME: DONT HAVE SOME ARBITARY TINT LIKE THIS
+            tinting.xyz *= 0.95f;
+        }
     }
 }

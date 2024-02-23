@@ -57,15 +57,15 @@ public class ActiveSectionTracker {
                 System.err.println("Unable to load section " + section.key + " setting to air");
                 status = 1;
             }
+            if (status == 1) {
+                //We need to set the data to air as it is undefined state
+                Arrays.fill(section.data, Mapper.AIR);
+            }
             section.acquire();
             holder.obj = section;
             if (nullOnEmpty && status == 1) {//If its air return null as stated, release the section aswell
                 section.release();
                 return null;
-            }
-            if (status == 1) {
-                //We need to set the data to air as it is undefined state
-                Arrays.fill(section.data, Mapper.AIR);
             }
             return section;
         } else {

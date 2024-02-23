@@ -117,7 +117,7 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
                 var update = this.blockStateUpdates.pop();
                 this.models.addEntry(update.id, update.state);
             }
-            //this.models.bakery.renderFaces(Blocks.LAVA.getDefaultState(), 1234, true);
+            //this.models.bakery.renderFaces(Blocks.ROSE_BUSH.getDefaultState(), 1234, false);
         }
 
         //TODO: fix this in a better way than this ungodly hacky stuff
