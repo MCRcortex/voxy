@@ -24,6 +24,7 @@ import static org.lwjgl.opengl.GL45C.glBlitNamedFramebuffer;
 
 public class PostProcessing {
     private final GlFramebuffer framebuffer;
+    private final GlFramebuffer framebufferSSAO;
     private int width;
     private int height;
     private GlTexture colour;
@@ -46,6 +47,7 @@ public class PostProcessing {
 
     public PostProcessing() {
         this.framebuffer = new GlFramebuffer();
+        this.framebufferSSAO = new GlFramebuffer();
     }
 
     public void setSize(int width, int height) {
@@ -67,6 +69,10 @@ public class PostProcessing {
             this.framebuffer.bind(GL_COLOR_ATTACHMENT0, this.colour);
             this.framebuffer.bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthStencil);
             this.framebuffer.verify();
+
+            this.framebufferSSAO.bind(GL_COLOR_ATTACHMENT0, this.colourSSAO);
+            this.framebufferSSAO.bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthStencil);
+            this.framebufferSSAO.verify();
         }
     }
 
@@ -74,6 +80,7 @@ public class PostProcessing {
 
     public void shutdown() {
         this.framebuffer.free();
+        this.framebufferSSAO.free();
         if (this.colourSSAO != null) this.colourSSAO.free();
         if (this.colour != null) this.colour.free();
         if (this.depthStencil != null) this.depthStencil.free();
@@ -139,6 +146,8 @@ public class PostProcessing {
         GL11C.glBindTexture(GL_TEXTURE_2D, this.colour.id);
 
         glDispatchCompute((this.width+31)/32, (this.height+31)/32, 1);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, this.framebufferSSAO.id);
     }
 
 
