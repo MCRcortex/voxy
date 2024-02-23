@@ -6,6 +6,7 @@ import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.service.SectionSavingService;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.common.storage.StorageBackend;
+import net.minecraft.world.chunk.WorldChunk;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.Arrays;
@@ -17,6 +18,8 @@ public class WorldEngine {
     public final StorageBackend storage;
     private final Mapper mapper;
     private final ActiveSectionTracker sectionTracker;
+    //TODO: maybe move this out of WorldEngine
+    //TODO: Split up into ingester and update applicator,
     public final VoxelIngestService ingestService;
     public final SectionSavingService savingService;
     private Consumer<WorldSection> dirtyCallback;
