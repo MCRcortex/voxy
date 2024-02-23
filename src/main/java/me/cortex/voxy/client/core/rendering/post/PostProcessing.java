@@ -21,6 +21,7 @@ import static org.lwjgl.opengl.GL20C.glGetUniformfv;
 import static org.lwjgl.opengl.GL43.GL_DEPTH_STENCIL_TEXTURE_MODE;
 import static org.lwjgl.opengl.GL44C.glBindImageTextures;
 import static org.lwjgl.opengl.GL45C.glBlitNamedFramebuffer;
+import static org.lwjgl.opengl.GL45C.glTextureParameterf;
 
 public class PostProcessing {
     private final GlFramebuffer framebuffer;
@@ -65,6 +66,11 @@ public class PostProcessing {
             this.colour = new GlTexture().store(GL_RGBA8, 1, width, height);
             this.colourSSAO = new GlTexture().store(GL_RGBA8, 1, width, height);
             this.depthStencil = new GlTexture().store(GL_DEPTH24_STENCIL8, 1, width, height);
+
+            glTextureParameterf(this.colour.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTextureParameterf(this.colour.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTextureParameterf(this.colourSSAO.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTextureParameterf(this.colourSSAO.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
             this.framebuffer.bind(GL_COLOR_ATTACHMENT0, this.colour);
             this.framebuffer.bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthStencil);
