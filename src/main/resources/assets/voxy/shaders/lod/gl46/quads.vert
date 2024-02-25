@@ -49,6 +49,7 @@ void main() {
     uint modelId = extractStateId(quad);
     BlockModel model = modelData[modelId];
     uint faceData = model.faceData[face];
+    bool isTranslucent = modelIsTranslucent(model);
     bool hasAO = modelHasMipmaps(model);//TODO: replace with per face AO flag
     bool isShaded = hasAO;//TODO: make this a per face flag
     //Change the ordering due to backface culling
@@ -115,7 +116,7 @@ void main() {
     }
 
     addin = vec4(0.0);
-    if (!modelIsTranslucent(model)) {
+    if (!isTranslucent) {
         tinting.w = 0.0;
         //Encode the face, the lod level and
         uint encodedData = 0;

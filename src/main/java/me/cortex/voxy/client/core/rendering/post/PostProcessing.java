@@ -21,9 +21,11 @@ import static org.lwjgl.opengl.GL20C.glGetUniformfv;
 import static org.lwjgl.opengl.GL43.GL_DEPTH_STENCIL_TEXTURE_MODE;
 import static org.lwjgl.opengl.GL44C.glBindImageTextures;
 import static org.lwjgl.opengl.GL45C.glBlitNamedFramebuffer;
+import static org.lwjgl.opengl.GL45C.glTextureParameterf;
 
 public class PostProcessing {
     private final GlFramebuffer framebuffer;
+    private final GlFramebuffer framebufferSSAO;
     private int width;
     private int height;
     private GlTexture colour;
@@ -46,6 +48,7 @@ public class PostProcessing {
 
     public PostProcessing() {
         this.framebuffer = new GlFramebuffer();
+        this.framebufferSSAO = new GlFramebuffer();
     }
 
     public void setSize(int width, int height) {
@@ -64,9 +67,20 @@ public class PostProcessing {
             this.colourSSAO = new GlTexture().store(GL_RGBA8, 1, width, height);
             this.depthStencil = new GlTexture().store(GL_DEPTH24_STENCIL8, 1, width, height);
 
+            glTextureParameterf(this.colour.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTextureParameterf(this.colour.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTextureParameterf(this.colourSSAO.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTextureParameterf(this.colourSSAO.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            //glTextureParameterf(this.depthStencil.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            //glTextureParameterf(this.depthStencil.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
             this.framebuffer.bind(GL_COLOR_ATTACHMENT0, this.colour);
             this.framebuffer.bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthStencil);
             this.framebuffer.verify();
+
+            this.framebufferSSAO.bind(GL_COLOR_ATTACHMENT0, this.colourSSAO);
+            this.framebufferSSAO.bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthStencil);
+            this.framebufferSSAO.verify();
         }
     }
 
@@ -74,6 +88,7 @@ public class PostProcessing {
 
     public void shutdown() {
         this.framebuffer.free();
+        this.framebufferSSAO.free();
         if (this.colourSSAO != null) this.colourSSAO.free();
         if (this.colour != null) this.colour.free();
         if (this.depthStencil != null) this.depthStencil.free();
@@ -139,6 +154,8 @@ public class PostProcessing {
         GL11C.glBindTexture(GL_TEXTURE_2D, this.colour.id);
 
         glDispatchCompute((this.width+31)/32, (this.height+31)/32, 1);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, this.framebufferSSAO.id);
     }
 
 
