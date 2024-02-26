@@ -12,6 +12,7 @@ layout(location = 2) out flat vec4 tinting;
 layout(location = 3) out flat vec4 addin;
 layout(location = 4) out flat uint flags;
 layout(location = 5) out flat vec4 conditionalTinting;
+//layout(location = 6) out flat vec4 solidColour;
 
 uint extractLodLevel() {
     return uint(gl_BaseInstance)>>27;
@@ -34,8 +35,12 @@ float getDepthOffset(uint faceData, uint face) {
 }
 
 vec2 getFaceSizeOffset(uint faceData, uint corner) {
+    float EPSILON = 0.001f;
     vec4 faceOffsetsSizes = extractFaceSizes(faceData);
-    return mix(faceOffsetsSizes.xz, -(1.0-faceOffsetsSizes.yw), bvec2(((corner>>1)&1u)==1, (corner&1u)==1));
+    //Expand the quads by a very small amount
+    faceOffsetsSizes.xz -= vec2(EPSILON);
+    faceOffsetsSizes.yw += vec2(EPSILON);
+    return mix(faceOffsetsSizes.xz, faceOffsetsSizes.yw-1.0f, bvec2(((corner>>1)&1u)==1, (corner&1u)==1));
 }
 
 //TODO: add a mechanism so that some quads can ignore backface culling
@@ -139,4 +144,7 @@ void main() {
             tinting.xyz *= 0.95f;
         }
     }
+
+
+    //solidColour = vec4(vec3(modelId&0xFu, (modelId>>4)&0xFu, (modelId>>8)&0xFu)*(1f/15f),1f);
 }
