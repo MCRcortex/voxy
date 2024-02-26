@@ -20,8 +20,15 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Serialization {
-    public static final Set<Class<?>> CONFIG_TYPES = new HashSet<>();
+    private static final Set<Class<?>> CONFIG_TYPES = new HashSet<>();
     public static final Gson GSON;
+
+    //TODO: should really replace with annotation processor
+    public static void register(Class<?> configClass) {
+        if (!CONFIG_TYPES.add(configClass)) {
+            throw new IllegalStateException("Class already registered: " + configClass);
+        }
+    }
 
     private static final class GsonConfigSerialization <T> implements TypeAdapterFactory {
         private final String typeField = "TYPE";
@@ -46,8 +53,15 @@ public class Serialization {
 
 
         private T deserialize(Gson gson, JsonElement json) {
-            var retype = this.name2type.get(json.getAsJsonObject().remove(this.typeField).getAsString());
-            return gson.getDelegateAdapter(this, TypeToken.get(retype)).fromJsonTree(json);
+            try {
+                //I dont think we need to remove the type field;
+                var type = json.getAsJsonObject().get(this.typeField);
+                var retype = this.name2type.get(type.getAsString());
+                var delegate = gson.getDelegateAdapter(this, TypeToken.get(retype));
+                return delegate.fromJsonTree(json);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to deserialize json: " + json, e);
+            }
         }
 
         private JsonElement serialize(Gson gson, T value) {
@@ -118,6 +132,7 @@ public class Serialization {
                     continue;
                 }
                 var original = clz;
+                boolean registeredOnce = false;
                 while ((clz = clz.getSuperclass()) != null) {
                     if (CONFIG_TYPES.contains(clz)) {
                         Method nameMethod = null;
@@ -132,8 +147,21 @@ public class Serialization {
                         String name = (String) nameMethod.invoke(null);
                         serializers.computeIfAbsent(clz, GsonConfigSerialization::new)
                                 .register(name, (Class) original);
-                        System.out.println("Registered " + original.getSimpleName() + " as " + name + " for config type " + clz.getSimpleName());
-                        break;
+                        if (registeredOnce) {
+                            System.out.println("NOTE: Config is registered for multiple hierarchical classes");
+                        }
+                        var clName = original.getSimpleName();
+                        {
+                            var outer = original.getEnclosingClass();
+                            while (outer != null) {
+                                clName = original.getSimpleName() + "." + clName;
+                                outer = outer.getEnclosingClass();
+                            }
+                        }
+                        System.out.println("Registered " + clName + " as " + name + " for config type " + clz.getSimpleName());
+
+                        registeredOnce = true;
+                        //break;
                     }
                 }
             } catch (Exception e) {

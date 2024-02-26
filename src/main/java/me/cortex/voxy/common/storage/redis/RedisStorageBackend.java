@@ -2,7 +2,7 @@ package me.cortex.voxy.common.storage.redis;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.storage.StorageBackend;
-import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
 import org.lwjgl.system.MemoryUtil;
 import redis.clients.jedis.JedisPool;
@@ -148,7 +148,7 @@ public class RedisStorageBackend extends StorageBackend {
 
         @Override
         public StorageBackend build(ConfigBuildCtx ctx) {
-            return new RedisStorageBackend(this.host, this.port, ctx.substituteString(this.prefix));
+            return new RedisStorageBackend(this.host, this.port, ctx.resolveString(this.prefix));
         }
 
         public static String getConfigTypeName() {

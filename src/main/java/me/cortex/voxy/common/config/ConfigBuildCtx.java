@@ -1,18 +1,15 @@
-package me.cortex.voxy.common.storage.config;
+package me.cortex.voxy.common.config;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Stack;
+import java.util.*;
 
 public class ConfigBuildCtx {
     //List of tokens
     public static final String BASE_SAVE_PATH = "{base_save_path}";
     public static final String WORLD_IDENTIFIER = "{world_identifier}";
     public static final String DEFAULT_STORAGE_PATH = BASE_SAVE_PATH+"/"+WORLD_IDENTIFIER+"/storage/";
-
+    private static final Set<String> ALLOWED_PROPERTIES = new HashSet<>(List.of(BASE_SAVE_PATH, WORLD_IDENTIFIER));
 
     private final Map<String, String> properties = new HashMap<>();
     private final Stack<String> pathStack = new Stack<>();
@@ -24,6 +21,9 @@ public class ConfigBuildCtx {
      * @return the builder context
      */
     public ConfigBuildCtx setProperty(String property, String value) {
+        if (!ALLOWED_PROPERTIES.contains(property)) {
+            throw new IllegalArgumentException("Property not within the set of allowed properties");
+        }
         if (!(property.startsWith("{") && property.endsWith("}"))) {
             throw new IllegalArgumentException("Property name doesnt start with { and end with }");
         }
@@ -76,7 +76,7 @@ public class ConfigBuildCtx {
     }
 
     /**
-     * Resolves the current path stack recursively
+     * Resolves the current path stack recursively and then resolves all the properties
      * @return resolved path
      */
     public String resolvePath() {
@@ -89,19 +89,35 @@ public class ConfigBuildCtx {
                 path = concatPath(path, part);
             }
         } while (!prev.equals(path));
-        return path;
+        return this.resolveString(path);
     }
 
     /**
-     * Substitutes special tokens in the string the configured values
-     * @param string the string to substitute
-     * @return substituted string
+     * Continuously substitutes all the property tokens in the string with the property values
+     * @param string the string to resolve
+     * @param disallowProperties properties not to apply (e.g. BASE_SAVE_PATH)
+     * @return resolved string
      */
-    public String substituteString(String string) {
-        for (var entry : this.properties.entrySet()) {
-            string = string.replace(entry.getKey(), entry.getValue());
+    public String resolveString(String string, String... disallowProperties) {
+        Set<String> disallowSet = new HashSet<>(List.of(disallowProperties));
+        String cstr = null;
+        while (!string.equals(cstr)) {
+            cstr = string;
+            for (var entry : this.properties.entrySet()) {
+                if (disallowSet.contains(entry.getValue())) continue;
+                string = string.replace(entry.getKey(), entry.getValue());
+            }
         }
         return string;
+    }
+
+    /**
+     * Gets the raw property result requested or empty string if it doesnt exist
+     * @param property the property to get
+     * @return the raw property value
+     */
+    public String getRawProperty(String property) {
+        return this.properties.getOrDefault(property, "");
     }
 
     /**

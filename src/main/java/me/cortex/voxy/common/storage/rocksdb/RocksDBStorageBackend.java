@@ -2,7 +2,7 @@ package me.cortex.voxy.common.storage.rocksdb;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.storage.StorageBackend;
-import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
 import org.lwjgl.system.MemoryUtil;
 import org.rocksdb.*;
@@ -179,7 +179,7 @@ public class RocksDBStorageBackend extends StorageBackend {
     public static class Config extends StorageConfig {
         @Override
         public StorageBackend build(ConfigBuildCtx ctx) {
-            return new RocksDBStorageBackend(ctx.ensurePathExists(ctx.substituteString(ctx.resolvePath())));
+            return new RocksDBStorageBackend(ctx.ensurePathExists(ctx.resolvePath()));
         }
 
         public static String getConfigTypeName() {

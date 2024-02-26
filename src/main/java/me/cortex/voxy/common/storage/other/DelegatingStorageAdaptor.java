@@ -2,16 +2,11 @@ package me.cortex.voxy.common.storage.other;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.storage.StorageBackend;
-import me.cortex.voxy.common.storage.StorageCompressor;
-import me.cortex.voxy.common.storage.config.CompressorConfig;
-import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
-import me.cortex.voxy.common.storage.config.StorageConfig;
-import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.util.List;
 
-public class DelegatingStorageAdaptor extends StorageBackend {
+public abstract class DelegatingStorageAdaptor extends StorageBackend {
     protected final StorageBackend delegate;
     public DelegatingStorageAdaptor(StorageBackend delegate) {
         this.delegate = delegate;

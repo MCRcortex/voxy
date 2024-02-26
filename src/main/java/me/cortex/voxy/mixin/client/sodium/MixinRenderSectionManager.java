@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.mixin.sodium;
+package me.cortex.voxy.mixin.client.sodium;
 
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxelCore;

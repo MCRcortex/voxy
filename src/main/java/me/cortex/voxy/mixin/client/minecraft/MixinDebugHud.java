@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.mixin.minecraft;
+package me.cortex.voxy.mixin.client.minecraft;
 
 import me.cortex.voxy.client.core.IGetVoxelCore;
 import net.minecraft.client.MinecraftClient;

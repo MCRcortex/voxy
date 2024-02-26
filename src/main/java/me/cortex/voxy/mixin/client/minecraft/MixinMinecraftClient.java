@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.mixin.minecraft;
+package me.cortex.voxy.mixin.client.minecraft;
 
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.RunArgs;

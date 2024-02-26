@@ -1,12 +1,25 @@
 package me.cortex.voxy.server;
 
+import me.cortex.voxy.server.world.IVoxyWorldGetterSetter;
 import net.fabricmc.api.DedicatedServerModInitializer;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
-import net.fabricmc.fabric.impl.networking.server.ServerNetworkingImpl;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 
 public class VoxyServer implements DedicatedServerModInitializer {
     @Override
     public void onInitializeServer() {
+        //Setup a VoxyWorld on the loaded dimension
+        ServerWorldEvents.LOAD.register((server, world) -> {
+            System.err.println("aa");
+        });
+
+        //Teardown the VoxyWorld on the loaded dimension if it exists
+        ServerWorldEvents.UNLOAD.register((server, world) -> {
+            var voxy = ((IVoxyWorldGetterSetter)world).getVoxyWorld();
+            if (voxy != null) {
+                voxy.shutdown();
+                ((IVoxyWorldGetterSetter)world).setVoxyWorld(null);
+            }
+        });
     }
 }
 

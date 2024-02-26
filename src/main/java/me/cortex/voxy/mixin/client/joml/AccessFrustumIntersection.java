@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.mixin.joml;
+package me.cortex.voxy.mixin.client.joml;
 
 import org.joml.FrustumIntersection;
 import org.joml.Vector4f;

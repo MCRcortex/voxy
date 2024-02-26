@@ -1,8 +1,9 @@
 package me.cortex.voxy.common.storage.other;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import me.cortex.voxy.common.config.AbstractConfig;
 import me.cortex.voxy.common.storage.StorageBackend;
-import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
 
 import java.nio.ByteBuffer;
@@ -63,13 +64,8 @@ public class ReadonlyCachingAdaptor extends StorageBackend {
     }
 
     public static class Config extends StorageConfig {
-        public StorageConfig cache;
-        public StorageConfig onMiss;
-
-        @Override
-        public List<StorageConfig> getChildStorageConfigs() {
-            return List.of(this.cache, this.onMiss);
-        }
+        public AbstractConfig<StorageBackend> cache;
+        public AbstractConfig<StorageBackend> onMiss;
 
         @Override
         public StorageBackend build(ConfigBuildCtx ctx) {

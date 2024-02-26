@@ -1,13 +1,14 @@
 package me.cortex.voxy.client.saver;
 
 import me.cortex.voxy.client.config.VoxyConfig;
+import me.cortex.voxy.common.config.AbstractConfig;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.storage.compressors.ZSTDCompressor;
-import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.config.Serialization;
-import me.cortex.voxy.common.storage.config.StorageConfig;
 import me.cortex.voxy.common.storage.other.CompressionStorageAdaptor;
 import me.cortex.voxy.common.storage.rocksdb.RocksDBStorageBackend;
+import me.cortex.voxy.common.util.LevelHelper;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
@@ -25,7 +26,7 @@ public class ContextSelectionSystem {
     public static class WorldConfig {
         public int minYOverride = Integer.MAX_VALUE;
         public int maxYOverride = Integer.MIN_VALUE;
-        public StorageConfig storageConfig;
+        public AbstractConfig<StorageBackend> storageConfig;
     }
 
     public static class Selection {
@@ -128,27 +129,6 @@ public class ContextSelectionSystem {
         return basePath;
     }
 
-    private static String bytesToHex(byte[] hash) {
-        StringBuilder hexString = new StringBuilder(2 * hash.length);
-        for (byte b : hash) {
-            String hex = Integer.toHexString(0xff & b);
-            if (hex.length() == 1) {
-                hexString.append('0');
-            }
-            hexString.append(hex);
-        }
-        return hexString.toString();
-    }
-
-    private static String getWorldId(ClientWorld world) {
-        String data = world.getBiomeAccess().seed + world.getRegistryKey().toString();
-        try {
-            return bytesToHex(MessageDigest.getInstance("SHA-256").digest(data.getBytes())).substring(0, 32);
-        } catch (
-                NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     //The way this works is saves are segmented into base worlds, e.g. server ip, local save etc
     // these are then segmented into subsaves for different worlds within the parent
@@ -163,6 +143,6 @@ public class ContextSelectionSystem {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        return new Selection(path, getWorldId(world));
+        return new Selection(path, LevelHelper.getWorldId(world));
     }
 }

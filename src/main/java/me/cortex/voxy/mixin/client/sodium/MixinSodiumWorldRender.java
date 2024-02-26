@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.mixin.sodium;
+package me.cortex.voxy.mixin.client.sodium;
 
 import me.jellysquid.mods.sodium.client.render.SodiumWorldRenderer;
 import net.minecraft.client.render.RenderLayer;

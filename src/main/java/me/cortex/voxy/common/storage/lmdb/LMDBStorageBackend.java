@@ -2,7 +2,7 @@ package me.cortex.voxy.common.storage.lmdb;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.storage.StorageBackend;
-import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.util.lmdb.MDBVal;
@@ -161,7 +161,7 @@ public class LMDBStorageBackend extends StorageBackend {
     public static class Config extends StorageConfig {
         @Override
         public StorageBackend build(ConfigBuildCtx ctx) {
-            return new LMDBStorageBackend(ctx.ensurePathExists(ctx.substituteString(ctx.resolvePath())));
+            return new LMDBStorageBackend(ctx.ensurePathExists(ctx.resolvePath()));
         }
 
         public static String getConfigTypeName() {

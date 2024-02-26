@@ -1,11 +1,10 @@
 package me.cortex.voxy.common.storage.other;
 
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import me.cortex.voxy.common.config.AbstractConfig;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.storage.StorageCompressor;
 import me.cortex.voxy.common.storage.config.CompressorConfig;
-import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
-import me.cortex.voxy.common.storage.config.StorageConfig;
+import me.cortex.voxy.common.config.ConfigBuildCtx;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -44,7 +43,7 @@ public class CompressionStorageAdaptor extends DelegatingStorageAdaptor {
     }
 
     public static class Config extends DelegateStorageConfig {
-        public CompressorConfig compressor;
+        public AbstractConfig<StorageCompressor> compressor;
 
         @Override
         public StorageBackend build(ConfigBuildCtx ctx) {

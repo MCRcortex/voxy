@@ -1,21 +1,25 @@
 {
   "required": true,
-  "package": "me.cortex.voxy.client.mixin",
+  "package": "me.cortex.voxy.mixin",
   "compatibilityLevel": "JAVA_17",
   "client": [
-    "joml.AccessFrustumIntersection",
-    "minecraft.MixinClientChunkManager",
-    "minecraft.MixinDebugHud",
-    "minecraft.MixinMinecraftClient",
-    "minecraft.MixinWorldRenderer",
-    "sodium.MixinSodiumWorldRender",
-    "sodium.MixinDefaultChunkRenderer",
-    "sodium.MixinRenderSectionManager",
-    "nvidium.MixinRenderPipeline"
+    "client.joml.AccessFrustumIntersection",
+    "client.minecraft.MixinClientChunkManager",
+    "client.minecraft.MixinDebugHud",
+    "client.minecraft.MixinMinecraftClient",
+    "client.minecraft.MixinWorldRenderer",
+    "client.nvidium.MixinRenderPipeline",
+    "client.sodium.MixinDefaultChunkRenderer",
+    "client.sodium.MixinRenderSectionManager",
+    "client.sodium.MixinSodiumWorldRender"
+  ],
+  "server": [
   ],
   "injectors": {
     "defaultRequire": 1
   },
   "mixins": [
+    "server.minecraft.MixinServerWorld",
+    "server.minecraft.MixinThreadedAnvilChunkStorage"
   ]
 }

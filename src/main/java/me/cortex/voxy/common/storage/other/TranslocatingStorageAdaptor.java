@@ -1,7 +1,8 @@
 package me.cortex.voxy.common.storage.other;
 
+import me.cortex.voxy.common.config.AbstractConfig;
 import me.cortex.voxy.common.storage.StorageBackend;
-import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
 import me.cortex.voxy.common.world.WorldEngine;
 
@@ -96,18 +97,12 @@ public class TranslocatingStorageAdaptor extends DelegatingStorageAdaptor {
     }
 
     public static class Config extends StorageConfig {
-        public StorageConfig delegate;
+        public AbstractConfig<StorageBackend> delegate;
         public List<BoxTransform> transforms = new ArrayList<>();
-
 
         @Override
         public StorageBackend build(ConfigBuildCtx ctx) {
             return new TranslocatingStorageAdaptor(this.delegate.build(ctx), this.transforms.toArray(BoxTransform[]::new));
-        }
-
-        @Override
-        public List<StorageConfig> getChildStorageConfigs() {
-            return List.of(this.delegate);
         }
 
         public static String getConfigTypeName() {

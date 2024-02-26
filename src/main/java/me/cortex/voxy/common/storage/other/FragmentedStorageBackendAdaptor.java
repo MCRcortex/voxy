@@ -3,8 +3,9 @@ package me.cortex.voxy.common.storage.other;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import me.cortex.voxy.common.config.AbstractConfig;
 import me.cortex.voxy.common.storage.StorageBackend;
-import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
 import net.minecraft.util.math.random.RandomSeed;
 
@@ -137,12 +138,7 @@ public class FragmentedStorageBackendAdaptor extends StorageBackend {
     }
 
     public static class Config extends StorageConfig {
-        public List<StorageConfig> backends = new ArrayList<>();
-
-        @Override
-        public List<StorageConfig> getChildStorageConfigs() {
-            return new ArrayList<>(this.backends);
-        }
+        public List<AbstractConfig<StorageBackend>> backends = new ArrayList<>();
 
         @Override
         public StorageBackend build(ConfigBuildCtx ctx) {

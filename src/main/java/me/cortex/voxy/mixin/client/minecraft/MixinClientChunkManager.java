@@ -1,8 +1,7 @@
-package me.cortex.voxy.client.mixin.minecraft;
+package me.cortex.voxy.mixin.client.minecraft;
 
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxelCore;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientChunkManager;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.math.ChunkPos;

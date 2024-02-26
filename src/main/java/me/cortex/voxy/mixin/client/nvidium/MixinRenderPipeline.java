@@ -1,10 +1,8 @@
-package me.cortex.voxy.client.mixin.nvidium;
+package me.cortex.voxy.mixin.client.nvidium;
 
 import me.cortex.nvidium.RenderPipeline;
-import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxelCore;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderMatrices;
-import me.jellysquid.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import me.jellysquid.mods.sodium.client.render.viewport.Viewport;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.util.math.MatrixStack;
