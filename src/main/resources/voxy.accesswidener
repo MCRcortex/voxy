@@ -9,6 +9,7 @@ accessible field net/minecraft/client/render/GameRenderer zoomY F
 accessible field net/minecraft/client/render/GameRenderer zoom F
 accessible field net/minecraft/client/world/ClientWorld worldRenderer Lnet/minecraft/client/render/WorldRenderer;
 accessible field net/minecraft/world/biome/source/BiomeAccess seed J
+accessible field net/minecraft/client/network/ClientPlayerInteractionManager networkHandler Lnet/minecraft/client/network/ClientPlayNetworkHandler;
 
 accessible class net/minecraft/client/render/RenderLayer$MultiPhase
 accessible class net/minecraft/client/render/RenderLayer$MultiPhaseParameters
