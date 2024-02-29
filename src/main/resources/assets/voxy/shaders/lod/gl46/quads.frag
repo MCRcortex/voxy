@@ -10,10 +10,12 @@ layout(location = 2) in flat vec4 tinting;
 layout(location = 3) in flat vec4 addin;
 layout(location = 4) in flat uint flags;
 layout(location = 5) in flat vec4 conditionalTinting;
+//layout(location = 6) in flat vec4 solidColour;
 
 layout(location = 0) out vec4 outColour;
 void main() {
     vec2 uv = mod(uv, vec2(1.0))*(1.0/(vec2(3.0,2.0)*256.0));
+    //vec4 colour = solidColour;
     vec4 colour = texture(blockModelAtlas, uv + baseUV, ((flags>>1)&1u)*-4.0);
     if ((flags&1u) == 1 && colour.a <= 0.25f) {
         discard;
