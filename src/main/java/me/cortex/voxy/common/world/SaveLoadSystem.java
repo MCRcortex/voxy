@@ -12,7 +12,7 @@ public class SaveLoadSystem {
 
     public static ByteBuffer serialize(WorldSection section) {
         var data = section.copyData();
-        var compressed = new Short[data.length];
+        var compressed = new short[data.length];
         Long2ShortOpenHashMap LUT = new Long2ShortOpenHashMap();
         LongArrayList LUTVAL = new LongArrayList();
         for (int i = 0; i < data.length; i++) {
@@ -49,7 +49,6 @@ public class SaveLoadSystem {
         raw.limit(raw.position());
         raw.rewind();
 
-        //Compress into a key + data pallet format
         return raw;
     }
 
