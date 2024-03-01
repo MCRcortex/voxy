@@ -42,6 +42,7 @@ public class VoxyConfig {
         }
         return new VoxyConfig();
     }
+
     public void save() {
         //Unsafe, todo: fixme! needs to be atomic!
         try {

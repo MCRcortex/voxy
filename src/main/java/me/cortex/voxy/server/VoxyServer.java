@@ -1,25 +1,54 @@
 package me.cortex.voxy.server;
 
+import me.cortex.voxy.client.config.VoxyConfig;
+import me.cortex.voxy.common.config.Serialization;
 import me.cortex.voxy.server.world.IVoxyWorldGetterSetter;
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
+import net.fabricmc.loader.api.FabricLoader;
+
+import java.io.FileReader;
+import java.io.IOException;
+import java.nio.file.Files;
 
 public class VoxyServer implements DedicatedServerModInitializer {
+    private VoxyServerConfig config;
+
     @Override
     public void onInitializeServer() {
-        //Setup a VoxyWorld on the loaded dimension
-        ServerWorldEvents.LOAD.register((server, world) -> {
-            System.err.println("aa");
-        });
-
-        //Teardown the VoxyWorld on the loaded dimension if it exists
-        ServerWorldEvents.UNLOAD.register((server, world) -> {
-            var voxy = ((IVoxyWorldGetterSetter)world).getVoxyWorld();
-            if (voxy != null) {
-                voxy.shutdown();
-                ((IVoxyWorldGetterSetter)world).setVoxyWorld(null);
+        //Load voxy config
+        {
+            var path = FabricLoader.getInstance()
+                    .getConfigDir()
+                    .resolve("voxy-config.json");
+            if (Files.exists(path)) {
+                try (FileReader reader = new FileReader(path.toFile())) {
+                    this.config = Serialization.GSON.fromJson(reader, VoxyServerConfig.class);
+                } catch (
+                        IOException e) {
+                    System.err.println("Could not parse config");
+                    e.printStackTrace();
+                }
+            } else {
+                this.config = new VoxyServerConfig();
             }
-        });
+        }
+
+        {
+            //Setup a VoxyWorld on the loaded dimension
+            ServerWorldEvents.LOAD.register((server, world) -> {
+                System.err.println("aa");
+            });
+
+            //Teardown the VoxyWorld on the loaded dimension if it exists
+            ServerWorldEvents.UNLOAD.register((server, world) -> {
+                var voxy = ((IVoxyWorldGetterSetter) world).getVoxyWorld();
+                if (voxy != null) {
+                    voxy.shutdown();
+                    ((IVoxyWorldGetterSetter) world).setVoxyWorld(null);
+                }
+            });
+        }
     }
 }
 
