@@ -30,13 +30,19 @@ uint encodeLocalLodPos(uint detail, ivec3 pos) {
 
 //Note: if i want reverse indexing i need to use the index buffer offset to offset
 void writeCmd(uint idx, uint encodedPos, uint offset, uint quadCount) {
+    /*
     DrawCommand cmd;
     cmd.count = quadCount * 6;
     cmd.instanceCount = 1;
     cmd.firstIndex = 0;
     cmd.baseVertex = int(offset)<<2;
     cmd.baseInstance = encodedPos;
-    cmdBuffer[idx] = cmd;
+    cmdBuffer[idx] = cmd;*/
+    cmdBuffer[idx].count = quadCount * 6;
+    cmdBuffer[idx].instanceCount = 1;
+    cmdBuffer[idx].firstIndex = 0;
+    cmdBuffer[idx].baseVertex = int(offset)<<2;
+    cmdBuffer[idx].baseInstance = encodedPos;
 }
 
 void main() {

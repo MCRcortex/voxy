@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import net.minecraft.block.Blocks;
@@ -29,6 +30,7 @@ import static org.lwjgl.opengl.GL42.*;
 import static org.lwjgl.opengl.GL42.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
+import static org.lwjgl.opengl.GL45C.glBindTextureUnit;
 import static org.lwjgl.opengl.GL45C.glClearNamedBufferData;
 
 public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport> {
@@ -76,6 +78,20 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         glBindVertexArray(0);
     }
 
+    private void aaa() {
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.glCommandBuffer.id);
+        glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.glCommandCountBuffer.id);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometry.geometryId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.glCommandBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.glCommandCountBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.geometry.metaId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.models.getBufferId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.models.getColourBufferId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, this.lightDataBuffer.id);//Lighting LUT
+    }
+
     //FIXME: dont do something like this as it breaks multiviewport mods
     // the issue is that voxy expects the counter to be incremented by one each frame (the compute shader generating the commands)
     // checks `frameId - 1`, this means in a multiviewport, effectivly only the stuff that was marked visible by the last viewport
@@ -115,7 +131,6 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
 
 
         RenderLayer.getCutoutMipped().startDrawing();
-        int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
         //RenderSystem.enableBlend();
         //RenderSystem.defaultBlendFunc();
 
@@ -128,28 +143,35 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
 
 
         //Bind the texture atlas
-        glActiveTexture(GL_TEXTURE0);
-        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
         glBindSampler(0, this.models.getSamplerId());
-        glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
+        glBindTextureUnit(0, this.models.getTextureId());
 
         glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
         this.commandGen.bind();
+        aaa();
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.visibilityBuffer.id);
         glDispatchCompute((this.geometry.getSectionCount()+127)/128, 1, 1);
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_UNIFORM_BARRIER_BIT);
 
         this.lodShader.bind();
+        aaa();
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.visibilityBuffer.id);
         glDisable(GL_CULL_FACE);
         //glPointSize(10);
-        //glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
+        //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, Math.min((int) (this.geometry.getSectionCount()*4.4), 50), 0);
         glEnable(GL_CULL_FACE);
 
 
         /*
         glFinish();
-        DownloadStream.INSTANCE.download(this.glCommandCountBuffer, 0, 4, (ptr, siz) -> {
-            int cnt = MemoryUtil.memGetInt(ptr);
-            System.out.println(cnt);
+        DownloadStream.INSTANCE.download(this.glCommandBuffer, 0, 4*5, (ptr, siz) -> {
+            System.out.println("\n\nCMD:");
+            System.out.println("count: " + MemoryUtil.memGetInt(ptr));
+            System.out.println("instanceCount: " + MemoryUtil.memGetInt(ptr+4));
+            System.out.println("firstIndex: " + MemoryUtil.memGetInt(ptr+8));
+            System.out.println("baseVertex: " + MemoryUtil.memGetInt(ptr+12));
+            System.out.println("baseInstance: " + MemoryUtil.memGetInt(ptr+16));
         });
         DownloadStream.INSTANCE.commit();
         DownloadStream.INSTANCE.tick();
@@ -159,6 +181,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
 
         this.cullShader.bind();
+        aaa();
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.visibilityBuffer.id);
 
         glColorMask(false, false, false, false);
         glDepthMask(false);
@@ -174,8 +198,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
 
         glBindVertexArray(0);
         glBindSampler(0, 0);
-        GL11C.glBindTexture(GL_TEXTURE_2D, oldBoundTexture);
-        glActiveTexture(oldActiveTexture);
+        glBindTextureUnit(0, 0);
         RenderLayer.getCutoutMipped().endDrawing();
     }
 
@@ -200,6 +223,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
 
         glDepthMask(false);
         //glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 400_000 * 4 * 5, 4, this.geometry.getSectionCount(), 0);
+        //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 400_000 * 4 * 5, this.geometry.getSectionCount(), 0);
         glDepthMask(true);
 
         glEnable(GL_CULL_FACE);
