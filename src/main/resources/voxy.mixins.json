@@ -8,14 +8,19 @@
     "minecraft.MixinDebugHud",
     "minecraft.MixinMinecraftClient",
     "minecraft.MixinWorldRenderer",
-    "sodium.MixinSodiumWorldRender",
+    "nvidium.MixinRenderPipeline",
     "sodium.MixinDefaultChunkRenderer",
     "sodium.MixinRenderSectionManager",
-    "nvidium.MixinRenderPipeline"
+    "sodium.MixinSodiumWorldRender"
   ],
   "injectors": {
     "defaultRequire": 1
   },
   "mixins": [
+    "iris.MixinProgramGroup",
+    "iris.MixinProgramId",
+    "iris.MixinProgramSet",
+    "iris.ProgramGroupAccessor",
+    "iris.ProgramIdAccessor"
   ]
 }

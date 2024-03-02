@@ -3,12 +3,12 @@ package me.cortex.voxy.client.core.rendering;
 import org.joml.Matrix4f;
 
 public abstract class Viewport {
-    int frameId;
-    Matrix4f projection;
-    Matrix4f modelView;
-    double cameraX;
-    double cameraY;
-    double cameraZ;
+    public int frameId;
+    public Matrix4f projection;
+    public Matrix4f modelView;
+    public double cameraX;
+    public double cameraY;
+    public double cameraZ;
 
     public abstract void delete();
 
