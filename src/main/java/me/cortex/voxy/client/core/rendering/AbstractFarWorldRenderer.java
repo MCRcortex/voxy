@@ -59,6 +59,8 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
 
     private final List<T> viewports = new ArrayList<>();
 
+    protected IntArrayList updatedSectionIds;
+
     private final ConcurrentLinkedDeque<Mapper.StateEntry> blockStateUpdates = new ConcurrentLinkedDeque<>();
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeUpdates = new ConcurrentLinkedDeque<>();
     public AbstractFarWorldRenderer(int geometrySize, int maxSections) {
@@ -96,7 +98,7 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
         }
 
         //Upload any new geometry
-        this.geometry.uploadResults();
+        this.updatedSectionIds = this.geometry.uploadResults();
         {
             boolean didHaveBiomeChange = false;
 

@@ -29,8 +29,8 @@ import static org.lwjgl.opengl.GL42.*;
 import static org.lwjgl.opengl.GL42.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
-import static org.lwjgl.opengl.GL45C.glBindTextureUnit;
-import static org.lwjgl.opengl.GL45C.glClearNamedBufferData;
+import static org.lwjgl.opengl.GL45.glBindTextureUnit;
+import static org.lwjgl.opengl.GL45.glClearNamedBufferData;
 
 public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport> {
     private final Shader commandGen = Shader.make()
@@ -102,6 +102,13 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
     public void renderFarAwayOpaque(Gl46Viewport viewport) {
         if (this.geometry.getSectionCount() == 0) {
             return;
+        }
+
+        {//Mark all of the updated sections as being visible from last frame
+            for (int id : this.updatedSectionIds) {
+                long ptr = UploadStream.INSTANCE.upload(viewport.visibilityBuffer, id * 4L, 4);
+                MemoryUtil.memPutInt(ptr, viewport.frameId - 1);//(visible from last frame)
+            }
         }
 
         glDisable(GL_BLEND);
