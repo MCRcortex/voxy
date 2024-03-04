@@ -39,7 +39,7 @@ import static org.lwjgl.opengl.GL30.*;
 
 //Todo: tinker with having the compute shader where each thread is a position to render? maybe idk
 public abstract class AbstractFarWorldRenderer <T extends Viewport> {
-    protected final int vao = glGenVertexArrays();
+    public static final int STATIC_VAO = glGenVertexArrays();
 
     protected final GlBuffer uniformBuffer;
     protected final GeometryManager geometry;
@@ -64,8 +64,6 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
         this.geometry = new GeometryManager(geometrySize*8L, maxSections);
         this.models = new ModelManager(16);
     }
-
-    protected abstract void setupVao();
 
     public void setupRender(Frustum frustum, Camera camera) {
         this.frustum = frustum.frustumIntersection;
@@ -126,7 +124,7 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
 
     public abstract void renderFarAwayOpaque(T viewport);
 
-    public abstract void renderFarAwayTranslucent();
+    public abstract void renderFarAwayTranslucent(T viewport);
 
     public void enqueueResult(BuiltSection result) {
         this.geometry.enqueueResult(result);
@@ -145,7 +143,6 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
     }
 
     public void shutdown() {
-        glDeleteVertexArrays(this.vao);
         this.models.free();
         this.geometry.free();
         this.uniformBuffer.free();

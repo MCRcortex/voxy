@@ -180,7 +180,7 @@ public class VoxelCore {
         this.postProcessing.computeSSAO(projection, matrices);
 
         //We can render the translucent directly after as it is the furthest translucent objects
-        this.renderer.renderFarAwayTranslucent();
+        this.renderer.renderFarAwayTranslucent(viewport);
 
 
         this.postProcessing.renderPost(projection, RenderSystem.getProjectionMatrix(), boundFB);
