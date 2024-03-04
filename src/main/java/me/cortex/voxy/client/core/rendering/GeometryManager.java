@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.rendering;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -21,6 +22,7 @@ public class GeometryManager {
     private final Long2IntOpenHashMap pos2id = new Long2IntOpenHashMap();
     private final LongArrayList id2pos = new LongArrayList();
     private final ObjectArrayList<SectionMeta> sectionMetadata = new ObjectArrayList<>();
+    private final IntArrayList markSectionIds = new IntArrayList();//Section ids to mark as visible (either due to being new, or swapping)
 
     private final GlBuffer sectionMetaBuffer;
     private final BufferArena geometryBuffer;
@@ -31,7 +33,8 @@ public class GeometryManager {
         this.pos2id.defaultReturnValue(-1);
     }
 
-    void uploadResults() {
+    IntArrayList uploadResults() {
+        this.markSectionIds.clear();
         while (!this.buildResults.isEmpty()) {
             var result = this.buildResults.pop();
             boolean isDelete = result.geometryBuffer == null;
@@ -66,6 +69,7 @@ public class GeometryManager {
                         }
                         long ptr = UploadStream.INSTANCE.upload(this.sectionMetaBuffer, (long) SECTION_METADATA_SIZE * id, SECTION_METADATA_SIZE);
                         swapMeta.writeMetadata(ptr);
+                        this.markSectionIds.add(id);
                     }
                 }
             } else {
@@ -102,6 +106,7 @@ public class GeometryManager {
                     this.sectionMetadata.add(meta);
                     long ptr = UploadStream.INSTANCE.upload(this.sectionMetaBuffer, (long)SECTION_METADATA_SIZE * id, SECTION_METADATA_SIZE);
                     meta.writeMetadata(ptr);
+                    this.markSectionIds.add(id);
                 }
             }
 
@@ -112,6 +117,7 @@ public class GeometryManager {
 
             result.free();
         }
+        return this.markSectionIds;
     }
 
     public void enqueueResult(BuiltSection sectionGeometry) {

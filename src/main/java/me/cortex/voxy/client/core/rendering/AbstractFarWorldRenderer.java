@@ -4,6 +4,7 @@ package me.cortex.voxy.client.core.rendering;
 // could maybe tosomething else
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
@@ -23,6 +24,7 @@ import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -54,6 +56,8 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
     protected int sz;
 
     protected FrustumIntersection frustum;
+
+    private final List<T> viewports = new ArrayList<>();
 
     private final ConcurrentLinkedDeque<Mapper.StateEntry> blockStateUpdates = new ConcurrentLinkedDeque<>();
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeUpdates = new ConcurrentLinkedDeque<>();
@@ -153,5 +157,15 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
         return this.models;
     }
 
-    public abstract T createViewport();
+    public final T createViewport() {
+        var viewport = createViewport0();
+        this.viewports.add(viewport);
+        return viewport;
+    }
+
+    final void removeViewport(T viewport) {
+        this.viewports.remove(viewport);
+    }
+
+    protected abstract T createViewport0();
 }

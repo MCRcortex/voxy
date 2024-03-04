@@ -207,9 +207,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         RenderLayer.getTranslucent().endDrawing();
     }
 
-    @Override
-    public Gl46Viewport createViewport() {
-        return new Gl46Viewport(this.maxSections);
+    protected Gl46Viewport createViewport0() {
+        return new Gl46Viewport(this, this.maxSections);
     }
 
     @Override
