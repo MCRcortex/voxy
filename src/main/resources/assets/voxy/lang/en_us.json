@@ -17,6 +17,8 @@
   "voxy.config.general.maxSections.tooltip": "The max number of sections the renderer can contain",
   "voxy.config.general.renderDistance": "Render Distance",
   "voxy.config.general.renderDistance.tooltip": "The render distance in chunks (set to -1 to disable chunk unloading)",
+  "voxy.config.general.nvmesh": "Use nvidia mesh shaders",
+  "voxy.config.general.nvmesh.tooltip": "Use nvidia mesh shaders if possible to render LoDs",
 
   "voxy.config.threads.ingest": "Ingest",
   "voxy.config.threads.ingest.tooltip": "How many threads voxy will use for ingesting new chunks",

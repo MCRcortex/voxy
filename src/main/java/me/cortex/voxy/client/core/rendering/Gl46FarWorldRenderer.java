@@ -27,7 +27,8 @@ import static org.lwjgl.opengl.GL42.*;
 import static org.lwjgl.opengl.GL42.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
-import static org.lwjgl.opengl.GL45C.glClearNamedBufferData;
+import static org.lwjgl.opengl.GL45.glBindTextureUnit;
+import static org.lwjgl.opengl.GL45.glClearNamedBufferData;
 
 public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport> {
     private final Shader commandGen = Shader.make()
@@ -54,12 +55,9 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         this.glCommandBuffer = new GlBuffer(maxSections*5L*4 * 6);
         this.glCommandCountBuffer = new GlBuffer(4*2);
         glClearNamedBufferData(this.glCommandBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
-        setupVao();
     }
 
-    @Override
-    protected void setupVao() {
-        glBindVertexArray(this.vao);
+    protected void bindResources(Gl46Viewport viewport) {
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.glCommandBuffer.id);
         glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.glCommandCountBuffer.id);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
@@ -68,10 +66,10 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.glCommandBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.glCommandCountBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.geometry.metaId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.visibilityBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.models.getBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.models.getColourBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, this.lightDataBuffer.id);//Lighting LUT
-        glBindVertexArray(0);
     }
 
     //FIXME: dont do something like this as it breaks multiviewport mods
@@ -104,6 +102,13 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
             return;
         }
 
+        {//Mark all of the updated sections as being visible from last frame
+            for (int id : this.updatedSectionIds) {
+                long ptr = UploadStream.INSTANCE.upload(viewport.visibilityBuffer, id * 4L, 4);
+                MemoryUtil.memPutInt(ptr, viewport.frameId - 1);//(visible from last frame)
+            }
+        }
+
         glDisable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);
 
@@ -113,30 +118,26 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
 
 
         RenderLayer.getCutoutMipped().startDrawing();
-        int oldActiveTexture = glGetInteger(GL_ACTIVE_TEXTURE);
         //RenderSystem.enableBlend();
         //RenderSystem.defaultBlendFunc();
 
         this.updateUniformBuffer(viewport);
-
         UploadStream.INSTANCE.commit();
-
-        glBindVertexArray(this.vao);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.visibilityBuffer.id);
+        glBindVertexArray(AbstractFarWorldRenderer.STATIC_VAO);
 
 
         //Bind the texture atlas
-        glActiveTexture(GL_TEXTURE0);
-        int oldBoundTexture = glGetInteger(GL_TEXTURE_BINDING_2D);
         glBindSampler(0, this.models.getSamplerId());
-        glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
+        glBindTextureUnit(0, this.models.getTextureId());
 
         glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
         this.commandGen.bind();
+        this.bindResources(viewport);
         glDispatchCompute((this.geometry.getSectionCount()+127)/128, 1, 1);
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_UNIFORM_BARRIER_BIT);
 
         this.lodShader.bind();
+        this.bindResources(viewport);
         glDisable(GL_CULL_FACE);
         //glPointSize(10);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
@@ -157,6 +158,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
 
         this.cullShader.bind();
+        this.bindResources(viewport);
 
         glColorMask(false, false, false, false);
         glDepthMask(false);
@@ -172,15 +174,14 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
 
         glBindVertexArray(0);
         glBindSampler(0, 0);
-        GL11C.glBindTexture(GL_TEXTURE_2D, oldBoundTexture);
-        glActiveTexture(oldActiveTexture);
+        glBindTextureUnit(0, 0);
         RenderLayer.getCutoutMipped().endDrawing();
     }
 
     @Override
-    public void renderFarAwayTranslucent() {
+    public void renderFarAwayTranslucent(Gl46Viewport viewport) {
         RenderLayer.getTranslucent().startDrawing();
-        glBindVertexArray(this.vao);
+        glBindVertexArray(AbstractFarWorldRenderer.STATIC_VAO);
         glDisable(GL_CULL_FACE);
         glEnable(GL_BLEND);
 
@@ -190,11 +191,11 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
 
 
         glBindSampler(0, this.models.getSamplerId());
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, this.models.getTextureId());
+        glBindTextureUnit(0, this.models.getTextureId());
 
         //RenderSystem.blendFunc(GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE);
         this.lodShader.bind();
+        this.bindResources(viewport);
 
         glDepthMask(false);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 400_000 * 4 * 5, 4, this.geometry.getSectionCount(), 0);
@@ -205,14 +206,14 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
 
 
         glBindSampler(0, 0);
+        glBindTextureUnit(0, 0);
         glDisable(GL_BLEND);
 
         RenderLayer.getTranslucent().endDrawing();
     }
 
-    @Override
-    public Gl46Viewport createViewport() {
-        return new Gl46Viewport(this.maxSections);
+    protected Gl46Viewport createViewport0() {
+        return new Gl46Viewport(this);
     }
 
     @Override
@@ -223,12 +224,5 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         this.cullShader.free();
         this.glCommandBuffer.free();
         this.glCommandCountBuffer.free();
-    }
-
-    @Override
-    public void addDebugData(List<String> debug) {
-        super.addDebugData(debug);
-        debug.add("Geometry buffer usage: " + ((float)Math.round((this.geometry.getGeometryBufferUsage()*100000))/1000) + "%");
-        debug.add("Render Sections: " + this.geometry.getSectionCount());
     }
 }

@@ -1,7 +1,7 @@
 #version 460 core
 #extension GL_ARB_gpu_shader_int64 : enable
 #define VISIBILITY_ACCESS writeonly
-#import <voxy:lod/gl46/bindings.glsl>
+#import <voxy:lod/nvmesh/bindings.glsl>
 #import <voxy:lod/section.glsl>
 
 flat out uint id;
@@ -22,7 +22,7 @@ void main() {
     pos += (aabbOffset-1)*(1<<detail);
     pos += (ivec3(gl_VertexID&1, (gl_VertexID>>2)&1, (gl_VertexID>>1)&1)*(size+2))*(1<<detail);
 
-    gl_Position = MVP * vec4(vec3(pos),1);
+    gl_Position = MVP * vec4(vec3(pos)-cameraSubPos,1);
 
     //Write to this id
     id = sid;

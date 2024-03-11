@@ -108,12 +108,12 @@ public class ContextSelectionSystem {
         if (iserver != null) {
             basePath = iserver.getSavePath(WorldSavePath.ROOT).resolve("voxy");
         } else {
-            var netHandle = MinecraftClient.getInstance().getNetworkHandler();
+            var netHandle = MinecraftClient.getInstance().interactionManager;
             if (netHandle == null) {
                 System.err.println("Network handle null");
                 basePath = basePath.resolve("UNKNOWN");
             } else {
-                var info = netHandle.getServerInfo();
+                var info = netHandle.networkHandler.getServerInfo();
                 if (info == null) {
                     System.err.println("Server info null");
                     basePath = basePath.resolve("UNKNOWN");

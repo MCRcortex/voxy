@@ -6,7 +6,7 @@ import java.util.Random;
 
 //TODO: redo this so that it works as you are inserting data into it maybe? since it should be much faster??
 
-public class Mesher2D {
+public final class Mesher2D {
     private final int size;
     private final int maxSize;
     private final long[] data;

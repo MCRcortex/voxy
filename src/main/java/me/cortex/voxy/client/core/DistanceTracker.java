@@ -98,7 +98,8 @@ public class DistanceTracker {
                     for (int y = this.minYSection >> capRing; y <= this.maxYSection >> capRing; y++) {
                         this.tracker.removeCache(capRing, x, y, z);
                     }
-                });*/
+                });
+                */
             }
 
             if (isTerminatingRing) {

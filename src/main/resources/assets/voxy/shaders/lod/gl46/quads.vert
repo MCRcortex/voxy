@@ -1,9 +1,9 @@
 #version 460 core
 #extension GL_ARB_gpu_shader_int64 : enable
 
-#import <voxy:lod/gl46/quad_format.glsl>
+#import <voxy:lod/quad_format.glsl>
 #import <voxy:lod/gl46/bindings.glsl>
-#import <voxy:lod/gl46/block_model.glsl>
+#import <voxy:lod/block_model.glsl>
 #line 8
 
 layout(location = 0) out vec2 uv;

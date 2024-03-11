@@ -4,7 +4,6 @@ import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
-import me.cortex.voxy.common.util.ClassFinder;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.BufferedReader;
@@ -20,15 +19,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Serialization {
-    private static final Set<Class<?>> CONFIG_TYPES = new HashSet<>();
+    public static final Set<Class<?>> CONFIG_TYPES = new HashSet<>();
     public static final Gson GSON;
-
-    //TODO: should really replace with annotation processor
-    public static void register(Class<?> configClass) {
-        if (!CONFIG_TYPES.add(configClass)) {
-            throw new IllegalStateException("Class already registered: " + configClass);
-        }
-    }
 
     private static final class GsonConfigSerialization <T> implements TypeAdapterFactory {
         private final String typeField = "TYPE";
@@ -53,15 +45,8 @@ public class Serialization {
 
 
         private T deserialize(Gson gson, JsonElement json) {
-            try {
-                //I dont think we need to remove the type field;
-                var type = json.getAsJsonObject().get(this.typeField);
-                var retype = this.name2type.get(type.getAsString());
-                var delegate = gson.getDelegateAdapter(this, TypeToken.get(retype));
-                return delegate.fromJsonTree(json);
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to deserialize json: " + json, e);
-            }
+            var retype = this.name2type.get(json.getAsJsonObject().remove(this.typeField).getAsString());
+            return gson.getDelegateAdapter(this, TypeToken.get(retype)).fromJsonTree(json);
         }
 
         private JsonElement serialize(Gson gson, T value) {
@@ -107,8 +92,12 @@ public class Serialization {
         String BASE_SEARCH_PACKAGE = "me.cortex.voxy";
 
         Map<Class<?>, GsonConfigSerialization<?>> serializers = new HashMap<>();
-        List<String> clazzs = ClassFinder.findClasses(BASE_SEARCH_PACKAGE);
 
+        Set<String> clazzs = new LinkedHashSet<>();
+        var path = FabricLoader.getInstance().getModContainer("voxy").get().getRootPaths().get(0);
+        clazzs.addAll(collectAllClasses(path, BASE_SEARCH_PACKAGE));
+        clazzs.addAll(collectAllClasses(BASE_SEARCH_PACKAGE));
+        int count = 0;
         outer:
         for (var clzName : clazzs) {
             if (!clzName.toLowerCase().contains("config")) {
@@ -132,7 +121,6 @@ public class Serialization {
                     continue;
                 }
                 var original = clz;
-                boolean registeredOnce = false;
                 while ((clz = clz.getSuperclass()) != null) {
                     if (CONFIG_TYPES.contains(clz)) {
                         Method nameMethod = null;
@@ -144,24 +132,12 @@ public class Serialization {
                             System.err.println("WARNING: Config class " + clzName + " doesnt contain a getConfigTypeName and thus wont be serializable");
                             continue outer;
                         }
+                        count++;
                         String name = (String) nameMethod.invoke(null);
                         serializers.computeIfAbsent(clz, GsonConfigSerialization::new)
                                 .register(name, (Class) original);
-                        if (registeredOnce) {
-                            System.out.println("NOTE: Config is registered for multiple hierarchical classes");
-                        }
-                        var clName = original.getSimpleName();
-                        {
-                            var outer = original.getEnclosingClass();
-                            while (outer != null) {
-                                clName = original.getSimpleName() + "." + clName;
-                                outer = outer.getEnclosingClass();
-                            }
-                        }
-                        System.out.println("Registered " + clName + " as " + name + " for config type " + clz.getSimpleName());
-
-                        registeredOnce = true;
-                        //break;
+                        System.out.println("Registered " + original.getSimpleName() + " as " + name + " for config type " + clz.getSimpleName());
+                        break;
                     }
                 }
             } catch (Exception e) {
@@ -176,8 +152,47 @@ public class Serialization {
         }
 
         GSON = builder.create();
+        System.out.println("Registered " + count + " config types");
     }
 
+    private static List<String> collectAllClasses(String pack) {
+        try {
+            InputStream stream = Serialization.class.getClassLoader()
+                    .getResourceAsStream(pack.replaceAll("[.]", "/"));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
+            return reader.lines().flatMap(inner -> {
+                if (inner.endsWith(".class")) {
+                    return Stream.of(pack + "." + inner.replace(".class", ""));
+                } else if (!inner.contains(".")) {
+                    return collectAllClasses(pack + "." + inner).stream();
+                } else {
+                    return Stream.of();
+                }
+            }).collect(Collectors.toList());
+        } catch (Exception e) {
+            System.err.println("Failed to collect classes in package: " + pack);
+            return List.of();
+        }
+    }
+    private static List<String> collectAllClasses(Path base, String pack) {
+        if (!Files.exists(base.resolve(pack.replaceAll("[.]", "/")))) {
+            return List.of();
+        }
+        try {
+            return Files.list(base.resolve(pack.replaceAll("[.]", "/"))).flatMap(inner -> {
+                if (inner.getFileName().toString().endsWith(".class")) {
+                    return Stream.of(pack + "." + inner.getFileName().toString().replace(".class", ""));
+                } else if (Files.isDirectory(inner)) {
+                    return collectAllClasses(base, pack + "." + inner.getFileName()).stream();
+                } else {
+                    return Stream.of();
+                }
+            }).collect(Collectors.toList());
+        } catch (
+                IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public static void init() {}
 }

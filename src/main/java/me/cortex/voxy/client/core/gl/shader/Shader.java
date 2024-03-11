@@ -102,7 +102,7 @@ public class Shader extends TrackedObject {
             if (result != GL20C.GL_TRUE) {
                 GL20C.glDeleteShader(shader);
 
-                throw new RuntimeException("Shader compilation failed, see log for details");
+                throw new RuntimeException("Shader compilation failed of type " + type.name() + ", see log for details");
             }
 
             return shader;

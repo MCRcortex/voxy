@@ -62,7 +62,11 @@ public class VoxelCore {
 
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
-        this.renderer = new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+        if (VoxyConfig.CONFIG.useMeshShaders()) {
+            this.renderer = new NvMeshFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+        } else {
+            this.renderer = new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+        }
         this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
         System.out.println("Renderer initialized");
 
@@ -168,6 +172,7 @@ public class VoxelCore {
         //fb.bind();
 
         var projection = computeProjectionMat();
+        //var projection = RenderSystem.getProjectionMatrix();//computeProjectionMat();
         var viewport = this.viewportSelector.getViewport();
         viewport.setProjection(projection).setModelView(matrices.peek().getPositionMatrix()).setCamera(cameraX, cameraY, cameraZ);
 
@@ -180,7 +185,7 @@ public class VoxelCore {
         this.postProcessing.computeSSAO(projection, matrices);
 
         //We can render the translucent directly after as it is the furthest translucent objects
-        this.renderer.renderFarAwayTranslucent();
+        this.renderer.renderFarAwayTranslucent(viewport);
 
 
         this.postProcessing.renderPost(projection, RenderSystem.getProjectionMatrix(), boundFB);

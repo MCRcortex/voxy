@@ -4,6 +4,7 @@ package me.cortex.voxy.client.core.rendering;
 // could maybe tosomething else
 
 import com.mojang.blaze3d.systems.RenderSystem;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
@@ -23,6 +24,7 @@ import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -39,7 +41,7 @@ import static org.lwjgl.opengl.GL30.*;
 
 //Todo: tinker with having the compute shader where each thread is a position to render? maybe idk
 public abstract class AbstractFarWorldRenderer <T extends Viewport> {
-    protected final int vao = glGenVertexArrays();
+    public static final int STATIC_VAO = glGenVertexArrays();
 
     protected final GlBuffer uniformBuffer;
     protected final GeometryManager geometry;
@@ -55,6 +57,10 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
 
     protected FrustumIntersection frustum;
 
+    private final List<T> viewports = new ArrayList<>();
+
+    protected IntArrayList updatedSectionIds;
+
     private final ConcurrentLinkedDeque<Mapper.StateEntry> blockStateUpdates = new ConcurrentLinkedDeque<>();
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeUpdates = new ConcurrentLinkedDeque<>();
     public AbstractFarWorldRenderer(int geometrySize, int maxSections) {
@@ -64,8 +70,6 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
         this.geometry = new GeometryManager(geometrySize*8L, maxSections);
         this.models = new ModelManager(16);
     }
-
-    protected abstract void setupVao();
 
     public void setupRender(Frustum frustum, Camera camera) {
         this.frustum = frustum.frustumIntersection;
@@ -94,7 +98,7 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
         }
 
         //Upload any new geometry
-        this.geometry.uploadResults();
+        this.updatedSectionIds = this.geometry.uploadResults();
         {
             boolean didHaveBiomeChange = false;
 
@@ -126,7 +130,7 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
 
     public abstract void renderFarAwayOpaque(T viewport);
 
-    public abstract void renderFarAwayTranslucent();
+    public abstract void renderFarAwayTranslucent(T viewport);
 
     public void enqueueResult(BuiltSection result) {
         this.geometry.enqueueResult(result);
@@ -142,10 +146,11 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
 
     public void addDebugData(List<String> debug) {
         this.models.addDebugInfo(debug);
+        debug.add("Geometry buffer usage: " + ((float)Math.round((this.geometry.getGeometryBufferUsage()*100000))/1000) + "%");
+        debug.add("Render Sections: " + this.geometry.getSectionCount());
     }
 
     public void shutdown() {
-        glDeleteVertexArrays(this.vao);
         this.models.free();
         this.geometry.free();
         this.uniformBuffer.free();
@@ -156,5 +161,15 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
         return this.models;
     }
 
-    public abstract T createViewport();
+    public final T createViewport() {
+        var viewport = createViewport0();
+        this.viewports.add(viewport);
+        return viewport;
+    }
+
+    final void removeViewport(T viewport) {
+        this.viewports.remove(viewport);
+    }
+
+    protected abstract T createViewport0();
 }
