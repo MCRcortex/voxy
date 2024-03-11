@@ -133,4 +133,17 @@ public class ConfigBuildCtx {
         }
         return path;
     }
+
+    /**
+     * Copies the current build context
+     * @return a copy of the context
+     */
+    public ConfigBuildCtx copy() {
+        var clone = new ConfigBuildCtx();
+        clone.properties.clear();
+        clone.properties.putAll(this.properties);
+        clone.pathStack.clear();
+        clone.pathStack.addAll(this.pathStack);
+        return clone;
+    }
 }

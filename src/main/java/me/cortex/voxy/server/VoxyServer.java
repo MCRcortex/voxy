@@ -1,18 +1,30 @@
 package me.cortex.voxy.server;
 
 import me.cortex.voxy.client.config.VoxyConfig;
+import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.config.Serialization;
+import me.cortex.voxy.common.util.LevelHelper;
 import me.cortex.voxy.server.world.IVoxyWorldGetterSetter;
+import me.cortex.voxy.server.world.VoxyWorld;
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.world.World;
 
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 
 public class VoxyServer implements DedicatedServerModInitializer {
     private VoxyServerConfig config;
+
+    private VoxyWorld createWorld(World world) {
+        var ctx = new ConfigBuildCtx();
+        ctx.setProperty(ConfigBuildCtx.BASE_SAVE_PATH, String.valueOf(new File("voxy").toPath().resolve(this.config.basePath)));
+        ctx.setProperty(ConfigBuildCtx.WORLD_IDENTIFIER, LevelHelper.getWorldId(world));
+        return this.config.worldConfig.build(ctx);
+    }
 
     @Override
     public void onInitializeServer() {
@@ -37,7 +49,7 @@ public class VoxyServer implements DedicatedServerModInitializer {
         {
             //Setup a VoxyWorld on the loaded dimension
             ServerWorldEvents.LOAD.register((server, world) -> {
-                System.err.println("aa");
+                ((IVoxyWorldGetterSetter) world).setVoxyWorld(this.createWorld(world));
             });
 
             //Teardown the VoxyWorld on the loaded dimension if it exists

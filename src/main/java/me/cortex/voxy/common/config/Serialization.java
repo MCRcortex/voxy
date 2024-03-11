@@ -20,6 +20,11 @@ import java.util.stream.Stream;
 
 public class Serialization {
     public static final Set<Class<?>> CONFIG_TYPES = new HashSet<>();
+    public static void register(Class<?> cls) {
+        if (!CONFIG_TYPES.add(cls)) {
+            throw new IllegalArgumentException("Class already registered");
+        }
+    }
     public static final Gson GSON;
 
     private static final class GsonConfigSerialization <T> implements TypeAdapterFactory {
@@ -106,7 +111,7 @@ public class Serialization {
             if (clzName.contains("mixin")) {
                 continue;//Dont want to load mixins
             }
-            if (clzName.contains("VoxyConfigScreenFactory")) {
+            if (clzName.contains("client.config")) {
                 continue;//Dont want to modmenu incase it doesnt exist
             }
 
