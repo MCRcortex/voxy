@@ -97,7 +97,7 @@ public class Serialization {
         var path = FabricLoader.getInstance().getModContainer("voxy").get().getRootPaths().get(0);
         clazzs.addAll(collectAllClasses(path, BASE_SEARCH_PACKAGE));
         clazzs.addAll(collectAllClasses(BASE_SEARCH_PACKAGE));
-
+        int count = 0;
         outer:
         for (var clzName : clazzs) {
             if (!clzName.toLowerCase().contains("config")) {
@@ -132,6 +132,7 @@ public class Serialization {
                             System.err.println("WARNING: Config class " + clzName + " doesnt contain a getConfigTypeName and thus wont be serializable");
                             continue outer;
                         }
+                        count++;
                         String name = (String) nameMethod.invoke(null);
                         serializers.computeIfAbsent(clz, GsonConfigSerialization::new)
                                 .register(name, (Class) original);
@@ -151,6 +152,7 @@ public class Serialization {
         }
 
         GSON = builder.create();
+        System.out.println("Registered " + count + " config types");
     }
 
     private static List<String> collectAllClasses(String pack) {

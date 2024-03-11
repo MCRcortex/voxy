@@ -3,10 +3,10 @@
 
 layout(local_size_x = 128) in;
 
-#import <voxy:lod/gl46/quad_format.glsl>
+#import <voxy:lod/quad_format.glsl>
 #import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/gl46/frustum.glsl>
-#import <voxy:lod/gl46/section.glsl>
+#import <voxy:lod/section.glsl>
 #line 11
 
 //https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_16bit_storage.txt

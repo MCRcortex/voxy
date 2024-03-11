@@ -1,0 +1,118 @@
+#version 460
+
+#extension GL_ARB_shading_language_include : enable
+#pragma optionNV(unroll all)
+#define UNROLL_LOOP
+
+#extension GL_NV_mesh_shader : require
+#extension GL_NV_gpu_shader5 : require
+#extension GL_ARB_gpu_shader_int64 : require
+
+#import <voxy:lod/nvmesh/bindings.glsl>
+#import <voxy:lod/section.glsl>
+#line 12
+
+#define MESH_WORKLOAD_PER_INVOCATION 16
+
+layout(local_size_x=1) in;
+
+taskNV out Task {
+    vec3 origin;//Offset to camera in world space (already multiplied by lod level)
+    uint baseOffset;//Base offset into the quad data buffer
+
+    //Binary search indexs and data
+    uvec4 binIa;
+    uvec4 binIb;
+    uvec4 binVa;
+    uvec4 binVb;
+
+    uint meta;//First 4 bits is lod level, remaining is quadCount
+} task;
+
+
+void putBinData(inout uint idx, inout uint lastIndex, uint offset, uint cnt) {
+    uint id = idx++;
+    if (id < 4) {
+        task.binIa[id] = lastIndex + cnt;
+        task.binVa[id] = offset;
+    } else {
+        task.binIb[id - 4] = lastIndex + cnt;
+        task.binVb[id - 4] = offset;
+    }
+    lastIndex += cnt;
+}
+
+void main() {
+    uint sectionId = gl_WorkGroupID.x;
+    bool visibleLastFrame = visibilityData[sectionId] == (frameId-1);
+
+    //If it wasnt visible last frame then dont render this frame ** (do temporal coherance)
+    if (!visibleLastFrame) {
+        gl_TaskCountNV = 0;
+        return;
+    }
+    SectionMeta meta = sectionData[sectionId];
+    uint lodLvl = extractDetail(meta);
+    ivec3 lodPos= extractPosition(meta);
+    //Relative position to camera with resepct to lod level to check for visibility bits
+    ivec3 cpos = lodPos-(baseSectionPos>>lodLvl);
+    //Relative position to camera
+    task.origin = vec3(((lodPos<<lodLvl)-baseSectionPos)<<5)-cameraSubPos;
+
+    task.baseOffset = extractQuadStart(meta);
+    task.meta = lodLvl&0xFu;
+
+
+    uint idx = 0;
+    uint lastIndex = 0;
+    uint offset = meta.cntA&0xFFFF;//Skip translucency
+
+    task.binIa = uvec4(0);
+    task.binIb = uvec4(0);
+
+    uint cnt = (meta.cntA>>16)&0xFFFF;
+    if (cnt!=0) {
+        putBinData(idx, lastIndex, offset, cnt);
+    }
+    offset += cnt;
+
+    cnt = meta.cntB      &0xFFFF;
+    if ((cnt!=0) && (cpos.y>-1)) {
+        putBinData(idx, lastIndex, offset, cnt);
+    }
+    offset += cnt;
+
+    cnt = (meta.cntB>>16)&0xFFFF;
+    if((cnt!=0) && (cpos.y<1 )){
+        putBinData(idx, lastIndex, offset, cnt);
+    }
+    offset += cnt;
+
+    cnt = meta.cntC      &0xFFFF;
+    if((cnt!=0) && (cpos.z>-1)){
+        putBinData(idx, lastIndex, offset, cnt);
+    }
+    offset += cnt;
+
+    cnt = (meta.cntC>>16)&0xFFFF;
+    if((cnt!=0) && (cpos.z<1 )){
+        putBinData(idx, lastIndex, offset, cnt);
+    }
+    offset += cnt;
+
+    cnt = meta.cntD      &0xFFFF;
+    if((cnt!=0) && (cpos.x>-1)){
+        putBinData(idx, lastIndex, offset, cnt);
+    }
+    offset += cnt;
+
+    cnt = (meta.cntD>>16)&0xFFFF;
+    if((cnt!=0) && (cpos.x<1 )){
+        putBinData(idx, lastIndex, offset, cnt);
+    }
+    offset += cnt;
+
+
+    task.meta |= lastIndex<<4;
+    gl_TaskCountNV = (lastIndex+MESH_WORKLOAD_PER_INVOCATION-1)/MESH_WORKLOAD_PER_INVOCATION;
+}

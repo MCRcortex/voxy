@@ -19,11 +19,11 @@ vec4 reDeProject(vec3 pos) {
     vec2 UV = clamp(view.xy*0.5+0.5, 0.0, 1.0);
     //TODO: sample the colour texture and check if the alpha has the hasAO flag
 
-    float depth = texture(depthTex, UV, -4.0f).x;
+    float depth = texture(depthTex, UV).x;
     if (depth == 1.0f) {
         return vec4(-1.0f);
     }
-    uint meta = uint(255.0f*texture(colourTex, UV, -4.0f).w);
+    uint meta = uint(255.0f*texture(colourTex, UV).w);
     if ((meta>>6)==0) {
         return vec4(-1.0f);
     }

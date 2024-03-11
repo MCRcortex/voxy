@@ -4,6 +4,7 @@ import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import net.fabricmc.loader.api.FabricLoader;
+import org.lwjgl.opengl.GL;
 
 import java.io.FileReader;
 import java.io.IOException;
@@ -28,6 +29,7 @@ public class VoxyConfig {
     public int ingestThreads = 2;
     public int savingThreads = 4;
     public int renderThreads = 5;
+    public boolean useMeshShaderIfPossible = true;
 
 
     public static VoxyConfig loadOrCreate() {
@@ -58,4 +60,8 @@ public class VoxyConfig {
                 .resolve("voxy-config.json");
     }
 
+    public boolean useMeshShaders() {
+        var cap = GL.getCapabilities();
+        return this.useMeshShaderIfPossible && cap.GL_NV_mesh_shader && cap.GL_NV_representative_fragment_test;
+    }
 }

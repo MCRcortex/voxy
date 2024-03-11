@@ -215,7 +215,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
     }
 
     protected Gl46Viewport createViewport0() {
-        return new Gl46Viewport(this, this.maxSections);
+        return new Gl46Viewport(this);
     }
 
     @Override
@@ -226,12 +226,5 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         this.cullShader.free();
         this.glCommandBuffer.free();
         this.glCommandCountBuffer.free();
-    }
-
-    @Override
-    public void addDebugData(List<String> debug) {
-        super.addDebugData(debug);
-        debug.add("Geometry buffer usage: " + ((float)Math.round((this.geometry.getGeometryBufferUsage()*100000))/1000) + "%");
-        debug.add("Render Sections: " + this.geometry.getSectionCount());
     }
 }
