@@ -75,37 +75,12 @@ taskNV in Task {
     vec3 origin;//Offset to camera in world space (already multiplied by lod level)
     uint baseOffset;//Base offset into the quad data buffer
 
-    //Binary search indexs and data
-    uvec4 binIa;
-    uvec4 binIb;
-    uvec4 binVa;
-    uvec4 binVb;
-
     uint meta;//First 4 bits is lod level, remaining is quadCount
 };
 
 uint getQuadIndex() {
-    uint gii = gl_GlobalInvocationID.x;
-    //TODO: replace this with binary search
-    if (gii < binIa.x) {
-        return binVa.x + gii + baseOffset;
-    } else if (gii < binIa.y) {
-        return binVa.y + (gii - binIa.x) + baseOffset;
-    } else if (gii < binIa.z) {
-        return binVa.z + (gii - binIa.y) + baseOffset;
-    } else if (gii < binIa.w) {
-        return binVa.w + (gii - binIa.z) + baseOffset;
-    } else if (gii < binIb.x) {
-        return binVb.x + (gii - binIa.w) + baseOffset;
-    } else if (gii < binIb.y) {
-        return binVb.y + (gii - binIb.x) + baseOffset;
-    } else if (gii < binIb.z) {
-        return binVb.z + (gii - binIb.y) + baseOffset;
-    } else if (gii < binIb.w) {
-        return binVb.w + (gii - binIb.z) + baseOffset;
-    } else {
-        return uint(-1);
-    }
+    if ((meta>>4)<=gl_GlobalInvocationID.x) return -1;
+    return baseOffset + gl_GlobalInvocationID.x;
 }
 
 void main() {

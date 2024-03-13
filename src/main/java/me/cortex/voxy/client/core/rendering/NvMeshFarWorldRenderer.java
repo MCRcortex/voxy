@@ -15,7 +15,9 @@ import org.lwjgl.system.MemoryUtil;
 import java.util.List;
 
 import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
+import static org.lwjgl.opengl.ARBIndirectParameters.glMultiDrawElementsIndirectCountARB;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.glBindBuffer;
 import static org.lwjgl.opengl.GL30.glBindBufferBase;
@@ -36,6 +38,12 @@ public class NvMeshFarWorldRenderer extends AbstractFarWorldRenderer<NvMeshViewp
     private final Shader terrain = Shader.make()
             .add(ShaderType.TASK, "voxy:lod/nvmesh/primary.task")
             .add(ShaderType.MESH, "voxy:lod/nvmesh/primary.mesh")
+            .add(ShaderType.FRAGMENT, "voxy:lod/nvmesh/primary.frag")
+            .compile();
+
+    private final Shader translucent = Shader.make()
+            .add(ShaderType.TASK, "voxy:lod/nvmesh/translucent.task")
+            .add(ShaderType.MESH, "voxy:lod/nvmesh/translucent.mesh")
             .add(ShaderType.FRAGMENT, "voxy:lod/nvmesh/primary.frag")
             .compile();
 
@@ -135,7 +143,35 @@ public class NvMeshFarWorldRenderer extends AbstractFarWorldRenderer<NvMeshViewp
         if (this.geometry.getSectionCount()==0) {
             return;
         }
-        //TODO: make a different task shader for translucent
+        RenderLayer.getTranslucent().startDrawing();
+        glBindVertexArray(AbstractFarWorldRenderer.STATIC_VAO);
+        glDisable(GL_CULL_FACE);
+        glEnable(GL_BLEND);
+
+        //TODO: maybe change this so the alpha isnt applied in the same way or something?? since atm the texture bakery uses a very hacky
+        // blend equation to make it avoid double applying translucency
+        glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+
+        glBindSampler(0, this.models.getSamplerId());
+        glBindTextureUnit(0, this.models.getTextureId());
+
+        this.translucent.bind();
+        this.bindResources(viewport);
+
+        glDepthMask(false);
+        glDrawMeshTasksNV(0, this.geometry.getSectionCount());
+        glDepthMask(true);
+
+        glEnable(GL_CULL_FACE);
+        glBindVertexArray(0);
+
+
+        glBindSampler(0, 0);
+        glBindTextureUnit(0, 0);
+        glDisable(GL_BLEND);
+
+        RenderLayer.getTranslucent().endDrawing();
     }
 
     @Override

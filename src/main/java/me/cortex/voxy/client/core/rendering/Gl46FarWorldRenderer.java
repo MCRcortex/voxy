@@ -38,7 +38,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
             .compile();
 
     private final Shader lodShader = Shader.make()
-            .add(ShaderType.VERTEX, "voxy:lod/gl46/quads.vert")
+            .add(ShaderType.VERTEX, "voxy:lod/gl46/quads2.vert")
             .add(ShaderType.FRAGMENT, "voxy:lod/gl46/quads.frag")
             .compile();
 

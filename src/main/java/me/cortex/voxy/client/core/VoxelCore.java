@@ -64,8 +64,10 @@ public class VoxelCore {
         SharedIndexBuffer.INSTANCE.id();
         if (VoxyConfig.CONFIG.useMeshShaders()) {
             this.renderer = new NvMeshFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+            System.out.println("Using NvMeshFarWorldRenderer");
         } else {
             this.renderer = new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+            System.out.println("Using Gl46FarWorldRenderer");
         }
         this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
         System.out.println("Renderer initialized");
