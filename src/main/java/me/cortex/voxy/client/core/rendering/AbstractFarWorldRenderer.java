@@ -124,8 +124,10 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
             //this.models.bakery.renderFaces(Blocks.ROSE_BUSH.getDefaultState(), 1234, false);
         }
 
-        //TODO: fix this in a better way than this ungodly hacky stuff
-        RenderSystem.setShaderFogColor(1f, 1f, 1f, 0f);
+        //TODO: fix this in a better way than this ungodly hacky stuff, causes clouds to dissapear
+        //RenderSystem.setShaderFogColor(1f, 1f, 1f, 0f);
+        RenderSystem.setShaderFogEnd(99999999);
+        RenderSystem.setShaderFogStart(9999999);
     }
 
     public abstract void renderFarAwayOpaque(T viewport);
