@@ -36,19 +36,19 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 public class WorldImporter {
-    public record ImportUpdate(){}
+    public interface UpdateCallback {
+        void update(int finished, int outof);
+    }
 
     private final WorldEngine world;
-    private final World mcWorld;
     private final ReadableContainer<RegistryEntry<Biome>> defaultBiomeProvider;
     private final Codec<ReadableContainer<RegistryEntry<Biome>>> biomeCodec;
     private final AtomicInteger totalRegions = new AtomicInteger();
     private final AtomicInteger regionsProcessed = new AtomicInteger();
-    private final AtomicInteger percentMarker = new AtomicInteger();
 
+    private volatile boolean isRunning;
     public WorldImporter(WorldEngine worldEngine, World mcWorld) {
         this.world = worldEngine;
-        this.mcWorld = mcWorld;
 
         var biomeRegistry = mcWorld.getRegistryManager().get(RegistryKeys.BIOME);
         var defaultBiome = biomeRegistry.entryOf(BiomeKeys.PLAINS);
@@ -97,9 +97,16 @@ public class WorldImporter {
         this.biomeCodec = PalettedContainer.createReadableContainerCodec(biomeRegistry.getIndexedEntries(), biomeRegistry.createEntryCodec(), PalettedContainer.PaletteProvider.BIOME, biomeRegistry.entryOf(BiomeKeys.PLAINS));
     }
 
+
+    public void shutdown() {
+        this.isRunning = false;
+        try {this.worker.join();} catch (InterruptedException e) {throw new RuntimeException(e);}
+    }
+
     private Thread worker;
-    public void importWorldAsyncStart(File directory, int threads, Function<ImportUpdate, Boolean> updateCallback, Runnable onCompletion) {
+    public void importWorldAsyncStart(File directory, int threads, UpdateCallback updateCallback, Runnable onCompletion) {
         this.worker = new Thread(() -> {
+            this.isRunning = true;
             var workers = new ForkJoinPool(threads);
             var files = directory.listFiles();
             for (var file : files) {
@@ -117,16 +124,12 @@ public class WorldImporter {
                 this.totalRegions.addAndGet(1);
                 workers.submit(() -> {
                     try {
+                        if (!isRunning) {
+                            return;
+                        }
                         this.importRegionFile(file.toPath(), rx, rz);
                         int regionsProcessedCount = this.regionsProcessed.addAndGet(1);
-                        synchronized (this.world) {
-                            int percentMark = this.percentMarker.get();
-                            int percent = (regionsProcessedCount*100)/this.totalRegions.get();
-                            if (percent > percentMark) {
-                                System.out.println(regionsProcessedCount + "/" + this.totalRegions.get());
-                                this.percentMarker.addAndGet(1);
-                            }
-                        }
+                        updateCallback.update(regionsProcessedCount, this.totalRegions.get());
                     } catch (
                             Exception e) {
                         e.printStackTrace();
