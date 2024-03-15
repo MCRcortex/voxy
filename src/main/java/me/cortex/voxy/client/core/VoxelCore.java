@@ -16,7 +16,10 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.entity.boss.BossBar;
+import net.minecraft.entity.boss.ServerBossBar;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.text.Text;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 import org.joml.Matrix4f;
@@ -54,7 +57,7 @@ public class VoxelCore {
 
     //private final Thread shutdownThread = new Thread(this::shutdown);
 
-
+    private WorldImporter importer;
     public VoxelCore(ContextSelectionSystem.Selection worldSelection) {
         this.world = worldSelection.createEngine();
         var cfg = worldSelection.getConfig();
@@ -64,8 +67,10 @@ public class VoxelCore {
         SharedIndexBuffer.INSTANCE.id();
         if (VoxyConfig.CONFIG.useMeshShaders()) {
             this.renderer = new NvMeshFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+            System.out.println("Using NvMeshFarWorldRenderer");
         } else {
             this.renderer = new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+            System.out.println("Using Gl46FarWorldRenderer");
         }
         this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
         System.out.println("Renderer initialized");
@@ -214,6 +219,10 @@ public class VoxelCore {
         //}
 
         //this.world.getMapper().forceResaveStates();
+        if (this.importer != null) {
+            System.out.println("Shutting down importer");
+            try {this.importer.shutdown();this.importer = null;} catch (Exception e) {System.err.println(e);}
+        }
         System.out.println("Shutting down voxel core");
         try {this.renderGen.shutdown();} catch (Exception e) {System.err.println(e);}
         System.out.println("Render gen shut down");
@@ -225,12 +234,24 @@ public class VoxelCore {
         System.out.println("Voxel core shut down");
     }
 
-    public WorldImporter createWorldImporter(World mcWorld, File worldPath) {
+    public boolean createWorldImporter(World mcWorld, File worldPath) {
+        if (this.importer != null) {
+            return false;
+        }
         var importer = new WorldImporter(this.world, mcWorld);
-        importer.importWorldAsyncStart(worldPath, 4, null, ()->{
-            System.err.println("DONE IMPORT");
-        });
-        return importer;
+        var bossBar = new ServerBossBar(Text.of("Voxy world importer"), BossBar.Color.GREEN, BossBar.Style.PROGRESS);
+        bossBar.addPlayer(MinecraftClient.getInstance().getServer().getPlayerManager().getPlayer(MinecraftClient.getInstance().player.getUuid()));
+        importer.importWorldAsyncStart(worldPath, 4, (a,b)->
+                MinecraftClient.getInstance().executeSync(()-> {
+                    bossBar.setPercent(((float) a)/((float) b));
+                    bossBar.setName(Text.of("Voxy import: "+ a+"/"+b + " region files"));
+                }),
+                ()-> {
+                    MinecraftClient.getInstance().executeSync(bossBar::clearPlayers);
+                    this.importer = null;
+                });
+        this.importer = importer;
+        return true;
     }
 
     public WorldEngine getWorldEngine() {

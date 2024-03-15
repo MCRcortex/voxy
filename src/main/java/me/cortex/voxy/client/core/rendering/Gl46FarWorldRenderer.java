@@ -36,7 +36,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
             .compile();
 
     private final Shader lodShader = Shader.make()
-            .add(ShaderType.VERTEX, "voxy:lod/gl46/quads.vert")
+            .add(ShaderType.VERTEX, "voxy:lod/gl46/quads2.vert")
             .add(ShaderType.FRAGMENT, "voxy:lod/gl46/quads.frag")
             .compile();
 
@@ -140,6 +140,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         this.bindResources(viewport);
         glDisable(GL_CULL_FACE);
         //glPointSize(10);
+        //TODO: replace glMultiDrawElementsIndirectCountARB with glMultiDrawElementsIndirect on intel gpus, since it performs so much better
+        //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, (int) (this.geometry.getSectionCount()*0.9), 0);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
         glEnable(GL_CULL_FACE);
 
