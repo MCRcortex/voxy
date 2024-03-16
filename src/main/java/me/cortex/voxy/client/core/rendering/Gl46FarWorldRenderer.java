@@ -60,9 +60,6 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
     }
 
     protected void bindResources(Gl46Viewport viewport) {
-        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.glCommandBuffer.id);
-        glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.glCommandCountBuffer.id);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometry.geometryId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.glCommandBuffer.id);
@@ -72,6 +69,13 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.models.getBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.models.getColourBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, this.lightDataBuffer.id);//Lighting LUT
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.glCommandBuffer.id);
+        glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.glCommandCountBuffer.id);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
+
+        //Bind the texture atlas
+        glBindSampler(0, this.models.getSamplerId());
+        glBindTextureUnit(0, this.models.getTextureId());
     }
 
     //FIXME: dont do something like this as it breaks multiviewport mods
@@ -127,11 +131,6 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         UploadStream.INSTANCE.commit();
         glBindVertexArray(AbstractFarWorldRenderer.STATIC_VAO);
 
-
-        //Bind the texture atlas
-        glBindSampler(0, this.models.getSamplerId());
-        glBindTextureUnit(0, this.models.getTextureId());
-
         glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
         this.commandGen.bind();
         this.bindResources(viewport);
@@ -143,7 +142,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         glDisable(GL_CULL_FACE);
         //glPointSize(10);
         //TODO: replace glMultiDrawElementsIndirectCountARB with glMultiDrawElementsIndirect on intel gpus, since it performs so much better
-        //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, (int) (this.geometry.getSectionCount()*0.9), 0);
+        //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, drawCnt, 0);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
         glEnable(GL_CULL_FACE);
 
@@ -155,7 +154,6 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
             System.out.println(cnt);
         });
         DownloadStream.INSTANCE.commit();
-        DownloadStream.INSTANCE.tick();
          */
 
 

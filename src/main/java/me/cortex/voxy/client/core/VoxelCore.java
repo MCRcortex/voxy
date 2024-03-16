@@ -13,6 +13,8 @@ import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.hud.BossBarHud;
+import net.minecraft.client.gui.hud.ClientBossBar;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
@@ -20,6 +22,7 @@ import net.minecraft.entity.boss.BossBar;
 import net.minecraft.entity.boss.ServerBossBar;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
 import net.minecraft.world.chunk.WorldChunk;
 import org.joml.Matrix4f;
@@ -239,15 +242,20 @@ public class VoxelCore {
             return false;
         }
         var importer = new WorldImporter(this.world, mcWorld);
-        var bossBar = new ServerBossBar(Text.of("Voxy world importer"), BossBar.Color.GREEN, BossBar.Style.PROGRESS);
-        bossBar.addPlayer(MinecraftClient.getInstance().getServer().getPlayerManager().getPlayer(MinecraftClient.getInstance().player.getUuid()));
+        var bossBar = new ClientBossBar(MathHelper.randomUuid(), Text.of("Voxy world importer"), 0.0f, BossBar.Color.GREEN, BossBar.Style.PROGRESS, false, false, false);
+        MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.put(bossBar.getUuid(), bossBar);
         importer.importWorldAsyncStart(worldPath, 4, (a,b)->
                 MinecraftClient.getInstance().executeSync(()-> {
                     bossBar.setPercent(((float) a)/((float) b));
                     bossBar.setName(Text.of("Voxy import: "+ a+"/"+b + " region files"));
                 }),
                 ()-> {
-                    MinecraftClient.getInstance().executeSync(bossBar::clearPlayers);
+                    MinecraftClient.getInstance().executeSync(()-> {
+                        MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.remove(bossBar.getUuid());
+                        String msg = "Voxy world import finished";
+                        MinecraftClient.getInstance().inGameHud.getChatHud().addMessage(Text.literal(msg));
+                        System.err.println(msg);
+                    });
                     this.importer = null;
                 });
         this.importer = importer;

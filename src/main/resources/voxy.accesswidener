@@ -13,6 +13,8 @@ accessible field net/minecraft/client/render/GameRenderer zoom F
 accessible field net/minecraft/client/world/ClientWorld worldRenderer Lnet/minecraft/client/render/WorldRenderer;
 accessible field net/minecraft/world/biome/source/BiomeAccess seed J
 
+accessible field net/minecraft/client/gui/hud/BossBarHud bossBars Ljava/util/Map;
+
 accessible field net/minecraft/client/render/RenderLayer$MultiPhaseParameters texture Lnet/minecraft/client/render/RenderPhase$TextureBase;
 accessible field net/minecraft/client/render/RenderLayer$MultiPhase phases Lnet/minecraft/client/render/RenderLayer$MultiPhaseParameters;
 accessible field net/minecraft/client/network/ClientPlayerInteractionManager networkHandler Lnet/minecraft/client/network/ClientPlayNetworkHandler;

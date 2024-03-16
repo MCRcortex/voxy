@@ -184,6 +184,7 @@ public class NvMeshFarWorldRenderer extends AbstractFarWorldRenderer<NvMeshViewp
     public void shutdown() {
         super.shutdown();
         this.terrain.free();
+        this.translucent.free();
         this.cull.free();
     }
 }

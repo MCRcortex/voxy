@@ -57,7 +57,10 @@ public class WorldImportCommand {
                     continue;
                 }
                 var wn = world.getFileName().toString();
-                if (CommandSource.shouldSuggest(sb.getRemaining(), wn)) {
+                if (CommandSource.shouldSuggest(sb.getRemaining(), wn) || CommandSource.shouldSuggest(sb.getRemaining(), '"'+wn)) {
+                    if (wn.contains(" ")) {
+                        wn = '"' + wn + '"';
+                    }
                     sb.suggest(wn);
                 }
             }
