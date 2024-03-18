@@ -31,6 +31,7 @@ import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
 import static org.lwjgl.opengl.GL45.glBindTextureUnit;
 import static org.lwjgl.opengl.GL45.glClearNamedBufferData;
+import static org.lwjgl.opengl.GL45C.nglClearNamedBufferData;
 
 public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport> {
     private final Shader commandGen = Shader.make()
@@ -56,7 +57,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         super(geometryBuffer, maxSections);
         this.glCommandBuffer = new GlBuffer(maxSections*5L*4 * 6);
         this.glCommandCountBuffer = new GlBuffer(4*2);
-        glClearNamedBufferData(this.glCommandBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
+        nglClearNamedBufferData(this.glCommandBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
     }
 
     protected void bindResources(Gl46Viewport viewport) {
@@ -131,7 +132,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         UploadStream.INSTANCE.commit();
         glBindVertexArray(AbstractFarWorldRenderer.STATIC_VAO);
 
-        glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
+        nglClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
         this.commandGen.bind();
         this.bindResources(viewport);
         glDispatchCompute((this.geometry.getSectionCount()+127)/128, 1, 1);

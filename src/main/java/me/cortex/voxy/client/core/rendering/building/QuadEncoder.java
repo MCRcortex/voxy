@@ -8,7 +8,7 @@ public class QuadEncoder {
 
     //Note: the encodedMeshedData is from the Mesher2D
     public static int encodePosition(int face, int otherAxis, int encodedMeshedData) {
-        if (Mesher2D.getW(encodedMeshedData) > 16 || Mesher2D.getH(encodedMeshedData) > 16) {
+        if (false&&(Mesher2D.getW(encodedMeshedData) > 16 || Mesher2D.getH(encodedMeshedData) > 16)) {
             throw new IllegalStateException("Width or height > 16");
         }
         int dat = face;

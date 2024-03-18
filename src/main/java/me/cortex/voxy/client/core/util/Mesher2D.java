@@ -28,7 +28,7 @@ public final class Mesher2D {
 
     private int getIdx(int x, int z) {
         int M = (1<<this.size)-1;
-        if (x>M || z>M) {
+        if (false&&(x>M || z>M)) {
             throw new IllegalStateException();
         }
         return ((z&M)<<this.size)|(x&M);
