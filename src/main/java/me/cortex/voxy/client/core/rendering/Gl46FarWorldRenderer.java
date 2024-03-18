@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import net.minecraft.block.Blocks;
@@ -11,8 +12,10 @@ import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11C;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
+import java.nio.IntBuffer;
 import java.util.List;
 
 import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
@@ -31,6 +34,7 @@ import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
 import static org.lwjgl.opengl.GL45.glBindTextureUnit;
 import static org.lwjgl.opengl.GL45.glClearNamedBufferData;
+import static org.lwjgl.opengl.GL45C.nglClearNamedBufferData;
 
 public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport> {
     private final Shader commandGen = Shader.make()
@@ -55,8 +59,9 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
     public Gl46FarWorldRenderer(int geometryBuffer, int maxSections) {
         super(geometryBuffer, maxSections);
         this.glCommandBuffer = new GlBuffer(maxSections*5L*4 * 6);
-        this.glCommandCountBuffer = new GlBuffer(4*2);
-        glClearNamedBufferData(this.glCommandBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
+        this.glCommandCountBuffer = new GlBuffer(1024);
+        glClearNamedBufferData(this.glCommandBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
+        glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
     }
 
     protected void bindResources(Gl46Viewport viewport) {
@@ -103,11 +108,13 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         MemoryUtil.memPutInt(ptr, viewport.frameId++); ptr += 4;
     }
 
+    private int aaa;
+    private int bbb;
     public void renderFarAwayOpaque(Gl46Viewport viewport) {
         if (this.geometry.getSectionCount() == 0) {
             return;
         }
-
+        /*
         {//Mark all of the updated sections as being visible from last frame
             for (int id : this.updatedSectionIds) {
                 long ptr = UploadStream.INSTANCE.upload(viewport.visibilityBuffer, id * 4L, 4);
@@ -123,65 +130,162 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         //this.models.bakery.renderFaces(Blocks.CHEST.getDefaultState(), 1234, false);
 
 
+        glMemoryBarrier(-1);
+        glFinish();
         RenderLayer.getCutoutMipped().startDrawing();
+        glMemoryBarrier(-1);
+        glFinish();
         //RenderSystem.enableBlend();
         //RenderSystem.defaultBlendFunc();
 
+        glMemoryBarrier(-1);
+        glFinish();
+        nglClearNamedBufferData(this.glCommandBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+        nglClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+        try (var stack = MemoryStack.stackPush()) {
+            IntBuffer buf = stack.callocInt(4);
+            //nglClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, MemoryUtil.memAddress(buf));
+            //glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+        //glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
+        //glClearNamedBufferData(this.glCommandBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
+        glMemoryBarrier(-1);
+        glFinish();
         this.updateUniformBuffer(viewport);
+        glMemoryBarrier(-1);
+        glFinish();
         UploadStream.INSTANCE.commit();
         glBindVertexArray(AbstractFarWorldRenderer.STATIC_VAO);
+        glMemoryBarrier(-1);
+        glFinish();
 
-        glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
+        //glClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, new int[1]);
+
+        glMemoryBarrier(-1);
+        glFinish();
         this.commandGen.bind();
+        glMemoryBarrier(-1);
+        glFinish();
         this.bindResources(viewport);
-        glDispatchCompute((this.geometry.getSectionCount()+127)/128, 1, 1);
+        glMemoryBarrier(-1);
+        glFinish();
+        //glDispatchCompute((this.geometry.getSectionCount()+127)/128, 1, 1);
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT | GL_SHADER_STORAGE_BARRIER_BIT | GL_UNIFORM_BARRIER_BIT);
 
+
+        glMemoryBarrier(-1);
+        glFinish();
+        glMemoryBarrier(-1);
+        glFinish();
         this.lodShader.bind();
+        glMemoryBarrier(-1);
+        glFinish();
         this.bindResources(viewport);
+        glMemoryBarrier(-1);
+        glFinish();
         glDisable(GL_CULL_FACE);
+        glMemoryBarrier(-1);
+        glFinish();
         //glPointSize(10);
         //TODO: replace glMultiDrawElementsIndirectCountARB with glMultiDrawElementsIndirect on intel gpus, since it performs so much better
-        //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, drawCnt, 0);
-        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
-        glEnable(GL_CULL_FACE);
-
-
-        /*
         glFinish();
-        DownloadStream.INSTANCE.download(this.glCommandCountBuffer, 0, 4, (ptr, siz) -> {
-            int cnt = MemoryUtil.memGetInt(ptr);
-            System.out.println(cnt);
-        });
-        DownloadStream.INSTANCE.commit();
-         */
+        //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 12000, 0);
+        //glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
+        glMemoryBarrier(-1);
+        glFinish();
+        glEnable(GL_CULL_FACE);
+        //System.out.println(aaa);
+
+
+
 
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
+        glMemoryBarrier(-1);
+        glFinish();
 
         this.cullShader.bind();
+        glMemoryBarrier(-1);
+        glFinish();
         this.bindResources(viewport);
+        glMemoryBarrier(-1);
+        glFinish();
 
         glColorMask(false, false, false, false);
         glDepthMask(false);
 
         glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3, GL_UNSIGNED_BYTE, (1 << 16) * 6 * 2, this.geometry.getSectionCount());
+        glMemoryBarrier(-1);
+        glFinish();
 
         glDepthMask(true);
         glColorMask(true, true, true, true);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        glMemoryBarrier(-1);
+        glFinish();
 
 
         //TODO: need to do temporal rasterization here
 
         glBindVertexArray(0);
+        glMemoryBarrier(-1);
+        glFinish();
+        glBindSampler(0, 0);
+        glMemoryBarrier(-1);
+        glFinish();
+        glBindTextureUnit(0, 0);
+        glMemoryBarrier(-1);
+        glFinish();
+        RenderLayer.getCutoutMipped().endDrawing();
+        glMemoryBarrier(-1);
+        glFinish();
+
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, 0);//Lighting LUT
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+        glBindBuffer(GL_PARAMETER_BUFFER_ARB, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+        //Bind the texture atlas
         glBindSampler(0, 0);
         glBindTextureUnit(0, 0);
-        RenderLayer.getCutoutMipped().endDrawing();
+
+         */
+        glMemoryBarrier(-1);
+        glFinish();
+
+        nglClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+        try (var stack = MemoryStack.stackPush()) {
+            IntBuffer buf = stack.callocInt(4);
+            nglClearNamedBufferData(this.glCommandCountBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, MemoryUtil.memAddress(buf));
+            //glBindBuffer(GL_ARRAY_BUFFER, 0);
+        }
+        glMemoryBarrier(-1);
+        glFinish();
+        DownloadStream.INSTANCE.download(this.glCommandCountBuffer, 0, 4, (ptr, siz) -> {
+            int cnt = MemoryUtil.memGetInt(ptr);
+            aaa = cnt;
+        });
+        glMemoryBarrier(-1);
+        glFinish();
+        DownloadStream.INSTANCE.commit();
+        glMemoryBarrier(-1);
+        glFinish();
+        DownloadStream.INSTANCE.tick();
+        glFinish();
+        System.out.println(aaa);
     }
 
     @Override
     public void renderFarAwayTranslucent(Gl46Viewport viewport) {
+        /*
         RenderLayer.getTranslucent().startDrawing();
         glBindVertexArray(AbstractFarWorldRenderer.STATIC_VAO);
         glDisable(GL_CULL_FACE);
@@ -200,7 +304,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         this.bindResources(viewport);
 
         glDepthMask(false);
-        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 400_000 * 4 * 5, 4, this.geometry.getSectionCount(), 0);
+        //glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 400_000 * 4 * 5, 4, this.geometry.getSectionCount(), 0);
         glDepthMask(true);
 
         glEnable(GL_CULL_FACE);
@@ -212,6 +316,27 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         glDisable(GL_BLEND);
 
         RenderLayer.getTranslucent().endDrawing();
+
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, 0);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, 0);//Lighting LUT
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+        glBindBuffer(GL_PARAMETER_BUFFER_ARB, 0);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+        //Bind the texture atlas
+        glBindSampler(0, 0);
+        glBindTextureUnit(0, 0);
+        glMemoryBarrier(-1);
+        glFinish();
+
+         */
     }
 
     protected Gl46Viewport createViewport0() {
