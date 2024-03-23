@@ -4,6 +4,8 @@ import me.cortex.voxy.common.storage.StorageCompressor;
 import me.cortex.voxy.common.world.SaveLoadSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.Text;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -40,12 +42,15 @@ public class SectionSavingService {
             if (!this.running) break;
             var section = this.saveQueue.pop();
             section.assertNotFree();
-            section.inSaveQueue.set(false);
-
-            var saveData = SaveLoadSystem.serialize(section);
-            this.world.storage.setSectionData(section.key, saveData);
-            MemoryUtil.memFree(saveData);
-
+            try {
+                section.inSaveQueue.set(false);
+                var saveData = SaveLoadSystem.serialize(section);
+                this.world.storage.setSectionData(section.key, saveData);
+                MemoryUtil.memFree(saveData);
+            } catch (Exception e) {
+                System.err.println(e);
+                MinecraftClient.getInstance().executeSync(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("Voxy saver had an exception while executing please check logs and report error")));
+            }
             section.release();
         }
     }
