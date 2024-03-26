@@ -59,7 +59,7 @@ public class ActiveSectionTracker {
             }
             if (status == 1) {
                 //We need to set the data to air as it is undefined state
-                Arrays.fill(section.data, Mapper.AIR);
+                Arrays.fill(section.data, Mapper.withLight(Mapper.AIR, 15));//Since lighting is inverted
             }
             section.acquire();
             holder.obj = section;

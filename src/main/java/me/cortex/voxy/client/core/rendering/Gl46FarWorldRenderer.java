@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import net.minecraft.block.Blocks;
@@ -149,13 +150,14 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
 
 
         /*
-        glFinish();
         DownloadStream.INSTANCE.download(this.glCommandCountBuffer, 0, 4, (ptr, siz) -> {
             int cnt = MemoryUtil.memGetInt(ptr);
-            System.out.println(cnt);
+            drawCnt = cnt;
         });
         DownloadStream.INSTANCE.commit();
+
          */
+
 
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
