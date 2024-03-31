@@ -3,7 +3,6 @@ package me.cortex.voxy.client.core.model;
 import com.mojang.blaze3d.platform.GlConst;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.VertexSorter;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
@@ -126,7 +125,7 @@ public class ModelTextureBakery {
                 0, 2,0,0,
                 0,0, -1f,0,
                 -1,-1,0,1,
-        }), VertexSorter.BY_Z);
+        }));
 
 
 
@@ -184,7 +183,7 @@ public class ModelTextureBakery {
         glDisable(GL_STENCIL_TEST);
         glDisable(GL_BLEND);
 
-        RenderSystem.setProjectionMatrix(oldProjection, VertexSorter.BY_DISTANCE);
+        RenderSystem.setProjectionMatrix(oldProjection);
         glBindFramebuffer(GL_FRAMEBUFFER, oldFB);
         GL11C.glViewport(GlStateManager.Viewport.getX(), GlStateManager.Viewport.getY(), GlStateManager.Viewport.getWidth(), GlStateManager.Viewport.getHeight());
 

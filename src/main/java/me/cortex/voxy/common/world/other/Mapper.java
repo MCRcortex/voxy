@@ -287,7 +287,7 @@ public class Mapper {
 
         public static StateEntry deserialize(int id, byte[] data) {
             try {
-                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data), NbtTagSizeTracker.ofUnlimitedBytes());
+                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data));
                 if (compound.getInt("id") != id) {
                     throw new IllegalStateException("Encoded id != expected id");
                 }
@@ -323,7 +323,7 @@ public class Mapper {
 
         public static BiomeEntry deserialize(int id, byte[] data) {
             try {
-                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data), NbtTagSizeTracker.ofUnlimitedBytes());
+                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data));
                 if (compound.getInt("id") != id) {
                     throw new IllegalStateException("Encoded id != expected id");
                 }

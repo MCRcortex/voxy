@@ -159,7 +159,7 @@ public class VoxelCore {
 
     private static Matrix4f computeProjectionMat() {
         return new Matrix4f(RenderSystem.getProjectionMatrix()).mulLocal(
-                makeProjectionMatrix(0.05f, MinecraftClient.getInstance().gameRenderer.getFarPlaneDistance()).invert()
+                makeProjectionMatrix(0.05f, MinecraftClient.getInstance().gameRenderer.method_32796()).invert()
         ).mulLocal(makeProjectionMatrix(16, 16*3000));
     }
 
