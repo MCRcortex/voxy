@@ -16,11 +16,12 @@ public class Voxy implements ClientModInitializer {
     static {
         ModContainer mod = (ModContainer) FabricLoader.getInstance().getModContainer("voxy").orElseThrow(NullPointerException::new);
         VERSION = mod.getMetadata().getVersion().getFriendlyString();
+
+        Serialization.init();
     }
 
     @Override
     public void onInitializeClient() {
-        Serialization.init();
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(WorldImportCommand.register());

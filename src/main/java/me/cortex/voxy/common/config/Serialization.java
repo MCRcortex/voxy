@@ -4,6 +4,8 @@ import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
+import me.cortex.voxy.common.storage.config.CompressorConfig;
+import me.cortex.voxy.common.storage.config.StorageConfig;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.BufferedReader;
@@ -89,6 +91,13 @@ public class Serialization {
     }
 
     static {
+        try {
+            Class.forName(CompressorConfig.class.getName());
+            Class.forName(StorageConfig.class.getName());
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
+
         String BASE_SEARCH_PACKAGE = "me.cortex.voxy";
 
         Map<Class<?>, GsonConfigSerialization<?>> serializers = new HashMap<>();
@@ -108,6 +117,9 @@ public class Serialization {
             }
             if (clzName.contains("VoxyConfigScreenFactory")) {
                 continue;//Dont want to modmenu incase it doesnt exist
+            }
+            if (clzName.endsWith("VoxyConfig")) {
+                continue;//Special case to prevent recursive loading pain
             }
 
             if (clzName.equals(Serialization.class.getName())) {

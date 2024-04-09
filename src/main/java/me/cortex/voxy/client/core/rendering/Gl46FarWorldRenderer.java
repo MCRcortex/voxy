@@ -145,6 +145,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         //glPointSize(10);
         //TODO: replace glMultiDrawElementsIndirectCountARB with glMultiDrawElementsIndirect on intel gpus, since it performs so much better
         //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, drawCnt, 0);
+        //glLineWidth(2);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
         glEnable(GL_CULL_FACE);
 
