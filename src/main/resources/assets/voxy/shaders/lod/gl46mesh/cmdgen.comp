@@ -1,0 +1,60 @@
+#version 450
+#define MESHLET_ACCESS writeonly
+#import <voxy:lod/quad_format.glsl>
+#import <voxy:lod/gl46mesh/bindings.glsl>
+#import <voxy:lod/section.glsl>
+#define extractMeshletStart extractQuadStart
+layout(local_size_x = 64) in;
+#define QUADS_PER_MESHLET 126
+
+void emitMeshlets(inout uint mli, inout uint meshletPtr, uint mskedCnt, uint cnt) {
+    for (;mskedCnt != 0; mskedCnt--,mli++) {
+        meshlets[mli] = meshletPtr + (mskedCnt-1);
+    }
+    meshletPtr += cnt;
+}
+
+void main() {
+    if (gl_GlobalInvocationID.x == 0) {
+        //Setup the remaining state of the drawElementsIndirect command
+        drawCmd.count = QUADS_PER_MESHLET*6;
+        drawCmd.firstIndex = 0;
+        drawCmd.baseVertex = 0;
+        drawCmd.baseInstance = 0;
+    }
+    if (gl_GlobalInvocationID.x >= sectionCount) {
+        return;
+    }
+
+    //Check the occlusion data from last frame
+    bool shouldRender = visibilityData[gl_GlobalInvocationID.x] == frameId - 1;
+    if (shouldRender) {
+        SectionMeta meta = sectionData[gl_GlobalInvocationID.x];
+        uint detail = extractDetail(meta);
+        ivec3 ipos = extractPosition(meta);
+
+        ivec3 relative = ipos-(baseSectionPos>>detail);
+
+        uint a = ((meta.cntA>>16)&0xFFFF);
+        uint u = (meta.cntB      &0xFFFF) * uint(relative.y>-1);
+        uint d = ((meta.cntB>>16)&0xFFFF) * uint(relative.y<1 );
+        uint s = (meta.cntC      &0xFFFF) * uint(relative.z>-1);
+        uint n = ((meta.cntC>>16)&0xFFFF) * uint(relative.z<1 );
+        uint w = (meta.cntD      &0xFFFF) * uint(relative.x>-1);
+        uint e = ((meta.cntD>>16)&0xFFFF) * uint(relative.x<1 );
+        uint total = a + u + d + s + n + w + e;
+
+        uint mli = atomicAdd(drawCmd.instanceCount, total);//meshletListIndex
+
+        uint meshletPtr = extractMeshletStart(meta);
+
+        emitMeshlets(mli, meshletPtr, a, a);
+        emitMeshlets(mli, meshletPtr, u, (meta.cntB      &0xFFFF));
+        emitMeshlets(mli, meshletPtr, d, ((meta.cntB>>16)&0xFFFF));
+        emitMeshlets(mli, meshletPtr, s, (meta.cntC      &0xFFFF));
+        emitMeshlets(mli, meshletPtr, n, ((meta.cntC>>16)&0xFFFF));
+        emitMeshlets(mli, meshletPtr, w, (meta.cntD      &0xFFFF));
+        emitMeshlets(mli, meshletPtr, e, ((meta.cntD>>16)&0xFFFF));
+        //TODO: also increment a secondary atomic buffer that can be used to do a compute pass over all meshlets (need to basicly divide the meshletCounter by the computes workGroup size)
+    }
+}

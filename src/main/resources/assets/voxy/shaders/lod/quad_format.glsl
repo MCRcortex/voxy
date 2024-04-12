@@ -29,6 +29,10 @@ uint extractLightId(uint64_t quad) {
     return Eu32(quad, 8, 55);
 }
 
+bool isQuadEmpty(uint64_t quad) {
+    return quad == uint64_t(0);
+}
+
 #else
 //TODO: FIXME, ivec2 swaps around the data of the x and y cause its written in little endian
 
@@ -68,5 +72,9 @@ uint extractBiomeId(ivec2 quad) {
 
 uint extractLightId(ivec2 quad) {
     return Eu32v(quad, 8, 55);
+}
+
+bool isQuadEmpty(ivec2 quad) {
+    return all(equal(quad, ivec2(0)));
 }
 #endif

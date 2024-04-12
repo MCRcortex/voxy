@@ -1,0 +1,164 @@
+package me.cortex.voxy.client.core.rendering;
+
+import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.shader.Shader;
+import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
+import net.minecraft.client.render.RenderLayer;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+import org.lwjgl.system.MemoryUtil;
+
+import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
+import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15.glBindBuffer;
+import static org.lwjgl.opengl.GL30.glBindBufferBase;
+import static org.lwjgl.opengl.GL30.glBindVertexArray;
+import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
+import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
+import static org.lwjgl.opengl.GL31.glDrawElementsInstanced;
+import static org.lwjgl.opengl.GL33.glBindSampler;
+import static org.lwjgl.opengl.GL40.glDrawElementsIndirect;
+import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
+import static org.lwjgl.opengl.GL42.GL_FRAMEBUFFER_BARRIER_BIT;
+import static org.lwjgl.opengl.GL42.glMemoryBarrier;
+import static org.lwjgl.opengl.GL43.*;
+import static org.lwjgl.opengl.GL45.glBindTextureUnit;
+import static org.lwjgl.opengl.GL45.nglClearNamedBufferSubData;
+import static org.lwjgl.opengl.GL45C.nglClearNamedBufferData;
+import static org.lwjgl.opengl.NVMeshShader.glDrawMeshTasksNV;
+import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FRAGMENT_TEST_NV;
+
+public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46MeshletViewport, DefaultGeometryManager> {
+    private final Shader meshletGenerator = Shader.make()
+            .add(ShaderType.COMPUTE, "voxy:lod/gl46mesh/cmdgen.comp")
+            .compile();
+
+    private final Shader lodShader = Shader.make()
+            .add(ShaderType.VERTEX, "voxy:lod/gl46mesh/quads.vert")
+            .add(ShaderType.FRAGMENT, "voxy:lod/gl46mesh/quads.frag")
+            .compile();
+
+    private final Shader cullShader = Shader.make()
+            .add(ShaderType.VERTEX, "voxy:lod/gl46mesh/cull.vert")
+            .add(ShaderType.FRAGMENT, "voxy:lod/gl46mesh/cull.frag")
+            .compile();
+
+    private final GlBuffer glDrawIndirect;
+    private final GlBuffer meshletBuffer;
+
+    public Gl46MeshletsFarWorldRenderer(int geometrySize, int maxSections) {
+        super(new DefaultGeometryManager(geometrySize*8L, maxSections));
+        this.glDrawIndirect = new GlBuffer(4*5);
+        this.meshletBuffer = new GlBuffer(4*1000000);//TODO: Make max meshlet count configurable
+    }
+
+    protected void bindResources(Gl46MeshletViewport viewport) {
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometry.geometryId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.glDrawIndirect.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.meshletBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.geometry.metaId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.visibilityBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.models.getBufferId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.models.getColourBufferId());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, this.lightDataBuffer.id);//Lighting LUT
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.glDrawIndirect.id);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
+
+        //Bind the texture atlas
+        glBindSampler(0, this.models.getSamplerId());
+        glBindTextureUnit(0, this.models.getTextureId());
+    }
+
+    private void updateUniformBuffer(Gl46MeshletViewport viewport) {
+        long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, this.uniformBuffer.size());
+
+        var mat = new Matrix4f(viewport.projection).mul(viewport.modelView);
+        var innerTranslation = new Vector3f((float) (viewport.cameraX-(this.sx<<5)), (float) (viewport.cameraY-(this.sy<<5)), (float) (viewport.cameraZ-(this.sz<<5)));
+        mat.translate(-innerTranslation.x, -innerTranslation.y, -innerTranslation.z);
+        mat.getToAddress(ptr); ptr += 4*4*4;
+        MemoryUtil.memPutInt(ptr, this.sx); ptr += 4;
+        MemoryUtil.memPutInt(ptr, this.sy); ptr += 4;
+        MemoryUtil.memPutInt(ptr, this.sz); ptr += 4;
+        MemoryUtil.memPutInt(ptr, this.geometry.getSectionCount()); ptr += 4;
+        var planes = ((AccessFrustumIntersection)this.frustum).getPlanes();
+        for (var plane : planes) {
+            plane.getToAddress(ptr); ptr += 4*4;
+        }
+        innerTranslation.getToAddress(ptr); ptr += 4*3;
+        MemoryUtil.memPutInt(ptr, viewport.frameId++); ptr += 4;
+    }
+
+    @Override
+    public void renderFarAwayOpaque(Gl46MeshletViewport viewport) {
+        if (this.geometry.getSectionCount() == 0) {
+            return;
+        }
+
+        {//Mark all of the updated sections as being visible from last frame
+            for (int id : this.updatedSectionIds) {
+                long ptr = UploadStream.INSTANCE.upload(viewport.visibilityBuffer, id * 4L, 4);
+                MemoryUtil.memPutInt(ptr, viewport.frameId - 1);//(visible from last frame)
+            }
+        }
+
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+
+        this.updateUniformBuffer(viewport);
+        UploadStream.INSTANCE.commit();
+        glBindVertexArray(AbstractFarWorldRenderer.STATIC_VAO);
+
+        nglClearNamedBufferSubData(this.glDrawIndirect.id, GL_R32UI, 4, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+
+        this.meshletGenerator.bind();
+        this.bindResources(viewport);
+        glDispatchCompute((this.geometry.getSectionCount()+63)/64, 1, 1);
+
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
+
+        this.lodShader.bind();
+        this.bindResources(viewport);
+        glDisable(GL_CULL_FACE);
+        glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0);
+        glEnable(GL_CULL_FACE);
+
+        glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
+
+        this.cullShader.bind();
+        this.bindResources(viewport);
+        glDepthMask(false);
+        glColorMask(false, false, false, false);
+        glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3, GL_UNSIGNED_BYTE, (1 << 16) * 6 * 2, this.geometry.getSectionCount());
+        glColorMask(true, true, true, true);
+        glDepthMask(true);
+
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    }
+
+
+    @Override
+    public void renderFarAwayTranslucent(Gl46MeshletViewport viewport) {
+
+    }
+
+    @Override
+    protected Gl46MeshletViewport createViewport0() {
+        return new Gl46MeshletViewport(this);
+    }
+
+    @Override
+    public void shutdown() {
+        super.shutdown();
+        this.meshletGenerator.free();
+        this.lodShader.free();
+        this.cullShader.free();
+
+        this.glDrawIndirect.free();
+        this.meshletBuffer.free();
+    }
+}

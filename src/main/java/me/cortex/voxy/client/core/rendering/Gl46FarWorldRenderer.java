@@ -34,7 +34,7 @@ import static org.lwjgl.opengl.GL45.glBindTextureUnit;
 import static org.lwjgl.opengl.GL45.glClearNamedBufferData;
 import static org.lwjgl.opengl.GL45C.nglClearNamedBufferData;
 
-public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport> {
+public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport, DefaultGeometryManager> {
     private final Shader commandGen = Shader.make()
             .add(ShaderType.COMPUTE, "voxy:lod/gl46/cmdgen.comp")
             .compile();
@@ -55,7 +55,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
     private final GlBuffer glCommandCountBuffer;
 
     public Gl46FarWorldRenderer(int geometryBuffer, int maxSections) {
-        super(geometryBuffer, maxSections);
+        super(new DefaultGeometryManager(geometryBuffer*8L, maxSections));
         this.glCommandBuffer = new GlBuffer(maxSections*5L*4 * 6);
         this.glCommandCountBuffer = new GlBuffer(4*2);
         nglClearNamedBufferData(this.glCommandBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);

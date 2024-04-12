@@ -40,11 +40,11 @@ import static org.lwjgl.opengl.GL30.*;
 
 
 //Todo: tinker with having the compute shader where each thread is a position to render? maybe idk
-public abstract class AbstractFarWorldRenderer <T extends Viewport> {
+public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends AbstractGeometryManager> {
     public static final int STATIC_VAO = glGenVertexArrays();
 
     protected final GlBuffer uniformBuffer;
-    protected final GeometryManager geometry;
+    protected final J geometry;
     protected final ModelManager models;
     protected final GlBuffer lightDataBuffer;
 
@@ -63,11 +63,11 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport> {
 
     private final ConcurrentLinkedDeque<Mapper.StateEntry> blockStateUpdates = new ConcurrentLinkedDeque<>();
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeUpdates = new ConcurrentLinkedDeque<>();
-    public AbstractFarWorldRenderer(int geometrySize, int maxSections) {
-        this.maxSections = maxSections;
+    public AbstractFarWorldRenderer(J geometry) {
+        this.maxSections = geometry.getMaxSections();
         this.uniformBuffer  = new GlBuffer(1024);
         this.lightDataBuffer  = new GlBuffer(256*4);//256 of uint
-        this.geometry = new GeometryManager(geometrySize*8L, maxSections);
+        this.geometry = geometry;
         this.models = new ModelManager(16);
     }
 

@@ -14,11 +14,8 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 
-public class GeometryManager {
+public class DefaultGeometryManager extends AbstractGeometryManager {
     private static final int SECTION_METADATA_SIZE = 32;
-
-    private final ConcurrentLinkedDeque<BuiltSection> buildResults = new ConcurrentLinkedDeque<>();
-    private int sectionCount = 0;
     private final Long2IntOpenHashMap pos2id = new Long2IntOpenHashMap();
     private final LongArrayList id2pos = new LongArrayList();
     private final ObjectArrayList<SectionMeta> sectionMetadata = new ObjectArrayList<>();
@@ -27,7 +24,8 @@ public class GeometryManager {
     private final GlBuffer sectionMetaBuffer;
     private final BufferArena geometryBuffer;
 
-    public GeometryManager(long geometryBufferSize, int maxSections) {
+    public DefaultGeometryManager(long geometryBufferSize, int maxSections) {
+        super(maxSections);
         this.sectionMetaBuffer = new GlBuffer(((long) maxSections) * SECTION_METADATA_SIZE);
         this.geometryBuffer = new BufferArena(geometryBufferSize, 8);
         this.pos2id.defaultReturnValue(-1);
@@ -120,14 +118,6 @@ public class GeometryManager {
         return this.markSectionIds;
     }
 
-    public void enqueueResult(BuiltSection sectionGeometry) {
-        this.buildResults.add(sectionGeometry);
-    }
-
-    public int getSectionCount() {
-        return this.sectionCount;
-    }
-
     public void free() {
         while (!this.buildResults.isEmpty()) {
             this.buildResults.pop().free();
@@ -156,7 +146,7 @@ public class GeometryManager {
 
     //TODO: pack the offsets of each axis so that implicit face culling can work
     //Note! the opaquePreDataCount and translucentPreDataCount are never writen to the meta buffer, as they are indexed in reverse relative to the base opaque and translucent geometry
-    private record SectionMeta(long position, int aabb, int geometryPtr, int size, int[] offsets) {
+    protected record SectionMeta(long position, int aabb, int geometryPtr, int size, int[] offsets) {
         public void writeMetadata(long ptr) {
             //THIS IS DUE TO ENDIANNESS and that we are splitting a long into 2 ints
             MemoryUtil.memPutInt(ptr, (int) (this.position>>32)); ptr += 4;
@@ -171,7 +161,7 @@ public class GeometryManager {
         }
     }
 
-    private SectionMeta createMeta(BuiltSection geometry) {
+    protected SectionMeta createMeta(BuiltSection geometry) {
         int geometryPtr = (int) this.geometryBuffer.upload(geometry.geometryBuffer);
         if (geometryPtr == -1) {
             String msg = "Buffer arena out of memory, please increase it in settings or decrease LoD quality";
@@ -182,10 +172,9 @@ public class GeometryManager {
         return new SectionMeta(geometry.position, geometry.aabb, geometryPtr, (int) (geometry.geometryBuffer.size/8), geometry.offsets);
     }
 
-    private void freeMeta(SectionMeta meta) {
+    protected void freeMeta(SectionMeta meta) {
         if (meta.geometryPtr != -1) {
             this.geometryBuffer.free(meta.geometryPtr);
         }
     }
-
 }

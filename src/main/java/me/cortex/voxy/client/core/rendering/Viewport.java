@@ -2,8 +2,8 @@ package me.cortex.voxy.client.core.rendering;
 
 import org.joml.Matrix4f;
 
-public abstract class Viewport <A extends Viewport<A,T>, T extends AbstractFarWorldRenderer<A>> {
-    private final T renderer;
+public abstract class Viewport <A extends Viewport<A>> {
+    private final AbstractFarWorldRenderer renderer;
 
     int frameId;
     Matrix4f projection;
@@ -12,7 +12,7 @@ public abstract class Viewport <A extends Viewport<A,T>, T extends AbstractFarWo
     double cameraY;
     double cameraZ;
 
-    protected Viewport(T renderer) {
+    protected Viewport(AbstractFarWorldRenderer renderer) {
         this.renderer = renderer;
     }
 
