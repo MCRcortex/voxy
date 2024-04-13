@@ -53,6 +53,7 @@ public class RenderDataFactory {
     // can do funny stuff like double rendering
 
     private static final boolean USE_UINT64 = false;//FIXME: replace with automatic detection of uint64 shader extension support
+    private static final int QUADS_PER_MESHLET = 62;
     private static void writePos(long ptr, long pos) {
         if (USE_UINT64) {
             MemoryUtil.memPutLong(ptr, pos);
@@ -88,10 +89,10 @@ public class RenderDataFactory {
 
         int bufferSize;
         if (this.generateMeshlets) {
-            bufferSize = getMeshletHoldingCount(this.doubleSidedQuadCollector.size(), 126, 128) +
-                    getMeshletHoldingCount(this.translucentQuadCollector.size(), 126, 128);
+            bufferSize = getMeshletHoldingCount(this.doubleSidedQuadCollector.size(), QUADS_PER_MESHLET, QUADS_PER_MESHLET+2) +
+                    getMeshletHoldingCount(this.translucentQuadCollector.size(), QUADS_PER_MESHLET, QUADS_PER_MESHLET+2);
             for (var collector : this.directionalQuadCollectors) {
-                bufferSize += getMeshletHoldingCount(collector.size(), 126, 128);
+                bufferSize += getMeshletHoldingCount(collector.size(), QUADS_PER_MESHLET, QUADS_PER_MESHLET+2);
             }
         } else {
             bufferSize = this.doubleSidedQuadCollector.size() + this.translucentQuadCollector.size();
@@ -122,11 +123,11 @@ public class RenderDataFactory {
                     //Write out meshlet header
 
                     //Write out the section position
-                    writePos(ptr + meshlet * 8L * 128L, key);
-                    MemoryUtil.memPutLong(ptr + meshlet * 8L * 128L + 8, 0);
+                    writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2), key);
+                    MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, 0);
                 }
-                MemoryUtil.memPutLong(ptr + meshlet * 8L * 128 + (2 + innerQuadCount++) * 8L, data);
-                if (innerQuadCount == 126) {
+                MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + (2 + innerQuadCount++) * 8L, data);
+                if (innerQuadCount == QUADS_PER_MESHLET) {
                     innerQuadCount = 0;
                     meshlet++;
                 }
@@ -143,11 +144,11 @@ public class RenderDataFactory {
                     //Write out meshlet header
 
                     //Write out the section position
-                    writePos(ptr + meshlet * 8L * 128L, key);
-                    MemoryUtil.memPutLong(ptr + meshlet * 8L * 128L + 8, 0);
+                    writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2), key);
+                    MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, 0);
                 }
-                MemoryUtil.memPutLong(ptr + meshlet * 8L * 128 + (2 + innerQuadCount++) * 8L, data);
-                if (innerQuadCount == 126) {
+                MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + (2 + innerQuadCount++) * 8L, data);
+                if (innerQuadCount == QUADS_PER_MESHLET) {
                     innerQuadCount = 0;
                     meshlet++;
                 }
@@ -165,11 +166,11 @@ public class RenderDataFactory {
                         //Write out meshlet header
 
                         //Write out the section position
-                        writePos(ptr + meshlet * 8L * 128L, key);
-                        MemoryUtil.memPutLong(ptr + meshlet * 8L * 128L + 8, 0);
+                        writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2), key);
+                        MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, 0);
                     }
-                    MemoryUtil.memPutLong(ptr + meshlet * 8L * 128 + (2 + innerQuadCount++) * 8L, data);
-                    if (innerQuadCount == 126) {
+                    MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + (2 + innerQuadCount++) * 8L, data);
+                    if (innerQuadCount == QUADS_PER_MESHLET) {
                         innerQuadCount = 0;
                         meshlet++;
                     }

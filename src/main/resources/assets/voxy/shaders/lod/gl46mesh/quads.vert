@@ -1,8 +1,8 @@
 #version 450
 #extension GL_ARB_gpu_shader_int64 : enable
+#define QUADS_PER_MESHLET 62
 
 #define MESHLET_ACCESS readonly
-#define QUADS_PER_MESHLET 126
 //There are 16 bytes of metadata at the start of the meshlet
 #define MESHLET_SIZE (QUADS_PER_MESHLET+2)
 #import <voxy:lod/quad_format.glsl>

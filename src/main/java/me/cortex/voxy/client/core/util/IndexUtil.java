@@ -4,6 +4,25 @@ import me.cortex.voxy.common.util.MemoryBuffer;
 import org.lwjgl.system.MemoryUtil;
 
 public class IndexUtil {
+    public static MemoryBuffer generateQuadIndicesByte(int quadCount) {
+        if ((quadCount*4) >= 1<<8) {
+            throw new IllegalArgumentException("Quad count to large");
+        }
+        MemoryBuffer buffer = new MemoryBuffer(quadCount * 6L);
+        long ptr = buffer.address;
+        for(int i = 0; i < quadCount*4; i += 4) {
+            MemoryUtil.memPutByte(ptr + (0), (byte) i);
+            MemoryUtil.memPutByte(ptr + (1), (byte) (i + 1));
+            MemoryUtil.memPutByte(ptr + (2), (byte) (i + 2));
+            MemoryUtil.memPutByte(ptr + (3), (byte) (i + 1));
+            MemoryUtil.memPutByte(ptr + (4), (byte) (i + 3));
+            MemoryUtil.memPutByte(ptr + (5), (byte) (i + 2));
+
+            ptr += 6;
+        }
+
+        return buffer;
+    }
     public static MemoryBuffer generateQuadIndicesShort(int quadCount) {
         if ((quadCount*4) >= 1<<16) {
             throw new IllegalArgumentException("Quad count to large");

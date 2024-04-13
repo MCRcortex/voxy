@@ -58,7 +58,7 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
     private final GlBuffer meshletBuffer;
 
     public Gl46MeshletsFarWorldRenderer(int geometrySize, int maxSections) {
-        super(new DefaultGeometryManager(alignUp(geometrySize*8L, 8*128), maxSections, 8*128));
+        super(new DefaultGeometryManager(alignUp(geometrySize*8L, 8*64), maxSections, 8*64));
         this.glDrawIndirect = new GlBuffer(4*5);
         this.meshletBuffer = new GlBuffer(4*1000000);//TODO: Make max meshlet count configurable, not just 1 million (even tho thats a max of 126 million quads per frame)
     }
@@ -74,7 +74,7 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.models.getColourBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, this.lightDataBuffer.id);//Lighting LUT
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, bindToDrawIndirect?this.glDrawIndirect.id:0);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BYTE.id());
 
         //Bind the texture atlas
         glBindSampler(0, this.models.getSamplerId());
@@ -132,8 +132,7 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         this.lodShader.bind();
         this.bindResources(viewport, true);
         glDisable(GL_CULL_FACE);
-        //glDrawElementsInstanced(GL_TRIANGLES, 6*126, GL_UNSIGNED_SHORT, 0, 40000);
-        glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0);
+        glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_BYTE, 0);
         glEnable(GL_CULL_FACE);
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
@@ -142,7 +141,7 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         this.bindResources(viewport, false);
         glDepthMask(false);
         glColorMask(false, false, false, false);
-        glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3, GL_UNSIGNED_BYTE, (1 << 16) * 6 * 2, this.geometry.getSectionCount());
+        glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3, GL_UNSIGNED_BYTE, (1 << 8) * 6, this.geometry.getSectionCount());
         glColorMask(true, true, true, true);
         glDepthMask(true);
 
