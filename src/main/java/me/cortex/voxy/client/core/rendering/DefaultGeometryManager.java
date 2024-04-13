@@ -24,11 +24,18 @@ public class DefaultGeometryManager extends AbstractGeometryManager {
     private final GlBuffer sectionMetaBuffer;
     private final BufferArena geometryBuffer;
 
+    private final int geometryElementSize;
+
     public DefaultGeometryManager(long geometryBufferSize, int maxSections) {
+        this(geometryBufferSize, maxSections, 8);//8 is default quad size
+    }
+
+    public DefaultGeometryManager(long geometryBufferSize, int maxSections, int elementSize) {
         super(maxSections);
         this.sectionMetaBuffer = new GlBuffer(((long) maxSections) * SECTION_METADATA_SIZE);
-        this.geometryBuffer = new BufferArena(geometryBufferSize, 8);
+        this.geometryBuffer = new BufferArena(geometryBufferSize, elementSize);
         this.pos2id.defaultReturnValue(-1);
+        this.geometryElementSize = elementSize;
     }
 
     IntArrayList uploadResults() {
@@ -169,7 +176,7 @@ public class DefaultGeometryManager extends AbstractGeometryManager {
             System.err.println(msg);
             return null;
         }
-        return new SectionMeta(geometry.position, geometry.aabb, geometryPtr, (int) (geometry.geometryBuffer.size/8), geometry.offsets);
+        return new SectionMeta(geometry.position, geometry.aabb, geometryPtr, (int) (geometry.geometryBuffer.size/this.geometryElementSize), geometry.offsets);
     }
 
     protected void freeMeta(SectionMeta meta) {

@@ -85,6 +85,8 @@ public class RenderDataFactory {
             return new BuiltSection(section.key);
         }
 
+        //TODO: generate the meshlets here
+
         var buff = new MemoryBuffer(quadCount*8L);
         long ptr = buff.address;
         int[] offsets = new int[8];

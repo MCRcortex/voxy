@@ -32,6 +32,13 @@ import static org.lwjgl.opengl.GL45C.nglClearNamedBufferData;
 import static org.lwjgl.opengl.NVMeshShader.glDrawMeshTasksNV;
 import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FRAGMENT_TEST_NV;
 
+//TODO: NOTE
+// can do "meshlet compaction"
+// that is, meshlets are refered not by the meshlet id but by an 8 byte alligned index, (the quad index)
+// this means that non full meshlets can have the tailing data be truncated and used in the next meshlet
+// as long as the number of quads in the meshlet is stored in the header
+// the shader can cull the verticies of any quad that has its index over the expected quuad count
+// this could potentially result in a fair bit of memory savings (especially if used in normal mc terrain rendering)
 public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46MeshletViewport, DefaultGeometryManager> {
     private final Shader meshletGenerator = Shader.make()
             .add(ShaderType.COMPUTE, "voxy:lod/gl46mesh/cmdgen.comp")
@@ -51,9 +58,9 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
     private final GlBuffer meshletBuffer;
 
     public Gl46MeshletsFarWorldRenderer(int geometrySize, int maxSections) {
-        super(new DefaultGeometryManager(geometrySize*8L, maxSections));
+        super(new DefaultGeometryManager(alignUp(geometrySize*8L, 8*128), maxSections, 8*128));
         this.glDrawIndirect = new GlBuffer(4*5);
-        this.meshletBuffer = new GlBuffer(4*1000000);//TODO: Make max meshlet count configurable
+        this.meshletBuffer = new GlBuffer(4*1000000);//TODO: Make max meshlet count configurable, not just 1 million (even tho thats a max of 126 million quads per frame)
     }
 
     protected void bindResources(Gl46MeshletViewport viewport) {
@@ -160,5 +167,9 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
 
         this.glDrawIndirect.free();
         this.meshletBuffer.free();
+    }
+
+    public static long alignUp(long n, long alignment) {
+        return (n + alignment - 1) & -alignment;
     }
 }
