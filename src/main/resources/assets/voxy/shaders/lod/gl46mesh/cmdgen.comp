@@ -48,7 +48,7 @@ void main() {
 
         uint mli = atomicAdd(drawCmd.instanceCount, total);//meshletListIndex
 
-        uint meshletPtr = extractMeshletStart(meta);
+        uint meshletPtr = extractMeshletStart(meta) + (meta.cntA&0xFFFF);
 
         emitMeshlets(mli, meshletPtr, a, a);
         emitMeshlets(mli, meshletPtr, u, (meta.cntB      &0xFFFF));

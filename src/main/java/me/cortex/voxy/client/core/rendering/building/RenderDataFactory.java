@@ -111,7 +111,7 @@ public class RenderDataFactory {
             long key = section.key;
             buff = new MemoryBuffer(bufferSize * 8L);
             long ptr = buff.address;
-            MemoryUtil.memSet(ptr, -1, bufferSize * 8L);
+            MemoryUtil.memSet(ptr, 0,bufferSize * 8L);
             int meshlet = 0;
             int innerQuadCount = 0;
 
