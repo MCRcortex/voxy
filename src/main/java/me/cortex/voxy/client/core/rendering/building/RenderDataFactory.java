@@ -30,6 +30,7 @@ public class RenderDataFactory {
     private final LongArrayList translucentQuadCollector = new LongArrayList();
     private final LongArrayList[] directionalQuadCollectors = new LongArrayList[]{new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList()};
 
+    private final boolean generateMeshlets = true;
 
     private int minX;
     private int minY;
@@ -51,6 +52,15 @@ public class RenderDataFactory {
     // since fluid states are explicitly overlays over the base block
     // can do funny stuff like double rendering
 
+    private static final boolean USE_UINT64 = false;//FIXME: replace with automatic detection of uint64 shader extension support
+    private static void writePos(long ptr, long pos) {
+        if (USE_UINT64) {
+            MemoryUtil.memPutLong(ptr, pos);
+        } else {
+            MemoryUtil.memPutInt(ptr, (int) (pos>>32));
+            MemoryUtil.memPutInt(ptr + 4, (int)pos);
+        }
+    }
 
     //section is already acquired and gets released by the parent
     public BuiltSection generateMesh(WorldSection section) {
@@ -76,37 +86,121 @@ public class RenderDataFactory {
         this.generateMeshForAxis(section, 1);//Direction.Axis.Z
         this.generateMeshForAxis(section, 2);//Direction.Axis.X
 
-        int quadCount = this.doubleSidedQuadCollector.size() + this.translucentQuadCollector.size();
-        for (var collector : this.directionalQuadCollectors) {
-            quadCount += collector.size();
+        int bufferSize;
+        if (this.generateMeshlets) {
+            bufferSize = getMeshletHoldingCount(this.doubleSidedQuadCollector.size(), 126, 128) +
+                    getMeshletHoldingCount(this.translucentQuadCollector.size(), 126, 128);
+            for (var collector : this.directionalQuadCollectors) {
+                bufferSize += getMeshletHoldingCount(collector.size(), 126, 128);
+            }
+        } else {
+            bufferSize = this.doubleSidedQuadCollector.size() + this.translucentQuadCollector.size();
+            for (var collector : this.directionalQuadCollectors) {
+                bufferSize += collector.size();
+            }
         }
 
-        if (quadCount == 0) {
+        if (bufferSize == 0) {
             return new BuiltSection(section.key);
         }
 
         //TODO: generate the meshlets here
-
-        var buff = new MemoryBuffer(quadCount*8L);
-        long ptr = buff.address;
+        MemoryBuffer buff;
         int[] offsets = new int[8];
-        int coff = 0;
+        if (this.generateMeshlets) {
+            long key = section.key;
+            buff = new MemoryBuffer(bufferSize * 8L);
+            long ptr = buff.address;
+            MemoryUtil.memSet(ptr, -1, bufferSize * 8L);
+            int meshlet = 0;
+            int innerQuadCount = 0;
 
-        //Ordering is: translucent, double sided quads, directional quads
-        offsets[0] = coff;
-        for (long data : this.translucentQuadCollector) {
-            MemoryUtil.memPutLong(ptr + ((coff++)*8L), data);
-        }
+            //Ordering is: translucent, double sided quads, directional quads
+            offsets[0] = meshlet;
+            for (long data : this.translucentQuadCollector) {
+                if (innerQuadCount == 0) {
+                    //Write out meshlet header
 
-        offsets[1] = coff;
-        for (long data : this.doubleSidedQuadCollector) {
-            MemoryUtil.memPutLong(ptr + ((coff++)*8L), data);
-        }
+                    //Write out the section position
+                    writePos(ptr + meshlet * 8L * 128L, key);
+                    MemoryUtil.memPutLong(ptr + meshlet * 8L * 128L + 8, 0);
+                }
+                MemoryUtil.memPutLong(ptr + meshlet * 8L * 128 + (2 + innerQuadCount++) * 8L, data);
+                if (innerQuadCount == 126) {
+                    innerQuadCount = 0;
+                    meshlet++;
+                }
+            }
 
-        for (int face = 0; face < 6; face++) {
-            offsets[face+2] = coff;
-            for (long data : this.directionalQuadCollectors[face]) {
+            if (innerQuadCount != 0) {
+                meshlet++;
+                innerQuadCount = 0;
+            }
+
+            offsets[1] = meshlet;
+            for (long data : this.doubleSidedQuadCollector) {
+                if (innerQuadCount == 0) {
+                    //Write out meshlet header
+
+                    //Write out the section position
+                    writePos(ptr + meshlet * 8L * 128L, key);
+                    MemoryUtil.memPutLong(ptr + meshlet * 8L * 128L + 8, 0);
+                }
+                MemoryUtil.memPutLong(ptr + meshlet * 8L * 128 + (2 + innerQuadCount++) * 8L, data);
+                if (innerQuadCount == 126) {
+                    innerQuadCount = 0;
+                    meshlet++;
+                }
+            }
+
+            if (innerQuadCount != 0) {
+                meshlet++;
+                innerQuadCount = 0;
+            }
+
+            for (int face = 0; face < 6; face++) {
+                offsets[face + 2] = meshlet;
+                for (long data : this.directionalQuadCollectors[face]) {
+                    if (innerQuadCount == 0) {
+                        //Write out meshlet header
+
+                        //Write out the section position
+                        writePos(ptr + meshlet * 8L * 128L, key);
+                        MemoryUtil.memPutLong(ptr + meshlet * 8L * 128L + 8, 0);
+                    }
+                    MemoryUtil.memPutLong(ptr + meshlet * 8L * 128 + (2 + innerQuadCount++) * 8L, data);
+                    if (innerQuadCount == 126) {
+                        innerQuadCount = 0;
+                        meshlet++;
+                    }
+                }
+
+                if (innerQuadCount != 0) {
+                    meshlet++;
+                    innerQuadCount = 0;
+                }
+            }
+        } else {
+            buff = new MemoryBuffer(bufferSize * 8L);
+            long ptr = buff.address;
+            int coff = 0;
+
+            //Ordering is: translucent, double sided quads, directional quads
+            offsets[0] = coff;
+            for (long data : this.translucentQuadCollector) {
                 MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
+            }
+
+            offsets[1] = coff;
+            for (long data : this.doubleSidedQuadCollector) {
+                MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
+            }
+
+            for (int face = 0; face < 6; face++) {
+                offsets[face + 2] = coff;
+                for (long data : this.directionalQuadCollectors[face]) {
+                    MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
+                }
             }
         }
 
@@ -322,5 +416,13 @@ public class RenderDataFactory {
                 axisOutputGeometry.add(encodedQuad);
             }
         }
+    }
+
+    private static int getMeshletHoldingCount(int quads, int quadsPerMeshlet, int meshletSize) {
+        return ((quads+(quadsPerMeshlet-1))/quadsPerMeshlet)*meshletSize;
+    }
+
+    public static int alignUp(int n, int alignment) {
+        return (n + alignment - 1) & -alignment;
     }
 }

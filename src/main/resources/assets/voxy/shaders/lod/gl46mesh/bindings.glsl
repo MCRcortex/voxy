@@ -1,3 +1,4 @@
+#line 1
 struct Frustum {
     vec4 planes[6];
 };
@@ -51,7 +52,7 @@ layout(binding = 2, std430) restrict buffer DrawBuffer {
     DrawCommand drawCmd;
 };
 
-#ifndef Quad
+#ifndef MESHLET_ACCESS
 #define MESHLET_ACCESS readonly writeonly
 #endif
 layout(binding = 3, std430) MESHLET_ACCESS restrict buffer MeshletListData {

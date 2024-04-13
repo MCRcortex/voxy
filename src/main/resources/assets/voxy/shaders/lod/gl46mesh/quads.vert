@@ -7,10 +7,35 @@
 #define MESHLET_SIZE (QUADS_PER_MESHLET+2)
 #import <voxy:lod/quad_format.glsl>
 #import <voxy:lod/gl46mesh/bindings.glsl>
-#import <voxy:lod/section.glsl>
-#define GEOMETRY_FMT Quad
+#define PosHeader Quad
 
-GEOMETRY_FMT meshletPosition;
+
+#ifdef GL_ARB_gpu_shader_int64
+ivec3 extractPosition(PosHeader pos64) {
+    //((long)lvl<<60)|((long)(y&0xFF)<<52)|((long)(z&((1<<24)-1))<<28)|((long)(x&((1<<24)-1))<<4);
+    //return ivec3((pos64<<4)&uint64_t(0xFFFFFFFF),(pos64>>28)&uint64_t(0xFFFFFFFF),(pos64>>24)&uint64_t(0xFFFFFFFF))>>ivec3(8,24,8);
+    return (ivec3(int(pos64>>4)&((1<<24)-1), int(pos64>>52)&0xFF, int(pos64>>28)&((1<<24)-1))<<ivec3(8,24,8))>>ivec3(8,24,8);
+}
+uint extractDetail(PosHeader pos64) {
+    return uint(pos64>>60);
+}
+#else
+ivec3 extractPosition(PosHeader pos) {
+    int y = ((int(pos.x)<<4)>>24);
+    int x = (int(pos.y)<<4)>>8;
+    int z = int((pos.x&((1<<20)-1))<<4);
+    z |= int(pos.y>>28)&0xF;
+    z <<= 8;
+    z >>= 8;
+    return ivec3(x,y,z);
+}
+
+uint extractDetail(PosHeader pos) {
+    return uint(pos.x)>>28;
+}
+#endif
+
+PosHeader meshletPosition;
 Quad quad;
 bool setupMeshlet() {
     gl_CullDistance[0] = 1;
@@ -23,7 +48,7 @@ bool setupMeshlet() {
         return true;
     }
 
-    uint baseId = (data*QUADS_PER_MESHLET);
+    uint baseId = (data*MESHLET_SIZE);
     uint quadIndex = baseId + (gl_VertexID>>2) + 2;
     meshletPosition = geometryPool[baseId];
     quad = geometryPool[quadIndex];
@@ -35,7 +60,21 @@ bool setupMeshlet() {
 }
 
 void main() {
+
     if (setupMeshlet()) {
+        gl_Position = vec4(1.0f/0.0f);
         return;
     }
+    if ((gl_VertexID>>2)!=0) {
+        gl_Position = vec4(1.0f/0.0f);
+        return;
+    }
+
+    uint detail = extractDetail(meshletPosition);
+    ivec3 sectionPos = extractPosition(meshletPosition);
+
+    ivec3 pos = (((sectionPos<<detail)-baseSectionPos)<<5);
+    pos += ivec3(gl_VertexID&1, 0, (gl_VertexID>>1)&1)*(1<<detail);
+
+    gl_Position = MVP * vec4(vec3(pos),1);
 }
