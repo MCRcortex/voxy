@@ -1,3 +1,16 @@
+struct Frustum {
+    vec4 planes[6];
+};
+
+layout(binding = 0, std140) uniform SceneUniform {
+    mat4 MVP;
+    ivec3 baseSectionPos;
+    int sectionCount;
+    Frustum frustum;
+    vec3 cameraSubPos;
+    uint frameId;
+};
+
 struct BlockModel {
     uint faceData[6];
     uint flagsA;
@@ -30,8 +43,8 @@ layout(binding = 0) uniform sampler2D blockModelAtlas;
 #ifndef Quad
 #define Quad ivec2
 #endif
-layout(binding = 1, std430) readonly restrict buffer QuadBuffer {
-Quad quadData[];
+layout(binding = 1, std430) readonly restrict buffer GeometryBuffer {
+    Quad geometryPool[];
 };
 
 layout(binding = 2, std430) restrict buffer DrawBuffer {

@@ -14,13 +14,16 @@ import net.minecraft.text.Text;
 import java.util.List;
 
 public class VoxyConfigScreenFactory implements ModMenuApi {
-    private static final VoxyConfig DEFAULT = new VoxyConfig();
+    private static VoxyConfig DEFAULT;
     @Override
     public ConfigScreenFactory<?> getModConfigScreenFactory() {
         return parent -> buildConfigScreen(parent, VoxyConfig.CONFIG);
     }
 
     private static Screen buildConfigScreen(Screen parent, VoxyConfig config) {
+        if (DEFAULT == null) {
+            DEFAULT = new VoxyConfig();
+        }
         ConfigBuilder builder = ConfigBuilder.create()
                 .setParentScreen(parent)
                 .setTitle(Text.translatable("voxy.config.title"));

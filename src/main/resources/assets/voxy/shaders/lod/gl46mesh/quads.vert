@@ -1,4 +1,6 @@
 #version 450
+#extension GL_ARB_gpu_shader_int64 : enable
+
 #define MESHLET_ACCESS readonly
 #define QUADS_PER_MESHLET 126
 //There are 16 bytes of metadata at the start of the meshlet
@@ -6,8 +8,9 @@
 #import <voxy:lod/quad_format.glsl>
 #import <voxy:lod/gl46mesh/bindings.glsl>
 #import <voxy:lod/section.glsl>
+#define GEOMETRY_FMT Quad
 
-uvec2 meshletPosition;
+GEOMETRY_FMT meshletPosition;
 Quad quad;
 bool setupMeshlet() {
     gl_CullDistance[0] = 1;
