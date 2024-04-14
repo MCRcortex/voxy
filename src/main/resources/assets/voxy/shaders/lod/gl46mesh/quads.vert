@@ -1,6 +1,6 @@
 #version 450
 #extension GL_ARB_gpu_shader_int64 : enable
-#define QUADS_PER_MESHLET 62
+#define QUADS_PER_MESHLET 30
 
 #define MESHLET_ACCESS readonly
 //There are 16 bytes of metadata at the start of the meshlet
@@ -36,6 +36,7 @@ uint extractDetail(PosHeader pos) {
 }
 #endif
 
+layout(location = 6) out flat uint meshlet;
 PosHeader meshletPosition;
 Quad quad;
 bool setupMeshlet() {
@@ -49,6 +50,7 @@ bool setupMeshlet() {
         return true;
     }
 
+    meshlet = data;
     uint baseId = (data*MESHLET_SIZE);
     uint quadIndex = baseId + (gl_VertexID>>2) + 2;
     meshletPosition = geometryPool[baseId];

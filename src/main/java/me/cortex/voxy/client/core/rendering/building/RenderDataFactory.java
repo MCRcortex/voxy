@@ -53,7 +53,7 @@ public class RenderDataFactory {
     // can do funny stuff like double rendering
 
     private static final boolean USE_UINT64 = false;//FIXME: replace with automatic detection of uint64 shader extension support
-    private static final int QUADS_PER_MESHLET = 62;
+    private static final int QUADS_PER_MESHLET = 30;
     private static void writePos(long ptr, long pos) {
         if (USE_UINT64) {
             MemoryUtil.memPutLong(ptr, pos);

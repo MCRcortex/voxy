@@ -5,11 +5,13 @@ import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.RenderLayer;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 
+import static org.lwjgl.opengl.ARBDirectStateAccess.glGetNamedFramebufferAttachmentParameteriv;
 import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
@@ -56,9 +58,10 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
 
     private final GlBuffer glDrawIndirect;
     private final GlBuffer meshletBuffer;
+    private final HiZBuffer hiZBuffer = new HiZBuffer();
 
     public Gl46MeshletsFarWorldRenderer(int geometrySize, int maxSections) {
-        super(new DefaultGeometryManager(alignUp(geometrySize*8L, 8*64), maxSections, 8*64));
+        super(new DefaultGeometryManager(alignUp(geometrySize*8L, 8*32), maxSections, 8*32));
         this.glDrawIndirect = new GlBuffer(4*5);
         this.meshletBuffer = new GlBuffer(4*1000000);//TODO: Make max meshlet count configurable, not just 1 million (even tho thats a max of 126 million quads per frame)
     }
@@ -147,6 +150,14 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
 
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
+
+
+        var i = new int[1];
+        glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, i);
+        this.hiZBuffer.buildMipChain(i[0], MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
+
+
+
         glBindVertexArray(0);
         glBindSampler(0, 0);
         glBindTextureUnit(0, 0);
@@ -173,6 +184,8 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
 
         this.glDrawIndirect.free();
         this.meshletBuffer.free();
+
+        this.hiZBuffer.free();
     }
 
     public static long alignUp(long n, long alignment) {

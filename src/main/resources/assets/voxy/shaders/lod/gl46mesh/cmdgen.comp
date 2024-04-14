@@ -7,7 +7,7 @@
 #import <voxy:lod/section.glsl>
 #define extractMeshletStart extractQuadStart
 layout(local_size_x = 64) in;
-#define QUADS_PER_MESHLET 62
+#define QUADS_PER_MESHLET 30
 
 void emitMeshlets(inout uint mli, inout uint meshletPtr, uint mskedCnt, uint cnt) {
     for (;mskedCnt != 0; mskedCnt--,mli++) {
