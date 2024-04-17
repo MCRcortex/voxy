@@ -4,7 +4,8 @@ import org.joml.Matrix4f;
 
 public abstract class Viewport <A extends Viewport<A>> {
     private final AbstractFarWorldRenderer renderer;
-
+    int width;
+    int height;
     int frameId;
     Matrix4f projection;
     Matrix4f modelView;
@@ -37,6 +38,12 @@ public abstract class Viewport <A extends Viewport<A>> {
         this.cameraX = x;
         this.cameraY = y;
         this.cameraZ = z;
+        return (A) this;
+    }
+
+    public A setScreenSize(int width, int height) {
+        this.width = width;
+        this.height = height;
         return (A) this;
     }
 }

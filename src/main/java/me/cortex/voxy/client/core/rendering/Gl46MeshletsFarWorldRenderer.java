@@ -42,10 +42,6 @@ import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FR
 // the shader can cull the verticies of any quad that has its index over the expected quuad count
 // this could potentially result in a fair bit of memory savings (especially if used in normal mc terrain rendering)
 public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46MeshletViewport, DefaultGeometryManager> {
-    private final Shader meshletGenerator = Shader.make()
-            .add(ShaderType.COMPUTE, "voxy:lod/gl46mesh/cmdgen.comp")
-            .compile();
-
     private final Shader lodShader = Shader.make()
             .add(ShaderType.VERTEX, "voxy:lod/gl46mesh/quads.vert")
             .add(ShaderType.FRAGMENT, "voxy:lod/gl46mesh/quads.frag")
@@ -56,17 +52,26 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
             .add(ShaderType.FRAGMENT, "voxy:lod/gl46mesh/cull.frag")
             .compile();
 
+    private final Shader meshletGenerator = Shader.make()
+            .add(ShaderType.COMPUTE, "voxy:lod/gl46mesh/cmdgen.comp")
+            .compile();
+
+    private final Shader meshletCuller = Shader.make()
+            .add(ShaderType.COMPUTE, "voxy:lod/gl46mesh/meshletculler.comp")
+            .compile();
+
     private final GlBuffer glDrawIndirect;
     private final GlBuffer meshletBuffer;
     private final HiZBuffer hiZBuffer = new HiZBuffer();
+    private final int hizSampler = glGenSamplers();
 
     public Gl46MeshletsFarWorldRenderer(int geometrySize, int maxSections) {
         super(new DefaultGeometryManager(alignUp(geometrySize*8L, 8*32), maxSections, 8*32));
-        this.glDrawIndirect = new GlBuffer(4*5);
+        this.glDrawIndirect = new GlBuffer(4*(4+5));
         this.meshletBuffer = new GlBuffer(4*1000000);//TODO: Make max meshlet count configurable, not just 1 million (even tho thats a max of 126 million quads per frame)
     }
 
-    protected void bindResources(Gl46MeshletViewport viewport, boolean bindToDrawIndirect) {
+    protected void bindResources(Gl46MeshletViewport viewport, boolean bindToDrawIndirect, boolean bindToDispatchIndirect, boolean bindHiz) {
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometry.geometryId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, bindToDrawIndirect?0:this.glDrawIndirect.id);
@@ -77,11 +82,18 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.models.getColourBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, this.lightDataBuffer.id);//Lighting LUT
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, bindToDrawIndirect?this.glDrawIndirect.id:0);
+        glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, bindToDispatchIndirect?this.glDrawIndirect.id:0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BYTE.id());
 
-        //Bind the texture atlas
-        glBindSampler(0, this.models.getSamplerId());
-        glBindTextureUnit(0, this.models.getTextureId());
+        if (!bindHiz) {
+            //Bind the texture atlas
+            glBindSampler(0, this.models.getSamplerId());
+            glBindTextureUnit(0, this.models.getTextureId());
+        } else {
+            //Bind the hiz buffer
+            glBindSampler(0, this.hizSampler);
+            glBindTextureUnit(0, this.hiZBuffer.getHizTextureId());
+        }
     }
 
     private void updateUniformBuffer(Gl46MeshletViewport viewport) {
@@ -101,6 +113,8 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         }
         innerTranslation.getToAddress(ptr); ptr += 4*3;
         MemoryUtil.memPutInt(ptr, viewport.frameId++); ptr += 4;
+        MemoryUtil.memPutInt(ptr, viewport.width); ptr += 4;
+        MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
     }
 
     @Override
@@ -124,24 +138,18 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         UploadStream.INSTANCE.commit();
         glBindVertexArray(AbstractFarWorldRenderer.STATIC_VAO);
 
-        nglClearNamedBufferSubData(this.glDrawIndirect.id, GL_R32UI, 4, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
-
-        this.meshletGenerator.bind();
-        this.bindResources(viewport, false);
-        glDispatchCompute((this.geometry.getSectionCount()+63)/64, 1, 1);
-
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
+        nglClearNamedBufferSubData(this.glDrawIndirect.id, GL_R32UI, 0, 4*4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
 
         this.lodShader.bind();
-        this.bindResources(viewport, true);
+        this.bindResources(viewport, true, false, false);
         glDisable(GL_CULL_FACE);
-        glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_BYTE, 0);
+        glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_BYTE, 4*4);
         glEnable(GL_CULL_FACE);
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);
 
         this.cullShader.bind();
-        this.bindResources(viewport, false);
+        this.bindResources(viewport, false, false, false);
         glDepthMask(false);
         glColorMask(false, false, false, false);
         glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3, GL_UNSIGNED_BYTE, (1 << 8) * 6, this.geometry.getSectionCount());
@@ -150,11 +158,19 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
 
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
+        this.meshletGenerator.bind();
+        this.bindResources(viewport, false, false, false);
+        glDispatchCompute((this.geometry.getSectionCount()+63)/64, 1, 1);
 
+        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
 
         var i = new int[1];
         glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, i);
         this.hiZBuffer.buildMipChain(i[0], MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
+
+        this.meshletCuller.bind();
+        this.bindResources(viewport, false, true, true);
+        glDispatchComputeIndirect(0);
 
 
 
@@ -178,14 +194,16 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
     @Override
     public void shutdown() {
         super.shutdown();
-        this.meshletGenerator.free();
         this.lodShader.free();
         this.cullShader.free();
+        this.meshletGenerator.free();
+        this.meshletCuller.free();
 
         this.glDrawIndirect.free();
         this.meshletBuffer.free();
 
         this.hiZBuffer.free();
+        glDeleteSamplers(this.hizSampler);
     }
 
     public static long alignUp(long n, long alignment) {

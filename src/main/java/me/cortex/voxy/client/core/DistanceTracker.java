@@ -23,7 +23,7 @@ public class DistanceTracker {
     private final int maxYSection;
     private final int renderDistance;
 
-    public DistanceTracker(RenderTracker tracker, int[] lodRingScales, int renderDistance, int cacheDistance, int minY, int maxY) {
+    public DistanceTracker(RenderTracker tracker, int[] lodRingScales, int renderDistance, int minY, int maxY) {
         this.loDRings = new TransitionRing2D[lodRingScales.length];
         this.cacheLoadRings = new TransitionRing2D[lodRingScales.length];
         this.cacheUnloadRings = new TransitionRing2D[lodRingScales.length];
@@ -72,34 +72,28 @@ public class DistanceTracker {
                 // the issue is when to uncache these methods
 
 
+
+
                 /*
-                this.cacheLoadRings[i] = new TransitionRing2D(5 + i, (scale << 1) + cacheDistance, (x, z) -> {
+                //TODO: FIX AND FINISH!!!
+                this.cacheLoadRings[i] = new TransitionRing2D(5 + i, (scale << 1) + 2, (x, z) -> {
                     //When entering a cache ring, trigger a mesh op and inject into cache
                     for (int y = this.minYSection >> capRing; y <= this.maxYSection >> capRing; y++) {
                         this.tracker.addCache(capRing, x, y, z);
                     }
                 }, (x, z) -> {
-                    int shift = capRing+1;
-                    if (shift <= this.loDRings.length) {
-                        for (int y = this.minYSection >> shift; y <= this.maxYSection >> shift; y++) {
-                            this.tracker.removeCache(shift, x>>1, y, z>>1);
-                        }
-                    }
-                });
-                this.cacheUnloadRings[i] = new TransitionRing2D(5 + i, Math.max(1, (scale << 1) + cacheDistance), (x, z) -> {
-                    int shift = capRing+1;
-                    if (shift <= this.loDRings.length) {
-                        for (int y = this.minYSection >> shift; y <= this.maxYSection >> shift; y++) {
-                            this.tracker.addCache(shift, x>>1, y, z>>1);
-                        }
-                    }
-                }, (x, z) -> {
-                    //When exiting the cache unload ring, tell the cache to dump whatever mesh it has cached and not add any mesh from that position
                     for (int y = this.minYSection >> capRing; y <= this.maxYSection >> capRing; y++) {
                         this.tracker.removeCache(capRing, x, y, z);
                     }
                 });
-                */
+
+                this.cacheUnloadRings[i] = new TransitionRing2D(5 + i, Math.max(1, (scale << 1) - 2), (x, z) -> {
+                    for (int y = this.minYSection >> capRing; y <= this.maxYSection >> capRing; y++) {
+                        this.tracker.removeCache(capRing, x, y, z);
+                    }
+                }, (x, z) -> {
+                });
+                 */
             }
 
             if (isTerminatingRing) {

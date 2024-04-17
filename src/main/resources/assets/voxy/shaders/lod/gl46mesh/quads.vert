@@ -1,40 +1,10 @@
 #version 450
 #extension GL_ARB_gpu_shader_int64 : enable
-#define QUADS_PER_MESHLET 30
 
-#define MESHLET_ACCESS readonly
-//There are 16 bytes of metadata at the start of the meshlet
-#define MESHLET_SIZE (QUADS_PER_MESHLET+2)
 #import <voxy:lod/quad_format.glsl>
 #import <voxy:lod/gl46mesh/bindings.glsl>
 #import <voxy:lod/block_model.glsl>
-#define PosHeader Quad
-
-
-#ifdef GL_ARB_gpu_shader_int64
-ivec3 extractPosition(PosHeader pos64) {
-    //((long)lvl<<60)|((long)(y&0xFF)<<52)|((long)(z&((1<<24)-1))<<28)|((long)(x&((1<<24)-1))<<4);
-    //return ivec3((pos64<<4)&uint64_t(0xFFFFFFFF),(pos64>>28)&uint64_t(0xFFFFFFFF),(pos64>>24)&uint64_t(0xFFFFFFFF))>>ivec3(8,24,8);
-    return (ivec3(int(pos64>>4)&((1<<24)-1), int(pos64>>52)&0xFF, int(pos64>>28)&((1<<24)-1))<<ivec3(8,24,8))>>ivec3(8,24,8);
-}
-uint extractDetail(PosHeader pos64) {
-    return uint(pos64>>60);
-}
-#else
-ivec3 extractPosition(PosHeader pos) {
-    int y = ((int(pos.x)<<4)>>24);
-    int x = (int(pos.y)<<4)>>8;
-    int z = int((pos.x&((1<<20)-1))<<4);
-    z |= int(pos.y>>28)&0xF;
-    z <<= 8;
-    z >>= 8;
-    return ivec3(x,y,z);
-}
-
-uint extractDetail(PosHeader pos) {
-    return uint(pos.x)>>28;
-}
-#endif
+#import <voxy:lod/gl46mesh/meshlet.glsl>
 
 layout(location = 6) out flat uint meshlet;
 PosHeader meshletPosition;

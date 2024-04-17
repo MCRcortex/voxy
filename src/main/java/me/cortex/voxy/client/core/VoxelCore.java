@@ -104,7 +104,7 @@ public class VoxelCore {
 
         this.distanceTracker = new DistanceTracker(this.renderTracker, new int[]{q,q,q,q},
                 (VoxyConfig.CONFIG.renderDistance<0?VoxyConfig.CONFIG.renderDistance:((VoxyConfig.CONFIG.renderDistance+1)/2)),
-                3, minY, maxY);
+                minY, maxY);
         System.out.println("Distance tracker initialized");
 
         this.postProcessing = new PostProcessing();
@@ -187,7 +187,11 @@ public class VoxelCore {
         var projection = computeProjectionMat();
         //var projection = RenderSystem.getProjectionMatrix();//computeProjectionMat();
         var viewport = this.viewportSelector.getViewport();
-        viewport.setProjection(projection).setModelView(matrices.peek().getPositionMatrix()).setCamera(cameraX, cameraY, cameraZ);
+        viewport
+                .setProjection(projection)
+                .setModelView(matrices.peek().getPositionMatrix())
+                .setCamera(cameraX, cameraY, cameraZ)
+                .setScreenSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
 
         int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);

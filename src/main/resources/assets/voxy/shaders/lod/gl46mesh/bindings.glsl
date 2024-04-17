@@ -10,6 +10,7 @@ layout(binding = 0, std140) uniform SceneUniform {
     Frustum frustum;
     vec3 cameraSubPos;
     uint frameId;
+    uvec2 screensize;
 };
 
 struct BlockModel {
@@ -38,8 +39,17 @@ struct DrawCommand {
     int  baseVertex;
     uint  baseInstance;
 };
+struct DispatchIndirect {
+    uint x;
+    uint y;
+    uint z;
+};
 
+#ifdef BIND_SAMPLER_AS_HIZ
+layout(binding = 0) uniform sampler2D hizSampler;
+#else
 layout(binding = 0) uniform sampler2D blockModelAtlas;
+#endif
 
 #ifndef Quad
 #define Quad ivec2
@@ -49,13 +59,12 @@ layout(binding = 1, std430) readonly restrict buffer GeometryBuffer {
 };
 
 layout(binding = 2, std430) restrict buffer DrawBuffer {
+    DispatchIndirect dispatchCmd;
+    uint fullMeshletCount;
     DrawCommand drawCmd;
 };
 
-#ifndef MESHLET_ACCESS
-#define MESHLET_ACCESS readonly writeonly
-#endif
-layout(binding = 3, std430) MESHLET_ACCESS restrict buffer MeshletListData {
+layout(binding = 3, std430) restrict buffer MeshletListData {
     uint meshlets[];
 };
 

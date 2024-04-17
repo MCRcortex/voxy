@@ -95,4 +95,8 @@ public class HiZBuffer {
         this.texture = null;
         glDeleteSamplers(this.sampler);
     }
+
+    public int getHizTextureId() {
+        return this.texture.id;
+    }
 }

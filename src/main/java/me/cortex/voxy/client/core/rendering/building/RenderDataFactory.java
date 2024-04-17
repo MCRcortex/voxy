@@ -118,24 +118,55 @@ public class RenderDataFactory {
 
             //Ordering is: translucent, double sided quads, directional quads
             offsets[0] = meshlet;
+            int mix = 32, miy = 32, miz = 32, max = 0, may = 0, maz = 0;
             for (long data : this.translucentQuadCollector) {
                 if (innerQuadCount == 0) {
                     //Write out meshlet header
 
                     //Write out the section position
                     writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2), key);
-                    MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, 0);
                 }
                 MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + (2 + innerQuadCount++) * 8L, data);
+                int x = QuadEncoder.getX(data), y = QuadEncoder.getY(data), z = QuadEncoder.getZ(data), f = QuadEncoder.getFace(data);
+                mix = Math.min(x, mix); miy = Math.min(y, miy); miz = Math.min(z, miz);
+                if ((f>>1)==0) {
+                    max = Math.max(x + QuadEncoder.getW(data), max);
+                    may = Math.max(y, may);
+                    maz = Math.max(z + QuadEncoder.getH(data), maz);
+                } else if ((f>>1)==1) {
+                    max = Math.max(x + QuadEncoder.getW(data), max);
+                    may = Math.max(y + QuadEncoder.getH(data), may);
+                    maz = Math.max(z, maz);
+                } else {
+                    max = Math.max(x, max);
+                    may = Math.max(y + QuadEncoder.getW(data), may);
+                    maz = Math.max(z + QuadEncoder.getH(data), maz);
+                }
+
+
+
                 if (innerQuadCount == QUADS_PER_MESHLET) {
+                    //Write out the meshlet size data
+                    long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                            (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                    writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
+
                     innerQuadCount = 0;
                     meshlet++;
+                    mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
                 }
             }
 
             if (innerQuadCount != 0) {
+                //Write out the meshlet size data
+                long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                        (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
                 meshlet++;
                 innerQuadCount = 0;
+                mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
             }
 
             offsets[1] = meshlet;
@@ -145,18 +176,46 @@ public class RenderDataFactory {
 
                     //Write out the section position
                     writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2), key);
-                    MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, 0);
                 }
                 MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + (2 + innerQuadCount++) * 8L, data);
+                int x = QuadEncoder.getX(data), y = QuadEncoder.getY(data), z = QuadEncoder.getZ(data), f = QuadEncoder.getFace(data);
+                mix = Math.min(x, mix); miy = Math.min(y, miy); miz = Math.min(z, miz);
+                if ((f>>1)==0) {
+                    max = Math.max(x + QuadEncoder.getW(data), max);
+                    may = Math.max(y, may);
+                    maz = Math.max(z + QuadEncoder.getH(data), maz);
+                } else if ((f>>1)==1) {
+                    max = Math.max(x + QuadEncoder.getW(data), max);
+                    may = Math.max(y + QuadEncoder.getH(data), may);
+                    maz = Math.max(z, maz);
+                } else {
+                    max = Math.max(x, max);
+                    may = Math.max(y + QuadEncoder.getW(data), may);
+                    maz = Math.max(z + QuadEncoder.getH(data), maz);
+                }
                 if (innerQuadCount == QUADS_PER_MESHLET) {
+                    //Write out the meshlet size data
+                    long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                            (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                    writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
+
                     innerQuadCount = 0;
                     meshlet++;
+                    mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
                 }
             }
 
             if (innerQuadCount != 0) {
+                //Write out the meshlet size data
+                long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                        (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
+
                 meshlet++;
                 innerQuadCount = 0;
+                mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
             }
 
             for (int face = 0; face < 6; face++) {
@@ -167,18 +226,46 @@ public class RenderDataFactory {
 
                         //Write out the section position
                         writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2), key);
-                        MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, 0);
                     }
                     MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + (2 + innerQuadCount++) * 8L, data);
+                    int x = QuadEncoder.getX(data), y = QuadEncoder.getY(data), z = QuadEncoder.getZ(data), f = QuadEncoder.getFace(data);
+                    mix = Math.min(x, mix); miy = Math.min(y, miy); miz = Math.min(z, miz);
+                    if ((f>>1)==0) {
+                        max = Math.max(x + QuadEncoder.getW(data), max);
+                        may = Math.max(y, may);
+                        maz = Math.max(z + QuadEncoder.getH(data), maz);
+                    } else if ((f>>1)==1) {
+                        max = Math.max(x + QuadEncoder.getW(data), max);
+                        may = Math.max(y + QuadEncoder.getH(data), may);
+                        maz = Math.max(z, maz);
+                    } else {
+                        max = Math.max(x, max);
+                        may = Math.max(y + QuadEncoder.getW(data), may);
+                        maz = Math.max(z + QuadEncoder.getH(data), maz);
+                    }
                     if (innerQuadCount == QUADS_PER_MESHLET) {
+                        //Write out the meshlet size data
+                        long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                                (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                        writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
+
                         innerQuadCount = 0;
                         meshlet++;
+                        mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
                     }
                 }
 
                 if (innerQuadCount != 0) {
+                    //Write out the meshlet size data
+                    long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                            (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                    writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
+
                     meshlet++;
                     innerQuadCount = 0;
+                    mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
                 }
             }
         } else {
