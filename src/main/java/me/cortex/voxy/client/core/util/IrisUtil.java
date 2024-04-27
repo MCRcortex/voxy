@@ -1,8 +1,7 @@
 package me.cortex.voxy.client.core.util;
 
-import net.coderbot.iris.pipeline.ShadowRenderer;
 import net.fabricmc.loader.api.FabricLoader;
-import org.spongepowered.asm.mixin.Unique;
+import net.irisshaders.iris.shadows.ShadowRenderer;
 
 public class IrisUtil {
     private static final boolean IRIS_INSTALLED = FabricLoader.getInstance().isModLoaded("iris");
