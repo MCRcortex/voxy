@@ -298,7 +298,7 @@ public class ModelTextureBakery {
             for (var quad : quads) {
                 //TODO: mark pixels that have
                 int meta = quad.hasColor()?1:0;
-                builder.quad(stack.peek(), quad, (meta>>16)&0xff, (meta>>8)&0xff, meta&0xff, 0, 0);
+                builder.quad(stack.peek(), quad, (meta>>16)&0xff, (meta>>8)&0xff, meta&0xff, 0, 0, 0);
             }
         }
     }
