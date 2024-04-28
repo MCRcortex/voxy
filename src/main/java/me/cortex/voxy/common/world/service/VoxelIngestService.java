@@ -4,6 +4,8 @@ import it.unimi.dsi.fastutil.Pair;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.Text;
 import net.minecraft.util.math.ChunkSectionPos;
 import net.minecraft.world.LightType;
 import net.minecraft.world.chunk.ChunkNibbleArray;
@@ -42,39 +44,44 @@ public class VoxelIngestService {
         while (this.running) {
             this.ingestCounter.acquireUninterruptibly();
             if (!this.running) break;
-            var chunk = this.ingestQueue.pop();
-            int i = chunk.getBottomSectionCoord() - 1;
-            for (var section : chunk.getSectionArray()) {
-                i++;
-                var lighting = this.captureLightMap.remove(ChunkSectionPos.from(chunk.getPos(), i).asLong());
-                if (section.isEmpty()) {
-                    this.world.insertUpdate(VoxelizedSection.createEmpty(chunk.getPos().x, i, chunk.getPos().z));
-                } else {
-                    VoxelizedSection csec = WorldConversionFactory.convert(
-                            this.world.getMapper(),
-                            section.getBlockStateContainer(),
-                            section.getBiomeContainer(),
-                            (x, y, z, state) -> {
-                                if (lighting == null || ((lighting.first() != null && lighting.first().isUninitialized())&&(lighting.second()!=null&&lighting.second().isUninitialized()))) {
-                                    return (byte) 0x0f;
-                                } else {
-                                    //Lighting is a piece of shit cause its done per face
-                                    int block = lighting.first()!=null?Math.min(15,lighting.first().get(x, y, z)):0;
-                                    int sky = lighting.second()!=null?Math.min(15,lighting.second().get(x, y, z)):0;
-                                    if (block<state.getLuminance()) {
-                                        block = state.getLuminance();
+            try {
+                var chunk = this.ingestQueue.pop();
+                int i = chunk.getBottomSectionCoord() - 1;
+                for (var section : chunk.getSectionArray()) {
+                    i++;
+                    var lighting = this.captureLightMap.remove(ChunkSectionPos.from(chunk.getPos(), i).asLong());
+                    if (section.isEmpty()) {
+                        this.world.insertUpdate(VoxelizedSection.createEmpty(chunk.getPos().x, i, chunk.getPos().z));
+                    } else {
+                        VoxelizedSection csec = WorldConversionFactory.convert(
+                                this.world.getMapper(),
+                                section.getBlockStateContainer(),
+                                section.getBiomeContainer(),
+                                (x, y, z, state) -> {
+                                    if (lighting == null || ((lighting.first() != null && lighting.first().isUninitialized())&&(lighting.second()!=null&&lighting.second().isUninitialized()))) {
+                                        return (byte) 0x0f;
+                                    } else {
+                                        //Lighting is a piece of shit cause its done per face
+                                        int block = lighting.first()!=null?Math.min(15,lighting.first().get(x, y, z)):0;
+                                        int sky = lighting.second()!=null?Math.min(15,lighting.second().get(x, y, z)):0;
+                                        if (block<state.getLuminance()) {
+                                            block = state.getLuminance();
+                                        }
+                                        sky = 15-sky;//This is cause sky light is inverted which saves memory when saving empty sections
+                                        return (byte) (sky|(block<<4));
                                     }
-                                    sky = 15-sky;//This is cause sky light is inverted which saves memory when saving empty sections
-                                    return (byte) (sky|(block<<4));
-                                }
-                            },
-                            chunk.getPos().x,
-                            i,
-                            chunk.getPos().z
-                    );
-                    WorldConversionFactory.mipSection(csec, this.world.getMapper());
-                    this.world.insertUpdate(csec);
+                                },
+                                chunk.getPos().x,
+                                i,
+                                chunk.getPos().z
+                        );
+                        WorldConversionFactory.mipSection(csec, this.world.getMapper());
+                        this.world.insertUpdate(csec);
+                    }
                 }
+            } catch (Exception e) {
+                System.err.println(e);
+                MinecraftClient.getInstance().executeSync(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("Voxy ingester had an exception while executing please check logs and report error")));
             }
         }
     }

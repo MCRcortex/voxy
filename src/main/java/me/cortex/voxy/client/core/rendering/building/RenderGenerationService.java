@@ -5,6 +5,8 @@ import me.cortex.voxy.client.core.model.IdNotYetComputedException;
 import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.Text;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -49,36 +51,42 @@ public class RenderGenerationService {
         while (this.running) {
             this.taskCounter.acquireUninterruptibly();
             if (!this.running) break;
-            BuildTask task;
-            synchronized (this.taskQueue) {
-                task = this.taskQueue.removeFirst();
-            }
-            var section = task.sectionSupplier.get();
-            if (section == null) {
-                continue;
-            }
-            section.assertNotFree();
-            BuiltSection mesh = null;
             try {
-                mesh = factory.generateMesh(section);
-            } catch (IdNotYetComputedException e) {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException ex) {
-                    throw new RuntimeException(ex);
-                }
-                //We need to reinsert the build task into the queue
-                //System.err.println("Render task failed to complete due to un-computed client id");
+                BuildTask task;
                 synchronized (this.taskQueue) {
-                    this.taskQueue.computeIfAbsent(section.key, key->{this.taskCounter.release(); return task;});
+                    task = this.taskQueue.removeFirst();
                 }
-            }
-            section.release();
-            if (mesh != null) {
-                this.resultConsumer.accept(mesh.clone());
-                if (!this.meshCache.putMesh(mesh)) {
-                    mesh.free();
+                var section = task.sectionSupplier.get();
+                if (section == null) {
+                    continue;
                 }
+                section.assertNotFree();
+                BuiltSection mesh = null;
+                try {
+                    mesh = factory.generateMesh(section);
+                } catch (IdNotYetComputedException e) {
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                    //We need to reinsert the build task into the queue
+                    //System.err.println("Render task failed to complete due to un-computed client id");
+                    synchronized (this.taskQueue) {
+                        this.taskQueue.computeIfAbsent(section.key, key->{this.taskCounter.release(); return task;});
+                    }
+                }
+                section.release();
+                if (mesh != null) {
+                    //TODO: if the mesh is null, need to clear the cache at that point
+                    this.resultConsumer.accept(mesh.clone());
+                    if (!this.meshCache.putMesh(mesh)) {
+                        mesh.free();
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println(e);
+                MinecraftClient.getInstance().executeSync(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("Voxy render service had an exception while executing please check logs and report error")));
             }
         }
     }
