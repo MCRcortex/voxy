@@ -19,7 +19,7 @@ void main() {
     //vec4 colour = solidColour;
     vec4 colour = texture(blockModelAtlas, uv + baseUV, ((flags>>1)&1u)*-4.0);
     if ((flags&1u) == 1 && colour.a <= 0.25f) {
-        discard;
+        //discard;
     }
 
     //Conditional tinting, TODO: FIXME: REPLACE WITH MASK OR SOMETHING, like encode data into the top bit of alpha
@@ -31,12 +31,11 @@ void main() {
 
     //outColour = vec4(uv + baseUV, 0, 1);
 
-    /*
+
     uint hash = meshlet*1231421+123141;
     hash ^= hash>>16;
     hash = hash*1231421+123141;
     hash ^= hash>>16;
-
-    outColour = vec4(float(hash&15u)/15, float((hash>>4)&15u)/15, float((hash>>8)&15u)/15, 1);
-    */
+    hash = hash * 1827364925 + 123325621;
+    //outColour = vec4(float(hash&15u)/15, float((hash>>4)&15u)/15, float((hash>>8)&15u)/15, 1);
 }

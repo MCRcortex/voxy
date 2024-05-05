@@ -1,0 +1,24 @@
+#version 460
+
+layout(local_size_x=32)
+
+//Works in multiple parts
+// first is a downwards traversal from a base level that finds all the bottom level pixel detail AABBs
+// task queue is firstly filled with large visible AABB's from rastered occlusion
+//
+// each node metadata contains the position in 3d space relative to the toplevel node
+// an offset into the datapool for the child nodes, and union between (a bitmsk of if a child node is full, empty, or mixed (or unloaded))
+//  and a pointer to render metadata for meshlets
+
+
+//The overarching idea is to have meshlets be automatatically selected based on the resulting pixel size/density
+// after 3d projection, we dont want subpixel triangles and we want to be able to automatically account for the
+// perspective warp on the edges of the screen (e.g. high fov == higher density at the center of the screen)
+// from this, the gpu can then (if they are not present) request meshlets be added and thereby automatic lod selection
+// and dynamic building resulting in possibly O(fast) rendering
+void main() {
+    while (true) {
+        barrier();
+
+    }
+}

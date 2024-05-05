@@ -174,4 +174,8 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends Ab
     }
 
     protected abstract T createViewport0();
+
+    public boolean usesMeshlets() {
+        return false;
+    }
 }

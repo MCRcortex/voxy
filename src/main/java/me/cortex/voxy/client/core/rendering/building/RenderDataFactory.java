@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering.building;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import me.cortex.voxy.client.core.Capabilities;
 import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.util.Mesher2D;
 import me.cortex.voxy.common.util.MemoryBuffer;
@@ -30,7 +31,7 @@ public class RenderDataFactory {
     private final LongArrayList translucentQuadCollector = new LongArrayList();
     private final LongArrayList[] directionalQuadCollectors = new LongArrayList[]{new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList()};
 
-    private final boolean generateMeshlets = true;
+    private final boolean generateMeshlets;
 
     private int minX;
     private int minY;
@@ -38,9 +39,10 @@ public class RenderDataFactory {
     private int maxX;
     private int maxY;
     private int maxZ;
-    public RenderDataFactory(WorldEngine world, ModelManager modelManager) {
+    public RenderDataFactory(WorldEngine world, ModelManager modelManager, boolean emitMeshlets) {
         this.world = world;
         this.modelMan = modelManager;
+        this.generateMeshlets = emitMeshlets;
     }
 
 
@@ -52,7 +54,7 @@ public class RenderDataFactory {
     // since fluid states are explicitly overlays over the base block
     // can do funny stuff like double rendering
 
-    private static final boolean USE_UINT64 = false;//FIXME: replace with automatic detection of uint64 shader extension support
+    private static final boolean USE_UINT64 = Capabilities.INSTANCE.INT64_t;
     private static final int QUADS_PER_MESHLET = 30;
     private static void writePos(long ptr, long pos) {
         if (USE_UINT64) {

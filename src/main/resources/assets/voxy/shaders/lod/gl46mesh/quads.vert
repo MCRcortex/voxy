@@ -84,6 +84,7 @@ void main() {
     uint lodLevel = extractDetail(meshletPosition);
     ivec3 sectionPos = extractPosition(meshletPosition);
 
+    //meshlet = (meshlet<<5)|(gl_VertexID>>2);
 
 
 

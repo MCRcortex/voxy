@@ -17,7 +17,7 @@ uint extractDetail(PosHeader pos64) {
     return uint(pos64>>60);
 }
 uvec3 extractMin(AABBHeader aabb) {
-    return uvec3(uint(aabb&0xFF),uint((aabb>>8)&0xFF),uint((aabb>>16)&0xFF));
+    return uvec3(uint(uint(aabb)&0xFF),uint((uint(aabb)>>8)&0xFF),uint((uint(aabb)>>16)&0xFF));
 }
 uvec3 extractMax(AABBHeader aabb) {
     return uvec3(uint((aabb>>24)&0xFF),uint((aabb>>32)&0xFF),uint((aabb>>40)&0xFF));

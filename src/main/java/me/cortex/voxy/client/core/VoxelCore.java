@@ -68,23 +68,12 @@ public class VoxelCore {
 
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
-        if (true) {
-            this.renderer = new Gl46MeshletsFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-            System.out.println("Using Gl46MeshletFarWorldRendering");
-        } else {
-            if (VoxyConfig.CONFIG.useMeshShaders()) {
-                this.renderer = new NvMeshFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-                System.out.println("Using NvMeshFarWorldRenderer");
-            } else {
-                this.renderer = new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-                System.out.println("Using Gl46FarWorldRenderer");
-            }
-        }
+        this.renderer = this.createRenderBackend();
         this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
         System.out.println("Renderer initialized");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
-        this.renderGen = new RenderGenerationService(this.world, this.renderer.getModelManager(), VoxyConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult);
+        this.renderGen = new RenderGenerationService(this.world, this.renderer.getModelManager(), VoxyConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult, this.renderer.usesMeshlets());
         this.world.setDirtyCallback(this.renderTracker::sectionUpdated);
         this.renderTracker.setRenderGen(this.renderGen);
         System.out.println("Render tracker and generator initialized");
@@ -130,6 +119,20 @@ public class VoxelCore {
         System.out.println("Voxy core initialized");
     }
 
+    private AbstractFarWorldRenderer<?,?> createRenderBackend() {
+        if (true) {
+            System.out.println("Using Gl46MeshletFarWorldRendering");
+            return new Gl46MeshletsFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+        } else {
+            if (VoxyConfig.CONFIG.useMeshShaders()) {
+                System.out.println("Using NvMeshFarWorldRenderer");
+                return new NvMeshFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+            } else {
+                System.out.println("Using Gl46FarWorldRenderer");
+                return new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+            }
+        }
+    }
 
 
     public void enqueueIngest(WorldChunk worldChunk) {

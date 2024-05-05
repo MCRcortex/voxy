@@ -1,0 +1,32 @@
+#version 460
+
+layout(local_size_x=8)
+
+
+
+
+//NEW IDEAm use the depth buffer directly to compute the lod level needed to cover it
+
+
+
+
+//Location in world space up to 2x2x2 block size resolution
+#define OctNodeTask uint64_t
+
+
+
+//First 32 bits are the start of child
+// next 16 bits are split into 8 pairs, each pair specifies the type of the subnode (air/empty, partial, full)
+
+
+
+//Tasks are of size uint64_t
+
+
+
+void main() {
+    while (true) {
+        barrier();
+
+    }
+}

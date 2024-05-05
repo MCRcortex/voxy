@@ -12,6 +12,7 @@ import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 
 import static org.lwjgl.opengl.ARBDirectStateAccess.glGetNamedFramebufferAttachmentParameteriv;
+import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri;
 import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
@@ -69,6 +70,12 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         super(new DefaultGeometryManager(alignUp(geometrySize*8L, 8*32), maxSections, 8*32));
         this.glDrawIndirect = new GlBuffer(4*(4+5));
         this.meshletBuffer = new GlBuffer(4*1000000);//TODO: Make max meshlet count configurable, not just 1 million (even tho thats a max of 126 million quads per frame)
+
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+        glTextureParameteri(this.hizSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTextureParameteri(this.hizSampler, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        glTextureParameteri(this.hizSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTextureParameteri(this.hizSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
 
     protected void bindResources(Gl46MeshletViewport viewport, boolean bindToDrawIndirect, boolean bindToDispatchIndirect, boolean bindHiz) {
@@ -113,8 +120,9 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         }
         innerTranslation.getToAddress(ptr); ptr += 4*3;
         MemoryUtil.memPutInt(ptr, viewport.frameId++); ptr += 4;
-        MemoryUtil.memPutInt(ptr, viewport.width); ptr += 4;
-        MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
+        //Divided by 2 cause hiz is half the size of the viewport
+        MemoryUtil.memPutInt(ptr, viewport.width/2); ptr += 4;
+        MemoryUtil.memPutInt(ptr, viewport.height/2); ptr += 4;
     }
 
     @Override
@@ -208,5 +216,10 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
 
     public static long alignUp(long n, long alignment) {
         return (n + alignment - 1) & -alignment;
+    }
+
+    @Override
+    public boolean usesMeshlets() {
+        return true;
     }
 }
