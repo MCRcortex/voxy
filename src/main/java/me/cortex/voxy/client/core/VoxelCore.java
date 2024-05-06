@@ -68,6 +68,7 @@ public class VoxelCore {
 
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
+        Capabilities.init();//Ensure clinit is called
         this.renderer = this.createRenderBackend();
         this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
         System.out.println("Renderer initialized");

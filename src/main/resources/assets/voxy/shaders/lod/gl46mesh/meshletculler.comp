@@ -63,7 +63,7 @@ void main() {
     PosHeader pos   = geometryPool[meshletId*MESHLET_SIZE];
     AABBHeader aabb = geometryPool[meshletId*MESHLET_SIZE+1];
 
-    if (testHiZ(pos, aabb)) {//If didnt cull, insert it back into the stream
+    if (testHiZ(pos, aabb) || true) {//If didnt cull, insert it back into the stream
         meshlets[atomicAdd(drawCmd.instanceCount, 1)+fullMeshletCount] = meshletId;
     }
 }
