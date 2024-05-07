@@ -52,7 +52,9 @@ public class MemoryStorageBackend extends StorageBackend {
     public void setSectionData(long key, ByteBuffer data) {
         var map = this.getMap(key);
         synchronized (map) {
-            var old = map.put(key, data);
+            var cpy = MemoryUtil.memAlloc(data.remaining());
+            MemoryUtil.memCopy(data, cpy);
+            var old = map.put(key, cpy);
             if (old != null) {
                 MemoryUtil.memFree(old);
             }

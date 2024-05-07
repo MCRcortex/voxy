@@ -43,6 +43,10 @@ public class ContextSelectionSystem {
 
         config.storageConfig = compression;
         DEFAULT_STORAGE_CONFIG = Serialization.GSON.toJson(config);
+
+        if (Serialization.GSON.fromJson(DEFAULT_STORAGE_CONFIG, WorldConfig.class) == null) {
+            throw new IllegalStateException();
+        }
     }
 
     public static class Selection {
