@@ -46,7 +46,7 @@ struct DispatchIndirect {
 };
 
 #ifdef BIND_SAMPLER_AS_HIZ
-layout(binding = 0) uniform sampler2D hizSampler;
+layout(binding = 0) uniform sampler2DShadow hizSampler;
 #else
 layout(binding = 0) uniform sampler2D blockModelAtlas;
 #endif

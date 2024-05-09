@@ -5,6 +5,7 @@ import org.lwjgl.opengl.GL20C;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
 import static org.lwjgl.opengl.GL20.glUseProgram;
@@ -37,10 +38,21 @@ public class Shader extends TrackedObject {
     }
 
     public static class Builder {
+        private final Map<String, String> defines = new HashMap<>();
         private final Map<ShaderType, String> sources = new HashMap<>();
         private final IShaderProcessor processor;
         private Builder(IShaderProcessor processor) {
             this.processor = processor;
+        }
+
+        public Builder define(String name) {
+            this.defines.put(name, "");
+            return this;
+        }
+
+        public Builder define(String name, int value) {
+            this.defines.put(name, Integer.toString(value));
+            return this;
         }
 
         public Builder add(ShaderType type, String id) {
@@ -55,7 +67,21 @@ public class Shader extends TrackedObject {
 
         public Shader compile() {
             int program = GL20C.glCreateProgram();
-            int[] shaders = this.sources.entrySet().stream().mapToInt(a->createShader(a.getKey(), a.getValue())).toArray();
+            int[] shaders = new int[this.sources.size()];
+            {
+                String defs = this.defines.entrySet().stream().map(a->"#define " + a.getKey() + " " + a.getValue() + "\n").collect(Collectors.joining());
+                int i = 0;
+                for (var entry : this.sources.entrySet()) {
+                    String src = entry.getValue();
+
+                    //Inject defines
+                    src = src.substring(0, src.indexOf('\n')+1) +
+                            defs
+                            + src.substring(src.indexOf('\n')+1);
+
+                    shaders[i++] = createShader(entry.getKey(), src);
+                }
+            }
 
             for (int i : shaders) {
                 GL20C.glAttachShader(program, i);

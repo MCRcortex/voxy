@@ -55,7 +55,7 @@ public class RenderDataFactory {
     // can do funny stuff like double rendering
 
     private static final boolean USE_UINT64 = Capabilities.INSTANCE.INT64_t;
-    private static final int QUADS_PER_MESHLET = 30;
+    public static final int QUADS_PER_MESHLET = 62;
     private static void writePos(long ptr, long pos) {
         if (USE_UINT64) {
             MemoryUtil.memPutLong(ptr, pos);

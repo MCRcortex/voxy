@@ -1,5 +1,3 @@
-#define QUADS_PER_MESHLET 30
-
 #define extractMeshletStart extractQuadStart
 #define PosHeader Quad
 #define AABBHeader Quad

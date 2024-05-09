@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.building.RenderDataFactory;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import net.minecraft.client.MinecraftClient;
@@ -44,20 +45,24 @@ import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FR
 // this could potentially result in a fair bit of memory savings (especially if used in normal mc terrain rendering)
 public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46MeshletViewport, DefaultGeometryManager> {
     private final Shader lodShader = Shader.make()
+            .define("QUADS_PER_MESHLET", RenderDataFactory.QUADS_PER_MESHLET)
             .add(ShaderType.VERTEX, "voxy:lod/gl46mesh/quads.vert")
             .add(ShaderType.FRAGMENT, "voxy:lod/gl46mesh/quads.frag")
             .compile();
 
     private final Shader cullShader = Shader.make()
+            .define("QUADS_PER_MESHLET", RenderDataFactory.QUADS_PER_MESHLET)
             .add(ShaderType.VERTEX, "voxy:lod/gl46mesh/cull.vert")
             .add(ShaderType.FRAGMENT, "voxy:lod/gl46mesh/cull.frag")
             .compile();
 
     private final Shader meshletGenerator = Shader.make()
+            .define("QUADS_PER_MESHLET", RenderDataFactory.QUADS_PER_MESHLET)
             .add(ShaderType.COMPUTE, "voxy:lod/gl46mesh/cmdgen.comp")
             .compile();
 
     private final Shader meshletCuller = Shader.make()
+            .define("QUADS_PER_MESHLET", RenderDataFactory.QUADS_PER_MESHLET)
             .add(ShaderType.COMPUTE, "voxy:lod/gl46mesh/meshletculler.comp")
             .compile();
 
@@ -67,15 +72,19 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
     private final int hizSampler = glGenSamplers();
 
     public Gl46MeshletsFarWorldRenderer(int geometrySize, int maxSections) {
-        super(new DefaultGeometryManager(alignUp(geometrySize*8L, 8*32), maxSections, 8*32));
+        super(new DefaultGeometryManager(alignUp(geometrySize*8L, 8* (RenderDataFactory.QUADS_PER_MESHLET+2)), maxSections, 8*(RenderDataFactory.QUADS_PER_MESHLET+2)));
         this.glDrawIndirect = new GlBuffer(4*(4+5));
         this.meshletBuffer = new GlBuffer(4*1000000);//TODO: Make max meshlet count configurable, not just 1 million (even tho thats a max of 126 million quads per frame)
 
-        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);//This is so that using the shadow sampler works correctly
         glTextureParameteri(this.hizSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTextureParameteri(this.hizSampler, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        glTextureParameteri(this.hizSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+        glTextureParameteri(this.hizSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
         glTextureParameteri(this.hizSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTextureParameteri(this.hizSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        nglClearNamedBufferData(this.meshletBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+        nglClearNamedBufferData(this.glDrawIndirect.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
     }
 
     protected void bindResources(Gl46MeshletViewport viewport, boolean bindToDrawIndirect, boolean bindToDispatchIndirect, boolean bindHiz) {
@@ -122,7 +131,6 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         }
         innerTranslation.getToAddress(ptr); ptr += 4*3;
         MemoryUtil.memPutInt(ptr, viewport.frameId++); ptr += 4;
-        //Divided by 2 cause hiz is half the size of the viewport
         MemoryUtil.memPutInt(ptr, viewport.width); ptr += 4;
         MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
     }
