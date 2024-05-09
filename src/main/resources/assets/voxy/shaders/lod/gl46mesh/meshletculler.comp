@@ -35,8 +35,8 @@ bool testHiZ(PosHeader secPos, AABBHeader aabb) {
     minBB = minBB*0.5+0.5;
     maxBB = maxBB*0.5+0.5;
 
-    vec2 size = (maxBB.xy - minBB.xy) * vec2(screensize);
-    float miplevel = ceil(log2(max(size.x, size.y)));//NOTE: the /2 is cause the mipmaps dont include bottom level depth
+    vec2 size = (maxBB.xy - minBB.xy) * vec2(ivec2(screensize));
+    float miplevel = ceil(log2(max(max(size.x, size.y),1)));
 
     float a = textureLod(hizSampler,minBB.xy,miplevel).r;
     float b = textureLod(hizSampler,vec2(minBB.x,maxBB.y),miplevel).r;
@@ -63,7 +63,7 @@ void main() {
     PosHeader pos   = geometryPool[meshletId*MESHLET_SIZE];
     AABBHeader aabb = geometryPool[meshletId*MESHLET_SIZE+1];
 
-    if (testHiZ(pos, aabb) || true) {//If didnt cull, insert it back into the stream
+    if (testHiZ(pos, aabb)) {//If didnt cull, insert it back into the stream
         meshlets[atomicAdd(drawCmd.instanceCount, 1)+fullMeshletCount] = meshletId;
     }
 }

@@ -1,5 +1,6 @@
 #version 450
 #extension GL_ARB_gpu_shader_int64 : enable
+#extension GL_ARB_shader_draw_parameters : require
 
 #import <voxy:lod/quad_format.glsl>
 #import <voxy:lod/gl46mesh/bindings.glsl>
@@ -12,7 +13,7 @@ Quad quad;
 bool setupMeshlet() {
     gl_CullDistance[0] = 1;
     //TODO: replace with vertexAttribute that has a divisor of 1
-    uint data = meshlets[gl_InstanceID];
+    uint data = meshlets[gl_InstanceID + gl_BaseInstanceARB];
     if (data == uint(-1)) {//Came across a culled meshlet
         gl_CullDistance[0] = -1;
         //Since the primative is culled, dont need to do any more work or set any values as the primative is discarded

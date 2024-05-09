@@ -11,6 +11,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinMinecraftClient {
     @Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/resource/PeriodicNotificationManager;<init>(Lnet/minecraft/util/Identifier;Lit/unimi/dsi/fastutil/objects/Object2BooleanFunction;)V", shift = At.Shift.AFTER))
     private void injectRenderDoc(RunArgs args, CallbackInfo ci) {
-        System.load("C:\\Program Files\\RenderDoc\\renderdoc.dll");
+        //System.load("C:\\Program Files\\RenderDoc\\renderdoc.dll");
     }
 }

@@ -12,7 +12,12 @@ import static org.lwjgl.opengl.GL30C.*;
 import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL33.glGenSamplers;
 import static org.lwjgl.opengl.GL33C.glDeleteSamplers;
+import static org.lwjgl.opengl.GL33C.glSamplerParameteri;
+import static org.lwjgl.opengl.GL42C.GL_FRAMEBUFFER_BARRIER_BIT;
+import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
+import static org.lwjgl.opengl.GL43C.glCopyImageSubData;
 import static org.lwjgl.opengl.GL45C.glNamedFramebufferTexture;
+import static org.lwjgl.opengl.GL45C.glTextureBarrier;
 
 public class HiZBuffer {
     private final Shader hiz = Shader.make()
@@ -36,15 +41,19 @@ public class HiZBuffer {
         this.levels -= 3;//Arbitrary size, shinks the max level by alot and saves a significant amount of processing time
         // (could probably increase it to be defined by a max meshlet coverage computation thing)
 
-        //We do a hack where we assume (which is probably wrong) that we will on average never
-        // get a meshlet that uses 0 mipping
-        this.levels--;
-        this.texture = new GlTexture().store(GL_DEPTH_COMPONENT32, this.levels, width/2, height/2);
+        this.texture = new GlTexture().store(GL_DEPTH_COMPONENT32, this.levels, width, height);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTextureParameteri(this.texture.id, GL_TEXTURE_COMPARE_MODE, GL_NONE);
         glTextureParameteri(this.texture.id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTextureParameteri(this.texture.id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        glSamplerParameteri(this.sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glSamplerParameteri(this.sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glSamplerParameteri(this.sampler, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        glSamplerParameteri(this.sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glSamplerParameteri(this.sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
         this.width  = width;
         this.height = height;
     }
@@ -65,20 +74,26 @@ public class HiZBuffer {
 
         glDepthFunc(GL_ALWAYS);
 
-        glBindTextureUnit(0, srcDepthTex);
+
+
+        glCopyImageSubData(srcDepthTex, GL_TEXTURE_2D, 0,0,0,0,
+                this.texture.id, GL_TEXTURE_2D, 0,0,0,0,
+                width, height, 1);
+
+
+        glBindTextureUnit(0, this.texture.id);
         glBindSampler(0, this.sampler);
         glUniform1i(0, 0);
-        int cw = this.width /2;
-        int ch = this.height/2;
-        for (int i = 0; i < this.levels; i++) {
-            this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, i);
-            glViewport(0, 0, cw, ch); cw /= 2; ch /= 2;
-            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-            if (i == 0) {
-                glBindTextureUnit(0, this.texture.id);
-            }
+        int cw = this.width;
+        int ch = this.height;
+        for (int i = 0; i < this.levels-1; i++) {
             glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, i);
-            glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, i+1);
+            glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, i);
+            this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, i+1);
+            cw /= 2; ch /= 2; glViewport(0, 0, cw, ch);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+            glTextureBarrier();
+            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
         }
         glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, 0);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, this.levels-1);//TODO: CHECK IF ITS -1 or -0

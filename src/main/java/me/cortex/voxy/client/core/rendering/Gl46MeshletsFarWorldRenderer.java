@@ -106,6 +106,8 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
     private void updateUniformBuffer(Gl46MeshletViewport viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, this.uniformBuffer.size());
 
+        //TODO:FIXME remove this.sx/sy/sz and make it based on the viewport!!!
+
         var mat = new Matrix4f(viewport.projection).mul(viewport.modelView);
         var innerTranslation = new Vector3f((float) (viewport.cameraX-(this.sx<<5)), (float) (viewport.cameraY-(this.sy<<5)), (float) (viewport.cameraZ-(this.sz<<5)));
         mat.translate(-innerTranslation.x, -innerTranslation.y, -innerTranslation.z);
@@ -121,8 +123,8 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         innerTranslation.getToAddress(ptr); ptr += 4*3;
         MemoryUtil.memPutInt(ptr, viewport.frameId++); ptr += 4;
         //Divided by 2 cause hiz is half the size of the viewport
-        MemoryUtil.memPutInt(ptr, viewport.width/2); ptr += 4;
-        MemoryUtil.memPutInt(ptr, viewport.height/2); ptr += 4;
+        MemoryUtil.memPutInt(ptr, viewport.width); ptr += 4;
+        MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
     }
 
     @Override
