@@ -16,9 +16,6 @@
     "client": [
       "me.cortex.voxy.client.Voxy"
     ],
-    "server": [
-      "me.cortex.voxy.server.VoxyServer"
-    ],
     "modmenu": [
       "me.cortex.voxy.client.config.VoxyConfigScreenFactory"
     ]

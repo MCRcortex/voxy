@@ -190,7 +190,7 @@ public class WorldImporter {
                                 if (decompressedData == null) {
                                     System.err.println("Error decompressing chunk data");
                                 } else {
-                                    var nbt = NbtIo.readCompound(decompressedData);
+                                    var nbt = NbtIo.read(decompressedData);
                                     this.importChunkNBT(nbt);
                                 }
                             }
