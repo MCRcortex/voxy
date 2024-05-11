@@ -57,7 +57,7 @@ dependencies {
 
     modImplementation("maven.modrinth:cloth-config:13.0.121+fabric")
     modImplementation("maven.modrinth:modmenu:9.0.0")
-    modCompileOnly("maven.modrinth:iris:1.6.17+1.20.4")
+    modCompileOnly("maven.modrinth:iris:1.7.0+1.20.4")
     //modRuntimeOnly("maven.modrinth:iris:1.6.17+1.20.4")
     modCompileOnly("maven.modrinth:starlight:1.1.3+1.20.4")
     //modCompileOnly("maven.modrinth:immersiveportals:v5.1.7-mc1.20.4")
