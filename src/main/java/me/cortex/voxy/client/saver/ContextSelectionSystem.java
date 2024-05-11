@@ -84,7 +84,7 @@ public class ContextSelectionSystem {
                 throw new RuntimeException("Failed to deserialize the default config, aborting!", e);
             }
             if (this.config == null) {
-                throw new IllegalStateException("Config is still null");
+                throw new IllegalStateException("Config is still null: \n"+VoxyConfig.CONFIG.defaultSaveConfig);
             }
         }
 

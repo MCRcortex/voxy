@@ -183,10 +183,13 @@ public class Mapper {
         return this.blockId2stateEntry.get(blockId).state;
     }
 
+    //TODO: replace lambda with a class cached lambda ref (cause doing this:: still does a lambda allocation)
     public int getIdForBlockState(BlockState state) {
         return this.block2stateEntry.computeIfAbsent(state, this::registerNewBlockState).id;
     }
 
+
+    //TODO: replace lambda with a class cached lambda ref (cause doing this:: still does a lambda allocation)
     public int getIdForBiome(RegistryEntry<Biome> biome) {
         String biomeId = biome.getKey().get().getValue().toString();
         return this.biome2biomeEntry.computeIfAbsent(biomeId, this::registerNewBiome).id;
