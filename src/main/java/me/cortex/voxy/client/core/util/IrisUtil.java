@@ -1,6 +1,6 @@
 package me.cortex.voxy.client.core.util;
 
-import net.coderbot.iris.pipeline.ShadowRenderer;
+import net.irisshaders.iris.shadows.ShadowRenderer;
 import net.fabricmc.loader.api.FabricLoader;
 import org.spongepowered.asm.mixin.Unique;
 

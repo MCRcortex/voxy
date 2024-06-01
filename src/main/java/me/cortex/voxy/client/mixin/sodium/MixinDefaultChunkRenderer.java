@@ -9,7 +9,7 @@ import me.jellysquid.mods.sodium.client.render.chunk.lists.ChunkRenderListIterab
 import me.jellysquid.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import me.jellysquid.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import me.jellysquid.mods.sodium.client.render.viewport.CameraTransform;
-import net.coderbot.iris.pipeline.ShadowRenderer;
+import net.irisshaders.iris.shadows.ShadowRenderer;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.util.math.MatrixStack;
