@@ -3,8 +3,7 @@ package me.cortex.voxy.client.core.gl.shader;
 import me.cortex.voxy.common.util.TrackedObject;
 import org.lwjgl.opengl.GL20C;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
@@ -16,8 +15,15 @@ public class Shader extends TrackedObject {
         id = program;
     }
 
-    public static Builder make(IShaderProcessor processor) {
-        return new Builder(processor);
+    public static Builder make(IShaderProcessor... processors) {
+        List<IShaderProcessor> aa = new ArrayList<>(List.of(processors));
+        Collections.reverse(aa);
+        IShaderProcessor applicator = (type,source)->source;
+        for (IShaderProcessor processor : processors) {
+            IShaderProcessor finalApplicator = applicator;
+            applicator = (type, source) -> finalApplicator.process(type, processor.process(type, source));
+        }
+        return new Builder(applicator);
     }
 
     public static Builder make() {

@@ -14,7 +14,7 @@ public class GlPersistentMappedBuffer extends TrackedObject {
         this.id = glCreateBuffers();
         this.size = size;
         glNamedBufferStorage(this.id, size, GL_CLIENT_STORAGE_BIT|GL_MAP_PERSISTENT_BIT|(flags&(GL_MAP_COHERENT_BIT|GL_MAP_WRITE_BIT|GL_MAP_READ_BIT)));
-        this.addr = nglMapNamedBufferRange(this.id, 0, size, flags|GL_MAP_PERSISTENT_BIT);
+        this.addr = nglMapNamedBufferRange(this.id, 0, size, (flags&(GL_MAP_WRITE_BIT|GL_MAP_READ_BIT|GL_MAP_UNSYNCHRONIZED_BIT|GL_MAP_FLUSH_EXPLICIT_BIT))|GL_MAP_PERSISTENT_BIT);
     }
 
     @Override
