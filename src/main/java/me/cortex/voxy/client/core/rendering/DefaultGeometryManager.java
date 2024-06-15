@@ -42,7 +42,7 @@ public class DefaultGeometryManager extends AbstractGeometryManager {
         this.markSectionIds.clear();
         while (!this.buildResults.isEmpty()) {
             var result = this.buildResults.pop();
-            boolean isDelete = result.geometryBuffer == null;
+            boolean isDelete = result.isEmpty();
             if (isDelete) {
                 int id = -1;
                 if ((id = this.pos2id.remove(result.position)) != -1) {
