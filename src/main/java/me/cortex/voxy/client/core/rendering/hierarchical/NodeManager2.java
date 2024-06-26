@@ -3,7 +3,9 @@ package me.cortex.voxy.client.core.rendering.hierarchical;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.MarkedObjectList;
+import me.cortex.voxy.common.util.HierarchicalBitSet;
 import me.cortex.voxy.common.world.WorldEngine;
+import org.lwjgl.system.MemoryUtil;
 
 import java.util.Arrays;
 
@@ -25,7 +27,7 @@ public class NodeManager2 {
         public int nodeId;
 
         //The mask of what child nodes are required
-        public byte requiredChildMask;
+        //public byte requiredChildMask;
 
         //The mask of currently supplied child node data
         public byte currentChildMask;
@@ -44,7 +46,7 @@ public class NodeManager2 {
         public void clear() {
             this.position = 0;
             this.nodeId = 0;
-            this.requiredChildMask = 0;
+            //this.requiredChildMask = 0;
             this.currentChildMask  = 0;
             Arrays.fill(this.meshIds, -1);
             Arrays.fill(this.childPositions, -1);
@@ -52,7 +54,7 @@ public class NodeManager2 {
 
         //Returns true if the request is satisfied
         public boolean isSatisfied() {
-            return (this.requiredChildMask&this.currentChildMask)==this.requiredChildMask;
+            return this.currentChildMask == -1;//(this.requiredChildMask&this.currentChildMask)==this.requiredChildMask;
         }
 
         public int getMeshId(int inner) {
@@ -71,14 +73,32 @@ public class NodeManager2 {
             this.meshIds[innerId] = mesh;
             this.childPositions[innerId] = position;
         }
+
+        public void make(int id, long position) {
+            this.nodeId = id;
+            this.position = position;
+        }
+
+        public byte nonAirMask() {
+            byte res = 0;
+            for (int i = 0; i < 8; i++) {
+                if (this.meshIds[i] != -1) {
+                    res |= (byte) (1<<i);
+                }
+            }
+            return res;
+        }
     }
 
     public static final int MAX_NODE_COUNT = 1<<22;
+    public static final int NODE_MSK = MAX_NODE_COUNT-1;
 
     //Local data layout
     // first long is position (todo! might not be needed)
     // next long contains mesh position ig/id
     private final long[] localNodeData = new long[MAX_NODE_COUNT * 3];
+
+    private final HierarchicalBitSet nodeAllocations = new HierarchicalBitSet(MAX_NODE_COUNT);
 
     private final INodeInteractor interactor;
     private final MeshManager meshManager;
@@ -102,9 +122,93 @@ public class NodeManager2 {
     }
 
     //Returns the mesh offset/id for the given node or -1 if it doesnt exist
-    private int getMeshForNode(int node) {
+    private int getNodeMesh(int node) {
         return -1;
     }
+
+    private long getNodePos(int node) {
+        return -1;
+    }
+
+    private boolean isLeafNode(int node) {
+        return true;
+    }
+
+    private void setMeshId(int node, int mesh) {
+
+    }
+
+    private static long makeChildPos(long basePos, int addin) {
+        int lvl = WorldEngine.getLevel(basePos);
+        if (lvl == 0) {
+            throw new IllegalArgumentException("Cannot create a child lower than lod level 0");
+        }
+        return WorldEngine.getWorldSectionId(lvl-1,
+                (WorldEngine.getX(basePos)<<1)|(addin&1),
+                (WorldEngine.getY(basePos)<<1)|((addin>>1)&1),
+                (WorldEngine.getZ(basePos)<<1)|((addin>>2)&1));
+    }
+
+
+    //IDEA, since a graph node can be in effectivly only 3 states, if inner node -> may or may not have mesh, and, if leaf node -> has mesh, no children
+    // the request queue only needs to supply the node id, since if its an inner node, it must be requesting for a mesh, while if its a leaf node, it must be requesting for children
+    private void processRequestQueue(long ptr, long size) {
+        int count = MemoryUtil.memGetInt(ptr); ptr += 4;
+        for (int i = 0; i < count; i++) {
+            int requestOp = MemoryUtil.memGetInt(ptr + i*4L);
+            int node = requestOp&NODE_MSK;
+
+            if (this.isLeafNode(node)) {
+                //If its a leaf node and it has a request, it must need the children
+                if (this.getNodeMesh(node) == -1) {
+                    throw new IllegalStateException("Leaf node doesnt have mesh");
+                }
+                //Create a new request
+                int idx = this.leafRequests.allocate();
+                var request = this.leafRequests.get(idx);
+
+                {
+                    long nodePos = this.getNodePos(node);
+                    request.make(node, nodePos);//Request all child nodes
+                    int requestIdx = idx|(1<<31);//First bit is set to 1 to indicate a request index instead of a node index
+
+                    //Loop over all child positions and insert them into the queue
+                    for (int j = 0; j < 8; j++) {
+                        long child = makeChildPos(nodePos, j);
+                        int prev = this.pos2meshId.putIfAbsent(child, requestIdx);
+                        if (prev != NO_NODE) {
+                            throw new IllegalArgumentException("Node pos already in request map");
+                        }
+                        //Mark the position as watching and force request an update
+                        this.interactor.watchUpdates(child);
+                        this.interactor.requestMesh(child);
+                    }
+                }
+                //NOTE: dont unmark the node yet, as the request hasnt been satisfied
+
+            } else {
+                //If its not a leaf node, it must be missing the inner mesh so request it
+                if (this.getNodeMesh(node) != -1) {
+                    //Node already has a mesh, ignore it, but might be a sign that an error has occured
+                    System.err.println("Requested a mesh for node, however the node already has a mesh");
+
+                    //TODO: need to unmark the node that requested it, either that or only clear node data when a mesh has been removed
+
+                } else {
+                    //Put it into the map + watch and request
+                    long pos = this.getNodePos(node);
+                    long prev = this.pos2meshId.putIfAbsent(pos, node);
+                    if (prev != NO_NODE) {
+                        throw new IllegalStateException("Pos already has a node id attached");
+                    }
+                    this.interactor.watchUpdates(pos);
+                    this.interactor.requestMesh(pos);
+                }
+            }
+        }
+    }
+
+
 
 
     //Tracking for nodes that specifically need meshes, if a node doesnt have or doesnt need a mesh node, it is not in the map
@@ -123,6 +227,15 @@ public class NodeManager2 {
 
     //TODO: if all the children of a node become empty/removed traverse up the chain until a non empty parent node is hit and
     // remove all from the chain
+
+
+
+
+
+
+    //TODO: FIXME: CRITICAL: if a section is empty when created, it wont get allocated a slot, however, the section might
+    // become unempty due to an update!!! THIS IS REALLY BAD. since it doesnt have an allocation
+
 
 
     //TODO: test and fix the possible race condition of if a section is not empty then becomes empty in the same tick
@@ -188,19 +301,45 @@ public class NodeManager2 {
 
         } else {
             //The mesh is an update for an existing node
-            int prevMesh = this.getMeshForNode(id);
+
+            //Sanity check
+            if (this.getNodePos(id) != mesh.position) {
+                throw new IllegalStateException("Node position not same as mesh position");
+            }
+
+            int prevMesh = this.getNodeMesh(id);
             // TODO: If the mesh to upload is air, the node should be removed (however i believe this is only true if all the children are air! fuuuuu)
             if (prevMesh != -1) {
                 //Node has a mesh attached, remove and replace it
+                this.setMeshId(id, this.meshManager.uploadReplaceMesh(prevMesh, mesh));
             } else {
                 //Node didnt have a mesh attached, so just set the current mesh
+                this.setMeshId(id, this.meshManager.uploadMesh(mesh));
             }
+            //Push the updated node to the gpu
+            this.pushNode(id);
         }
     }
 
 
     private void completeRequest(LeafRequest request) {
         //TODO: need to actually update all of the pos2meshId of the children to point to there new nodes
+        int msk = Byte.toUnsignedInt(request.nonAirMask());
+        int baseIdx = this.nodeAllocations.allocateNextConsecutiveCounted(Integer.bitCount(msk));
+        for (int i = 0; i < 8; i++) {
+            if ((msk&(1<<i))!=0) {
+                //It means the section actually exists,
+            } else {
+                //The section was empty, so just remove it
+
+            }
+        }
+
+    }
+
+    //Invalidates the node and tells it to be pushed to the gpu next slot, NOTE: pushing a node, clears any gpu side flags
+    private void pushNode(int node) {
+
     }
 
 }

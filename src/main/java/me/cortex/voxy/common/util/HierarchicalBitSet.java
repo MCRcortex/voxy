@@ -3,6 +3,7 @@ package me.cortex.voxy.common.util;
 public class HierarchicalBitSet {
     private final int limit;
     private int cnt;
+    //If a bit is 1 it means all children are also set
     private long A = 0;
     private final long[] B = new long[64];
     private final long[] C = new long[64*64];
@@ -47,6 +48,24 @@ public class HierarchicalBitSet {
         this.cnt++;
         return ret;
     }
+
+    //Returns the next free index from idx
+    private int findNextFree(int idx) {
+        int pos = Long.numberOfTrailingZeros((~this.A)|((1L<<(idx>>18))-1));
+        return 0;
+    }
+
+    public int allocateNextConsecutiveCounted(int count) {
+        if (this.A==-1) {
+            return -1;
+        }
+        if (this.cnt+count>this.limit) {
+            return -2;//Limit reached
+        }
+
+        return 0;
+    }
+
 
     public boolean free(int idx) {
         long v = this.D[idx>>6];
