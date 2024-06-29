@@ -1,0 +1,29 @@
+{
+  "voxy.config.title": "Configuration de Voxy",
+
+  "voxy.config.general": "Général",
+  "voxy.config.threads": "Threads",
+  "voxy.config.storage": "Stockage",
+
+  "voxy.config.general.enabled": "Activer Voxy",
+  "voxy.config.general.enabled.tooltip": "Active ou Désactive Voxy",
+  "voxy.config.general.ingest": "Conversion en LoDs",
+  "voxy.config.general.ingest.tooltip": "Active ou Désactive la conversion en LoD des nouveaux chunks",
+  "voxy.config.general.quality": "Qualité des LoDs",
+  "voxy.config.general.quality.tooltip": "Jusqu'à où chaque anneau de LoDs va avant de réduire en qualité",
+  "voxy.config.general.geometryBuffer": "Mémoire Tampon Géométrique de Quadrilatère",
+  "voxy.config.general.geometryBuffer.tooltip": "Combien de quadrilatères la mémoire tampon peut contenir",
+  "voxy.config.general.maxSections": "Nombre de Sections",
+  "voxy.config.general.maxSections.tooltip": "Le nombre maximum de sections que le moteur de rendu peut contenir",
+  "voxy.config.general.renderDistance": "Distance d'affichage",
+  "voxy.config.general.renderDistance.tooltip": "La distance d'affichage en chunks (ou -1 pour que les chunks ne disparaissent pas)",
+  "voxy.config.general.nvmesh": "Utilise les 'mesh shaders' d'Nvidia",
+  "voxy.config.general.nvmesh.tooltip": "Si possible, utilise les 'mesh shaders' d'Nvidia pour afficher les LoDs",
+
+  "voxy.config.threads.ingest": "Conversion en LoDs",
+  "voxy.config.threads.ingest.tooltip": "Combien de threads Voxy utilisera pour Convertir des nouveaux chunks en LoDs",
+  "voxy.config.threads.saving": "Sauvegarde",
+  "voxy.config.threads.saving.tooltip": "Combien de threads Voxy utilisera pour sauvegarder des sections dans le stockage",
+  "voxy.config.threads.render": "Rendu",
+  "voxy.config.threads.render.tooltip": "Combien de threads Voxy utilisera pour générer des nouvelles données de rendu"
+}
