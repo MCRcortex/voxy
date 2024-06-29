@@ -106,7 +106,7 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends Ab
             while (!this.biomeUpdates.isEmpty()) {
                 var update = this.biomeUpdates.pop();
                 var biomeReg = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME);
-                this.models.addBiome(update.id, biomeReg.get(new Identifier(update.biome)));
+                this.models.addBiome(update.id, biomeReg.get(Identifier.of(update.biome)));
                 didHaveBiomeChange = true;
             }
 

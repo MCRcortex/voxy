@@ -171,7 +171,7 @@ public class ModelTextureBakery {
 
         this.rasterShader.bind();
         glActiveTexture(GL_TEXTURE0);
-        int texId = MinecraftClient.getInstance().getTextureManager().getTexture(new Identifier("minecraft", "textures/atlas/blocks.png")).getGlId();
+        int texId = MinecraftClient.getInstance().getTextureManager().getTexture(Identifier.of("minecraft", "textures/atlas/blocks.png")).getGlId();
         GlUniform.uniform1(0, 0);
 
         var faces = new ColourDepthTextureData[FACE_VIEWS.size()];
@@ -196,7 +196,7 @@ public class ModelTextureBakery {
 
 
     private ColourDepthTextureData captureView(BlockState state, BakedModel model, BakedBlockEntityModel blockEntityModel, MatrixStack stack, long randomValue, int face, boolean renderFluid, int textureId) {
-        var vc = Tessellator.getInstance().getBuffer();
+        var vc = Tessellator.getInstance();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         float[] mat = new float[4*4];
@@ -208,9 +208,9 @@ public class ModelTextureBakery {
             blockEntityModel.renderOut();
         }
 
-        vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR_TEXTURE);
+        var bb = vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
         if (!renderFluid) {
-            renderQuads(vc, state, model, new MatrixStack(), randomValue);
+            renderQuads(bb, state, model, new MatrixStack(), randomValue);
         } else {
             MinecraftClient.getInstance().getBlockRenderManager().renderFluid(BlockPos.ORIGIN, new BlockRenderView() {
                 @Override
@@ -277,12 +277,15 @@ public class ModelTextureBakery {
                 public int getBottomY() {
                     return 0;
                 }
-            }, vc, state, state.getFluidState());
+            }, bb, state, state.getFluidState());
         }
 
         glBindTexture(GL_TEXTURE_2D, textureId);
-        BufferRenderer.draw(vc.end());
-
+        try {
+            BufferRenderer.draw(bb.end());
+        } catch (IllegalStateException e) {
+            System.err.println("Got empty buffer builder! for block " + state);
+        }
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
         int[] colourData = new int[this.width*this.height];
@@ -298,7 +301,7 @@ public class ModelTextureBakery {
             for (var quad : quads) {
                 //TODO: mark pixels that have
                 int meta = quad.hasColor()?1:0;
-                builder.quad(stack.peek(), quad, (meta>>16)&0xff, (meta>>8)&0xff, meta&0xff, 0, 0);
+                builder.quad(stack.peek(), quad, 255f/((meta>>16)&0xff), 255f/((meta>>8)&0xff), 255f/(meta&0xff), 1.0f, 0, 0);
             }
         }
     }
