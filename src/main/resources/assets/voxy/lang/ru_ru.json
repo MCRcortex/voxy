@@ -1,0 +1,29 @@
+{
+  "voxy.config.title": "Настройки Voxy",
+
+  "voxy.config.general": "Общие",
+  "voxy.config.threads": "Потоки",
+  "voxy.config.storage": "Хранилище",
+
+  "voxy.config.general.enabled": "Включить Voxy",
+  "voxy.config.general.enabled.tooltip": "Полностью включает или отключает Voxy.",
+  "voxy.config.general.ingest": "Поглощение чанков",
+  "voxy.config.general.ingest.tooltip": "Включает или отключает возможность voxies преобразовывать новые чанки в LoD'ы.",
+  "voxy.config.general.quality": "Качество LoD",
+  "voxy.config.general.quality.tooltip": "Как далеко будет простираться каждое кольцо LoD'ов, прежде чем его качество будет понижено.",
+  "voxy.config.general.geometryBuffer": "Квады геометрического буфера",
+  "voxy.config.general.geometryBuffer.tooltip": "Сколько квадов может вместить буфер геометри.и",
+  "voxy.config.general.maxSections": "Максимальное количество секций",
+  "voxy.config.general.maxSections.tooltip": "Максимальное количество секций, которые может находиться в рендере.",
+  "voxy.config.general.renderDistance": "Расстояние рендеринга",
+  "voxy.config.general.renderDistance.tooltip": "Расстояние рендеринга в чанках (установите значение -1, чтобы отключить выгрузку чанков).",
+  "voxy.config.general.nvmesh": "Используйте Mesh-шейдеры Nvidia",
+  "voxy.config.general.nvmesh.tooltip": "По возможности использовать Mesh-шейдеры Nvidia для рендеринга LoD'ов.",
+
+  "voxy.config.threads.ingest": "Поглощение",
+  "voxy.config.threads.ingest.tooltip": "Сколько потоков Voxy будет использовать для поглощения новых чанков.",
+  "voxy.config.threads.saving": "Сохранение",
+  "voxy.config.threads.saving.tooltip": "Сколько потоков Voxy будет использовать для сохранения секций во внутреннем хранилище.",
+  "voxy.config.threads.render": "Рендер",
+  "voxy.config.threads.render.tooltip": "Сколько потоков Voxy будет использовать для генерации данных для рендеринга."
+}
