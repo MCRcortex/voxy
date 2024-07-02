@@ -62,6 +62,7 @@ public class HierarchicalBitSet {
         if (this.cnt+count>this.limit) {
             return -2;//Limit reached
         }
+        //At a minimum maybe just do a while loop for testing
 
         return 0;
     }
