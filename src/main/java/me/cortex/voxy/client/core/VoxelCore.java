@@ -116,7 +116,7 @@ public class VoxelCore {
     }
 
     private AbstractFarWorldRenderer<?,?> createRenderBackend() {
-        if (false) {
+        if (true) {
             System.out.println("Using Gl46MeshletFarWorldRendering");
             return new Gl46MeshletsFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
         } else {

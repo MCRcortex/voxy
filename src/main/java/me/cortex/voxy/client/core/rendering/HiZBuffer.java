@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import org.lwjgl.opengl.GL11;
 
 import static org.lwjgl.opengl.ARBDirectStateAccess.*;
+import static org.lwjgl.opengl.GL11.glScaled;
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL30C.*;
 import static org.lwjgl.opengl.GL33.glBindSampler;
@@ -41,7 +42,8 @@ public class HiZBuffer {
         this.levels -= 3;//Arbitrary size, shinks the max level by alot and saves a significant amount of processing time
         // (could probably increase it to be defined by a max meshlet coverage computation thing)
 
-        this.texture = new GlTexture().store(GL_DEPTH_COMPONENT32, this.levels, width, height);
+        //GL_DEPTH_COMPONENT32F //Cant use this as it does not match the depth format of the provided depth buffer
+        this.texture = new GlTexture().store(GL_DEPTH24_STENCIL8, this.levels, width, height);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTextureParameteri(this.texture.id, GL_TEXTURE_COMPARE_MODE, GL_NONE);
@@ -75,7 +77,7 @@ public class HiZBuffer {
         glDepthFunc(GL_ALWAYS);
 
 
-
+        //System.err.println("SRC: " + GlTexture.getRawTextureType(srcDepthTex) + " DST: " + this.texture.id);
         glCopyImageSubData(srcDepthTex, GL_TEXTURE_2D, 0,0,0,0,
                 this.texture.id, GL_TEXTURE_2D, 0,0,0,0,
                 width, height, 1);
