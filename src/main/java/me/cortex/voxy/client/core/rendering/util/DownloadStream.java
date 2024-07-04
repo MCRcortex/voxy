@@ -84,7 +84,7 @@ public class DownloadStream {
         for (var entry : this.downloadList) {
             glCopyNamedBufferSubData(entry.target.id, this.downloadBuffer.id, entry.targetOffset, entry.downloadStreamOffset, entry.size);
         }
-        thisFrameDownloadList.addAll(this.downloadList);
+        this.thisFrameDownloadList.addAll(this.downloadList);
         this.downloadList.clear();
 
         this.caddr = -1;

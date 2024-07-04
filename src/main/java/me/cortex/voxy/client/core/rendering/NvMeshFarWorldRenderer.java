@@ -34,7 +34,7 @@ import static org.lwjgl.opengl.GL45.glBindTextureUnit;
 import static org.lwjgl.opengl.NVMeshShader.glDrawMeshTasksNV;
 import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FRAGMENT_TEST_NV;
 
-public class NvMeshFarWorldRenderer extends AbstractFarWorldRenderer<NvMeshViewport> {
+public class NvMeshFarWorldRenderer extends AbstractFarWorldRenderer<NvMeshViewport, DefaultGeometryManager> {
     private final Shader terrain = Shader.make()
             .add(ShaderType.TASK, "voxy:lod/nvmesh/primary.task")
             .add(ShaderType.MESH, "voxy:lod/nvmesh/primary.mesh")
@@ -53,7 +53,7 @@ public class NvMeshFarWorldRenderer extends AbstractFarWorldRenderer<NvMeshViewp
             .compile();
 
     public NvMeshFarWorldRenderer(int geometrySize, int maxSections) {
-        super(geometrySize, maxSections);
+        super(new DefaultGeometryManager(geometrySize*8L, maxSections));
     }
 
 

@@ -10,10 +10,11 @@ import static org.lwjgl.util.zstd.Zstd.*;
 
 public class SaveLoadSystem {
 
+    //TODO: Cache like long2short and the short and other data to stop allocs
     public static ByteBuffer serialize(WorldSection section) {
         var data = section.copyData();
         var compressed = new short[data.length];
-        Long2ShortOpenHashMap LUT = new Long2ShortOpenHashMap();
+        Long2ShortOpenHashMap LUT = new Long2ShortOpenHashMap(data.length);
         LongArrayList LUTVAL = new LongArrayList();
         for (int i = 0; i < data.length; i++) {
             long block = data[i];

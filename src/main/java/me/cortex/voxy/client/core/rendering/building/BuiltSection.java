@@ -39,4 +39,8 @@ public final class BuiltSection {
             this.geometryBuffer.free();
         }
     }
+
+    public boolean isEmpty() {
+        return this.geometryBuffer == null;
+    }
 }

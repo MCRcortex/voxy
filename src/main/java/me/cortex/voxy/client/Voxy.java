@@ -4,6 +4,8 @@ import me.cortex.voxy.client.core.VoxelCore;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.client.terrain.WorldImportCommand;
 import me.cortex.voxy.common.config.Serialization;
+import me.cortex.voxy.common.storage.compressors.ZSTDCompressor;
+import me.cortex.voxy.common.storage.config.StorageConfig;
 import net.fabricmc.api.ClientModInitializer;
         import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
@@ -16,11 +18,11 @@ public class Voxy implements ClientModInitializer {
     static {
         ModContainer mod = (ModContainer) FabricLoader.getInstance().getModContainer("voxy").orElseThrow(NullPointerException::new);
         VERSION = mod.getMetadata().getVersion().getFriendlyString();
+        Serialization.init();
     }
 
     @Override
     public void onInitializeClient() {
-        Serialization.init();
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(WorldImportCommand.register());

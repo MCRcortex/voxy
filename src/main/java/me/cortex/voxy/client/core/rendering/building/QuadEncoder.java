@@ -6,6 +6,25 @@ import me.cortex.voxy.client.core.util.Mesher2D;
 
 public class QuadEncoder {
 
+    public static int getX(long data) {
+        return (int) ((data>>21)&0b11111);
+    }
+    public static int getY(long data) {
+        return (int) ((data>>16)&0b11111);
+    }
+    public static int getZ(long data) {
+        return (int) ((data>>11)&0b11111);
+    }
+    public static int getW(long data) {
+        return (int) ((data>>3)&0b1111)+1;
+    }
+    public static int getH(long data) {
+        return (int) ((data>>7)&0b1111)+1;
+    }
+    public static int getFace(long data) {
+        return (int) (data&0b111);
+    }
+
     //Note: the encodedMeshedData is from the Mesher2D
     public static int encodePosition(int face, int otherAxis, int encodedMeshedData) {
         if (false&&(Mesher2D.getW(encodedMeshedData) > 16 || Mesher2D.getH(encodedMeshedData) > 16)) {

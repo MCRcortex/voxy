@@ -63,6 +63,8 @@ public class RenderTracker {
         }
     }
 
+    //TODO: replace this:: with a class cached lambda ref (cause doing this:: still does a lambda allocation)
+
     //Adds a lvl 0 section into the world renderer
     public void addLvl0(int x, int y, int z) {
         this.put(WorldEngine.getWorldSectionId(0, x, y, z));
@@ -92,6 +94,7 @@ public class RenderTracker {
         // concurrent hashmap or something, this is so that e.g. the build data position
         // can be updated
 
+        //TODO: replace this:: with a class cached lambda ref (cause doing this:: still does a lambda allocation)
         this.renderGen.enqueueTask(lvl, x, y, z, this::shouldStillBuild);
 
         this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl-1, (x<<1), (y<<1), (z<<1))));
@@ -129,6 +132,7 @@ public class RenderTracker {
         this.renderer.enqueueResult(new BuiltSection(WorldEngine.getWorldSectionId(lvl, x, y, z)));
         this.renderGen.removeTask(lvl, x, y, z);
 
+        //TODO: replace this:: with a class cached lambda ref (cause doing this:: still does a lambda allocation)
         this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1), this::shouldStillBuild);
         this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1), (z<<1)+1, this::shouldStillBuild);
         this.renderGen.enqueueTask(lvl - 1, (x<<1), (y<<1)+1, (z<<1), this::shouldStillBuild);
@@ -157,6 +161,7 @@ public class RenderTracker {
 
     public void add(int lvl, int x, int y, int z) {
         this.put(WorldEngine.getWorldSectionId(lvl, x, y, z));
+        //TODO: replace this:: with a class cached lambda ref (cause doing this:: still does a lambda allocation)
         this.renderGen.enqueueTask(lvl, x, y, z, this::shouldStillBuild);
     }
 
@@ -173,6 +178,7 @@ public class RenderTracker {
             this.renderGen.clearCache(section.lvl, section.x+1, section.y, section.z);
             this.renderGen.clearCache(section.lvl, section.x, section.y, section.z-1);
             this.renderGen.clearCache(section.lvl, section.x, section.y, section.z+1);
+            //TODO: replace this:: with a class cached lambda ref (cause doing this:: still does a lambda allocation)
             this.renderGen.enqueueTask(section.lvl, section.x, section.y, section.z, this::shouldStillBuild);
             this.renderGen.enqueueTask(section.lvl, section.x-1, section.y, section.z, this::shouldStillBuild);
             this.renderGen.enqueueTask(section.lvl, section.x+1, section.y, section.z, this::shouldStillBuild);

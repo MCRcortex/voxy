@@ -1,0 +1,262 @@
+#version 460 core
+
+#define WORKGROUP 4
+#define MINI_BATCH_SIZE 32
+//The entire uint is a minibatch (each idx is one)
+#define MINI_BATCH_MSK (uint(-1))
+
+//Each y dim is a quadrent in the octree
+// multiple x dims to fill up workgroups
+layout(local_size_x=WORKGROUP, local_size_y=8) in;
+
+layout(binding = 1, std430) restrict buffer RequestSectionLoadQueue {
+    uint counter;
+    uint[] queue;
+} requestQueue;
+
+//SectionNodeData is a uvec4 that contains the position + flags + ptr to own render section data + ptr to children
+layout(binding = 2, std430) restrict readonly buffer SectionNodeData {
+    uvec4[] sectionNodes;
+};
+
+layout(binding = 3, std430) restrict buffer ActiveWorkingNodeQueue {
+    uint feedbackStatus;
+    uint batchIndex;
+    uint end;
+    uint start;
+    uint maxSize;//Needs to be a multiple of local_size_x
+    uint[] queue;
+} nodeQueue;
+
+
+struct UnpackedNode {
+    ivec4 position;//x,y,z,detail
+    uint  flags;//16 bits
+    uint  self;
+    uint  children;
+};
+
+UnpackedNode unpackNode(uvec4 data) {
+    UnpackedNode node;
+
+    return node;
+}
+
+//NOTE: this is different to nanite in the fact that if a node is not loaded, too bad dont render
+
+shared UnpackedNode workingNodes[WORKGROUP];
+shared uint miniBatchMsk;
+void loadNode() {
+    if (gl_LocalInvocationIndex == 0) {//Check if we need to
+        batchMsk = 0;//Reset the minibatch
+        if (miniBatchMsk == MINI_BATCH_SIZE) {
+
+        }
+    }
+    barrier();
+    if (gl_LocalInvocationID.y == 0) {
+
+
+        //Need to make it work in y size 8, but only gl_LocalInvocationId.x == 0
+        workingNodes[gl_LocalInvocationID.x] = unpackNode(sectionNodes[id]);
+    }
+    barrier();//Synchonize, also acts as memory barrier
+}
+
+
+
+//Computes screensize of the node and whether it should render itself or its children
+bool shouldRenderChildren(UnpackedNode node) {
+
+}
+
+//Process a single node and enqueue child nodes if needed into work queue, enqueue self to render and/or request children to load
+void processNode(uint id) {//Called even if it doesnt have any work (id==-1) to ensure uniform control flow for barriers
+
+    //Bottom 2 bits are status flags, is air and children loaded
+    // node.flags
+
+    //If the childrenloaded flag is not set, send a request for the children of the node to be loaded
+    // if all the children are loaded but we are not and we need to render, render the children and dispatch
+    // a request to load self
+
+    if (shouldRenderChildren(node)) {
+        //Dont care about
+    } else {
+
+    }
+
+}
+
+
+//The activly schedualed/acquired work slot for this group
+shared uint workingBatchIndex;
+shared uint workingBatchOffset;
+void process() {
+    if (gl_LocalInvocationIndex == 0) {//This includes both x and y
+        workingBatchIndex = atomicAdd(nodeQueue.batchIndex, BATCH_SIZE);
+    }
+}
+
+
+
+void main() {
+    while (true) {
+        barrier();
+
+    }
+}
+
+
+
+
+//when a node is processed,
+// compute its screen bounding box is computed using fast trick (e.g. if your viewing it from a quadrent you already know its bounding points (min/max))
+// frustum cull, check hiz
+// if it passes culling, use the screensize to check wether it must render itself
+// or dispatch its children to render
+//      IF its error is small enough, then render itself, its mesh should always be loaded, if not its a critical error (except maybe if its a top level node or something)
+//      if its error is too large,
+//          check that all children are loaded (or empty), if they are not all loaded, enqueu a request for the cpu to load
+//          that nodes children
+//              if the load queue is full, dont enqueue it to the queue
+//          then instead of rendering children, render its own mesh since it should always be loaded
+
+//Can also reverse the above slightly and make it so that it checks the children before enqueuing them
+
+
+//the main thing to worry about is if there is enough work to fill the inital few rounds of this
+// before amplification takes effect
+// can do a thing where it initally just blasts child nodes out until the size is small enough
+
+
+
+// NOTE: since matrix multiplication distributes over addition
+//  can precompute the AABB corners with respect to the matrix
+//  then you can just add a translation vector
+
+
+
+
+
+
+
+//TODO: can do in another way
+// first compute the sections that should either render self or childs
+// then in as a seperate job queue work though it
+
+
+
+
+
+
+
+
+
+
+
+uint getChildCount(UnpackedNode node) {
+
+}
+
+
+//Checks whether a node should be culled based on hiz/frustum
+bool cullNode(UnpackedNode node) {
+
+}
+
+//Should render this node, or recurse to children
+bool shouldRenderChildrenInstead(UnpackedNode node) {
+
+}
+
+//Does the node have its own mesh loaded
+bool nodeHasSelfMesh(UnpackedNode node) {
+
+}
+
+//Does the node its children loaded (note! not child meshes)
+bool nodeHasChildrenLoaded(UnpackedNode node) {
+
+}
+
+//Are all the childrens meshes loaded
+bool nodeHasChildMeshesLoaded(UnpackedNode node) {
+
+}
+
+void request(uint type, uint idx) {
+
+}
+
+void renderMesh(uint idx) {
+
+}
+
+void enqueueChildren(uint arg, UnpackedNode node) {
+    uint cnt = getChildCount(node);
+    //TODO: the queue needs 2 counters, the pre and post atomic,
+    // pre is incremented to get index
+    // queue is written to
+    // post is then incremented to signal
+}
+
+void reportCritical(uint type) {
+
+}
+
+void processNode(uint idx) {
+    UnpackedNode node = unpackNode(sectionNodes[idx]);
+    if (!cullNode(node)) {
+        //Should we render children instead of ourselves with respect to screenspace error
+        if (shouldRenderChildrenInstead(node)) {
+            if (nodeHasChildrenLoaded(node)) {
+                //Dispatch nodes to queue
+                enqueueChildren(0, node);
+            } else {
+                //Children arnt loaded so either render self mesh or if we cant
+                // abort basicly must request nodes
+                if (nodeHasSelfMesh(node)) {
+                    //Render self and dispatch request to load children
+                    renderMesh(node.self);
+                    request(1, idx);
+                } else {
+                    //Critical issue, no are loaded and self has no mesh
+                    reportCritical(0);
+                }
+            }
+        } else {
+            if (nodeHasSelfMesh(node)) {
+                //render self
+                renderMesh(node.self);
+            } else {
+                //Request that self mesh is loaded
+                request(0, idx);
+
+                //render children instead
+                if (nodeHasChildrenLoaded(node)) {//Might need to be node nodeHasChildMeshesLoaded
+                    enqueueChildren(1, node);
+                } else {
+                    //This is very bad, it means cant render anything
+                    reportCritical(1);
+                }
+            }
+        }
+    }
+}
+
+//Psudo code, one thread, one load
+void main() {
+    while (true) {
+        //Try to process a node queue entry
+        uint work = atomicAdd(workingNodeQueuePos, 1);
+        uint idx = work&0xFFFFFFu;
+        uint arg = work>>24;
+        if (idx < workingNodeQueueEnd) {
+
+
+        } else {
+            //Do other queue work however we still have the work slot allocated
+        }
+    }
+}

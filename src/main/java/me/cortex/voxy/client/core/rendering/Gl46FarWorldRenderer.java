@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import net.minecraft.block.Blocks;
@@ -33,7 +34,7 @@ import static org.lwjgl.opengl.GL45.glBindTextureUnit;
 import static org.lwjgl.opengl.GL45.glClearNamedBufferData;
 import static org.lwjgl.opengl.GL45C.nglClearNamedBufferData;
 
-public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport> {
+public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport, DefaultGeometryManager> {
     private final Shader commandGen = Shader.make()
             .add(ShaderType.COMPUTE, "voxy:lod/gl46/cmdgen.comp")
             .compile();
@@ -54,7 +55,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
     private final GlBuffer glCommandCountBuffer;
 
     public Gl46FarWorldRenderer(int geometryBuffer, int maxSections) {
-        super(geometryBuffer, maxSections);
+        super(new DefaultGeometryManager(geometryBuffer*8L, maxSections));
         this.glCommandBuffer = new GlBuffer(maxSections*5L*4 * 6);
         this.glCommandCountBuffer = new GlBuffer(4*2);
         nglClearNamedBufferData(this.glCommandBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
@@ -144,18 +145,20 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport>
         //glPointSize(10);
         //TODO: replace glMultiDrawElementsIndirectCountARB with glMultiDrawElementsIndirect on intel gpus, since it performs so much better
         //glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, drawCnt, 0);
+        //glLineWidth(2);
         glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, (int) (this.geometry.getSectionCount()*4.4), 0);
         glEnable(GL_CULL_FACE);
 
 
         /*
-        glFinish();
         DownloadStream.INSTANCE.download(this.glCommandCountBuffer, 0, 4, (ptr, siz) -> {
             int cnt = MemoryUtil.memGetInt(ptr);
-            System.out.println(cnt);
+            drawCnt = cnt;
         });
         DownloadStream.INSTANCE.commit();
+
          */
+
 
 
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT);

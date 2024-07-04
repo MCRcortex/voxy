@@ -7,7 +7,7 @@ import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
 import static org.lwjgl.opengl.GL42.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL45C.glClearNamedBufferData;
 
-public class NvMeshViewport extends Viewport<NvMeshViewport, NvMeshFarWorldRenderer> {
+public class NvMeshViewport extends Viewport<NvMeshViewport> {
     GlBuffer visibilityBuffer;
     public NvMeshViewport(NvMeshFarWorldRenderer renderer) {
         super(renderer);

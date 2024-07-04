@@ -6,13 +6,18 @@
 #import <voxy:lod/block_model.glsl>
 #line 8
 
+//#define DEBUG_RENDER
+
 layout(location = 0) out vec2 uv;
 layout(location = 1) out flat vec2 baseUV;
 layout(location = 2) out flat vec4 tinting;
 layout(location = 3) out flat vec4 addin;
 layout(location = 4) out flat uint flags;
 layout(location = 5) out flat vec4 conditionalTinting;
-//layout(location = 6) out flat vec4 solidColour;
+
+#ifdef DEBUG_RENDER
+layout(location = 6) out flat uint quadDebug;
+#endif
 
 uint extractLodLevel() {
     return uint(gl_BaseInstance)>>27;
@@ -143,4 +148,8 @@ void main() {
 
     vec3 origin = vec3(((extractRelativeLodPos()<<lodLevel) - (baseSectionPos&(ivec3((1<<lodLevel)-1))))<<5);
     gl_Position = MVP*vec4((cornerPos+swizzelDataAxis(face>>1,vec3(cQuadSize,0)))*(1<<lodLevel)+origin, 1.0);
+
+    #ifdef DEBUG_RENDER
+    quadDebug = lodLevel;
+    #endif
 }

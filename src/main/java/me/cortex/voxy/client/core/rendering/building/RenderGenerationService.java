@@ -30,8 +30,10 @@ public class RenderGenerationService {
     private final ModelManager modelManager;
     private final Consumer<BuiltSection> resultConsumer;
     private final BuiltSectionMeshCache meshCache = new BuiltSectionMeshCache();
+    private final boolean emitMeshlets;
 
-    public RenderGenerationService(WorldEngine world, ModelManager modelManager, int workers, Consumer<BuiltSection> consumer) {
+    public RenderGenerationService(WorldEngine world, ModelManager modelManager, int workers, Consumer<BuiltSection> consumer, boolean emitMeshlets) {
+        this.emitMeshlets = emitMeshlets;
         this.world = world;
         this.modelManager = modelManager;
         this.resultConsumer = consumer;
@@ -47,7 +49,7 @@ public class RenderGenerationService {
     //TODO: add a generated render data cache
     private void renderWorker() {
         //Thread local instance of the factory
-        var factory = new RenderDataFactory(this.world, this.modelManager);
+        var factory = new RenderDataFactory(this.world, this.modelManager, this.emitMeshlets);
         while (this.running) {
             this.taskCounter.acquireUninterruptibly();
             if (!this.running) break;

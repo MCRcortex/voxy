@@ -1,25 +1,21 @@
 package me.cortex.voxy.client.core;
 
-import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
-import me.cortex.voxy.client.core.util.DebugUtil;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.hud.BossBarHud;
 import net.minecraft.client.gui.hud.ClientBossBar;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.boss.BossBar;
-import net.minecraft.entity.boss.ServerBossBar;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
@@ -32,7 +28,6 @@ import java.io.File;
 import java.util.*;
 
 import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
-import static org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER;
 
 //Core class that ingests new data from sources and updates the required systems
 
@@ -68,18 +63,13 @@ public class VoxelCore {
 
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
-        if (VoxyConfig.CONFIG.useMeshShaders()) {
-            this.renderer = new NvMeshFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-            System.out.println("Using NvMeshFarWorldRenderer");
-        } else {
-            this.renderer = new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-            System.out.println("Using Gl46FarWorldRenderer");
-        }
+        Capabilities.init();//Ensure clinit is called
+        this.renderer = this.createRenderBackend();
         this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
         System.out.println("Renderer initialized");
 
         this.renderTracker = new RenderTracker(this.world, this.renderer);
-        this.renderGen = new RenderGenerationService(this.world, this.renderer.getModelManager(), VoxyConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult);
+        this.renderGen = new RenderGenerationService(this.world, this.renderer.getModelManager(), VoxyConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult, this.renderer.usesMeshlets());
         this.world.setDirtyCallback(this.renderTracker::sectionUpdated);
         this.renderTracker.setRenderGen(this.renderGen);
         System.out.println("Render tracker and generator initialized");
@@ -99,7 +89,7 @@ public class VoxelCore {
 
         this.distanceTracker = new DistanceTracker(this.renderTracker, new int[]{q,q,q,q},
                 (VoxyConfig.CONFIG.renderDistance<0?VoxyConfig.CONFIG.renderDistance:((VoxyConfig.CONFIG.renderDistance+1)/2)),
-                3, minY, maxY);
+                minY, maxY);
         System.out.println("Distance tracker initialized");
 
         this.postProcessing = new PostProcessing();
@@ -125,6 +115,20 @@ public class VoxelCore {
         System.out.println("Voxy core initialized");
     }
 
+    private AbstractFarWorldRenderer<?,?> createRenderBackend() {
+        if (true) {
+            System.out.println("Using Gl46MeshletFarWorldRendering");
+            return new Gl46MeshletsFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+        } else {
+            if (VoxyConfig.CONFIG.useMeshShaders()) {
+                System.out.println("Using NvMeshFarWorldRenderer");
+                return new NvMeshFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+            } else {
+                System.out.println("Using Gl46FarWorldRenderer");
+                return new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+            }
+        }
+    }
 
 
     public void enqueueIngest(WorldChunk worldChunk) {
@@ -147,9 +151,9 @@ public class VoxelCore {
 
         var projection = new Matrix4f();
         var client = MinecraftClient.getInstance();
-        var gameRenderer = client.gameRenderer;
+        var gameRenderer = client.gameRenderer;//tickCounter.getTickDelta(true);
 
-        float fov = (float) gameRenderer.getFov(gameRenderer.getCamera(), client.getTickDelta(), true);
+        float fov = (float) gameRenderer.getFov(gameRenderer.getCamera(), client.getRenderTickCounter().getTickDelta(true), true);
 
         projection.setPerspective(fov * 0.01745329238474369f,
                 (float) client.getWindow().getFramebufferWidth() / (float)client.getWindow().getFramebufferHeight(),
@@ -169,7 +173,6 @@ public class VoxelCore {
         }
         matrices.push();
         matrices.translate(-cameraX, -cameraY, -cameraZ);
-        DebugUtil.setPositionMatrix(matrices);
         matrices.pop();
         //this.renderer.getModelManager().updateEntry(0, Blocks.DIRT_PATH.getDefaultState());
 
@@ -182,7 +185,11 @@ public class VoxelCore {
         var projection = computeProjectionMat();
         //var projection = RenderSystem.getProjectionMatrix();//computeProjectionMat();
         var viewport = this.viewportSelector.getViewport();
-        viewport.setProjection(projection).setModelView(matrices.peek().getPositionMatrix()).setCamera(cameraX, cameraY, cameraZ);
+        viewport
+                .setProjection(projection)
+                .setModelView(matrices.peek().getPositionMatrix())
+                .setCamera(cameraX, cameraY, cameraZ)
+                .setScreenSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
 
         int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);

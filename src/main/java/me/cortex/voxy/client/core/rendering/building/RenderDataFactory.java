@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering.building;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import me.cortex.voxy.client.core.Capabilities;
 import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.util.Mesher2D;
 import me.cortex.voxy.common.util.MemoryBuffer;
@@ -30,6 +31,7 @@ public class RenderDataFactory {
     private final LongArrayList translucentQuadCollector = new LongArrayList();
     private final LongArrayList[] directionalQuadCollectors = new LongArrayList[]{new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList(), new LongArrayList()};
 
+    private final boolean generateMeshlets;
 
     private int minX;
     private int minY;
@@ -37,9 +39,10 @@ public class RenderDataFactory {
     private int maxX;
     private int maxY;
     private int maxZ;
-    public RenderDataFactory(WorldEngine world, ModelManager modelManager) {
+    public RenderDataFactory(WorldEngine world, ModelManager modelManager, boolean emitMeshlets) {
         this.world = world;
         this.modelMan = modelManager;
+        this.generateMeshlets = emitMeshlets;
     }
 
 
@@ -51,6 +54,16 @@ public class RenderDataFactory {
     // since fluid states are explicitly overlays over the base block
     // can do funny stuff like double rendering
 
+    private static final boolean USE_UINT64 = Capabilities.INSTANCE.INT64_t;
+    public static final int QUADS_PER_MESHLET = 62;
+    private static void writePos(long ptr, long pos) {
+        if (USE_UINT64) {
+            MemoryUtil.memPutLong(ptr, pos);
+        } else {
+            MemoryUtil.memPutInt(ptr, (int) (pos>>32));
+            MemoryUtil.memPutInt(ptr + 4, (int)pos);
+        }
+    }
 
     //section is already acquired and gets released by the parent
     public BuiltSection generateMesh(WorldSection section) {
@@ -76,35 +89,208 @@ public class RenderDataFactory {
         this.generateMeshForAxis(section, 1);//Direction.Axis.Z
         this.generateMeshForAxis(section, 2);//Direction.Axis.X
 
-        int quadCount = this.doubleSidedQuadCollector.size() + this.translucentQuadCollector.size();
-        for (var collector : this.directionalQuadCollectors) {
-            quadCount += collector.size();
+        int bufferSize;
+        if (this.generateMeshlets) {
+            bufferSize = getMeshletHoldingCount(this.doubleSidedQuadCollector.size(), QUADS_PER_MESHLET, QUADS_PER_MESHLET+2) +
+                    getMeshletHoldingCount(this.translucentQuadCollector.size(), QUADS_PER_MESHLET, QUADS_PER_MESHLET+2);
+            for (var collector : this.directionalQuadCollectors) {
+                bufferSize += getMeshletHoldingCount(collector.size(), QUADS_PER_MESHLET, QUADS_PER_MESHLET+2);
+            }
+        } else {
+            bufferSize = this.doubleSidedQuadCollector.size() + this.translucentQuadCollector.size();
+            for (var collector : this.directionalQuadCollectors) {
+                bufferSize += collector.size();
+            }
         }
 
-        if (quadCount == 0) {
+        if (bufferSize == 0) {
             return new BuiltSection(section.key);
         }
 
-        var buff = new MemoryBuffer(quadCount*8L);
-        long ptr = buff.address;
+        //TODO: generate the meshlets here
+        MemoryBuffer buff;
         int[] offsets = new int[8];
-        int coff = 0;
+        if (this.generateMeshlets) {
+            long key = section.key;
+            buff = new MemoryBuffer(bufferSize * 8L);
+            long ptr = buff.address;
+            MemoryUtil.memSet(ptr, 0,bufferSize * 8L);
+            int meshlet = 0;
+            int innerQuadCount = 0;
 
-        //Ordering is: translucent, double sided quads, directional quads
-        offsets[0] = coff;
-        for (long data : this.translucentQuadCollector) {
-            MemoryUtil.memPutLong(ptr + ((coff++)*8L), data);
-        }
+            //Ordering is: translucent, double sided quads, directional quads
+            offsets[0] = meshlet;
+            int mix = 32, miy = 32, miz = 32, max = 0, may = 0, maz = 0;
+            for (long data : this.translucentQuadCollector) {
+                if (innerQuadCount == 0) {
+                    //Write out meshlet header
 
-        offsets[1] = coff;
-        for (long data : this.doubleSidedQuadCollector) {
-            MemoryUtil.memPutLong(ptr + ((coff++)*8L), data);
-        }
+                    //Write out the section position
+                    writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2), key);
+                }
+                MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + (2 + innerQuadCount++) * 8L, data);
+                int x = QuadEncoder.getX(data), y = QuadEncoder.getY(data), z = QuadEncoder.getZ(data), f = QuadEncoder.getFace(data);
+                mix = Math.min(x, mix); miy = Math.min(y, miy); miz = Math.min(z, miz);
+                if ((f>>1)==0) {
+                    max = Math.max(x + QuadEncoder.getW(data), max);
+                    may = Math.max(y, may);
+                    maz = Math.max(z + QuadEncoder.getH(data), maz);
+                } else if ((f>>1)==1) {
+                    max = Math.max(x + QuadEncoder.getW(data), max);
+                    may = Math.max(y + QuadEncoder.getH(data), may);
+                    maz = Math.max(z, maz);
+                } else {
+                    max = Math.max(x, max);
+                    may = Math.max(y + QuadEncoder.getW(data), may);
+                    maz = Math.max(z + QuadEncoder.getH(data), maz);
+                }
 
-        for (int face = 0; face < 6; face++) {
-            offsets[face+2] = coff;
-            for (long data : this.directionalQuadCollectors[face]) {
+
+
+                if (innerQuadCount == QUADS_PER_MESHLET) {
+                    //Write out the meshlet size data
+                    long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                            (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                    writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
+
+                    innerQuadCount = 0;
+                    meshlet++;
+                    mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
+                }
+            }
+
+            if (innerQuadCount != 0) {
+                //Write out the meshlet size data
+                long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                        (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
+                meshlet++;
+                innerQuadCount = 0;
+                mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
+            }
+
+            offsets[1] = meshlet;
+            for (long data : this.doubleSidedQuadCollector) {
+                if (innerQuadCount == 0) {
+                    //Write out meshlet header
+
+                    //Write out the section position
+                    writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2), key);
+                }
+                MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + (2 + innerQuadCount++) * 8L, data);
+                int x = QuadEncoder.getX(data), y = QuadEncoder.getY(data), z = QuadEncoder.getZ(data), f = QuadEncoder.getFace(data);
+                mix = Math.min(x, mix); miy = Math.min(y, miy); miz = Math.min(z, miz);
+                if ((f>>1)==0) {
+                    max = Math.max(x + QuadEncoder.getW(data), max);
+                    may = Math.max(y, may);
+                    maz = Math.max(z + QuadEncoder.getH(data), maz);
+                } else if ((f>>1)==1) {
+                    max = Math.max(x + QuadEncoder.getW(data), max);
+                    may = Math.max(y + QuadEncoder.getH(data), may);
+                    maz = Math.max(z, maz);
+                } else {
+                    max = Math.max(x, max);
+                    may = Math.max(y + QuadEncoder.getW(data), may);
+                    maz = Math.max(z + QuadEncoder.getH(data), maz);
+                }
+                if (innerQuadCount == QUADS_PER_MESHLET) {
+                    //Write out the meshlet size data
+                    long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                            (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                    writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
+
+                    innerQuadCount = 0;
+                    meshlet++;
+                    mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
+                }
+            }
+
+            if (innerQuadCount != 0) {
+                //Write out the meshlet size data
+                long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                        (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
+
+                meshlet++;
+                innerQuadCount = 0;
+                mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
+            }
+
+            for (int face = 0; face < 6; face++) {
+                offsets[face + 2] = meshlet;
+                for (long data : this.directionalQuadCollectors[face]) {
+                    if (innerQuadCount == 0) {
+                        //Write out meshlet header
+
+                        //Write out the section position
+                        writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2), key);
+                    }
+                    MemoryUtil.memPutLong(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + (2 + innerQuadCount++) * 8L, data);
+                    int x = QuadEncoder.getX(data), y = QuadEncoder.getY(data), z = QuadEncoder.getZ(data), f = QuadEncoder.getFace(data);
+                    mix = Math.min(x, mix); miy = Math.min(y, miy); miz = Math.min(z, miz);
+                    if ((f>>1)==0) {
+                        max = Math.max(x + QuadEncoder.getW(data), max);
+                        may = Math.max(y, may);
+                        maz = Math.max(z + QuadEncoder.getH(data), maz);
+                    } else if ((f>>1)==1) {
+                        max = Math.max(x + QuadEncoder.getW(data), max);
+                        may = Math.max(y + QuadEncoder.getH(data), may);
+                        maz = Math.max(z, maz);
+                    } else {
+                        max = Math.max(x, max);
+                        may = Math.max(y + QuadEncoder.getW(data), may);
+                        maz = Math.max(z + QuadEncoder.getH(data), maz);
+                    }
+                    if (innerQuadCount == QUADS_PER_MESHLET) {
+                        //Write out the meshlet size data
+                        long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                                (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                        writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
+
+                        innerQuadCount = 0;
+                        meshlet++;
+                        mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
+                    }
+                }
+
+                if (innerQuadCount != 0) {
+                    //Write out the meshlet size data
+                    long sizeData = ((long)mix)|(((long)miy)<<8)|(((long)miz)<<16)|
+                            (((long)max)<<24)|(((long)may)<<32)|(((long)maz)<<40);
+                    writePos(ptr + meshlet * 8L * (QUADS_PER_MESHLET+2) + 8, sizeData);
+
+
+                    meshlet++;
+                    innerQuadCount = 0;
+                    mix = 32; miy = 32; miz = 32; max = 0; may = 0; maz = 0;
+                }
+            }
+        } else {
+            buff = new MemoryBuffer(bufferSize * 8L);
+            long ptr = buff.address;
+            int coff = 0;
+
+            //Ordering is: translucent, double sided quads, directional quads
+            offsets[0] = coff;
+            for (long data : this.translucentQuadCollector) {
                 MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
+            }
+
+            offsets[1] = coff;
+            for (long data : this.doubleSidedQuadCollector) {
+                MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
+            }
+
+            for (int face = 0; face < 6; face++) {
+                offsets[face + 2] = coff;
+                for (long data : this.directionalQuadCollectors[face]) {
+                    MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
+                }
             }
         }
 
@@ -164,7 +350,7 @@ public class RenderDataFactory {
                                     connectedSection.copyDataTo(this.connectedSectionCache);
                                     connectedSection.release();
                                 } else {
-                                    Arrays.fill(this.connectedSectionCache, 0);
+                                    Arrays.fill(this.connectedSectionCache, Mapper.withLight(Mapper.AIR, 15));
                                 }
                                 obtainedOppositeSection0 = true;
                             }
@@ -190,7 +376,7 @@ public class RenderDataFactory {
                                     connectedSection.copyDataTo(this.connectedSectionCache);
                                     connectedSection.release();
                                 } else {
-                                    Arrays.fill(this.connectedSectionCache, 0);
+                                    Arrays.fill(this.connectedSectionCache, Mapper.withLight(Mapper.AIR, 15));
                                 }
                                 obtainedOppositeSection31 = true;
                             }
@@ -320,5 +506,13 @@ public class RenderDataFactory {
                 axisOutputGeometry.add(encodedQuad);
             }
         }
+    }
+
+    private static int getMeshletHoldingCount(int quads, int quadsPerMeshlet, int meshletSize) {
+        return ((quads+(quadsPerMeshlet-1))/quadsPerMeshlet)*meshletSize;
+    }
+
+    public static int alignUp(int n, int alignment) {
+        return (n + alignment - 1) & -alignment;
     }
 }

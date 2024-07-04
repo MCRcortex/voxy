@@ -9,7 +9,7 @@ import static org.lwjgl.opengl.GL42.GL_UNSIGNED_BYTE;
 import static org.lwjgl.opengl.GL45C.glClearNamedBufferData;
 import static org.lwjgl.opengl.GL45C.nglClearNamedBufferData;
 
-public class Gl46Viewport extends Viewport<Gl46Viewport, Gl46FarWorldRenderer> {
+public class Gl46Viewport extends Viewport<Gl46Viewport> {
     GlBuffer visibilityBuffer;
     public Gl46Viewport(Gl46FarWorldRenderer renderer) {
         super(renderer);

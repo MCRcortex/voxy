@@ -27,6 +27,27 @@ public class ContextSelectionSystem {
         public int maxYOverride = Integer.MIN_VALUE;
         public StorageConfig storageConfig;
     }
+    public static final String DEFAULT_STORAGE_CONFIG;
+    static {
+        var config = new WorldConfig();
+
+        //Load the default config
+        var baseDB = new RocksDBStorageBackend.Config();
+
+        var compressor = new ZSTDCompressor.Config();
+        compressor.compressionLevel = 7;
+
+        var compression = new CompressionStorageAdaptor.Config();
+        compression.delegate = baseDB;
+        compression.compressor = compressor;
+
+        config.storageConfig = compression;
+        DEFAULT_STORAGE_CONFIG = Serialization.GSON.toJson(config);
+
+        if (Serialization.GSON.fromJson(DEFAULT_STORAGE_CONFIG, WorldConfig.class) == null) {
+            throw new IllegalStateException();
+        }
+    }
 
     public static class Selection {
         private final Path selectionFolder;
@@ -46,27 +67,25 @@ public class ContextSelectionSystem {
             if (Files.exists(json)) {
                 try {
                     this.config = Serialization.GSON.fromJson(Files.readString(json), WorldConfig.class);
+                    if (this.config == null) {
+                        throw new IllegalStateException("Config deserialization null, reverting to default");
+                    }
                     return;
                 } catch (Exception e) {
                     System.err.println("Failed to load the storage configuration file, resetting it to default");
                     e.printStackTrace();
                 }
             }
-            this.config = new WorldConfig();
 
-            //Load the default config
-            var baseDB = new RocksDBStorageBackend.Config();
-
-            var compressor = new ZSTDCompressor.Config();
-            compressor.compressionLevel = 7;
-
-            var compression = new CompressionStorageAdaptor.Config();
-            compression.delegate = baseDB;
-            compression.compressor = compressor;
-
-            this.config.storageConfig = compression;
-
-            this.save();
+            try {
+                this.config = Serialization.GSON.fromJson(VoxyConfig.CONFIG.defaultSaveConfig, WorldConfig.class);
+                this.save();
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to deserialize the default config, aborting!", e);
+            }
+            if (this.config == null) {
+                throw new IllegalStateException("Config is still null: \n"+VoxyConfig.CONFIG.defaultSaveConfig);
+            }
         }
 
         public StorageBackend createStorageBackend() {

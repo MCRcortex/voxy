@@ -52,6 +52,8 @@ public class WorldConversionFactory {
                                         }
                                     }
                                     data[G(x, y, z)] = Mapper.composeMappingId(light, blockId, biomeId);
+                                } else {
+                                    data[G(x, y, z)] = Mapper.AIR;
                                 }
                             }
                         }

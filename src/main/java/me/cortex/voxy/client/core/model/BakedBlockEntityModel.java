@@ -18,6 +18,7 @@ import static org.lwjgl.opengl.GL11.glBindTexture;
 
 public class BakedBlockEntityModel {
     private static final class BakedVertices implements VertexConsumer {
+        private boolean makingVertex = false;
         public final RenderLayer layer;
         private float cX, cY, cZ;
         private int cR, cG, cB, cA;
@@ -30,10 +31,12 @@ public class BakedBlockEntityModel {
         }
 
         @Override
-        public VertexConsumer vertex(double x, double y, double z) {
-            this.cX = (float) x;
-            this.cY = (float) y;
-            this.cZ = (float) z;
+        public VertexConsumer vertex(float x, float y, float z) {
+            this.next();
+            this.cX = x;
+            this.cY = y;
+            this.cZ = z;
+            this.makingVertex = true;
             return this;
         }
 
@@ -68,30 +71,22 @@ public class BakedBlockEntityModel {
             return this;
         }
 
-        @Override
-        public void fixedColor(int red, int green, int blue, int alpha) {
-
-        }
-
-        @Override
-        public void unfixColor() {
-
-        }
-
-        @Override
-        public void next() {
-            this.vertices.add(new int[]{
-                    Float.floatToIntBits(this.cX), Float.floatToIntBits(this.cY), Float.floatToIntBits(this.cZ),
-                    this.cR, this.cG, this.cB, this.cA,
-                    Float.floatToIntBits(this.cU), Float.floatToIntBits(this.cV)});
+        private void next() {
+            if (this.makingVertex) {
+                this.makingVertex = false;
+                this.vertices.add(new int[]{
+                        Float.floatToIntBits(this.cX), Float.floatToIntBits(this.cY), Float.floatToIntBits(this.cZ),
+                        this.cR, this.cG, this.cB, this.cA,
+                        Float.floatToIntBits(this.cU), Float.floatToIntBits(this.cV)});
+            }
         }
 
         public void putInto(VertexConsumer vc) {
+            this.next();
             for (var vert : this.vertices) {
                 vc.vertex(Float.intBitsToFloat(vert[0]), Float.intBitsToFloat(vert[1]), Float.intBitsToFloat(vert[2]))
                         .color(vert[3], vert[4], vert[5], vert[6])
-                        .texture(Float.intBitsToFloat(vert[7]), Float.intBitsToFloat(vert[8]))
-                        .next();
+                        .texture(Float.intBitsToFloat(vert[7]), Float.intBitsToFloat(vert[8]));
             }
         }
     }
@@ -102,9 +97,9 @@ public class BakedBlockEntityModel {
     }
 
     public void renderOut() {
-        var vc = Tessellator.getInstance().getBuffer();
+        var vc = Tessellator.getInstance();
         for (var layer : this.layers) {
-            vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR_TEXTURE);
+            var bb = vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
             if (layer.layer instanceof RenderLayer.MultiPhase mp) {
                 Identifier textureId = mp.phases.texture.getId().orElse(null);
                 if (textureId == null) {
@@ -114,8 +109,8 @@ public class BakedBlockEntityModel {
                     glBindTexture(GL_TEXTURE_2D, texture.getGlId());
                 }
             }
-            layer.putInto(vc);
-            BufferRenderer.draw(vc.end());
+            layer.putInto(bb);
+            BufferRenderer.draw(bb.end());
         }
     }
 

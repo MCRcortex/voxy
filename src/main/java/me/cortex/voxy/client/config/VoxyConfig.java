@@ -3,6 +3,8 @@ package me.cortex.voxy.client.config;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import me.cortex.voxy.client.core.Capabilities;
+import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import net.fabricmc.loader.api.FabricLoader;
 import org.lwjgl.opengl.GL;
 
@@ -30,13 +32,19 @@ public class VoxyConfig {
     public int savingThreads = 4;
     public int renderThreads = 5;
     public boolean useMeshShaderIfPossible = true;
+    public String defaultSaveConfig;
 
 
     public static VoxyConfig loadOrCreate() {
         var path = getConfigPath();
         if (Files.exists(path)) {
             try (FileReader reader = new FileReader(path.toFile())) {
-                return GSON.fromJson(reader, VoxyConfig.class);
+                var cfg = GSON.fromJson(reader, VoxyConfig.class);
+                if (cfg.defaultSaveConfig == null) {
+                    //Shitty gson being a pain TODO: replace with a proper fix
+                    cfg.defaultSaveConfig = ContextSelectionSystem.DEFAULT_STORAGE_CONFIG;
+                }
+                return cfg;
             } catch (IOException e) {
                 System.err.println("Could not parse config");
                 e.printStackTrace();
@@ -61,7 +69,6 @@ public class VoxyConfig {
     }
 
     public boolean useMeshShaders() {
-        var cap = GL.getCapabilities();
-        return this.useMeshShaderIfPossible && cap.GL_NV_mesh_shader && cap.GL_NV_representative_fragment_test;
+        return this.useMeshShaderIfPossible && Capabilities.INSTANCE.meshShaders;
     }
 }
