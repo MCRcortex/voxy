@@ -341,5 +341,8 @@ public class NodeManager2 {
     private void pushNode(int node) {
 
     }
+    public void nodeUpload() {
+
+    }
 
 }
