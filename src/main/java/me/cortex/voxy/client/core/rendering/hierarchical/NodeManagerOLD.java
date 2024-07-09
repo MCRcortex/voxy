@@ -12,7 +12,7 @@ import static org.lwjgl.opengl.GL30.GL_R32UI;
 import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
 import static org.lwjgl.opengl.GL45.nglClearNamedBufferSubData;
 
-public class NodeManager {
+public class NodeManagerOLD {
     public static final int MAX_NODE_COUNT = 1<<22;
     public static final int MAX_REQUESTS = 1024;
     private final HierarchicalBitSet bitSet = new HierarchicalBitSet(MAX_NODE_COUNT);
@@ -36,7 +36,7 @@ public class NodeManager {
 
     private final INodeInteractor interactor;
 
-    public NodeManager(INodeInteractor interactor) {
+    public NodeManagerOLD(INodeInteractor interactor) {
         this.interactor = interactor;
         this.pos2meshId.defaultReturnValue(NO_NODE);
     }
