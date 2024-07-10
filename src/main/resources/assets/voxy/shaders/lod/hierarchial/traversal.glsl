@@ -12,15 +12,10 @@ layout(local_size_x=1, local_size_y=1) in;
 // then increment head strictly _AFTER_ writing to the queue, this ensures that the data is always written and avaible in the queue
 
 layout(binding = 0, std140) uniform SceneUniform {
-
+    uint a;
 };
 
-layout(binding = 1, std430) restrict buffer NodeData {//Needs to be read and writeable for marking data,
-    //(could do an evil violation, make this readonly, then have a writeonly varient, which means that writing might not be visible but will show up by the next frame)
-    //Nodes are 16 bytes big (or 32 cant decide, 16 might _just_ be enough)
-    ivec4[] nodes;
-};
-
+#define NODE_DATA_INDEX 1
 
 layout(binding = 2, std430) restrict buffer Atomics {
     uint requestQueueIndex;
@@ -51,18 +46,10 @@ layout(binding = 2, std430) restrict buffer QueueData {
 
 #import <voxy:lod/hierarchial/node.glsl>
 
-layout(binding = 0) uniform sampler2DShadow hizDepthSampler;
-
-
-void aqcuireNewBatch() {
-
-}
+#define HIZ_BINDING_INDEX 0
 
 //Contains all the screenspace computation
 #import <voxy:lod/hierarchial/screenspace.glsl>
-
-
-
 
 
 //If a request is successfully added to the RequestQueue, must update NodeData to mark that the node has been put into the request queue
@@ -81,32 +68,37 @@ void aqcuireNewBatch() {
 // not sure
 
 
-void addRequest() {
-    if (!hasRequested()) {
-        //TODO: request this node (cpu side can figure out what it wants/needs)
 
-        //Mark node as having a request submitted to prevent duplicate submissions
+void addRequest(inout UnpackedNode node) {
+    if (!hasRequested(node)) {
+        //TODO: maybe try using only 1 variable and it being <0 being bad
+        if (atomics.requestQueueIndex < atomic.requestQueueMaxSize) {
+            //Mark node as having a request submitted to prevent duplicate submissions
+            requestQueue[atomicAdd(atomics.requestQueueIndex, 1)] = getId(node);
+            markRequested(node);
+        }
     }
 }
 
-void enqueueSelfForRender() {
-    //TODO: Draw mesh and stop with this node (good path)
+void enqueueChildren(in UnpackedNode node) {
+
 }
 
-void enqueueChildren() {
-
+void enqueueSelfForRender(in UnpackedNode node) {
+    renderQueue[atomicAdd(atomics.renderQueueIndex, 1)] = getMesh(node);
 }
 
 //TODO: need to add an empty mesh, as a parent node might not have anything to render but the children do??
 void main() {
-    uint id = 0;
+    UnpackedNode node;
 
     //Setup/unpack the node
-    unpackNode(id);
+    unpackNode(node, gl_GlobalInvocationID.x);
+
     //TODO: check the node is OK first??? maybe?
 
     //Compute screenspace
-    setupScreenspace();
+    setupScreenspace(node);
 
     if (isCulledByHiz()) {
         //We are done here, dont do any more, the issue is the shader barriers maybe
@@ -115,25 +107,25 @@ void main() {
         //It is visible, TODO: maybe do a more detailed hiz test? (or make it so that )
 
         if (shouldDecend()) {
-            if (hasChildren()) {
-                enqueueChildren();
+            if (hasChildren(node)) {
+                enqueueChildren(node);
             } else {
-                addRequest();
+                addRequest(node);
                 //TODO: use self mesh (is error state if it doesnt have one since all leaf nodes should have a mesh)
                 // Basicly guarenteed to have a mesh, if it doesnt it is very very bad and incorect since its a violation of the graph properties
                 // that all leaf nodes must contain a mesh
-                enqueueSelfForRender();
+                enqueueSelfForRender(node);
             }
         } else {
-            if (hasMesh()) {
-                enqueueSelfForRender();
+            if (hasMesh(node)) {
+                enqueueSelfForRender(node);
             } else {
                 //!! not ideal, we want to render this mesh but dont have it. If we havent sent a request
                 // then send a request for a mesh for this node.
-                addRequest();
+                addRequest(node);
 
                 //TODO: Decend into children? maybe add a bitflag saying is bad if the immediate children dont have meshes
-                enqueueChildren();
+                enqueueChildren(node);
             }
         }
     }

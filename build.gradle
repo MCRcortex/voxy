@@ -56,14 +56,23 @@ dependencies {
     modCompileOnly "maven.modrinth:nvidium:0.2.8-beta"
 
     modImplementation("maven.modrinth:cloth-config:13.0.121+fabric")
+
     modImplementation("maven.modrinth:modmenu:11.0.1")
+
     modCompileOnly("maven.modrinth:iris:1.7.3+1.21")
+
     //modRuntimeOnly("maven.modrinth:iris:1.6.17+1.20.4")
+
     modCompileOnly("maven.modrinth:starlight:1.1.3+1.20.4")
+
     //modCompileOnly("maven.modrinth:immersiveportals:v5.1.7-mc1.20.4")
+
     modCompileOnly("maven.modrinth:vivecraft:1.20.4-1.1.6-fabric")
+
     modCompileOnly("maven.modrinth:chunky:1.3.138")
     modRuntimeOnly("maven.modrinth:chunky:1.3.138")
+
+    modImplementation('io.github.douira:glsl-transformer:2.0.1')
 }
 
 
