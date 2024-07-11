@@ -103,13 +103,13 @@ public class Mipper {
                 maxIndex = block;
             }
 
-            avgBlockLight += lightLevel & 0xF0;
+            avgBlockLight += (lightLevel & 0xF0) >> 4;
             avgSkyLight += lightLevel & 0x0F;
         }
 
         avgBlockLight /= 8;
         avgSkyLight = (int) Math.ceil((double) avgSkyLight / 8);
 
-        return withLight(maxIndex, avgBlockLight | avgSkyLight);
+        return withLight(maxIndex, (avgBlockLight << 4) | avgSkyLight);
     }
 }
