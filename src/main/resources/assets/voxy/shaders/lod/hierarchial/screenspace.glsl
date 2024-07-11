@@ -21,31 +21,35 @@ vec3 minBB;
 vec3 maxBB;
 vec2 size;
 
-vec3 projPoint(mat4 mat, vec3 pos) {
-    vec4 t = mat * vec4(vec3(pos),1);
-    return t.xyz/t.w;
-}
 
 //Sets up screenspace with the given node id, returns true on success false on failure/should not continue
 //Accesses data that is setup in the main traversal and is just shared to here
 void setupScreenspace(in UnpackedNode node) {
     //TODO: Need to do aabb size for the nodes, it must be an overesimate of all the children
 
-    mat4 mvp;
+    Transform transform = transforms[getTransformIndex(node)];
 
-    vec3 basePos;
-    vec3 minSize;
-    vec3 maxSize;
+    /*
+    vec3 point = VP*(((transform.transform*vec4((node.pos<<node.lodLevel) - transform.originPos.xyz, 1))
+                    + (transform.worldPos.xyz-camChunkPos))-camSubChunk);
+                    */
 
 
-    vec3 minPos = minSize + basePos;
-    vec3 maxPos = maxSize + basePos;
+    vec4 base = VP*vec4(vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos, 1);
 
-    minBB = projPoint(mvp, minPos);
+    //TODO: AABB SIZES not just a max cube
+
+    //vec3 minPos = minSize + basePos;
+    //vec3 maxPos = maxSize + basePos;
+
+    minBB = base.xyz/base.w;
     maxBB = minBB;
 
     for (int i = 1; i < 8; i++) {
-        vec3 point = projPoint(mvp, mix(minPos, maxPos, bvec3((i&1)!=0,(i&2)!=0,(i&4)!=0)));
+        //NOTE!: cant this be precomputed and put in an array?? in the scene uniform??
+        vec4 pPoint = (VP*vec4(vec3((i&1)!=0,(i&2)!=0,(i&4)!=0)*32,1));//Size of section is 32x32x32 (need to change it to a bounding box in the future)
+        pPoint += base;
+        vec3 point = pPoint.xyz/pPoint.w;
         minBB = min(minBB, point);
         maxBB = max(maxBB, point);
     }
@@ -54,7 +58,7 @@ void setupScreenspace(in UnpackedNode node) {
 }
 
 bool isCulledByHiz() {
-    vec2 ssize = size.xy * vec2(ivec2(screensize));
+    vec2 ssize = size.xy * vec2(ivec2(screenW, screenH));
     float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5;
     return textureLod(hizDepthSampler, vec3(midpoint, minBB.z), miplevel) > 0.0001;

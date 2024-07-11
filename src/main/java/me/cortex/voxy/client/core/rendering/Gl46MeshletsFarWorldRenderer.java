@@ -44,6 +44,7 @@ import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FR
 // the shader can cull the verticies of any quad that has its index over the expected quuad count
 // this could potentially result in a fair bit of memory savings (especially if used in normal mc terrain rendering)
 public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46MeshletViewport, DefaultGeometryManager> {
+
     private final Shader lodShader = Shader.make()
             .define("QUADS_PER_MESHLET", RenderDataFactory.QUADS_PER_MESHLET)
             .add(ShaderType.VERTEX, "voxy:lod/gl46mesh/quads.vert")
