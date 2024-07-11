@@ -90,9 +90,10 @@ public class WorldConversionFactory {
             for (int z = 0; z < 16; z += 2) {
                 for (int x = 0; x < 16; x += 2) {
                     data[16*16*16 + i++] =
-                            Mipper.mip(
-                                    data[G(x, y, z)],       data[G(x+1, y, z)],       data[G(x, y, z+1)],      data[G(x+1, y, z+1)],
-                                    data[G(x, y+1, z)],   data[G(x+1, y+1, z)],  data[G(x, y+1, z+1)], data[G(x+1, y+1, z+1)],
+                            Mipper.mip(new long[]{
+                                        data[G(x, y, z)],        data[G(x+1, y, z)],        data[G(x, y, z+1)],      data[G(x+1, y, z+1)],
+                                        data[G(x, y+1, z)],   data[G(x+1, y+1, z)],  data[G(x, y+1, z+1)], data[G(x+1, y+1, z+1)]
+                                    },
                                     mapper);
                 }
             }
@@ -104,9 +105,10 @@ public class WorldConversionFactory {
             for (int z = 0; z < 8; z += 2) {
                 for (int x = 0; x < 8; x += 2) {
                     data[16*16*16 + 8*8*8 + i++] =
-                            Mipper.mip(
-                                    data[H(x, y, z)],       data[H(x+1, y, z)],       data[H(x, y, z+1)],      data[H(x+1, y, z+1)],
-                                    data[H(x, y+1, z)],  data[H(x+1, y+1, z)],  data[H(x, y+1, z+1)], data[H(x+1, y+1, z+1)],
+                            Mipper.mip(new long[]{
+                                            data[H(x, y, z)], data[H(x + 1, y, z)], data[H(x, y, z + 1)], data[H(x + 1, y, z + 1)],
+                                            data[H(x, y + 1, z)], data[H(x + 1, y + 1, z)], data[H(x, y + 1, z + 1)], data[H(x + 1, y + 1, z + 1)]
+                                    },
                                     mapper);
                 }
             }
@@ -118,9 +120,10 @@ public class WorldConversionFactory {
             for (int z = 0; z < 4; z += 2) {
                 for (int x = 0; x < 4; x += 2) {
                     data[16*16*16 + 8*8*8 + 4*4*4 + i++] =
-                            Mipper.mip(
-                                    data[I(x, y, z)],       data[I(x+1, y, z)],       data[I(x, y, z+1)],      data[I(x+1, y, z+1)],
-                                    data[I(x, y+1, z)],   data[I(x+1, y+1, z)],  data[I(x, y+1, z+1)], data[I(x+1, y+1, z+1)],
+                            Mipper.mip(new long[]{
+                                            data[I(x, y, z)], data[I(x + 1, y, z)], data[I(x, y, z + 1)], data[I(x + 1, y, z + 1)],
+                                            data[I(x, y + 1, z)], data[I(x + 1, y + 1, z)], data[I(x, y + 1, z + 1)], data[I(x + 1, y + 1, z + 1)],
+                                    },
                                     mapper);
                 }
             }
@@ -128,9 +131,10 @@ public class WorldConversionFactory {
 
         //Mip L4
         data[16*16*16 + 8*8*8 + 4*4*4 + 2*2*2] =
-                Mipper.mip(
-                        data[J(0, 0, 0)], data[J(1, 0, 0)], data[J(0, 0, 1)], data[J(1, 0, 1)],
-                        data[J(0, 1, 0)], data[J(1, 1, 0)], data[J(0, 1, 1)], data[J(1, 1, 1)],
+                Mipper.mip(new long[]{
+                                data[J(0, 0, 0)], data[J(1, 0, 0)], data[J(0, 0, 1)], data[J(1, 0, 1)],
+                                data[J(0, 1, 0)], data[J(1, 1, 0)], data[J(0, 1, 1)], data[J(1, 1, 1)],
+                        },
                         mapper);
     }
 }

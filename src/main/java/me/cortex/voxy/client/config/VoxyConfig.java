@@ -50,8 +50,13 @@ public class VoxyConfig {
                 e.printStackTrace();
             }
         }
-        return new VoxyConfig();
+
+        var cfg = new VoxyConfig();
+        cfg.defaultSaveConfig = ContextSelectionSystem.DEFAULT_STORAGE_CONFIG;
+
+        return cfg;
     }
+
     public void save() {
         //Unsafe, todo: fixme! needs to be atomic!
         try {
