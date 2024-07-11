@@ -344,14 +344,14 @@ public class NodeManager2 {
     }
 
     private void writeNode(long dst, int id) {
-        
+
     }
 
     //2 parts upload and download
 
     private void download() {
         //Download the request queue then clear the counter (first 4 bytes)
-        DownloadStream.INSTANCE.download(this.);
+        //DownloadStream.INSTANCE.download(this.);
 
     }
 
