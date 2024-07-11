@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering.hierarchical;
 
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.MarkedObjectList;
 import me.cortex.voxy.common.util.HierarchicalBitSet;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -341,7 +342,16 @@ public class NodeManager2 {
     private void pushNode(int node) {
 
     }
-    public void nodeUpload() {
+
+    private void writeNode(long dst, int id) {
+        
+    }
+
+    //2 parts upload and download
+
+    private void download() {
+        //Download the request queue then clear the counter (first 4 bytes)
+        DownloadStream.INSTANCE.download(this.);
 
     }
 

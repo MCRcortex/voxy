@@ -21,21 +21,17 @@ layout(binding = SCENE_UNIFORM_INDEX, std140) uniform SceneUniform {
     uint screenW;
     vec3 camSubSecPos;
     uint screenH;
+    uint requestQueueMaxSize;
+    uint renderQueueMaxSize;
 };
 
-layout(binding = ATOMIC_DATA_INDEX, std430) restrict buffer Atomics {
+layout(binding = REQUEST_QUEUE_INDEX, std430) restrict buffer RequestQueue {
     uint requestQueueIndex;
-    uint requestQueueMaxSize;
-
-    uint renderQueueIndex;
-    uint renderQueueMaxSize;
-} atomics;
-
-layout(binding = REQUEST_QUEUE_INDEX, std430) restrict writeonly buffer RequestQueue {
     uint[] requestQueue;
 };
 
-layout(binding = RENDER_QUEUE_INDEX, std430) restrict writeonly buffer RenderQueue {
+layout(binding = RENDER_QUEUE_INDEX, std430) restrict buffer RenderQueue {
+    uint renderQueueIndex;
     uint[] renderQueue;
 };
 
@@ -77,9 +73,9 @@ layout(binding = 2, std430) restrict buffer QueueData {
 void addRequest(inout UnpackedNode node) {
     if (!hasRequested(node)) {
         //TODO: maybe try using only 1 variable and it being <0 being bad
-        if (atomics.requestQueueIndex < atomics.requestQueueMaxSize) {
+        if (requestQueueIndex < requestQueueMaxSize) {
             //Mark node as having a request submitted to prevent duplicate submissions
-            requestQueue[atomicAdd(atomics.requestQueueIndex, 1)] = getId(node);
+            requestQueue[atomicAdd(requestQueueIndex, 1)] = getId(node);
             markRequested(node);
         }
     }
@@ -90,7 +86,9 @@ void enqueueChildren(in UnpackedNode node) {
 }
 
 void enqueueSelfForRender(in UnpackedNode node) {
-    renderQueue[atomicAdd(atomics.renderQueueIndex, 1)] = getMesh(node);
+    if (renderQueueIndex < renderQueueMaxSize) {
+        renderQueue[atomicAdd(renderQueueIndex, 1)] = getMesh(node);
+    }
 }
 
 //TODO: need to add an empty mesh, as a parent node might not have anything to render but the children do??
