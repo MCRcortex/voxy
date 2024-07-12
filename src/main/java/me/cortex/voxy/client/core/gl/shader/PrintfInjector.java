@@ -17,7 +17,7 @@ import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
 import static org.lwjgl.opengl.GL45.nglClearNamedBufferSubData;
 
-public class PrintfInjector {
+public class PrintfInjector implements IShaderProcessor {
     private final GlBuffer textBuffer;
     private final HashMap<String, Integer> printfStringMap = new HashMap<>();
     private final HashMap<Integer, String> idToPrintfStringMap = new HashMap<>();
@@ -149,19 +149,20 @@ public class PrintfInjector {
             //Inject the printf code
             StringBuilder subCode = new StringBuilder();
             subCode.append(String.format("{" +
-                    "uint printfWriteIndex = atomicAdd(printfOutputStruct.index,%s);" +
-                    "printfOutputStruct.stream[printfWriteIndex]=%s;", types.size()+1,
+                            "uint printfWriteIndex = atomicAdd(printfOutputStruct.index,%s);" +
+                            "printfOutputStruct.stream[printfWriteIndex]=%s;", types.size()+1,
                     this.printfStringMap.computeIfAbsent(fmtStr, a->{int id = this.printfStringMap.size();
                         this.idToPrintfStringMap.put(id, a);
                         return id;})));
 
             for (int i = 0; i < types.size(); i++) {
                 subCode.append("printfOutputStruct.stream[printfWriteIndex+").append(i+1).append("]=");
-                if (types.get(i) == 'd' || types.get(i) == 'i' ||  types.get(i) == 'u') {
+                if (types.get(i) == 'd' || types.get(i) == 'i') {
                     subCode.append("uint(").append(argVals.get(i)).append(")");
-                }
-                if (types.get(i) == 'f') {
+                } else if (types.get(i) == 'f') {
                     subCode.append("floatBitsToUint(").append(argVals.get(i)).append(")");
+                } else {
+                    throw new IllegalStateException("Unknown type " + types.get(i));
                 }
                 subCode.append(";");
             }
@@ -193,7 +194,7 @@ public class PrintfInjector {
             parsePrintfTypes(fmt, types);
             Object[] args = new Object[types.size()];
             for (int i = 0; i < types.size(); i++) {
-                if (types.get(i) == 'd' || types.get(i) == 'i' || types.get(i) == 'u') {
+                if (types.get(i) == 'd' || types.get(i) == 'i') {
                     args[i] = MemoryUtil.memGetInt(ptr);
                     ptr += 4;
                     cnt++;
@@ -209,12 +210,17 @@ public class PrintfInjector {
     }
 
     public void download() {
-        DownloadStream.INSTANCE.download(this.textBuffer, 0, this.textBuffer.size(), this::processResult);
+        DownloadStream.INSTANCE.download(this.textBuffer, this::processResult);
         DownloadStream.INSTANCE.commit();
         nglClearNamedBufferSubData(this.textBuffer.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
     }
 
     public void free() {
         this.textBuffer.free();
+    }
+
+    @Override
+    public String process(ShaderType type, String source) {
+        return this.transformInject(source);
     }
 }

@@ -43,6 +43,12 @@ public class DownloadStream {
 
     private long caddr = -1;
     private long offset = 0;
+
+    //Pulls the entire buffer from the gpu
+    public void download(GlBuffer buffer, DownloadResultConsumer resultConsumer) {
+        this.download(buffer, 0, buffer.size(), resultConsumer);
+    }
+
     public void download(GlBuffer buffer, long destOffset, long size, DownloadResultConsumer resultConsumer) {
         if (size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException();

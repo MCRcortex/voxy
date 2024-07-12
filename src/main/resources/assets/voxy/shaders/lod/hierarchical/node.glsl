@@ -87,3 +87,7 @@ void markRequested(inout UnpackedNode node) {
     node.flags |= 1u;
     nodes[node.nodeId].z |= 1u<<24;
 }
+
+void debugDumpNode(in UnpackedNode node) {
+    printf("Node %d, %d@[%d,%d,%d], flags: %d, mesh: %d, ChildPtr: %d", node.nodeId, node.lodLevel, node.pos.x, node.pos.z, node.pos.z, node.flags, node.meshPtr, node.childPtr);
+}

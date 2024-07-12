@@ -1,6 +1,8 @@
 package me.cortex.voxy.client.core.rendering.hierarchical;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.MarkedObjectList;
@@ -9,6 +11,11 @@ import me.cortex.voxy.common.world.WorldEngine;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.Arrays;
+
+import static org.lwjgl.opengl.GL11.GL_UNSIGNED_INT;
+import static org.lwjgl.opengl.GL30.GL_R32UI;
+import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
+import static org.lwjgl.opengl.GL45.nglClearNamedBufferSubData;
 
 
 //TODO:FIXME: TODO, Must fix/have some filtering for section updates based on time or something
@@ -91,6 +98,7 @@ public class NodeManager2 {
         }
     }
 
+    public static final int REQUEST_QUEUE_SIZE = 1024;
     public static final int MAX_NODE_COUNT = 1<<22;
     public static final int NODE_MSK = MAX_NODE_COUNT-1;
 
@@ -104,11 +112,16 @@ public class NodeManager2 {
     private final INodeInteractor interactor;
     private final MeshManager meshManager;
 
+    public final GlBuffer nodeBuffer;
+    public final GlBuffer requestQueue;
+
     public NodeManager2(INodeInteractor interactor, MeshManager meshManager) {
         this.interactor = interactor;
         this.pos2meshId.defaultReturnValue(NO_NODE);
         this.interactor.setMeshUpdateCallback(this::meshUpdate);
         this.meshManager = meshManager;
+        this.nodeBuffer = new GlBuffer(MAX_NODE_COUNT*16);
+        this.requestQueue = new GlBuffer(REQUEST_QUEUE_SIZE*4+4);
     }
 
     public void insertTopLevelNode(long position) {
@@ -335,24 +348,41 @@ public class NodeManager2 {
                 //The section was empty, so just remove/skip it
             }
         }
-
     }
+
+    private final IntArrayList nodeUpdates = new IntArrayList();
 
     //Invalidates the node and tells it to be pushed to the gpu next slot, NOTE: pushing a node, clears any gpu side flags
     private void pushNode(int node) {
-
+        //TODO: update the local struct with the current frame id to prevent it from being put in the queue multiple times
+        this.nodeUpdates.add(node);
     }
 
     private void writeNode(long dst, int id) {
 
     }
 
-    //2 parts upload and download
+    public void upload() {
+        for (int i = 0; i < this.nodeUpdates.size(); i++) {
+            int node = this.nodeUpdates.getInt(i);
+            //TODO: UPLOAD NODE
 
-    private void download() {
+        }
+        this.nodeUpdates.clear();
+    }
+
+    public void download() {
         //Download the request queue then clear the counter (first 4 bytes)
-        //DownloadStream.INSTANCE.download(this.);
+        DownloadStream.INSTANCE.download(this.requestQueue, this::processRequestQueue);
+        DownloadStream.INSTANCE.commit();
+        nglClearNamedBufferSubData(this.requestQueue.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
 
+    }
+
+
+    public void free() {
+        this.requestQueue.free();
+        this.nodeBuffer.free();
     }
 
 }

@@ -5,6 +5,7 @@ import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
+import me.cortex.voxy.client.core.rendering.Test;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
@@ -56,6 +57,7 @@ public class VoxelCore {
     //private final Thread shutdownThread = new Thread(this::shutdown);
 
     private WorldImporter importer;
+    private Test test;
     public VoxelCore(ContextSelectionSystem.Selection worldSelection) {
         this.world = worldSelection.createEngine();
         var cfg = worldSelection.getConfig();
@@ -113,10 +115,11 @@ public class VoxelCore {
         //this.renderer.getModelManager().updateEntry(0, Blocks.GRASS_BLOCK.getDefaultState());
 
         System.out.println("Voxy core initialized");
+        this.test = new Test();
     }
 
     private AbstractFarWorldRenderer<?,?> createRenderBackend() {
-        if (true) {
+        if (false) {
             System.out.println("Using Gl46MeshletFarWorldRendering");
             return new Gl46MeshletsFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
         } else {
@@ -195,6 +198,8 @@ public class VoxelCore {
         this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);
 
         this.renderer.renderFarAwayOpaque(viewport);
+
+        this.test.doIt(viewport);
 
         //Compute the SSAO of the rendered terrain
         this.postProcessing.computeSSAO(projection, matrices);

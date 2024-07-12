@@ -3,7 +3,7 @@
 //TODO: make this better than a single thread
 layout(local_size_x=1, local_size_y=1) in;
 
-#import <voxy:lod/hierarchial/binding_points.glsl>
+#import <voxy:lod/hierarchical/binding_points.glsl>
 #line 7
 
 //The queue contains 3 atomics
@@ -44,13 +44,13 @@ layout(binding = 2, std430) restrict buffer QueueData {
 } queue;
 */
 #line 1
-#import <voxy:lod/hierarchial/transform.glsl>
+#import <voxy:lod/hierarchical/transform.glsl>
 #line 1
-#import <voxy:lod/hierarchial/node.glsl>
+#import <voxy:lod/hierarchical/node.glsl>
 #line 1
 
 //Contains all the screenspace computation
-#import <voxy:lod/hierarchial/screenspace.glsl>
+#import <voxy:lod/hierarchical/screenspace.glsl>
 #line 58
 
 //If a request is successfully added to the RequestQueue, must update NodeData to mark that the node has been put into the request queue
@@ -71,6 +71,7 @@ layout(binding = 2, std430) restrict buffer QueueData {
 
 
 void addRequest(inout UnpackedNode node) {
+    printf("requested");
     if (!hasRequested(node)) {
         //TODO: maybe try using only 1 variable and it being <0 being bad
         if (requestQueueIndex < requestQueueMaxSize) {
@@ -82,10 +83,11 @@ void addRequest(inout UnpackedNode node) {
 }
 
 void enqueueChildren(in UnpackedNode node) {
-
+    printf("children");
 }
 
 void enqueueSelfForRender(in UnpackedNode node) {
+    printf("render");
     if (renderQueueIndex < renderQueueMaxSize) {
         renderQueue[atomicAdd(renderQueueIndex, 1)] = getMesh(node);
     }
@@ -103,7 +105,10 @@ void main() {
     //Compute screenspace
     setupScreenspace(node);
 
+    debugDumpNode(node);
+
     if (isCulledByHiz()) {
+        printf("HizCulled");
         //We are done here, dont do any more, the issue is the shader barriers maybe
         // its culled, maybe just mark it as culled?
     } else {
