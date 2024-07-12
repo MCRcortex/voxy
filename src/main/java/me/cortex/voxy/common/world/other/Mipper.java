@@ -104,7 +104,13 @@ public class Mipper {
             }
 
             avgBlockLight += (lightLevel & 0xF0) >> 4;
-            avgSkyLight += lightLevel & 0x0F;
+
+            if(blockState.isOf(Blocks.SNOW) && i >= 4 ) { // If snow and a top block, remove lighting from block below
+                long blockBelow = blocks[i - 4];
+                avgSkyLight -= Mapper.getLightId(blockBelow) & 0x0F;
+            } else {
+                avgSkyLight += lightLevel & 0x0F;
+            }
         }
 
         avgBlockLight /= 8;
