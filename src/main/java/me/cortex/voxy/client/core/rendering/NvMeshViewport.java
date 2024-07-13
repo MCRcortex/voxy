@@ -10,9 +10,7 @@ import static org.lwjgl.opengl.GL45C.glClearNamedBufferData;
 public class NvMeshViewport extends Viewport<NvMeshViewport> {
     GlBuffer visibilityBuffer;
     public NvMeshViewport(NvMeshFarWorldRenderer renderer) {
-        super(renderer);
-        this.visibilityBuffer = new GlBuffer(renderer.maxSections*4L);
-        glClearNamedBufferData(this.visibilityBuffer.id, GL_R8UI, GL_RED_INTEGER, GL_UNSIGNED_BYTE, new int[1]);
+        this.visibilityBuffer = new GlBuffer(renderer.maxSections*4L).zero();
     }
 
     protected void delete0() {

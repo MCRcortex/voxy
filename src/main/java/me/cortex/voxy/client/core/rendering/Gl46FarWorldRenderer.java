@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
@@ -54,8 +55,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport,
     private final GlBuffer glCommandBuffer;
     private final GlBuffer glCommandCountBuffer;
 
-    public Gl46FarWorldRenderer(int geometryBuffer, int maxSections) {
-        super(new DefaultGeometryManager(geometryBuffer*8L, maxSections));
+    public Gl46FarWorldRenderer(ModelManager modelManager, int geometryBuffer, int maxSections) {
+        super(modelManager, new DefaultGeometryManager(geometryBuffer*8L, maxSections));
         this.glCommandBuffer = new GlBuffer(maxSections*5L*4 * 6);
         this.glCommandCountBuffer = new GlBuffer(4*2);
         nglClearNamedBufferData(this.glCommandBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);

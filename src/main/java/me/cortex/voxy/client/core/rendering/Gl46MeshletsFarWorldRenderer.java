@@ -4,6 +4,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.rendering.building.RenderDataFactory;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
@@ -73,10 +74,10 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
     private final HiZBuffer hiZBuffer = new HiZBuffer();
     private final int hizSampler = glGenSamplers();
 
-    public Gl46MeshletsFarWorldRenderer(int geometrySize, int maxSections) {
-        super(new DefaultGeometryManager(alignUp(geometrySize*8L, 8* (RenderDataFactory.QUADS_PER_MESHLET+2)), maxSections, 8*(RenderDataFactory.QUADS_PER_MESHLET+2)));
-        this.glDrawIndirect = new GlBuffer(4*(4+5));
-        this.meshletBuffer = new GlBuffer(4*1000000);//TODO: Make max meshlet count configurable, not just 1 million (even tho thats a max of 126 million quads per frame)
+    public Gl46MeshletsFarWorldRenderer(ModelManager modelManager, int geometrySize, int maxSections) {
+        super(modelManager, new DefaultGeometryManager(alignUp(geometrySize*8L, 8* (RenderDataFactory.QUADS_PER_MESHLET+2)), maxSections, 8*(RenderDataFactory.QUADS_PER_MESHLET+2)));
+        this.glDrawIndirect = new GlBuffer(4*(4+5)).zero();
+        this.meshletBuffer = new GlBuffer(4*1000000).zero();//TODO: Make max meshlet count configurable, not just 1 million (even tho thats a max of 126 million quads per frame)
 
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);//This is so that using the shadow sampler works correctly
         glTextureParameteri(this.hizSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -85,8 +86,10 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         glTextureParameteri(this.hizSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTextureParameteri(this.hizSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
+        /*
         nglClearNamedBufferData(this.meshletBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
         nglClearNamedBufferData(this.glDrawIndirect.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+         */
     }
 
     protected void bindResources(Gl46MeshletViewport viewport, boolean bindToDrawIndirect, boolean bindToDispatchIndirect, boolean bindHiz) {
@@ -231,7 +234,7 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
     }
 
     @Override
-    public boolean usesMeshlets() {
+    public boolean generateMeshlets() {
         return true;
     }
 }

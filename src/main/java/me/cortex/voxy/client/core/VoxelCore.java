@@ -3,9 +3,9 @@ package me.cortex.voxy.client.core;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.config.VoxyConfig;
+import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
-import me.cortex.voxy.client.core.rendering.Test;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
@@ -46,18 +46,19 @@ import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
 //Ingest -> world engine -> raw render data -> render data
 public class VoxelCore {
     private final WorldEngine world;
-    private final DistanceTracker distanceTracker;
     private final RenderGenerationService renderGen;
+    private final ModelManager modelManager;
+
+    private final DistanceTracker distanceTracker;
     private final RenderTracker renderTracker;
 
-    private final AbstractFarWorldRenderer renderer;
+    private final IRenderInterface renderer;
     private final ViewportSelector viewportSelector;
     private final PostProcessing postProcessing;
 
     //private final Thread shutdownThread = new Thread(this::shutdown);
 
     private WorldImporter importer;
-    private Test test;
     public VoxelCore(ContextSelectionSystem.Selection worldSelection) {
         this.world = worldSelection.createEngine();
         var cfg = worldSelection.getConfig();
@@ -66,12 +67,13 @@ public class VoxelCore {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         Capabilities.init();//Ensure clinit is called
+        this.modelManager = new ModelManager(16);
         this.renderer = this.createRenderBackend();
         this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
         System.out.println("Renderer initialized");
 
-        this.renderTracker = new RenderTracker(this.world, this.renderer);
-        this.renderGen = new RenderGenerationService(this.world, this.renderer.getModelManager(), VoxyConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult, this.renderer.usesMeshlets());
+        this.renderTracker = new RenderTracker(this.world, (AbstractFarWorldRenderer) this.renderer);
+        this.renderGen = new RenderGenerationService(this.world, this.modelManager, VoxyConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult, this.renderer.generateMeshlets());
         this.world.setDirtyCallback(this.renderTracker::sectionUpdated);
         this.renderTracker.setRenderGen(this.renderGen);
         System.out.println("Render tracker and generator initialized");
@@ -115,20 +117,19 @@ public class VoxelCore {
         //this.renderer.getModelManager().updateEntry(0, Blocks.GRASS_BLOCK.getDefaultState());
 
         System.out.println("Voxy core initialized");
-        this.test = new Test();
     }
 
     private AbstractFarWorldRenderer<?,?> createRenderBackend() {
         if (false) {
             System.out.println("Using Gl46MeshletFarWorldRendering");
-            return new Gl46MeshletsFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+            return new Gl46MeshletsFarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
         } else {
             if (VoxyConfig.CONFIG.useMeshShaders()) {
                 System.out.println("Using NvMeshFarWorldRenderer");
-                return new NvMeshFarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+                return new NvMeshFarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
             } else {
                 System.out.println("Using Gl46FarWorldRenderer");
-                return new Gl46FarWorldRenderer(VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+                return new Gl46FarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
             }
         }
     }
@@ -199,8 +200,6 @@ public class VoxelCore {
 
         this.renderer.renderFarAwayOpaque(viewport);
 
-        this.test.doIt(viewport);
-
         //Compute the SSAO of the rendered terrain
         this.postProcessing.computeSSAO(projection, matrices);
 
@@ -246,7 +245,7 @@ public class VoxelCore {
         System.out.println("Render gen shut down");
         try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
         System.out.println("World engine shut down");
-        try {this.renderer.shutdown(); this.viewportSelector.free();} catch (Exception e) {System.err.println(e);}
+        try {this.renderer.shutdown(); this.viewportSelector.free(); this.modelManager.free();} catch (Exception e) {System.err.println(e);}
         System.out.println("Renderer shut down");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}}
         System.out.println("Voxel core shut down");

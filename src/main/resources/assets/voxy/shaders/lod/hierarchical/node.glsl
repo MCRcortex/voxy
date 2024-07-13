@@ -25,12 +25,12 @@ struct UnpackedNode {
     uint childPtr;
 };
 
-#define NULL_NODE ((1<<25)-1)
+#define NULL_NODE ((1<<24)-1)
 #define NULL_MESH ((1<<24)-1)
 
-void unpackNode(inout UnpackedNode node, uint nodeId) {
-    node.nodeId = nodeId;
+void unpackNode(out UnpackedNode node, uint nodeId) {
     uvec4 compactedNode = nodes[nodeId];
+    node.nodeId = nodeId;
     node.lodLevel = compactedNode.x >> 28;
 
     {
@@ -40,13 +40,12 @@ void unpackNode(inout UnpackedNode node, uint nodeId) {
         z |= int(compactedNode.y>>28);
         z <<= 8;
         z >>= 8;
-
         node.pos = ivec3(x, y, z);
     }
 
     node.meshPtr = compactedNode.z&0xFFFFFFu;
-    node.childPtr = compactedNode.w&0x1FFFFFFu;
-    node.flags = (compactedNode.z>>24) | ((compactedNode.w>>23)<<8);
+    node.childPtr = compactedNode.w&0xFFFFFFu;
+    node.flags = ((compactedNode.z>>24)&0xFFu) | (((compactedNode.w>>24)&0xFFu)<<8);
 }
 
 bool hasMesh(in UnpackedNode node) {
@@ -89,5 +88,5 @@ void markRequested(inout UnpackedNode node) {
 }
 
 void debugDumpNode(in UnpackedNode node) {
-    printf("Node %d, %d@[%d,%d,%d], flags: %d, mesh: %d, ChildPtr: %d", node.nodeId, node.lodLevel, node.pos.x, node.pos.z, node.pos.z, node.flags, node.meshPtr, node.childPtr);
+    printf("Node %d, %d@[%d,%d,%d], flags: %d, mesh: %d, ChildPtr: %d", node.nodeId, node.lodLevel, node.pos.x, node.pos.y, node.pos.z, node.flags, node.meshPtr, node.childPtr);
 }

@@ -30,4 +30,8 @@ public class MeshManager {
     public void removeMesh(int mesh) {
 
     }
+
+    public void free() {
+
+    }
 }

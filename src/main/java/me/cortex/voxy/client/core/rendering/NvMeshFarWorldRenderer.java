@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import net.minecraft.client.render.Camera;
@@ -52,8 +53,8 @@ public class NvMeshFarWorldRenderer extends AbstractFarWorldRenderer<NvMeshViewp
             .add(ShaderType.FRAGMENT, "voxy:lod/nvmesh/cull.frag")
             .compile();
 
-    public NvMeshFarWorldRenderer(int geometrySize, int maxSections) {
-        super(new DefaultGeometryManager(geometrySize*8L, maxSections));
+    public NvMeshFarWorldRenderer(ModelManager modelManager, int geometrySize, int maxSections) {
+        super(modelManager, new DefaultGeometryManager(geometrySize*8L, maxSections));
     }
 
 

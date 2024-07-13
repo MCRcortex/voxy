@@ -6,6 +6,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.MarkedObjectList;
+import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.util.HierarchicalBitSet;
 import me.cortex.voxy.common.world.WorldEngine;
 import org.lwjgl.system.MemoryUtil;
@@ -25,7 +26,7 @@ import static org.lwjgl.opengl.GL45.nglClearNamedBufferSubData;
 
 //TODO: Make it an sparse voxel octree, that is if all of the children bar 1 are empty/air, remove the self node and replace it with the non empty child
 
-public class NodeManager2 {
+public class NodeManager {
     //A request for making a new child nodes 
     private static final class LeafRequest {
         //LoD position identifier
@@ -98,9 +99,12 @@ public class NodeManager2 {
         }
     }
 
-    public static final int REQUEST_QUEUE_SIZE = 1024;
     public static final int MAX_NODE_COUNT = 1<<22;
-    public static final int NODE_MSK = MAX_NODE_COUNT-1;
+    public static final int MAX_MESH_ID = 1<<24;
+
+    public static final int REQUEST_QUEUE_SIZE = 1024;
+    public static final int MESH_MSK = MAX_MESH_ID-1;
+    public static final int NODE_MSK = (1<<24)-1;//NOTE!! IS DIFFERENT FROM MAX_NODE_COUNT as the MAX_NODE_COUNT is for the buffers, the ACTUAL MAX is NODE_MSK+1
 
     //Local data layout
     // first long is position (todo! might not be needed)
@@ -115,13 +119,20 @@ public class NodeManager2 {
     public final GlBuffer nodeBuffer;
     public final GlBuffer requestQueue;
 
-    public NodeManager2(INodeInteractor interactor, MeshManager meshManager) {
+    public NodeManager(INodeInteractor interactor, MeshManager meshManager) {
         this.interactor = interactor;
         this.pos2meshId.defaultReturnValue(NO_NODE);
         this.interactor.setMeshUpdateCallback(this::meshUpdate);
         this.meshManager = meshManager;
         this.nodeBuffer = new GlBuffer(MAX_NODE_COUNT*16);
         this.requestQueue = new GlBuffer(REQUEST_QUEUE_SIZE*4+4);
+        Arrays.fill(this.localNodeData, 0);
+
+
+        this.setNodePosition(0, WorldEngine.getWorldSectionId(0, 0,5,0));
+        this.setChildPtr(0, NODE_MSK, 0);
+        this.setMeshId(0, MESH_MSK);
+        this.pushNode(0);
     }
 
     public void insertTopLevelNode(long position) {
@@ -137,20 +148,62 @@ public class NodeManager2 {
 
     //Returns the mesh offset/id for the given node or -1 if it doesnt exist
     private int getNodeMesh(int node) {
-        return -1;
+        return (int) (this.localNodeData[node*3+1]&((1<<24)-1));
+    }
+
+    private int getNodeChildPtr(int node) {
+        return (int) ((this.localNodeData[node*3+1]>>>32)&NODE_MSK);
+    }
+
+    private int getNodeChildCnt(int node) {
+        return (int) ((this.localNodeData[node*3+1]>>>61)&7)+1;
     }
 
     private long getNodePos(int node) {
-        return -1;
+        return this.localNodeData[node*3];
     }
 
     private boolean isLeafNode(int node) {
-        return true;
+        //TODO: maybe make this flag based instead of checking the child ptr?
+        return this.getNodeChildPtr(node) != NODE_MSK;
+    }
+
+    //Its ment to return if the node is just an empty mesh or if all the children are also empty
+    private boolean isEmptyNode(int node) {
+        return this.getNodeMesh(node)==(MESH_MSK-1);//Special case/reserved
+    }
+
+    private void setNodePosition(int node, long position) {
+        this.localNodeData[node*3] = position;
     }
 
     private void setMeshId(int node, int mesh) {
-
+        if (mesh > MESH_MSK) {
+            throw new IllegalArgumentException();
+        }
+        long val = this.localNodeData[node*3+1];
+        val &= ~MESH_MSK;
+        val |= mesh;
+        this.localNodeData[node*3+1] = val;
     }
+
+    private void setChildPtr(int node, int childPtr, int count) {
+        if (childPtr > NODE_MSK || (childPtr!=NODE_MSK&&count < 1)) {
+            throw new IllegalArgumentException();
+        }
+        long val = this.localNodeData[node*3+1];
+        //Put the count
+        val &= ~(0x7L<<61);
+        val |= Integer.toUnsignedLong(Math.max(count-1,0))<<61;
+        //Put the child ptr
+        val &= ~(Integer.toUnsignedLong(NODE_MSK)<<32);
+        val |= Integer.toUnsignedLong(childPtr) << 32;
+        this.localNodeData[node*3+1] = val;
+    }
+
+
+
+
 
     private static long makeChildPos(long basePos, int addin) {
         int lvl = WorldEngine.getLevel(basePos);
@@ -256,6 +309,9 @@ public class NodeManager2 {
     // that is, there is a request that is satisfied bar 1 section, that section is supplied as non emptpty but then becomes empty in the same tick
     private void meshUpdate(BuiltSection mesh) {
         int id = this.pos2meshId.get(mesh.position);
+        //TODO: FIXME!! if we get a node that has an update and is watched but no id for it, it could be an update state from
+        // an empty node to non empty node, this means we need to invalidate all the childrens positions and move them!
+        // then also update the parent pointer
         if (id == NO_NODE) {
             //The built mesh section is no longer needed, discard it
             // TODO: could probably?? cache the mesh in ram that way if its requested? it can be immediatly fetched while a newer mesh is built??
@@ -359,16 +415,31 @@ public class NodeManager2 {
     }
 
     private void writeNode(long dst, int id) {
+        long pos = this.localNodeData[id*3];
+        MemoryUtil.memPutInt(dst, (int) (pos>>32)); dst += 4;
+        MemoryUtil.memPutInt(dst, (int) pos); dst += 4;
 
+        int flags = 0;
+        flags |= this.isEmptyNode(id)?2:0;
+        flags |= Math.max(0, this.getNodeChildCnt(id)-1)<<2;
+
+        int a = this.getNodeMesh(id)|(flags&0xFF);
+        int b = this.getNodeChildPtr(id)|((flags>>8)&0xFF);
+
+        MemoryUtil.memPutInt(dst, a); dst += 4;
+        MemoryUtil.memPutInt(dst, b); dst += 4;
     }
 
     public void upload() {
         for (int i = 0; i < this.nodeUpdates.size(); i++) {
             int node = this.nodeUpdates.getInt(i);
-            //TODO: UPLOAD NODE
-
+            long ptr = UploadStream.INSTANCE.upload(this.nodeBuffer, node*16L, 16);
+            this.writeNode(ptr, node);
         }
-        this.nodeUpdates.clear();
+        if (!this.nodeUpdates.isEmpty()) {
+            UploadStream.INSTANCE.commit();//Cause we actually uploaded something (do it after cause it allows batch comitting thing)
+            this.nodeUpdates.clear();
+        }
     }
 
     public void download() {

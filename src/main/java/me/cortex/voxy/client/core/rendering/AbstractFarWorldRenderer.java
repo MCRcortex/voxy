@@ -35,7 +35,7 @@ import static org.lwjgl.opengl.GL30.*;
 
 
 //Todo: tinker with having the compute shader where each thread is a position to render? maybe idk
-public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends AbstractGeometryManager> {
+public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends AbstractGeometryManager> implements IRenderInterface<T> {
     public static final int STATIC_VAO = glGenVertexArrays();
 
     protected final GlBuffer uniformBuffer;
@@ -52,18 +52,18 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends Ab
 
     protected FrustumIntersection frustum;
 
-    private final List<T> viewports = new ArrayList<>();
+    //private final List<T> viewports = new ArrayList<>();
 
     protected IntArrayList updatedSectionIds;
 
     private final ConcurrentLinkedDeque<Mapper.StateEntry> blockStateUpdates = new ConcurrentLinkedDeque<>();
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeUpdates = new ConcurrentLinkedDeque<>();
-    public AbstractFarWorldRenderer(J geometry) {
+    public AbstractFarWorldRenderer(ModelManager models, J geometry) {
         this.maxSections = geometry.getMaxSections();
         this.uniformBuffer  = new GlBuffer(1024);
         this.lightDataBuffer  = new GlBuffer(256*4);//256 of uint
         this.geometry = geometry;
-        this.models = new ModelManager(16);
+        this.models = models;
     }
 
     public void setupRender(Frustum frustum, Camera camera) {
@@ -148,29 +148,20 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends Ab
     }
 
     public void shutdown() {
-        this.models.free();
         this.geometry.free();
         this.uniformBuffer.free();
         this.lightDataBuffer.free();
     }
 
-    public ModelManager getModelManager() {
-        return this.models;
-    }
-
     public final T createViewport() {
         var viewport = createViewport0();
-        this.viewports.add(viewport);
+        //this.viewports.add(viewport);
         return viewport;
-    }
-
-    final void removeViewport(T viewport) {
-        this.viewports.remove(viewport);
     }
 
     protected abstract T createViewport0();
 
-    public boolean usesMeshlets() {
+    public boolean generateMeshlets() {
         return false;
     }
 }

@@ -3,7 +3,6 @@ package me.cortex.voxy.client.core.rendering;
 import org.joml.Matrix4f;
 
 public abstract class Viewport <A extends Viewport<A>> {
-    private final AbstractFarWorldRenderer renderer;
     int width;
     int height;
     int frameId;
@@ -13,13 +12,11 @@ public abstract class Viewport <A extends Viewport<A>> {
     double cameraY;
     double cameraZ;
 
-    protected Viewport(AbstractFarWorldRenderer renderer) {
-        this.renderer = renderer;
+    protected Viewport() {
     }
 
     public final void delete() {
         this.delete0();
-        this.renderer.removeViewport((A) this);
     }
 
     protected abstract void delete0();

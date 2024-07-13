@@ -25,6 +25,11 @@ layout(binding = SCENE_UNIFORM_INDEX, std140) uniform SceneUniform {
     uint renderQueueMaxSize;
 };
 
+layout(binding = NODE_QUEUE_INDEX, std430) restrict buffer NodeQueue {
+    uint  nodeQueueSize;
+    uint[] nodeQueue;
+};
+
 layout(binding = REQUEST_QUEUE_INDEX, std430) restrict buffer RequestQueue {
     uint requestQueueIndex;
     uint[] requestQueue;
@@ -34,6 +39,7 @@ layout(binding = RENDER_QUEUE_INDEX, std430) restrict buffer RenderQueue {
     uint renderQueueIndex;
     uint[] renderQueue;
 };
+
 
 /*
 layout(binding = 2, std430) restrict buffer QueueData {
@@ -83,11 +89,11 @@ void addRequest(inout UnpackedNode node) {
 }
 
 void enqueueChildren(in UnpackedNode node) {
-    printf("children");
+    //printf("children");
 }
 
 void enqueueSelfForRender(in UnpackedNode node) {
-    printf("render");
+    //printf("render");
     if (renderQueueIndex < renderQueueMaxSize) {
         renderQueue[atomicAdd(renderQueueIndex, 1)] = getMesh(node);
     }
@@ -98,17 +104,17 @@ void main() {
     UnpackedNode node;
 
     //Setup/unpack the node
-    unpackNode(node, gl_GlobalInvocationID.x);
+    unpackNode(node, nodeQueue[gl_GlobalInvocationID.x]);
 
     //TODO: check the node is OK first??? maybe?
 
     //Compute screenspace
     setupScreenspace(node);
 
-    debugDumpNode(node);
+    //debugDumpNode(node);
 
     if (isCulledByHiz()) {
-        printf("HizCulled");
+        //printf("HizCulled");
         //We are done here, dont do any more, the issue is the shader barriers maybe
         // its culled, maybe just mark it as culled?
     } else {
