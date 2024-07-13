@@ -48,9 +48,7 @@ public class VoxelCore {
     private final WorldEngine world;
     private final RenderGenerationService renderGen;
     private final ModelManager modelManager;
-
-    private final DistanceTracker distanceTracker;
-    private final RenderTracker renderTracker;
+    private final AbstractRenderWorldInteractor interactor;
 
     private final IRenderInterface renderer;
     private final ViewportSelector viewportSelector;
@@ -71,30 +69,14 @@ public class VoxelCore {
         this.renderer = this.createRenderBackend();
         this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
         System.out.println("Renderer initialized");
+        this.interactor = new DefaultRenderWorldInteractor(cfg, this.world, this.renderer);
 
-        this.renderTracker = new RenderTracker(this.world, (AbstractFarWorldRenderer) this.renderer);
-        this.renderGen = new RenderGenerationService(this.world, this.modelManager, VoxyConfig.CONFIG.renderThreads, this.renderTracker::processBuildResult, this.renderer.generateMeshlets());
-        this.world.setDirtyCallback(this.renderTracker::sectionUpdated);
-        this.renderTracker.setRenderGen(this.renderGen);
+        this.renderGen = new RenderGenerationService(this.world, this.modelManager, VoxyConfig.CONFIG.renderThreads, this.interactor::processBuildResult, this.renderer.generateMeshlets());
+        this.world.setDirtyCallback(this.interactor::sectionUpdated);
+        this.interactor.setRenderGen(this.renderGen);
         System.out.println("Render tracker and generator initialized");
 
-        //To get to chunk scale multiply the scale by 2, the scale is after how many chunks does the lods halve
-        int q = VoxyConfig.CONFIG.qualityScale;
-        int minY = MinecraftClient.getInstance().world.getBottomSectionCoord()/2;
-        int maxY = MinecraftClient.getInstance().world.getTopSectionCoord()/2;
 
-        if (cfg.minYOverride != Integer.MAX_VALUE) {
-            minY = cfg.minYOverride;
-        }
-
-        if (cfg.maxYOverride != Integer.MIN_VALUE) {
-            maxY = cfg.maxYOverride;
-        }
-
-        this.distanceTracker = new DistanceTracker(this.renderTracker, new int[]{q,q,q,q},
-                (VoxyConfig.CONFIG.renderDistance<0?VoxyConfig.CONFIG.renderDistance:((VoxyConfig.CONFIG.renderDistance+1)/2)),
-                minY, maxY);
-        System.out.println("Distance tracker initialized");
 
         this.postProcessing = new PostProcessing();
 
@@ -142,11 +124,11 @@ public class VoxelCore {
     boolean firstTime = true;
     public void renderSetup(Frustum frustum, Camera camera) {
         if (this.firstTime) {
-            this.distanceTracker.init(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
+            this.interactor.initPosition(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
             this.firstTime = false;
             //this.renderTracker.addLvl0(0,6,0);
         }
-        this.distanceTracker.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
+        this.interactor.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
         this.renderer.setupRender(frustum, camera);
     }
 
