@@ -400,6 +400,8 @@ public class NodeManager {
             if ((msk&(1<<i))!=0) {
                 //It means the section actually exists, so add and upload it
                 // aswell as add it to the mapping + push the node
+
+
             } else {
                 //The section was empty, so just remove/skip it
             }

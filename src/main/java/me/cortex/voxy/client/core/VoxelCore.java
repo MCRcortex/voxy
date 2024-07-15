@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -212,6 +213,9 @@ public class VoxelCore {
     // since they are AABBS crossing the normal is impossible without one of the axis being equal
 
     public void shutdown() {
+        System.out.println("Flushing download stream");
+        DownloadStream.INSTANCE.flushWaitClear();
+
         //if (Thread.currentThread() != this.shutdownThread) {
         //    Runtime.getRuntime().removeShutdownHook(this.shutdownThread);
         //}

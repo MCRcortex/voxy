@@ -24,7 +24,8 @@ public class MeshManager {
 
     //Varient of uploadMesh that releases the previous mesh at the same time, this is a performance optimization
     public int uploadReplaceMesh(int old, BuiltSection section) {
-        return -1;
+        section.free();
+        return 1;
     }
 
     public void removeMesh(int mesh) {

@@ -53,6 +53,12 @@ public class DownloadStream {
         if (size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException();
         }
+        if (size <= 0) {
+            throw new IllegalArgumentException();
+        }
+        if (destOffset+size > buffer.size()) {
+            throw new IllegalArgumentException();
+        }
 
         long addr;
         if (this.caddr == -1 || !this.allocationArena.expand(this.caddr, (int) size)) {
@@ -122,6 +128,20 @@ public class DownloadStream {
 
             frame.allocations.forEach(this.allocationArena::free);
             frame.fence.free();
+        }
+    }
+
+    //Synchonize force flushes everything
+    public void flushWaitClear() {
+        this.tick();
+        var fence = new GlFence();
+        glFinish();
+        while (!fence.signaled())
+            Thread.onSpinWait();
+        fence.free();
+        this.tick();
+        if (!this.frames.isEmpty()) {
+            throw new IllegalStateException();
         }
     }
 

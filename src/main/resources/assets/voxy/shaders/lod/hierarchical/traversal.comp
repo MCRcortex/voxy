@@ -120,7 +120,8 @@ void main() {
     } else {
         //It is visible, TODO: maybe do a more detailed hiz test? (or make it so that )
 
-        if (shouldDecend()) {
+        //Only decend if not a root node
+        if (node.lodLevel!=0 && shouldDecend()) {
             if (hasChildren(node)) {
                 enqueueChildren(node);
             } else {

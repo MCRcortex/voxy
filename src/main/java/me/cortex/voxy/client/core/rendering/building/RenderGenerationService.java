@@ -16,9 +16,8 @@ import java.util.function.ToIntFunction;
 
 //TODO: Add a render cache
 public class RenderGenerationService {
-
     public interface TaskChecker {boolean check(int lvl, int x, int y, int z);}
-    private record BuildTask(Supplier<WorldSection> sectionSupplier) {}
+    private record BuildTask(long position, Supplier<WorldSection> sectionSupplier) {}
 
     private volatile boolean running = true;
     private final Thread[] workers;
@@ -60,6 +59,7 @@ public class RenderGenerationService {
                 }
                 var section = task.sectionSupplier.get();
                 if (section == null) {
+                    this.resultConsumer.accept(new BuiltSection(task.position));
                     continue;
                 }
                 section.assertNotFree();
@@ -130,7 +130,7 @@ public class RenderGenerationService {
         synchronized (this.taskQueue) {
             this.taskQueue.computeIfAbsent(ikey, key->{
                 this.taskCounter.release();
-                return new BuildTask(()->{
+                return new BuildTask(ikey, ()->{
                     if (checker.check(lvl, x, y, z)) {
                         return this.world.acquireIfExists(lvl, x, y, z);
                     } else {

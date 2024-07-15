@@ -14,17 +14,21 @@ import me.cortex.voxy.client.core.rendering.hierarchical.INodeInteractor;
 import me.cortex.voxy.client.core.rendering.hierarchical.MeshManager;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
+import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.render.RenderLayer;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.Identifier;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Consumer;
 
 import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri;
@@ -52,6 +56,12 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
     private final GlBuffer renderSections = new GlBuffer(100_000 * 4 + 4).zero();
 
 
+
+    private final ConcurrentLinkedDeque<Mapper.StateEntry> blockStateUpdates = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeUpdates = new ConcurrentLinkedDeque<>();
+
+    protected final ConcurrentLinkedDeque<BuiltSection> buildResults = new ConcurrentLinkedDeque<>();
+
     private final ModelManager modelManager;
     private RenderGenerationService sectionGenerationService;
     private Consumer<BuiltSection> resultConsumer;
@@ -72,7 +82,12 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
             @Override
             public void requestMesh(long pos) {
-                System.err.println("Request: " + pos);
+                Gl46HierarchicalRenderer.this.sectionGenerationService.enqueueTask(
+                        WorldEngine.getLevel(pos),
+                        WorldEngine.getX(pos),
+                        WorldEngine.getY(pos),
+                        WorldEngine.getZ(pos)
+                );
             }
 
             @Override
@@ -84,11 +99,39 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
     @Override
     public void setupRender(Frustum frustum, Camera camera) {
+        {
+            boolean didHaveBiomeChange = false;
 
+            //Do any BiomeChanges
+            while (!this.biomeUpdates.isEmpty()) {
+                var update = this.biomeUpdates.pop();
+                var biomeReg = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME);
+                this.modelManager.addBiome(update.id, biomeReg.get(Identifier.of(update.biome)));
+                didHaveBiomeChange = true;
+            }
+
+            if (didHaveBiomeChange) {
+                UploadStream.INSTANCE.commit();
+            }
+
+            int maxUpdatesPerFrame = 40;
+
+            //Do any BlockChanges
+            while ((!this.blockStateUpdates.isEmpty()) && (maxUpdatesPerFrame-- > 0)) {
+                var update = this.blockStateUpdates.pop();
+                this.modelManager.addEntry(update.id, update.state);
+            }
+        }
     }
 
     @Override
     public void renderFarAwayOpaque(Gl46HierarchicalViewport viewport) {
+        //Process all the build results
+        while (!this.buildResults.isEmpty()) {
+            this.resultConsumer.accept(this.buildResults.pop());
+        }
+
+
         //Render terrain from previous frame (renderSections)
 
 
@@ -121,12 +164,12 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
     @Override
     public void addBlockState(Mapper.StateEntry stateEntry) {
-
+        this.blockStateUpdates.add(stateEntry);
     }
 
     @Override
     public void addBiome(Mapper.BiomeEntry biomeEntry) {
-
+        this.biomeUpdates.add(biomeEntry);
     }
 
 
@@ -134,7 +177,7 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
     @Override
     public void processBuildResult(BuiltSection section) {
-
+        this.buildResults.add(section);
     }
 
     @Override
