@@ -109,6 +109,8 @@ public class WorldEngine {
 
     //TODO: move this to auxilery class  so that it can take into account larger than 4 mip levels
     //Executes an update to the world and automatically updates all the parent mip layers up to level 4 (e.g. where 1 chunk section is 1 block big)
+
+    //NOTE: THIS RUNS ON THE THREAD IT WAS EXECUTED ON, when this method exits, the calling method may assume that VoxelizedSection is no longer needed
     public void insertUpdate(VoxelizedSection section) {//TODO: add a bitset of levels to update and if it should force update
         //The >>1 is cause the world sections size is 32x32x32 vs the 16x16x16 of the voxelized section
         for (int lvl = 0; lvl < this.maxMipLevels; lvl++) {
@@ -146,10 +148,10 @@ public class WorldEngine {
     }
 
     public void shutdown() {
-        try {this.storage.flush();} catch (Exception e) {System.err.println(e);}
+        try {this.storage.flush();} catch (Exception e) {e.printStackTrace();}
         //Shutdown in this order to preserve as much data as possible
-        try {this.ingestService.shutdown();} catch (Exception e) {System.err.println(e);}
-        try {this.savingService.shutdown();} catch (Exception e) {System.err.println(e);}
-        try {this.storage.close();} catch (Exception e) {System.err.println(e);}
+        try {this.ingestService.shutdown();} catch (Exception e) {e.printStackTrace();}
+        try {this.savingService.shutdown();} catch (Exception e) {e.printStackTrace();}
+        try {this.storage.close();} catch (Exception e) {e.printStackTrace();}
     }
 }

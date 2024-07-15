@@ -5,15 +5,19 @@ import me.cortex.voxy.common.world.other.Mapper;
 
 //16x16x16 block section
 public class VoxelizedSection {
-    public final int x;
-    public final int y;
-    public final int z;
+    public int x;
+    public int y;
+    public int z;
     final long[] section;
-    public VoxelizedSection(long[] section, int x, int y, int z) {
+    public VoxelizedSection(long[] section) {
         this.section = section;
+    }
+
+    public VoxelizedSection setPosition(int x, int y, int z) {
         this.x = x;
         this.y = y;
         this.z = z;
+        return this;
     }
 
     private static int getIdx(int x, int y, int z, int shiftBy, int size) {
@@ -32,7 +36,7 @@ public class VoxelizedSection {
         return this.section[getIdx(x, y, z, 0, 4-lvl) + offset];
     }
 
-    public static VoxelizedSection createEmpty(int x, int y, int z) {
-        return new VoxelizedSection(new long[16*16*16 + 8*8*8 + 4*4*4 + 2*2*2 + 1], x, y, z);
+    public static VoxelizedSection createEmpty() {
+        return new VoxelizedSection(new long[16*16*16 + 8*8*8 + 4*4*4 + 2*2*2 + 1]);
     }
 }

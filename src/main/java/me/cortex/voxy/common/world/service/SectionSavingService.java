@@ -48,7 +48,7 @@ public class SectionSavingService {
                 this.world.storage.setSectionData(section.key, saveData);
                 MemoryUtil.memFree(saveData);
             } catch (Exception e) {
-                System.err.println(e);
+                e.printStackTrace();
                 MinecraftClient.getInstance().executeSync(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("Voxy saver had an exception while executing please check logs and report error")));
             }
             section.release();

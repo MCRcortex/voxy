@@ -51,9 +51,11 @@ public class VoxelIngestService {
                     i++;
                     var lighting = this.captureLightMap.remove(ChunkSectionPos.from(chunk.getPos(), i).asLong());
                     if (section.isEmpty()) {
-                        this.world.insertUpdate(VoxelizedSection.createEmpty(chunk.getPos().x, i, chunk.getPos().z));
+                        //TODO: add local cache so that it doesnt constantly create new sections
+                        this.world.insertUpdate(VoxelizedSection.createEmpty().setPosition(chunk.getPos().x, i, chunk.getPos().z));
                     } else {
                         VoxelizedSection csec = WorldConversionFactory.convert(
+                                VoxelizedSection.createEmpty().setPosition(chunk.getPos().x, i, chunk.getPos().z),
                                 this.world.getMapper(),
                                 section.getBlockStateContainer(),
                                 section.getBiomeContainer(),
@@ -70,17 +72,14 @@ public class VoxelIngestService {
                                         sky = 15-sky;//This is cause sky light is inverted which saves memory when saving empty sections
                                         return (byte) (sky|(block<<4));
                                     }
-                                },
-                                chunk.getPos().x,
-                                i,
-                                chunk.getPos().z
+                                }
                         );
                         WorldConversionFactory.mipSection(csec, this.world.getMapper());
                         this.world.insertUpdate(csec);
                     }
                 }
             } catch (Exception e) {
-                System.err.println(e);
+                e.printStackTrace();
                 MinecraftClient.getInstance().executeSync(()->MinecraftClient.getInstance().player.sendMessage(Text.literal("Voxy ingester had an exception while executing please check logs and report error")));
             }
         }

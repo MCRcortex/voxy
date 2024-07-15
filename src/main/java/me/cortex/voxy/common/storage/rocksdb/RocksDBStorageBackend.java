@@ -24,6 +24,7 @@ public class RocksDBStorageBackend extends StorageBackend {
     private final List<AbstractImmutableNativeReference> closeList = new ArrayList<>();
 
     public RocksDBStorageBackend(String path) {
+        /*
         var lockPath = new File(path).toPath().resolve("LOCK");
         if (Files.exists(lockPath)) {
             System.err.println("WARNING, deleting rocksdb LOCK file");
@@ -44,6 +45,7 @@ public class RocksDBStorageBackend extends StorageBackend {
                 throw new RuntimeException("Unable to delete rocksdb lock file");
             }
         }
+         */
 
         final ColumnFamilyOptions cfOpts = new ColumnFamilyOptions().optimizeUniversalStyleCompaction();
 
@@ -71,6 +73,8 @@ public class RocksDBStorageBackend extends StorageBackend {
 
             this.worldSections = handles.get(1);
             this.idMappings = handles.get(2);
+
+            this.db.flushWal(true);
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }

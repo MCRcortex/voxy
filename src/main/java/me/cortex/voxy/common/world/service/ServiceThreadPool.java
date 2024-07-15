@@ -42,7 +42,7 @@ public class ServiceThreadPool {
             try {
                 job.run();
             } catch (Exception e) {
-                System.err.println(e);
+                e.printStackTrace();
                 MinecraftClient.getInstance().executeSync(()->
                         MinecraftClient.getInstance().player.sendMessage(
                                 Text.literal(

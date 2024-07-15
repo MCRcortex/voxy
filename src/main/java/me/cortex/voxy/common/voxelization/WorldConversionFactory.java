@@ -13,16 +13,12 @@ public class WorldConversionFactory {
     private static final ThreadLocal<Reference2IntOpenHashMap<BlockState>> BLOCK_CACHE = ThreadLocal.withInitial(Reference2IntOpenHashMap::new);
 
     //TODO: add a local mapper cache since it should be smaller and faster
-    public static VoxelizedSection convert(Mapper stateMapper,
+    public static VoxelizedSection convert(VoxelizedSection section,
+                                           Mapper stateMapper,
                                            PalettedContainer<BlockState> blockContainer,
                                            ReadableContainer<RegistryEntry<Biome>> biomeContainer,
-                                           ILightingSupplier lightSupplier,
-                                           int sx,
-                                           int sy,
-                                           int sz) {
+                                           ILightingSupplier lightSupplier) {
         var blockCache = BLOCK_CACHE.get();
-
-        var section = VoxelizedSection.createEmpty(sx, sy, sz);
         var data = section.section;
 
         int blockId = -1;

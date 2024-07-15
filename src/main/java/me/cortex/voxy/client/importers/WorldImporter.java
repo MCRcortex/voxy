@@ -237,6 +237,8 @@ public class WorldImporter {
     }
 
 
+
+    private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);
     private static final Codec<PalettedContainer<BlockState>> BLOCK_STATE_CODEC = PalettedContainer.createPalettedContainerCodec(Block.STATE_IDS, BlockState.CODEC, PalettedContainer.PaletteProvider.BLOCK_STATE, Blocks.AIR.getDefaultState());
     private void importSectionNBT(int x, int y, int z, NbtCompound section) {
         if (section.getCompound("block_states").isEmpty()) {
@@ -260,9 +262,15 @@ public class WorldImporter {
             skyLight = null;
         }
 
-        var blockStates = BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states")).result().get();
+        var blockStatesRes = BLOCK_STATE_CODEC.parse(NbtOps.INSTANCE, section.getCompound("block_states"));
+        if (!blockStatesRes.hasResultOrPartial()) {
+            //TODO: if its only partial, it means should try to upgrade the nbt format with datafixerupper probably
+            return;
+        }
+        var blockStates = blockStatesRes.getPartialOrThrow();
         var biomes = this.biomeCodec.parse(NbtOps.INSTANCE, section.getCompound("biomes")).result().orElse(this.defaultBiomeProvider);
         VoxelizedSection csec = WorldConversionFactory.convert(
+                SECTION_CACHE.get().setPosition(x, y, z),
                 this.world.getMapper(),
                 blockStates,
                 biomes,
@@ -277,10 +285,7 @@ public class WorldImporter {
                     }
                     sky = 15-sky;
                     return (byte) (sky|(block<<4));
-                },
-                x,
-                y,
-                z
+                }
         );
 
         WorldConversionFactory.mipSection(csec, this.world.getMapper());

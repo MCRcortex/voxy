@@ -234,16 +234,16 @@ public class VoxelCore {
         //this.world.getMapper().forceResaveStates();
         if (this.importer != null) {
             System.out.println("Shutting down importer");
-            try {this.importer.shutdown();this.importer = null;} catch (Exception e) {System.err.println(e);}
+            try {this.importer.shutdown();this.importer = null;} catch (Exception e) {e.printStackTrace();}
         }
         System.out.println("Shutting down voxel core");
-        try {this.renderGen.shutdown();} catch (Exception e) {System.err.println(e);}
+        try {this.renderGen.shutdown();} catch (Exception e) {e.printStackTrace();}
         System.out.println("Render gen shut down");
-        try {this.world.shutdown();} catch (Exception e) {System.err.println(e);}
+        try {this.world.shutdown();} catch (Exception e) {e.printStackTrace();}
         System.out.println("World engine shut down");
-        try {this.renderer.shutdown(); this.viewportSelector.free(); this.modelManager.free();} catch (Exception e) {System.err.println(e);}
+        try {this.renderer.shutdown(); this.viewportSelector.free(); this.modelManager.free();} catch (Exception e) {e.printStackTrace();}
         System.out.println("Renderer shut down");
-        if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {System.err.println(e);}}
+        if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {e.printStackTrace();}}
         System.out.println("Voxel core shut down");
     }
 
