@@ -15,6 +15,10 @@ public class HierarchicalBitSet {
         }
     }
 
+    public HierarchicalBitSet() {
+        this(1<<(6*4));
+    }
+
     public int allocateNext() {
         if (this.A==-1) {
             return -1;

@@ -62,17 +62,17 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
         this.sectionSelector = new HierarchicalOcclusionRenderer(new INodeInteractor() {
             @Override
             public void watchUpdates(long pos) {
-
+                System.err.println("Watch: " + pos);
             }
 
             @Override
             public void unwatchUpdates(long pos) {
-
+                System.err.println("Unwatch: " + pos);
             }
 
             @Override
             public void requestMesh(long pos) {
-
+                System.err.println("Request: " + pos);
             }
 
             @Override
@@ -93,7 +93,7 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
 
 
-        {//Run the hierarchical selector over the buffer to generate the set of render sections
+        if (true) {//Run the hierarchical selector over the buffer to generate the set of render sections
             var i = new int[1];
             glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, i);
             this.sectionSelector.doHierarchicalTraversalSelection(viewport, i[0], this.renderSections);

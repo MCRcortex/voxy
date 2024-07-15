@@ -115,21 +115,6 @@ public class VoxelCore {
         System.out.println("Voxy core initialized");
     }
 
-    private IRenderInterface<?> createRenderBackend() {
-        if (false) {
-            return new Gl46HierarchicalRenderer(this.modelManager);
-        } else if (true) {
-            return new Gl46MeshletsFarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-        } else {
-            if (VoxyConfig.CONFIG.useMeshShaders()) {
-                return new NvMeshFarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-            } else {
-                return new Gl46FarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-            }
-        }
-    }
-
-
     public void enqueueIngest(WorldChunk worldChunk) {
         this.world.ingestService.enqueueIngest(worldChunk);
     }
@@ -274,5 +259,21 @@ public class VoxelCore {
 
     public WorldEngine getWorldEngine() {
         return this.world;
+    }
+
+
+
+    private IRenderInterface<?> createRenderBackend() {
+        if (true) {
+            return new Gl46HierarchicalRenderer(this.modelManager);
+        } else if (true) {
+            return new Gl46MeshletsFarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+        } else {
+            if (VoxyConfig.CONFIG.useMeshShaders()) {
+                return new NvMeshFarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+            } else {
+                return new Gl46FarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
+            }
+        }
     }
 }

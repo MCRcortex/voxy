@@ -50,14 +50,25 @@ void setupScreenspace(in UnpackedNode node) {
         vec4 pPoint = (VP*vec4(vec3((i&1)!=0,(i&2)!=0,(i&4)!=0)*32,1));//Size of section is 32x32x32 (need to change it to a bounding box in the future)
         pPoint += base;
         vec3 point = pPoint.xyz/pPoint.w;
+        //TODO: CLIP TO VIEWPORT
         minBB = min(minBB, point);
         maxBB = max(maxBB, point);
     }
+    //printf("Screenspace MIN: %f, %f, %f  MAX: %f, %f, %f", minBB.x,minBB.y,minBB.z, maxBB.x,maxBB.y,maxBB.z);
 
     size = maxBB.xy - minBB.xy;
+
+}
+
+//Checks if the node is implicitly culled (outside frustum)
+bool outsideFrustum() {
+    return any(lessThanEqual(maxBB, vec3(-1f, -1f, 0f))) || any(lessThanEqual(vec3(1f, 1f, 1f), minBB));
 }
 
 bool isCulledByHiz() {
+    if (minBB.z < 0) {//Minpoint is behind the camera, its always going to pass
+        return false;
+    }
     vec2 ssize = size.xy * vec2(ivec2(screenW, screenH));
     float miplevel = ceil(log2(max(max(ssize.x, ssize.y),1)));
     vec2 midpoint = (maxBB.xy + minBB.xy)*0.5;
@@ -66,5 +77,6 @@ bool isCulledByHiz() {
 
 //Returns if we should decend into its children or not
 bool shouldDecend() {
-    return (size.x*size.y) > (64*64F);
+    //printf("Screen area %f: %f, %f", (size.x*size.y*float(screenW)*float(screenH)), float(screenW), float(screenH));
+    return (size.x*size.y*screenW*screenH) > (64*64F);
 }

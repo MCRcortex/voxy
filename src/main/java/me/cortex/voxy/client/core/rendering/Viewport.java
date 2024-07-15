@@ -6,11 +6,11 @@ public abstract class Viewport <A extends Viewport<A>> {
     public int width;
     public int height;
     int frameId;
-    Matrix4f projection;
-    Matrix4f modelView;
-    double cameraX;
-    double cameraY;
-    double cameraZ;
+    public Matrix4f projection;
+    public Matrix4f modelView;
+    public double cameraX;
+    public double cameraY;
+    public double cameraZ;
 
     protected Viewport() {
     }

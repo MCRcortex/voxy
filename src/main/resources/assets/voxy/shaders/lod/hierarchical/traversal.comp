@@ -77,8 +77,8 @@ layout(binding = 2, std430) restrict buffer QueueData {
 
 
 void addRequest(inout UnpackedNode node) {
-    printf("requested");
     if (!hasRequested(node)) {
+        printf("requested");
         //TODO: maybe try using only 1 variable and it being <0 being bad
         if (requestQueueIndex < requestQueueMaxSize) {
             //Mark node as having a request submitted to prevent duplicate submissions
@@ -113,7 +113,7 @@ void main() {
 
     //debugDumpNode(node);
 
-    if (isCulledByHiz()) {
+    if (outsideFrustum() || isCulledByHiz()) {
         //printf("HizCulled");
         //We are done here, dont do any more, the issue is the shader barriers maybe
         // its culled, maybe just mark it as culled?

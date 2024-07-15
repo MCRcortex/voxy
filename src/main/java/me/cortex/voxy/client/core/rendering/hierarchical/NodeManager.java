@@ -129,7 +129,7 @@ public class NodeManager {
         Arrays.fill(this.localNodeData, 0);
 
 
-        this.setNodePosition(0, WorldEngine.getWorldSectionId(0, 0,5,0));
+        this.setNodePosition(0, WorldEngine.getWorldSectionId(2, 0,0,0));
         this.setChildPtr(0, NODE_MSK, 0);
         this.setMeshId(0, MESH_MSK);
         this.pushNode(0);
@@ -165,7 +165,7 @@ public class NodeManager {
 
     private boolean isLeafNode(int node) {
         //TODO: maybe make this flag based instead of checking the child ptr?
-        return this.getNodeChildPtr(node) != NODE_MSK;
+        return this.getNodeChildPtr(node) == NODE_MSK;
     }
 
     //Its ment to return if the node is just an empty mesh or if all the children are also empty

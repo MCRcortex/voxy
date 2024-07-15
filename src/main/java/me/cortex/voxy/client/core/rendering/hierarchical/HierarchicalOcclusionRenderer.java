@@ -6,13 +6,12 @@ import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.Gl46HierarchicalViewport;
 import me.cortex.voxy.client.core.rendering.HiZBuffer;
-import me.cortex.voxy.client.core.rendering.building.BuiltSection;
-import me.cortex.voxy.client.core.rendering.hierarchical.INodeInteractor;
-import me.cortex.voxy.client.core.rendering.hierarchical.MeshManager;
-import me.cortex.voxy.client.core.rendering.hierarchical.NodeManager;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
-
-import java.util.function.Consumer;
+import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
+import net.minecraft.util.math.MathHelper;
+import org.joml.Matrix4f;
+import org.joml.Vector3f;
+import org.lwjgl.system.MemoryUtil;
 
 import static org.lwjgl.opengl.GL30.glBindBufferBase;
 import static org.lwjgl.opengl.GL33.glBindSampler;
@@ -44,14 +43,32 @@ public class HierarchicalOcclusionRenderer {
                 .compile();
     }
 
-    private void uploadUniform() {
+    private void uploadUniform(Gl46HierarchicalViewport viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 1024);
+        int sx = MathHelper.floor(viewport.cameraX)>>5;
+        int sy = MathHelper.floor(viewport.cameraY)>>5;
+        int sz = MathHelper.floor(viewport.cameraZ)>>5;
 
+        new Matrix4f(viewport.projection).mul(viewport.modelView).getToAddress(ptr); ptr += 4*4*4;
+
+        MemoryUtil.memPutInt(ptr, sx); ptr += 4;
+        MemoryUtil.memPutInt(ptr, sy); ptr += 4;
+        MemoryUtil.memPutInt(ptr, sz); ptr += 4;
+        MemoryUtil.memPutInt(ptr, viewport.width); ptr += 4;
+
+        var innerTranslation = new Vector3f((float) (viewport.cameraX-(sx<<5)), (float) (viewport.cameraY-(sy<<5)), (float) (viewport.cameraZ-(sz<<5)));
+        innerTranslation.getToAddress(ptr); ptr += 4*3;
+
+        MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
+
+        MemoryUtil.memPutInt(ptr, NodeManager.REQUEST_QUEUE_SIZE); ptr += 4;
+        MemoryUtil.memPutInt(ptr, 1000000); ptr += 4;
     }
 
     public void doHierarchicalTraversalSelection(Gl46HierarchicalViewport viewport, int depthBuffer, GlBuffer renderSelectionResult) {
-        this.uploadUniform();
+        this.uploadUniform(viewport);
         this.nodeManager.upload();
+        UploadStream.INSTANCE.commit();
 
         //Make hiz
         this.hiz.buildMipChain(depthBuffer, viewport.width, viewport.height);
@@ -75,6 +92,8 @@ public class HierarchicalOcclusionRenderer {
             glDispatchCompute(1,1,1);
         }
 
+        glBindSampler(0, 0);
+        glBindTextureUnit(0, 0);
         this.nodeManager.download();
     }
 

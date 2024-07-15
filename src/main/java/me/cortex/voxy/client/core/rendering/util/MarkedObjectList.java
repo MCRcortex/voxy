@@ -10,7 +10,7 @@ public class MarkedObjectList<T> {
 
     private final Int2ObjectFunction<T[]> arrayGenerator;
     private final Supplier<T> nullSupplier;
-    private final HierarchicalBitSet bitSet = new HierarchicalBitSet(-1);
+    private final HierarchicalBitSet bitSet = new HierarchicalBitSet();
     private T[] objects;//Should maybe make a getter function instead
 
     public MarkedObjectList(Int2ObjectFunction<T[]> arrayGenerator, Supplier<T> nullSupplier) {
