@@ -76,6 +76,10 @@ uint getChildCount(in UnpackedNode node) {
     return ((node.flags >> 2)&7U)+1;
 }
 
+uint getChildPtr(in UnpackedNode node) {
+    return node.childPtr;
+}
+
 uint getTransformIndex(in UnpackedNode node) {
     return (node.flags >> 5)&31u;
 }

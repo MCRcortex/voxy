@@ -33,9 +33,10 @@ public class HierarchicalBitSet {
         idx = Long.numberOfTrailingZeros(~cp) + 64*idx;
         long dp = this.D[idx];
         idx =  Long.numberOfTrailingZeros(~dp) + 64*idx;
+        int ret = idx;
+
         dp |= 1L<<(idx&0x3f);
         this.D[idx>>6] = dp;
-        int ret = idx;
         if (dp==-1) {
             idx >>= 6;
             cp |= 1L<<(idx&0x3f);
@@ -50,7 +51,24 @@ public class HierarchicalBitSet {
             }
         }
         this.cnt++;
+
         return ret;
+    }
+
+    private void set(int idx) {
+        long dp = this.D[idx>>6] |= 1L<<(idx&0x3f);
+        if (dp==-1) {
+            idx >>= 6;
+            long cp = (this.C[idx>>6] |= 1L<<(idx&0x3f));
+            if (cp==-1) {
+                idx >>= 6;
+                long bp = this.B[idx>>6] |= 1L<<(idx&0x3f);
+                if (bp==-1) {
+                    this.A |= 1L<<(idx&0x3f);
+                }
+            }
+        }
+        this.cnt++;
     }
 
     //Returns the next free index from idx
@@ -66,9 +84,33 @@ public class HierarchicalBitSet {
         if (this.cnt+count>this.limit) {
             return -2;//Limit reached
         }
-        //At a minimum maybe just do a while loop for testing
+        //TODO:FIXME DONT DO THIS, do a faster search
 
-        return 0;
+        int i = 0;
+        while (true) {
+            boolean isFree = true;
+            for (int j = 0; j < count; j++) {
+                if (this.isSet(i+j)) {
+                    isFree = false;
+                    break;
+                }
+            }
+
+            if (isFree) {
+                for (int j = 0; j < count; j++) {
+                    this.set(j + i);
+                }
+                return i;
+            } else {
+                i++;//THIS IS SLOW BUT WORKS
+                /* TODO: FIX AND FINISH OPTIMIZATION
+                i +=
+                while (this.D[i>>6] == -1) {
+                    i++;
+                }
+                 */
+            }
+        }
     }
 
 

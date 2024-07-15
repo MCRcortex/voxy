@@ -12,6 +12,7 @@ import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.hierarchical.HierarchicalOcclusionRenderer;
 import me.cortex.voxy.client.core.rendering.hierarchical.INodeInteractor;
 import me.cortex.voxy.client.core.rendering.hierarchical.MeshManager;
+import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -27,6 +28,7 @@ import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Consumer;
@@ -52,7 +54,10 @@ import static org.lwjgl.opengl.GL45.nglClearNamedBufferSubData;
 public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46HierarchicalViewport>, AbstractRenderWorldInteractor {
     private final HierarchicalOcclusionRenderer sectionSelector;
     private final MeshManager meshManager = new MeshManager();
-    private final PrintfInjector printf = new PrintfInjector(100000, 10, System.out::println);
+
+    private final List<String> printfQueue = new ArrayList<>();
+    private final PrintfInjector printf = new PrintfInjector(100000, 10, this.printfQueue::add);
+
     private final GlBuffer renderSections = new GlBuffer(100_000 * 4 + 4).zero();
 
 
@@ -99,6 +104,11 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
     @Override
     public void setupRender(Frustum frustum, Camera camera) {
+        {//Tick upload and download queues
+            UploadStream.INSTANCE.tick();
+            DownloadStream.INSTANCE.tick();
+        }
+
         {
             boolean didHaveBiomeChange = false;
 
@@ -153,7 +163,14 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
     @Override
     public void addDebugData(List<String> debug) {
-
+        debug.add("Printf Queue: ");
+        debug.addAll(this.printfQueue);
+        for (String a : this.printfQueue) {
+            if (a.startsWith("LOG")) {
+                System.err.println(a);
+            }
+        }
+        this.printfQueue.clear();
     }
 
 

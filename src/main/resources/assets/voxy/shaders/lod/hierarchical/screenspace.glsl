@@ -47,7 +47,7 @@ void setupScreenspace(in UnpackedNode node) {
 
     for (int i = 1; i < 8; i++) {
         //NOTE!: cant this be precomputed and put in an array?? in the scene uniform??
-        vec4 pPoint = (VP*vec4(vec3((i&1)!=0,(i&2)!=0,(i&4)!=0)*32,1));//Size of section is 32x32x32 (need to change it to a bounding box in the future)
+        vec4 pPoint = (VP*vec4(vec3((i&1)!=0,(i&2)!=0,(i&4)!=0),1))*(32<<node.lodLevel);//Size of section is 32x32x32 (need to change it to a bounding box in the future)
         pPoint += base;
         vec3 point = pPoint.xyz/pPoint.w;
         //TODO: CLIP TO VIEWPORT
@@ -78,5 +78,5 @@ bool isCulledByHiz() {
 //Returns if we should decend into its children or not
 bool shouldDecend() {
     //printf("Screen area %f: %f, %f", (size.x*size.y*float(screenW)*float(screenH)), float(screenW), float(screenH));
-    return (size.x*size.y*screenW*screenH) > (64*64F);
+    return (size.x*size.y*screenW*screenH) > decendSSS;
 }

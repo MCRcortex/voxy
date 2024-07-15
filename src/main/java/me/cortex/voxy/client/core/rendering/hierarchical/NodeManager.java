@@ -128,8 +128,8 @@ public class NodeManager {
         this.requestQueue = new GlBuffer(REQUEST_QUEUE_SIZE*4+4);
         Arrays.fill(this.localNodeData, 0);
 
-
-        this.setNodePosition(0, WorldEngine.getWorldSectionId(2, 0,0,0));
+        this.nodeAllocations.allocateNext();
+        this.setNodePosition(0, WorldEngine.getWorldSectionId(4, 0,0,0));
         this.setChildPtr(0, NODE_MSK, 0);
         this.setMeshId(0, MESH_MSK);
         this.pushNode(0);
@@ -148,7 +148,7 @@ public class NodeManager {
 
     //Returns the mesh offset/id for the given node or -1 if it doesnt exist
     private int getNodeMesh(int node) {
-        return (int) (this.localNodeData[node*3+1]&((1<<24)-1));
+        return (int) (this.localNodeData[node*3+1]&MESH_MSK);
     }
 
     private int getNodeChildPtr(int node) {
@@ -224,6 +224,7 @@ public class NodeManager {
         for (int i = 0; i < count; i++) {
             int requestOp = MemoryUtil.memGetInt(ptr + i*4L);
             int node = requestOp&NODE_MSK;
+            System.out.println("Got request for node: " + node);
 
             if (this.isLeafNode(node)) {
                 //If its a leaf node and it has a request, it must need the children
@@ -255,7 +256,7 @@ public class NodeManager {
 
             } else {
                 //If its not a leaf node, it must be missing the inner mesh so request it
-                if (this.getNodeMesh(node) != -1) {
+                if (this.getNodeMesh(node) != MESH_MSK) {
                     //Node already has a mesh, ignore it, but might be a sign that an error has occured
                     System.err.println("Requested a mesh for node, however the node already has a mesh");
 
@@ -312,6 +313,7 @@ public class NodeManager {
         //TODO: FIXME!! if we get a node that has an update and is watched but no id for it, it could be an update state from
         // an empty node to non empty node, this means we need to invalidate all the childrens positions and move them!
         // then also update the parent pointer
+        //TODO: Also need a way to remove sections, requires shuffling stuff around
         if (id == NO_NODE) {
             //The built mesh section is no longer needed, discard it
             // TODO: could probably?? cache the mesh in ram that way if its requested? it can be immediatly fetched while a newer mesh is built??
@@ -360,7 +362,7 @@ public class NodeManager {
 
             if (request.isSatisfied()) {
                 //If request is now satisfied update the internal nodes, create the children and reset + release the request set
-                this.completeRequest(request);
+                this.completeLeafRequest(request);
 
                 //Reset + release
                 request.clear();
@@ -392,20 +394,36 @@ public class NodeManager {
     }
 
 
-    private void completeRequest(LeafRequest request) {
+    private void completeLeafRequest(LeafRequest request) {
         //TODO: need to actually update all of the pos2meshId of the children to point to there new nodes
         int msk = Byte.toUnsignedInt(request.nonAirMask());
         int baseIdx = this.nodeAllocations.allocateNextConsecutiveCounted(Integer.bitCount(msk));
+        int cnt = 0;
         for (int i = 0; i < 8; i++) {
             if ((msk&(1<<i))!=0) {
                 //It means the section actually exists, so add and upload it
                 // aswell as add it to the mapping + push the node
+                int id = baseIdx+(cnt++);
+                long pos = request.childPositions[i];
 
+                //Put it in the mapping
+                this.pos2meshId.putIfAbsent(pos, id);
+                this.setNodePosition(id, pos);
+                this.setMeshId(id, request.getMeshId(i));
+                this.setChildPtr(id, NODE_MSK, 0);
 
+                this.pushNode(id);//request it to be uploaded
             } else {
                 //The section was empty, so just remove/skip it
             }
         }
+        if (cnt == 0) {
+            throw new IllegalStateException("Should not reach here");
+        }
+
+        //Actually signal the update
+        this.setChildPtr(request.nodeId, baseIdx, cnt);
+        this.pushNode(request.nodeId);
     }
 
     private final IntArrayList nodeUpdates = new IntArrayList();
@@ -425,9 +443,9 @@ public class NodeManager {
         flags |= this.isEmptyNode(id)?2:0;
         flags |= Math.max(0, this.getNodeChildCnt(id)-1)<<2;
 
-        int a = this.getNodeMesh(id)|(flags&0xFF);
-        int b = this.getNodeChildPtr(id)|((flags>>8)&0xFF);
-
+        int a = this.getNodeMesh(id)|((flags&0xFF)<<24);
+        int b = this.getNodeChildPtr(id)|(((flags>>8)&0xFF)<<24);
+        System.out.println("Setting mesh " + this.getNodeMesh(id) + " for node " + id);
         MemoryUtil.memPutInt(dst, a); dst += 4;
         MemoryUtil.memPutInt(dst, b); dst += 4;
     }
@@ -445,6 +463,7 @@ public class NodeManager {
     }
 
     public void download() {
+        //this.pushNode(0);
         //Download the request queue then clear the counter (first 4 bytes)
         DownloadStream.INSTANCE.download(this.requestQueue, this::processRequestQueue);
         DownloadStream.INSTANCE.commit();
