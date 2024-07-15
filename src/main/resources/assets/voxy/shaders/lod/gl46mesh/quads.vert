@@ -2,12 +2,17 @@
 #extension GL_ARB_gpu_shader_int64 : enable
 #extension GL_ARB_shader_draw_parameters : require
 
+//#define DEBUG_MESHLETS_ONLY
+
 #import <voxy:lod/quad_format.glsl>
 #import <voxy:lod/gl46mesh/bindings.glsl>
 #import <voxy:lod/block_model.glsl>
 #import <voxy:lod/gl46mesh/meshlet.glsl>
 
+#ifdef DEBUG_MESHLETS_ONLY
 layout(location = 6) out flat uint meshlet;
+#endif
+
 PosHeader meshletPosition;
 Quad quad;
 bool setupMeshlet() {
@@ -21,7 +26,11 @@ bool setupMeshlet() {
         return true;
     }
 
+    #ifdef DEBUG_MESHLETS_ONLY
     meshlet = data;
+    #endif
+
+
     uint baseId = (data*MESHLET_SIZE);
     uint quadIndex = baseId + (gl_VertexID>>2) + 2;
     meshletPosition = geometryPool[baseId];
@@ -35,13 +44,14 @@ bool setupMeshlet() {
 
 
 
-
+#ifndef DEBUG_MESHLETS_ONLY
 layout(location = 0) out vec2 uv;
 layout(location = 1) out flat vec2 baseUV;
 layout(location = 2) out flat vec4 tinting;
 layout(location = 3) out flat vec4 addin;
 layout(location = 4) out flat uint flags;
 layout(location = 5) out flat vec4 conditionalTinting;
+#endif
 
 vec4 uint2vec4RGBA(uint colour) {
     return vec4((uvec4(colour)>>uvec4(24,16,8,0))&uvec4(0xFF))/255.0;
@@ -100,12 +110,18 @@ void main() {
     bool isShaded = hasAO;//TODO: make this a per face flag
 
 
-    vec2 modelUV = vec2(modelId&0xFFu, (modelId>>8)&0xFFu)*(1.0/(256.0));
-    baseUV = modelUV + (vec2(face>>1, face&1u) * (1.0/(vec2(3.0, 2.0)*256.0)));
 
     ivec2 quadSize = extractSize(quad);
 
-    { //Generate tinting and flag data
+    #ifndef DEBUG_MESHLETS_ONLY
+    //Exploit provoking vertex to do less work
+    //if (cornerIdx==1)
+    {
+        vec2 modelUV = vec2(modelId&0xFFu, (modelId>>8)&0xFFu)*(1.0/(256.0));
+        baseUV = modelUV + (vec2(face>>1, face&1u) * (1.0/(vec2(3.0, 2.0)*256.0)));
+
+        //Generate tinting and flag data
+
         flags = faceHasAlphaCuttout(faceData);
 
         //We need to have a conditional override based on if the model size is < a full face + quadSize > 1
@@ -152,6 +168,7 @@ void main() {
             }
         }
     }
+    #endif
 
 
 
@@ -160,7 +177,8 @@ void main() {
     vec4 faceSize = getFaceSize(faceData);
 
     vec2 cQuadSize = (faceSize.yw + quadSize - 1) * vec2((cornerIdx>>1)&1, cornerIdx&1);
-    uv = faceSize.xz + cQuadSize;
+
+    //uv = faceSize.xz + cQuadSize;
 
     vec3 cornerPos = extractPos(quad);
     float depthOffset = extractFaceIndentation(faceData);

@@ -72,6 +72,10 @@ dependencies {
     modCompileOnly("maven.modrinth:chunky:1.3.138")
     modRuntimeOnly("maven.modrinth:chunky:1.3.138")
 
+    modRuntimeOnly("maven.modrinth:spark:1.10.73-fabric")
+    modRuntimeOnly("maven.modrinth:fabric-permissions-api:0.3.1")
+    modRuntimeOnly("maven.modrinth:nsight-loader:1.2.0")
+
     modImplementation('io.github.douira:glsl-transformer:2.0.1')
 }
 

@@ -4,6 +4,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.Gl46HierarchicalViewport;
 import me.cortex.voxy.client.core.rendering.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.hierarchical.INodeInteractor;
@@ -22,47 +23,25 @@ import static org.lwjgl.opengl.GL43.glDispatchCompute;
 import static org.lwjgl.opengl.GL45.glBindTextureUnit;
 
 public class HierarchicalOcclusionRenderer {
-    private PrintfInjector printf = new PrintfInjector(100000, 10, System.out::println);
-
-    private final MeshManager meshManager = new MeshManager();
-    private final NodeManager nodeManager = new NodeManager(new INodeInteractor() {
-        @Override
-        public void watchUpdates(long pos) {
-
-        }
-
-        @Override
-        public void unwatchUpdates(long pos) {
-
-        }
-
-        @Override
-        public void requestMesh(long pos) {
-
-        }
-
-        @Override
-        public void setMeshUpdateCallback(Consumer<BuiltSection> mesh) {
-
-        }
-    }, this.meshManager);
-
     private final HiZBuffer hiz = new HiZBuffer();
 
     private final int hizSampler = glGenSamplers();
 
-    private final Shader hierarchicalTraversal = Shader.make(this.printf)
-            .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/traversal.comp")
-            .compile();
+    private final NodeManager nodeManager;
+    private final Shader hierarchicalTraversal;
+    private final PrintfInjector printf;
 
     private final GlBuffer nodeQueue;
-    private final GlBuffer renderQueue;
     private final GlBuffer uniformBuffer;
 
-    public HierarchicalOcclusionRenderer() {
+    public HierarchicalOcclusionRenderer(INodeInteractor interactor, MeshManager mesh, PrintfInjector printf) {
+        this.nodeManager = new NodeManager(interactor, mesh);
         this.nodeQueue = new GlBuffer(1000000*4+4).zero();
-        this.renderQueue = new GlBuffer(1000000*4+4).zero();
         this.uniformBuffer = new GlBuffer(1024).zero();
+        this.printf = printf;
+        this.hierarchicalTraversal = Shader.make(printf)
+                .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/traversal.comp")
+                .compile();
     }
 
     private void uploadUniform() {
@@ -70,11 +49,12 @@ public class HierarchicalOcclusionRenderer {
 
     }
 
-    private void doHierarchicalTraversal(int depthBuffer, int width, int height) {
+    public void doHierarchicalTraversalSelection(Gl46HierarchicalViewport viewport, int depthBuffer, GlBuffer renderSelectionResult) {
         this.uploadUniform();
         this.nodeManager.upload();
+
         //Make hiz
-        this.hiz.buildMipChain(depthBuffer, width, height);
+        this.hiz.buildMipChain(depthBuffer, viewport.width, viewport.height);
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT);
         this.hierarchicalTraversal.bind();
 
@@ -83,7 +63,7 @@ public class HierarchicalOcclusionRenderer {
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.nodeManager.nodeBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.nodeQueue.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.nodeManager.requestQueue.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.renderQueue.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, renderSelectionResult.id);
 
             //Bind the hiz buffer
             glBindSampler(0, this.hizSampler);
@@ -98,20 +78,10 @@ public class HierarchicalOcclusionRenderer {
         this.nodeManager.download();
     }
 
-    public void render(int depthBuffer, int width, int height) {
-        this.doHierarchicalTraversal(depthBuffer, width, height);
-
-
-        this.printf.download();
-    }
-
     public void free() {
         this.nodeQueue.free();
-        this.renderQueue.free();
-        this.printf.free();
         this.hiz.free();
         this.nodeManager.free();
-        this.meshManager.free();
         glDeleteSamplers(this.hizSampler);
     }
 }

@@ -85,6 +85,7 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         glTextureParameteri(this.hizSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
         glTextureParameteri(this.hizSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTextureParameteri(this.hizSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTextureParameteri(this.hizSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         /*
         nglClearNamedBufferData(this.meshletBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
@@ -166,6 +167,7 @@ public class Gl46MeshletsFarWorldRenderer extends AbstractFarWorldRenderer<Gl46M
         this.lodShader.bind();
         this.bindResources(viewport, true, false, false);
         glDisable(GL_CULL_FACE);
+        glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
         glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_BYTE, 4*4);
         glEnable(GL_CULL_FACE);
 

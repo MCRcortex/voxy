@@ -11,9 +11,9 @@ public class IndexUtil {
         MemoryBuffer buffer = new MemoryBuffer(quadCount * 6L);
         long ptr = buffer.address;
         for(int i = 0; i < quadCount*4; i += 4) {
-            MemoryUtil.memPutByte(ptr + (0), (byte) i);
-            MemoryUtil.memPutByte(ptr + (1), (byte) (i + 1));
-            MemoryUtil.memPutByte(ptr + (2), (byte) (i + 2));
+            MemoryUtil.memPutByte(ptr + (0), (byte) (i + 1));
+            MemoryUtil.memPutByte(ptr + (1), (byte) (i + 2));
+            MemoryUtil.memPutByte(ptr + (2), (byte) (i + 0));
             MemoryUtil.memPutByte(ptr + (3), (byte) (i + 1));
             MemoryUtil.memPutByte(ptr + (4), (byte) (i + 3));
             MemoryUtil.memPutByte(ptr + (5), (byte) (i + 2));
@@ -30,9 +30,9 @@ public class IndexUtil {
         MemoryBuffer buffer = new MemoryBuffer(quadCount * 6L * 2);
         long ptr = buffer.address;
         for(int i = 0; i < quadCount*4; i += 4) {
-            MemoryUtil.memPutShort(ptr + (0*2), (short) i);
-            MemoryUtil.memPutShort(ptr + (1*2), (short) (i + 1));
-            MemoryUtil.memPutShort(ptr + (2*2), (short) (i + 2));
+            MemoryUtil.memPutShort(ptr + (0*2), (short) (i + 1));
+            MemoryUtil.memPutShort(ptr + (1*2), (short) (i + 2));
+            MemoryUtil.memPutShort(ptr + (2*2), (short) (i + 0));
             MemoryUtil.memPutShort(ptr + (3*2), (short) (i + 1));
             MemoryUtil.memPutShort(ptr + (4*2), (short) (i + 3));
             MemoryUtil.memPutShort(ptr + (5*2), (short) (i + 2));

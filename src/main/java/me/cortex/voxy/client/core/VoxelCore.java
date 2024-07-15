@@ -44,6 +44,13 @@ import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
 
 //There is strict forward only dataflow
 //Ingest -> world engine -> raw render data -> render data
+
+
+
+//REDESIGN THIS PIECE OF SHIT SPAGETTY SHIT FUCK
+// like Get rid of interactor and renderer being seperate just fucking put them together
+// fix the callback bullshit spagetti
+//REMOVE setRenderGen like holy hell
 public class VoxelCore {
     private final WorldEngine world;
     private final RenderGenerationService renderGen;
@@ -67,9 +74,16 @@ public class VoxelCore {
         Capabilities.init();//Ensure clinit is called
         this.modelManager = new ModelManager(16);
         this.renderer = this.createRenderBackend();
+        System.out.println("Using " + this.renderer.getClass().getSimpleName());
         this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
+
+        //Ungodly hacky code
+        if (this.renderer instanceof AbstractRenderWorldInteractor) {
+            this.interactor = (AbstractRenderWorldInteractor) this.renderer;
+        } else {
+            this.interactor = new DefaultRenderWorldInteractor(cfg, this.world, this.renderer);
+        }
         System.out.println("Renderer initialized");
-        this.interactor = new DefaultRenderWorldInteractor(cfg, this.world, this.renderer);
 
         this.renderGen = new RenderGenerationService(this.world, this.modelManager, VoxyConfig.CONFIG.renderThreads, this.interactor::processBuildResult, this.renderer.generateMeshlets());
         this.world.setDirtyCallback(this.interactor::sectionUpdated);
@@ -101,16 +115,15 @@ public class VoxelCore {
         System.out.println("Voxy core initialized");
     }
 
-    private AbstractFarWorldRenderer<?,?> createRenderBackend() {
+    private IRenderInterface<?> createRenderBackend() {
         if (false) {
-            System.out.println("Using Gl46MeshletFarWorldRendering");
+            return new Gl46HierarchicalRenderer(this.modelManager);
+        } else if (true) {
             return new Gl46MeshletsFarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
         } else {
             if (VoxyConfig.CONFIG.useMeshShaders()) {
-                System.out.println("Using NvMeshFarWorldRenderer");
                 return new NvMeshFarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
             } else {
-                System.out.println("Using Gl46FarWorldRenderer");
                 return new Gl46FarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
             }
         }
@@ -124,6 +137,7 @@ public class VoxelCore {
     boolean firstTime = true;
     public void renderSetup(Frustum frustum, Camera camera) {
         if (this.firstTime) {
+            //TODO: remove initPosition
             this.interactor.initPosition(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
             this.firstTime = false;
             //this.renderTracker.addLvl0(0,6,0);

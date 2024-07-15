@@ -3,8 +3,8 @@ package me.cortex.voxy.client.core.rendering;
 import org.joml.Matrix4f;
 
 public abstract class Viewport <A extends Viewport<A>> {
-    int width;
-    int height;
+    public int width;
+    public int height;
     int frameId;
     Matrix4f projection;
     Matrix4f modelView;
