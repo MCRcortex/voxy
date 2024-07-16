@@ -89,6 +89,9 @@ public class HierarchicalOcclusionRenderer {
         glMemoryBarrier(GL_PIXEL_BUFFER_BARRIER_BIT);
         this.hierarchicalTraversal.bind();
 
+        //Clear the render counter
+        nglClearNamedBufferSubData(renderSelectionResult.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+
         {
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.nodeManager.nodeBuffer.id);
@@ -119,19 +122,19 @@ public class HierarchicalOcclusionRenderer {
             nglClearNamedBufferSubData(this.nodeQueueB.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.nodeQueueA.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.nodeQueueB.id);
-            glDispatchCompute(16,1,1);
+            glDispatchCompute(8*8,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
             nglClearNamedBufferSubData(this.nodeQueueA.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.nodeQueueB.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.nodeQueueA.id);
-            glDispatchCompute(32,1,1);
+            glDispatchCompute(8*8*8,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
             nglClearNamedBufferSubData(this.nodeQueueB.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.nodeQueueA.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.nodeQueueB.id);
-            glDispatchCompute(64,1,1);
+            glDispatchCompute(8*8*8*8,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         }
 
@@ -146,5 +149,9 @@ public class HierarchicalOcclusionRenderer {
         this.hiz.free();
         this.nodeManager.free();
         glDeleteSamplers(this.hizSampler);
+    }
+
+    public GlBuffer getNodeDataBuffer() {
+        return this.nodeManager.nodeBuffer;
     }
 }

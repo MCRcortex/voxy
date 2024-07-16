@@ -23,11 +23,17 @@ public class PrintfInjector implements IShaderProcessor {
     private final HashMap<Integer, String> idToPrintfStringMap = new HashMap<>();
     private final int bindingIndex;
     private final Consumer<String> callback;
+    private final Runnable preRun;
     public PrintfInjector(int bufferSize, int bufferBindingIndex, Consumer<String> callback) {
+        this(bufferSize, bufferBindingIndex, callback, null);
+    }
+
+    public PrintfInjector(int bufferSize, int bufferBindingIndex, Consumer<String> callback, Runnable pre) {
         this.textBuffer = new GlBuffer(bufferSize*4L+4);
         nglClearNamedBufferData(this.textBuffer.id, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
         this.bindingIndex = bufferBindingIndex;
         this.callback = callback;
+        this.preRun = pre;
     }
 
     private static int findNextCall(String src, int after) {
@@ -183,6 +189,13 @@ public class PrintfInjector implements IShaderProcessor {
 
     private void processResult(long ptr, long size) {
         int total = MemoryUtil.memGetInt(ptr); ptr += 4;
+        if (total == 0) {
+            return;
+        }
+        if (this.preRun != null) {
+            this.preRun.run();
+        }
+
         int cnt = 0;
         List<Character> types = new ArrayList<>();
         while (cnt < total) {

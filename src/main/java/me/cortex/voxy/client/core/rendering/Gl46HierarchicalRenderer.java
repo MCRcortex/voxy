@@ -9,6 +9,7 @@ import me.cortex.voxy.client.core.model.ModelManager;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderDataFactory;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
+import me.cortex.voxy.client.core.rendering.hierarchical.DebugRenderer;
 import me.cortex.voxy.client.core.rendering.hierarchical.HierarchicalOcclusionRenderer;
 import me.cortex.voxy.client.core.rendering.hierarchical.INodeInteractor;
 import me.cortex.voxy.client.core.rendering.hierarchical.MeshManager;
@@ -56,11 +57,17 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
     private final MeshManager meshManager = new MeshManager();
 
     private final List<String> printfQueue = new ArrayList<>();
-    private final PrintfInjector printf = new PrintfInjector(100000, 10, this.printfQueue::add);
+    private final PrintfInjector printf = new PrintfInjector(100000, 10, line->{
+        if (line.startsWith("LOG")) {
+            System.err.println(line);
+        }
+        this.printfQueue.add(line);
+    }, this.printfQueue::clear);
 
     private final GlBuffer renderSections = new GlBuffer(100_000 * 4 + 4).zero();
 
 
+    private final DebugRenderer debugRenderer = new DebugRenderer();
 
     private final ConcurrentLinkedDeque<Mapper.StateEntry> blockStateUpdates = new ConcurrentLinkedDeque<>();
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeUpdates = new ConcurrentLinkedDeque<>();
@@ -150,6 +157,8 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
             var i = new int[1];
             glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, i);
             this.sectionSelector.doHierarchicalTraversalSelection(viewport, i[0], this.renderSections);
+
+            this.debugRenderer.render(viewport, this.sectionSelector.getNodeDataBuffer(), this.renderSections);
         }
 
 
@@ -165,12 +174,6 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
     public void addDebugData(List<String> debug) {
         debug.add("Printf Queue: ");
         debug.addAll(this.printfQueue);
-        for (String a : this.printfQueue) {
-            if (a.startsWith("LOG")) {
-                System.err.println(a);
-            }
-        }
-        this.printfQueue.clear();
     }
 
 
@@ -244,5 +247,6 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
         this.meshManager.free();
         this.sectionSelector.free();
         this.printf.free();
+        this.debugRenderer.free();
     }
 }

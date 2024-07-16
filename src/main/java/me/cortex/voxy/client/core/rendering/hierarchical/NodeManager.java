@@ -221,6 +221,12 @@ public class NodeManager {
     // the request queue only needs to supply the node id, since if its an inner node, it must be requesting for a mesh, while if its a leaf node, it must be requesting for children
     private void processRequestQueue(long ptr, long size) {
         int count = MemoryUtil.memGetInt(ptr); ptr += 4;
+        if (count > REQUEST_QUEUE_SIZE*1.5) {
+            System.err.println("CORRUPTED PROCESS REQUEST, IGNORING (had count of: "+count+")");
+            return;
+        }
+
+
         for (int i = 0; i < count; i++) {
             int requestOp = MemoryUtil.memGetInt(ptr + i*4L);
             int node = requestOp&NODE_MSK;
@@ -414,7 +420,8 @@ public class NodeManager {
 
                 this.pushNode(id);//request it to be uploaded
             } else {
-                //The section was empty, so just remove/skip it
+                //The section was empty, so just remove/skip it, but remove it from the map
+                this.pos2meshId.remove(request.childPositions[i]);
             }
         }
         if (cnt == 0) {
@@ -443,7 +450,9 @@ public class NodeManager {
         flags |= this.isEmptyNode(id)?2:0;
         flags |= Math.max(0, this.getNodeChildCnt(id)-1)<<2;
 
-        int a = this.getNodeMesh(id)|((flags&0xFF)<<24);
+        //TODO: PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK
+        //int a = this.getNodeMesh(id)|((flags&0xFF)<<24);
+        int a = id|((flags&0xFF)<<24);
         int b = this.getNodeChildPtr(id)|(((flags>>8)&0xFF)<<24);
         System.out.println("Setting mesh " + this.getNodeMesh(id) + " for node " + id);
         MemoryUtil.memPutInt(dst, a); dst += 4;
@@ -468,7 +477,6 @@ public class NodeManager {
         DownloadStream.INSTANCE.download(this.requestQueue, this::processRequestQueue);
         DownloadStream.INSTANCE.commit();
         nglClearNamedBufferSubData(this.requestQueue.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
-
     }
 
 
