@@ -55,7 +55,7 @@ dependencies {
     //modRuntimeOnly "maven.modrinth:nvidium:0.2.6-beta"
     modCompileOnly "maven.modrinth:nvidium:0.2.8-beta"
 
-    modImplementation("maven.modrinth:cloth-config:13.0.121+fabric")
+    modImplementation("maven.modrinth:cloth-config:15.0.127+fabric")
 
     modImplementation("maven.modrinth:modmenu:11.0.1")
 

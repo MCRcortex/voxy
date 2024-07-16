@@ -52,6 +52,10 @@ bool hasMesh(in UnpackedNode node) {
     return node.meshPtr != NULL_MESH;
 }
 
+bool isEmptyMesh(in UnpackedNode node) {
+    return node.meshPtr == (NULL_MESH-1);//Specialcase
+}
+
 bool hasChildren(in UnpackedNode node) {
     return node.childPtr != NULL_NODE;
 }

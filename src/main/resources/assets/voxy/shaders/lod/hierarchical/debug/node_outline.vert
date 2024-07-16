@@ -29,10 +29,12 @@ void main() {
 
     gl_Position = pos;
 
+    //node.nodeId
     uint hash = node.nodeId*1231421+123141;
     hash ^= hash>>16;
     hash = hash*1231421+123141;
     hash ^= hash>>16;
     hash = hash * 1827364925 + 123325621;
-    colour = vec4(float(hash&15u)/15, float((hash>>4)&15u)/15, float((hash>>8)&15u)/15, 1);
+    //colour = vec4(vec3(float(hash&15u)/15, float((hash>>4)&15u)/15, float((hash>>8)&15u)/15), 1);
+    colour = vec4(vec3(float(hash&31u)/31, float(node.lodLevel)/4, float(node.lodLevel)/4), 1);
 }

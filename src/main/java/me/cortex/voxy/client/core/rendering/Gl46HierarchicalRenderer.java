@@ -174,6 +174,7 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
     public void addDebugData(List<String> debug) {
         debug.add("Printf Queue: ");
         debug.addAll(this.printfQueue);
+        this.printfQueue.clear();
     }
 
 
@@ -210,8 +211,15 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
 
     @Override
-    public void initPosition(int x, int z) {
-
+    public void initPosition(int X, int Z) {
+        for (int x = -10; x <= 10; x++) {
+            for (int z = -10; z <= 10; z++) {
+                for (int y = -1; y <= 0; y++) {
+                    long pos = WorldEngine.getWorldSectionId(4, x,y,z);
+                    this.sectionSelector.nodeManager.insertTopLevelNode(pos);
+                }
+            }
+        }
     }
 
     @Override

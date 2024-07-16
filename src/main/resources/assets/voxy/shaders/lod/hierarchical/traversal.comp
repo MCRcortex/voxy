@@ -105,8 +105,8 @@ void enqueueChildren(in UnpackedNode node) {
 }
 
 void enqueueSelfForRender(in UnpackedNode node) {
-    printf("render %d@[%d,%d,%d]", node.lodLevel, node.pos.x, node.pos.y, node.pos.z);
-    if (renderQueueIndex < renderQueueMaxSize) {
+    //printf("render %d@[%d,%d,%d]", node.lodLevel, node.pos.x, node.pos.y, node.pos.z);
+    if ((!isEmptyMesh(node)) && renderQueueIndex < renderQueueMaxSize) {
         renderQueue[atomicAdd(renderQueueIndex, 1)] = getMesh(node);
     }
 }
@@ -128,11 +128,13 @@ void main() {
 
     //debugDumpNode(node);
 
-    if (outsideFrustum() || isCulledByHiz()) {
+    if (outsideFrustum()) {// || isCulledByHiz()
         //printf("HizCulled");
         //We are done here, dont do any more, the issue is the shader barriers maybe
         // its culled, maybe just mark it as culled?
-        printf("Cull");
+
+
+        //printf("Cull");
     } else {
         //It is visible, TODO: maybe do a more detailed hiz test? (or make it so that )
 

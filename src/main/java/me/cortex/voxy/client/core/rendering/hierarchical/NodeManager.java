@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering.hierarchical;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
@@ -104,10 +105,11 @@ public class NodeManager {
 
     public static final int REQUEST_QUEUE_SIZE = 1024;
     public static final int MESH_MSK = MAX_MESH_ID-1;
+    public static final int EMPTY_MESH_ID = MESH_MSK-1;
     public static final int NODE_MSK = (1<<24)-1;//NOTE!! IS DIFFERENT FROM MAX_NODE_COUNT as the MAX_NODE_COUNT is for the buffers, the ACTUAL MAX is NODE_MSK+1
 
     //Local data layout
-    // first long is position (todo! might not be needed)
+    // first long is position
     // next long contains mesh position ig/id
     private final long[] localNodeData = new long[MAX_NODE_COUNT * 3];
 
@@ -127,24 +129,26 @@ public class NodeManager {
         this.nodeBuffer = new GlBuffer(MAX_NODE_COUNT*16);
         this.requestQueue = new GlBuffer(REQUEST_QUEUE_SIZE*4+4);
         Arrays.fill(this.localNodeData, 0);
-
-        this.nodeAllocations.allocateNext();
-        this.setNodePosition(0, WorldEngine.getWorldSectionId(4, 0,0,0));
-        this.setChildPtr(0, NODE_MSK, 0);
-        this.setMeshId(0, MESH_MSK);
-        this.pushNode(0);
     }
 
+    public final Long2IntOpenHashMap rootPos2Id = new Long2IntOpenHashMap();
     public void insertTopLevelNode(long position) {
         //NOTE! when initally adding a top level node, set it to air and request a meshing of the mesh
         // (if the mesh returns as air uhhh idk what to do cause a top level air node is kinda... not valid but eh)
         // that way the node will replace itself with its meshed varient when its ready aswell as prevent
         // the renderer from exploding, as it should ignore the empty sections entirly
+        this.rootPosRequests.add(position);
+        this.interactor.watchUpdates(position);
+        this.interactor.requestMesh(position);
+
     }
 
     public void removeTopLevelNode(long position) {
 
     }
+
+
+
 
     //Returns the mesh offset/id for the given node or -1 if it doesnt exist
     private int getNodeMesh(int node) {
@@ -170,7 +174,7 @@ public class NodeManager {
 
     //Its ment to return if the node is just an empty mesh or if all the children are also empty
     private boolean isEmptyNode(int node) {
-        return this.getNodeMesh(node)==(MESH_MSK-1);//Special case/reserved
+        return this.getNodeMesh(node)==EMPTY_MESH_ID;//Special case/reserved
     }
 
     private void setNodePosition(int node, long position) {
@@ -188,7 +192,7 @@ public class NodeManager {
     }
 
     private void setChildPtr(int node, int childPtr, int count) {
-        if (childPtr > NODE_MSK || (childPtr!=NODE_MSK&&count < 1)) {
+        if (childPtr > NODE_MSK || ((childPtr!=NODE_MSK&&childPtr!=EMPTY_MESH_ID)&&count < 1)) {
             throw new IllegalArgumentException();
         }
         long val = this.localNodeData[node*3+1];
@@ -217,7 +221,8 @@ public class NodeManager {
     }
 
 
-    //IDEA, since a graph node can be in effectivly only 3 states, if inner node -> may or may not have mesh, and, if leaf node -> has mesh, no children
+
+    //The idea is, since a graph node can be in effectivly only 3 states, if inner node -> may or may not have mesh, and, if leaf node -> has mesh, no children
     // the request queue only needs to supply the node id, since if its an inner node, it must be requesting for a mesh, while if its a leaf node, it must be requesting for children
     private void processRequestQueue(long ptr, long size) {
         int count = MemoryUtil.memGetInt(ptr); ptr += 4;
@@ -264,7 +269,7 @@ public class NodeManager {
                 //If its not a leaf node, it must be missing the inner mesh so request it
                 if (this.getNodeMesh(node) != MESH_MSK) {
                     //Node already has a mesh, ignore it, but might be a sign that an error has occured
-                    System.err.println("Requested a mesh for node, however the node already has a mesh");
+                    throw new IllegalStateException("Requested a mesh for node, however the node already has a mesh");
 
                     //TODO: need to unmark the node that requested it, either that or only clear node data when a mesh has been removed
 
@@ -289,6 +294,7 @@ public class NodeManager {
     // the map should be identical to the currently watched set of sections
     //NOTE: that if the id is negative its part of a mesh request
     private final Long2IntOpenHashMap pos2meshId = new Long2IntOpenHashMap();
+    private final LongOpenHashSet rootPosRequests = new LongOpenHashSet();//
     private static final int NO_NODE = -1;
 
     //The request queue should be like some array that can reuse objects to prevent gc nightmare + like a bitset to find an avalible free slot
@@ -310,10 +316,10 @@ public class NodeManager {
     //TODO: FIXME: CRITICAL: if a section is empty when created, it wont get allocated a slot, however, the section might
     // become unempty due to an update!!! THIS IS REALLY BAD. since it doesnt have an allocation
 
-
-
     //TODO: test and fix the possible race condition of if a section is not empty then becomes empty in the same tick
     // that is, there is a request that is satisfied bar 1 section, that section is supplied as non emptpty but then becomes empty in the same tick
+
+    //TODO: Fixme: need to fix/make it so that the system can know if every child (to lod0) is empty or if its just the current section
     private void meshUpdate(BuiltSection mesh) {
         int id = this.pos2meshId.get(mesh.position);
         //TODO: FIXME!! if we get a node that has an update and is watched but no id for it, it could be an update state from
@@ -321,11 +327,22 @@ public class NodeManager {
         // then also update the parent pointer
         //TODO: Also need a way to remove sections, requires shuffling stuff around
         if (id == NO_NODE) {
-            //The built mesh section is no longer needed, discard it
-            // TODO: could probably?? cache the mesh in ram that way if its requested? it can be immediatly fetched while a newer mesh is built??
-
-            //This might be a warning? or maybe info?
-            mesh.free();
+            //If its a top level node insertion request, insert the node
+            if (this.rootPosRequests.remove(mesh.position)) {
+                if (!mesh.isEmpty()) {
+                    int top = this.nodeAllocations.allocateNext();
+                    this.rootPos2Id.put(mesh.position, top);
+                    this.setNodePosition(top, mesh.position);
+                    this.setChildPtr(top, NODE_MSK, 0);
+                    this.setMeshId(top, this.meshManager.uploadMesh(mesh));
+                    this.pushNode(top);
+                }
+            } else {
+                //The built mesh section is no longer needed, discard it
+                // TODO: could probably?? cache the mesh in ram that way if its requested? it can be immediatly fetched while a newer mesh is built??
+                //This might be a warning? or maybe info?
+                mesh.free();
+            }
             return;
         }
 
@@ -401,7 +418,8 @@ public class NodeManager {
 
 
     private void completeLeafRequest(LeafRequest request) {
-        //TODO: need to actually update all of the pos2meshId of the children to point to there new nodes
+        //TODO: FIXME: need to make it so that if a nodes mesh is empty but there are children that exist that arnt empty
+        // then it needs to still add the node, but just with an empty mesh flag
         int msk = Byte.toUnsignedInt(request.nonAirMask());
         int baseIdx = this.nodeAllocations.allocateNextConsecutiveCounted(Integer.bitCount(msk));
         int cnt = 0;
@@ -425,11 +443,12 @@ public class NodeManager {
             }
         }
         if (cnt == 0) {
-            throw new IllegalStateException("Should not reach here");
+            //This means that every child node didnt have a mesh, this is not good
+            throw new IllegalStateException("Every child node empty for node at " + request.position);
+        } else {
+            //Set the ptr
+            this.setChildPtr(request.nodeId, baseIdx, cnt);
         }
-
-        //Actually signal the update
-        this.setChildPtr(request.nodeId, baseIdx, cnt);
         this.pushNode(request.nodeId);
     }
 
