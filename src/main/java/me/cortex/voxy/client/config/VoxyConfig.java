@@ -32,7 +32,7 @@ public class VoxyConfig {
     public int savingThreads = 4;
     public int renderThreads = 5;
     public boolean useMeshShaderIfPossible = true;
-    public String defaultSaveConfig;
+    public String defaultSaveConfig = ContextSelectionSystem.DEFAULT_STORAGE_CONFIG;
 
 
     public static VoxyConfig loadOrCreate() {

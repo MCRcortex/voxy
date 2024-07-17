@@ -68,9 +68,10 @@ public class ContextSelectionSystem {
                 try {
                     this.config = Serialization.GSON.fromJson(Files.readString(json), WorldConfig.class);
                     if (this.config == null) {
-                        throw new IllegalStateException("Config deserialization null, reverting to default");
+                        System.err.println("Config deserialization null, reverting to default");
+                    } else {
+                        return;
                     }
-                    return;
                 } catch (Exception e) {
                     System.err.println("Failed to load the storage configuration file, resetting it to default");
                     e.printStackTrace();
