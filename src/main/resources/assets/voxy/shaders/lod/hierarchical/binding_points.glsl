@@ -6,6 +6,10 @@
 #define TRANSFORM_ARRAY_INDEX 5
 #define NEXT_NODE_QUEUE_INDEX 6
 
+#ifdef IS_DEBUG
+#define DEBUG_RENDER_NODE_INDEX 7
+#endif
+
 //Samplers
 #define HIZ_BINDING_INDEX 0
 

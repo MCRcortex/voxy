@@ -46,6 +46,12 @@ layout(binding = NEXT_NODE_QUEUE_INDEX, std430) restrict buffer NextNodeQueue {
     uint[] nextNodeQueue;
 };
 
+#ifdef IS_DEBUG
+layout(binding = DEBUG_RENDER_NODE_INDEX, std430) restrict buffer DebugRenderNodeQueue {
+    uint debugRenderNodeQueueIndex;
+    uint[] debugRenderNodeQueue;
+};
+#endif
 
 /*
 layout(binding = 2, std430) restrict buffer QueueData {
@@ -108,6 +114,9 @@ void enqueueSelfForRender(in UnpackedNode node) {
     //printf("render %d@[%d,%d,%d]", node.lodLevel, node.pos.x, node.pos.y, node.pos.z);
     if ((!isEmptyMesh(node)) && renderQueueIndex < renderQueueMaxSize) {
         renderQueue[atomicAdd(renderQueueIndex, 1)] = getMesh(node);
+        #ifdef IS_DEBUG
+        debugRenderNodeQueue[atomicAdd(debugRenderNodeQueueIndex, 1)] = node.nodeId;
+        #endif
     }
 }
 

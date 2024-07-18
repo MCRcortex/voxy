@@ -575,7 +575,6 @@ public class ModelManager {
         return res;
     }
 
-    //TODO:FIXME: DONT DO SPIN LOCKS :WAA:
     public long getModelMetadata(int blockId) {
         int map = this.idMappings[blockId];
         if (map == -1) {
@@ -590,16 +589,6 @@ public class ModelManager {
             throw new IdNotYetComputedException(blockId);
         }
         return this.metadataCache[map];
-        //int map = 0;
-        //int i = 10;
-        //while ((map = this.idMappings[blockId]) == -1) {
-        //    Thread.onSpinWait();
-        //}
-
-        //long meta = 0;
-        //while ((meta = this.metadataCache[map]) == 0) {
-        //    Thread.onSpinWait();
-        //}
     }
 
     public long getModelMetadataFromClientId(int clientId) {
