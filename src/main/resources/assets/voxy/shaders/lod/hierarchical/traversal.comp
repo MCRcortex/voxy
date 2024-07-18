@@ -90,7 +90,7 @@ layout(binding = 2, std430) restrict buffer QueueData {
 
 void addRequest(inout UnpackedNode node) {
     if (!hasRequested(node)) {
-        printf("Request %d %d %d %d", node.nodeId, node.flags, node.meshPtr, node.childPtr);
+        //printf("Request %d %d %d %d", node.nodeId, node.flags, node.meshPtr, node.childPtr);
         //TODO: maybe try using only 1 variable and it being <0 being bad
         if (requestQueueIndex < requestQueueMaxSize) {
             //Mark node as having a request submitted to prevent duplicate submissions
