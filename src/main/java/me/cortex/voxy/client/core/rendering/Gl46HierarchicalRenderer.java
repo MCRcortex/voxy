@@ -66,6 +66,7 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
     }, this.printfQueue::clear);
 
     private final GlBuffer renderSections = new GlBuffer(100_000 * 4 + 4).zero();
+    private final GlBuffer debugNodeQueue = new GlBuffer(1000000*4+4).zero();
 
 
     private final DebugRenderer debugRenderer = new DebugRenderer();
@@ -85,12 +86,12 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
         this.sectionSelector = new HierarchicalOcclusionRenderer(new INodeInteractor() {
             @Override
             public void watchUpdates(long pos) {
-                System.err.println("Watch: " + pos);
+                //System.err.println("Watch: " + pos);
             }
 
             @Override
             public void unwatchUpdates(long pos) {
-                System.err.println("Unwatch: " + pos);
+                //System.err.println("Unwatch: " + pos);
             }
 
             @Override
@@ -157,9 +158,9 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
         if (true) {//Run the hierarchical selector over the buffer to generate the set of render sections
             var i = new int[1];
             glGetFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME, i);
-            this.sectionSelector.doHierarchicalTraversalSelection(viewport, i[0], this.renderSections);
+            this.sectionSelector.doHierarchicalTraversalSelection(viewport, i[0], this.renderSections, this.debugNodeQueue);
 
-            this.debugRenderer.render(viewport, this.sectionSelector.getNodeDataBuffer(), this.renderSections);
+            this.debugRenderer.render(viewport, this.sectionSelector.getNodeDataBuffer(), this.debugNodeQueue);
         }
 
 

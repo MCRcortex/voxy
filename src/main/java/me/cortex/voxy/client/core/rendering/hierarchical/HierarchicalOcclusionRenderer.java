@@ -42,6 +42,7 @@ public class HierarchicalOcclusionRenderer {
         this.uniformBuffer = new GlBuffer(1024).zero();
         this.printf = printf;
         this.hierarchicalTraversal = Shader.make(printf)
+                .define("IS_DEBUG")
                 .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/traversal.comp")
                 .compile();
     }
@@ -71,7 +72,7 @@ public class HierarchicalOcclusionRenderer {
         MemoryUtil.memPutFloat(ptr, 64*64); ptr += 4;
     }
 
-    public void doHierarchicalTraversalSelection(Gl46HierarchicalViewport viewport, int depthBuffer, GlBuffer renderSelectionResult) {
+    public void doHierarchicalTraversalSelection(Gl46HierarchicalViewport viewport, int depthBuffer, GlBuffer renderSelectionResult, GlBuffer debugNodeOutput) {
         this.uploadUniform(viewport);
         this.nodeManager.upload();
 
@@ -94,6 +95,7 @@ public class HierarchicalOcclusionRenderer {
 
         //Clear the render counter
         nglClearNamedBufferSubData(renderSelectionResult.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+        nglClearNamedBufferSubData(debugNodeOutput.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
 
         {
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
@@ -102,6 +104,7 @@ public class HierarchicalOcclusionRenderer {
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.nodeManager.requestQueue.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, renderSelectionResult.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.nodeQueueB.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, debugNodeOutput.id);
 
             //Bind the hiz buffer
             glBindSampler(0, this.hizSampler);
@@ -119,19 +122,19 @@ public class HierarchicalOcclusionRenderer {
             nglClearNamedBufferSubData(this.nodeQueueA.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.nodeQueueB.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.nodeQueueA.id);
-            glDispatchCompute(21*21*4,1,1);
+            glDispatchCompute(21*21*8,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
             nglClearNamedBufferSubData(this.nodeQueueB.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.nodeQueueA.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.nodeQueueB.id);
-            glDispatchCompute(21*21*8,1,1);
+            glDispatchCompute(21*21*32,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
             nglClearNamedBufferSubData(this.nodeQueueA.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.nodeQueueB.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.nodeQueueA.id);
-            glDispatchCompute(21*21*8,1,1);
+            glDispatchCompute(21*21*128,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
             nglClearNamedBufferSubData(this.nodeQueueB.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);

@@ -192,7 +192,7 @@ public class NodeManager {
     }
 
     private void setChildPtr(int node, int childPtr, int count) {
-        if (childPtr > NODE_MSK || ((childPtr!=NODE_MSK&&childPtr!=EMPTY_MESH_ID)&&count < 1)) {
+        if (childPtr > NODE_MSK || ((childPtr!=NODE_MSK)&&count < 1)) {
             throw new IllegalArgumentException();
         }
         long val = this.localNodeData[node*3+1];
@@ -235,8 +235,11 @@ public class NodeManager {
         for (int i = 0; i < count; i++) {
             int requestOp = MemoryUtil.memGetInt(ptr + i*4L);
             int node = requestOp&NODE_MSK;
-            System.out.println("Got request for node: " + node);
-
+            //System.out.println("Got request for node: " + node);
+            if (WorldEngine.getLevel(this.getNodePos(node)) == 0) {
+                System.err.println("Got a request for node at level 0: " + node + " pos: " + this.getNodePos(node));
+                continue;
+            }
             if (this.isLeafNode(node)) {
                 //If its a leaf node and it has a request, it must need the children
                 if (this.getNodeMesh(node) == -1) {
@@ -444,12 +447,15 @@ public class NodeManager {
         }
         if (cnt == 0) {
             //This means that every child node didnt have a mesh, this is not good
-            throw new IllegalStateException("Every child node empty for node at " + request.position);
+            //throw new IllegalStateException("Every child node empty for node at " + request.position);
+            System.err.println("Every child node empty for node at " + request.position);
+            //this.setChildPtr(request.nodeId, baseIdx, 0);
         } else {
             //Set the ptr
             this.setChildPtr(request.nodeId, baseIdx, cnt);
+            this.pushNode(request.nodeId);
         }
-        this.pushNode(request.nodeId);
+
     }
 
     private final IntArrayList nodeUpdates = new IntArrayList();
@@ -469,11 +475,9 @@ public class NodeManager {
         flags |= this.isEmptyNode(id)?2:0;
         flags |= Math.max(0, this.getNodeChildCnt(id)-1)<<2;
 
-        //TODO: PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK PUT BACK
-        //int a = this.getNodeMesh(id)|((flags&0xFF)<<24);
-        int a = id|((flags&0xFF)<<24);
+        int a = this.getNodeMesh(id)|((flags&0xFF)<<24);
         int b = this.getNodeChildPtr(id)|(((flags>>8)&0xFF)<<24);
-        System.out.println("Setting mesh " + this.getNodeMesh(id) + " for node " + id);
+        //System.out.println("Setting mesh " + this.getNodeMesh(id) + " for node " + id);
         MemoryUtil.memPutInt(dst, a); dst += 4;
         MemoryUtil.memPutInt(dst, b); dst += 4;
     }

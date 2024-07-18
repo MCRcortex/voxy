@@ -1,7 +1,7 @@
 #version 460 core
 
 //TODO: make this better than a single thread
-layout(local_size_x=1, local_size_y=1) in;
+layout(local_size_x=32, local_size_y=1) in;
 
 #import <voxy:lod/hierarchical/binding_points.glsl>
 #line 7
@@ -90,7 +90,7 @@ layout(binding = 2, std430) restrict buffer QueueData {
 
 void addRequest(inout UnpackedNode node) {
     if (!hasRequested(node)) {
-        printf("LOG: Request %d %d %d %d", node.nodeId, node.flags, node.meshPtr, node.childPtr);
+        printf("Request %d %d %d %d", node.nodeId, node.flags, node.meshPtr, node.childPtr);
         //TODO: maybe try using only 1 variable and it being <0 being bad
         if (requestQueueIndex < requestQueueMaxSize) {
             //Mark node as having a request submitted to prevent duplicate submissions
