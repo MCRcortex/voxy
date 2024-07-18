@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.rendering;
 
+import com.sun.jna.NativeLibrary;
 import me.cortex.voxy.client.core.AbstractRenderWorldInteractor;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.PrintfInjector;

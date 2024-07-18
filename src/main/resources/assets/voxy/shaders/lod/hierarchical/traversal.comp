@@ -128,7 +128,7 @@ void main() {
 
     //debugDumpNode(node);
 
-    if (outsideFrustum()) {// || isCulledByHiz()
+    if (outsideFrustum() || isCulledByHiz()) {
         //printf("HizCulled");
         //We are done here, dont do any more, the issue is the shader barriers maybe
         // its culled, maybe just mark it as culled?
