@@ -94,7 +94,7 @@ public class Mipper {
 
             int blockId = Mapper.getBlockId(block);
             int lightLevel = Mapper.getLightId(block);
-            BlockState blockState = mapper.getBlockStateFromBlockId(blockId)
+            BlockState blockState = mapper.getBlockStateFromBlockId(blockId);
 
             float newWeight = computedWeights.getOrDefault(blockId, 0.0f) + getWeight(blockState);
             computedWeights.put(blockId, newWeight);
