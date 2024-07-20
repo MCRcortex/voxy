@@ -54,6 +54,11 @@ void setupScreenspace(in UnpackedNode node) {
         minBB = min(minBB, point);
         maxBB = max(maxBB, point);
     }
+
+    //TODO: MORE ACCURATLY DETERMIN SCREENSPACE AREA, this can be done by computing and adding
+    //  the projected surface area of each face which winding order faces the camera
+    //  (this is just the dot product of 2 projected vectors afaik)
+
     //printf("Screenspace MIN: %f, %f, %f  MAX: %f, %f, %f", minBB.x,minBB.y,minBB.z, maxBB.x,maxBB.y,maxBB.z);
 
     size = maxBB.xy - minBB.xy;
