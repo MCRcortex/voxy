@@ -268,7 +268,7 @@ public class VoxelCore {
 
 
     private IRenderInterface<?> createRenderBackend() {
-        if (false) {
+        if (true) {
             return new Gl46HierarchicalRenderer(this.modelManager);
         } else if (false) {
             return new Gl46MeshletsFarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
