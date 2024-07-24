@@ -50,11 +50,9 @@ public class VoxyConfig {
                 e.printStackTrace();
             }
         }
-
-        var cfg = new VoxyConfig();
-        cfg.defaultSaveConfig = ContextSelectionSystem.DEFAULT_STORAGE_CONFIG;
-
-        return cfg;
+        var config = new VoxyConfig();
+        config.defaultSaveConfig = ContextSelectionSystem.DEFAULT_STORAGE_CONFIG;
+        return config;
     }
 
     public void save() {
