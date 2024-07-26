@@ -54,6 +54,7 @@ public class VoxyConfig {
         config.defaultSaveConfig = ContextSelectionSystem.DEFAULT_STORAGE_CONFIG;
         return config;
     }
+
     public void save() {
         //Unsafe, todo: fixme! needs to be atomic!
         try {
