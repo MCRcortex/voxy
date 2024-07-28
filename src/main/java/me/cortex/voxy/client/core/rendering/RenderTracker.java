@@ -4,12 +4,9 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
+import me.cortex.voxy.client.core.rendering.geometry.OLD.AbstractFarWorldRenderer;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.util.math.Direction;
-
-import java.util.concurrent.ConcurrentHashMap;
 
 //Tracks active sections, dispatches updates to the build system, everything related to rendering flows through here
 public class RenderTracker {

@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering;
+package me.cortex.voxy.client.core.rendering.geometry.OLD;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -11,8 +11,6 @@ import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 import org.lwjgl.system.MemoryUtil;
-
-import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class DefaultGeometryManager extends AbstractGeometryManager {
     private static final int SECTION_METADATA_SIZE = 32;

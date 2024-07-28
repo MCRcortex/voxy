@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering;
+package me.cortex.voxy.client.core.rendering.geometry.OLD;
 
 //NOTE: an idea on how to do it is so that any render section, we _keep_ aquired (yes this will be very memory intensive)
 // could maybe tosomething else
@@ -6,7 +6,8 @@ package me.cortex.voxy.client.core.rendering;
 import com.mojang.blaze3d.systems.RenderSystem;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.cortex.voxy.client.core.gl.GlBuffer;
-import me.cortex.voxy.client.core.model.ModelManager;
+import me.cortex.voxy.client.core.model.ModelFactory;
+import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
@@ -19,7 +20,6 @@ import net.minecraft.util.Identifier;
 import org.joml.FrustumIntersection;
 import org.lwjgl.system.MemoryUtil;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -35,12 +35,12 @@ import static org.lwjgl.opengl.GL30.*;
 
 
 //Todo: tinker with having the compute shader where each thread is a position to render? maybe idk
-public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends AbstractGeometryManager> implements IRenderInterface<T> {
+public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends AbstractGeometryManager> {
     public static final int STATIC_VAO = glGenVertexArrays();
 
     protected final GlBuffer uniformBuffer;
     protected final J geometry;
-    protected final ModelManager models;
+    protected final ModelFactory models;
     protected final GlBuffer lightDataBuffer;
 
     protected final int maxSections;
@@ -58,7 +58,7 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends Ab
 
     private final ConcurrentLinkedDeque<Mapper.StateEntry> blockStateUpdates = new ConcurrentLinkedDeque<>();
     private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeUpdates = new ConcurrentLinkedDeque<>();
-    public AbstractFarWorldRenderer(ModelManager models, J geometry) {
+    public AbstractFarWorldRenderer(ModelFactory models, J geometry) {
         this.maxSections = geometry.getMaxSections();
         this.uniformBuffer  = new GlBuffer(1024);
         this.lightDataBuffer  = new GlBuffer(256*4);//256 of uint

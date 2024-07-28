@@ -7,6 +7,7 @@ import me.cortex.voxy.common.storage.config.StorageConfig;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.function.LongConsumer;
 
 public class ReadonlyCachingLayer extends StorageBackend {
     private final StorageBackend cache;
@@ -28,6 +29,11 @@ public class ReadonlyCachingLayer extends StorageBackend {
             this.cache.setSectionData(key, result);
         }
         return result;
+    }
+
+    @Override
+    public void iterateStoredSectionPositions(LongConsumer consumer) {
+        throw new IllegalStateException("Not yet implemented");
     }
 
     @Override

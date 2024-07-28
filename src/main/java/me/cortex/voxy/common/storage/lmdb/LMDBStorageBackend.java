@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 
 import static org.lwjgl.util.lmdb.LMDB.*;
@@ -80,6 +81,11 @@ public class LMDBStorageBackend extends StorageBackend {
         } finally {
             this.accessingCounts.getAndAdd(-1);
         }
+    }
+
+    @Override
+    public void iterateStoredSectionPositions(LongConsumer consumer) {
+        throw new IllegalStateException("Not yet implemented");
     }
 
     //TODO: make batch get and updates

@@ -10,12 +10,16 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.function.LongConsumer;
 
 public class DelegatingStorageAdaptor extends StorageBackend {
     protected final StorageBackend delegate;
     public DelegatingStorageAdaptor(StorageBackend delegate) {
         this.delegate = delegate;
     }
+
+    @Override
+    public void iterateStoredSectionPositions(LongConsumer consumer) {this.delegate.iterateStoredSectionPositions(consumer);}
 
     @Override
     public ByteBuffer getSectionData(long key) {

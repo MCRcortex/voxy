@@ -13,6 +13,7 @@ import org.apache.commons.lang3.stream.Streams;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
+import java.util.function.LongConsumer;
 
 public class MemoryStorageBackend extends StorageBackend {
     private final Long2ObjectMap<ByteBuffer>[] maps;
@@ -22,15 +23,24 @@ public class MemoryStorageBackend extends StorageBackend {
         this(4);
     }
 
+    private Long2ObjectMap<ByteBuffer> getMap(long key) {
+        return this.maps[(int) (RandomSeed.mixStafford13(RandomSeed.mixStafford13(key)^key)&(this.maps.length-1))];
+    }
+
+    @Override
+    public void iterateStoredSectionPositions(LongConsumer consumer) {
+        for (var map : this.maps) {
+            synchronized (map) {
+                map.keySet().forEach(consumer);
+            }
+        }
+    }
+
     public MemoryStorageBackend(int slicesBitCount) {
         this.maps = new Long2ObjectMap[1<<slicesBitCount];
         for (int i = 0; i < this.maps.length; i++) {
             this.maps[i] = new Long2ObjectOpenHashMap<>();
         }
-    }
-
-    private Long2ObjectMap<ByteBuffer> getMap(long key) {
-        return this.maps[(int) (RandomSeed.mixStafford13(RandomSeed.mixStafford13(key)^key)&(this.maps.length-1))];
     }
 
     @Override

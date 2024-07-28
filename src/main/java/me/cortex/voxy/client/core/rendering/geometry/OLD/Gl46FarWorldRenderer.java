@@ -1,30 +1,23 @@
-package me.cortex.voxy.client.core.rendering;
+package me.cortex.voxy.client.core.rendering.geometry.OLD;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
-import me.cortex.voxy.client.core.model.ModelManager;
-import me.cortex.voxy.client.core.rendering.util.DownloadStream;
+import me.cortex.voxy.client.core.model.ModelFactory;
+import me.cortex.voxy.client.core.rendering.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
-import net.minecraft.block.Blocks;
 import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import org.lwjgl.opengl.GL11C;
 import org.lwjgl.system.MemoryUtil;
-
-import java.util.List;
 
 import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
 import static org.lwjgl.opengl.ARBIndirectParameters.glMultiDrawElementsIndirectCountARB;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_SHORT;
-import static org.lwjgl.opengl.GL11.glGetInteger;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
-import static org.lwjgl.opengl.GL30C.GL_R8UI;
 import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
 import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
 import static org.lwjgl.opengl.GL42.*;
@@ -55,7 +48,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport,
     private final GlBuffer glCommandBuffer;
     private final GlBuffer glCommandCountBuffer;
 
-    public Gl46FarWorldRenderer(ModelManager modelManager, int geometryBuffer, int maxSections) {
+    public Gl46FarWorldRenderer(ModelFactory modelManager, int geometryBuffer, int maxSections) {
         super(modelManager, new DefaultGeometryManager(geometryBuffer*8L, maxSections));
         this.glCommandBuffer = new GlBuffer(maxSections*5L*4 * 6);
         this.glCommandCountBuffer = new GlBuffer(4*2);
@@ -69,8 +62,8 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport,
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.glCommandCountBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, this.geometry.metaId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.visibilityBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.models.getBufferId());
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.models.getColourBufferId());
+        //glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, this.models.getBufferId());
+        //glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.models.getColourBufferId());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, this.lightDataBuffer.id);//Lighting LUT
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.glCommandBuffer.id);
         glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.glCommandCountBuffer.id);
@@ -78,7 +71,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport,
 
         //Bind the texture atlas
         glBindSampler(0, this.models.getSamplerId());
-        glBindTextureUnit(0, this.models.getTextureId());
+        //glBindTextureUnit(0, this.models.getTextureId());
     }
 
     //FIXME: dont do something like this as it breaks multiviewport mods
@@ -198,7 +191,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport,
 
 
         glBindSampler(0, this.models.getSamplerId());
-        glBindTextureUnit(0, this.models.getTextureId());
+        //glBindTextureUnit(0, this.models.getTextureId());
 
         //RenderSystem.blendFunc(GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE);
         this.lodShader.bind();

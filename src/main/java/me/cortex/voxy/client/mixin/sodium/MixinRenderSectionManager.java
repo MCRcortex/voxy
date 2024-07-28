@@ -17,9 +17,9 @@ public class MixinRenderSectionManager {
 
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))
     private void injectIngest(int x, int z, CallbackInfo ci) {
-        var core = ((IGetVoxelCore)(world.worldRenderer)).getVoxelCore();
+        var core = ((IGetVoxelCore)(this.world.worldRenderer)).getVoxelCore();
         if (core != null && VoxyConfig.CONFIG.ingestEnabled) {
-            core.enqueueIngest(world.getChunk(x, z));
+            core.enqueueIngest(this.world.getChunk(x, z));
         }
     }
 }

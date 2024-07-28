@@ -7,6 +7,7 @@
     "minecraft.MixinClientChunkManager",
     "minecraft.MixinDebugHud",
     "minecraft.MixinMinecraftClient",
+    "minecraft.MixinRenderSystem",
     "minecraft.MixinWorldRenderer",
     "nvidium.MixinRenderPipeline",
     "sodium.MixinDefaultChunkRenderer",

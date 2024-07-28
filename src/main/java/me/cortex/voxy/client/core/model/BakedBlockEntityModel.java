@@ -89,6 +89,10 @@ public class BakedBlockEntityModel {
                         .texture(Float.intBitsToFloat(vert[7]), Float.intBitsToFloat(vert[8]));
             }
         }
+
+        public boolean isEmpty() {
+            return this.vertices.isEmpty();
+        }
     }
 
     private final List<BakedVertices> layers;
@@ -99,6 +103,7 @@ public class BakedBlockEntityModel {
     public void renderOut() {
         var vc = Tessellator.getInstance();
         for (var layer : this.layers) {
+            if (layer.isEmpty()) continue;
             var bb = vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
             if (layer.layer instanceof RenderLayer.MultiPhase mp) {
                 Identifier textureId = mp.phases.texture.getId().orElse(null);

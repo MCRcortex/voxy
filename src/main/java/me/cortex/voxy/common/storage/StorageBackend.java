@@ -5,8 +5,10 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.LongConsumer;
 
 public abstract class StorageBackend {
+    public abstract void iterateStoredSectionPositions(LongConsumer consumer);
 
     public abstract ByteBuffer getSectionData(long key);
 

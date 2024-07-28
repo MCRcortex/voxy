@@ -1,14 +1,9 @@
-package me.cortex.voxy.client.core.rendering;
+package me.cortex.voxy.client.core.rendering.geometry.OLD;
 
-import com.sun.jna.NativeLibrary;
-import me.cortex.voxy.client.core.AbstractRenderWorldInteractor;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
-import me.cortex.voxy.client.core.gl.shader.Shader;
-import me.cortex.voxy.client.core.gl.shader.ShaderType;
-import me.cortex.voxy.client.core.model.ModelManager;
+import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
-import me.cortex.voxy.client.core.rendering.building.RenderDataFactory;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.hierarchical.DebugRenderer;
 import me.cortex.voxy.client.core.rendering.hierarchical.HierarchicalOcclusionRenderer;
@@ -16,44 +11,24 @@ import me.cortex.voxy.client.core.rendering.hierarchical.INodeInteractor;
 import me.cortex.voxy.client.core.rendering.hierarchical.MeshManager;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
-import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
-import net.minecraft.client.render.RenderLayer;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.util.Identifier;
-import org.joml.Matrix4f;
-import org.joml.Vector3f;
-import org.lwjgl.system.MemoryUtil;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.function.Consumer;
 
-import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
-import static org.lwjgl.opengl.GL15.glBindBuffer;
-import static org.lwjgl.opengl.GL30.glBindBufferBase;
-import static org.lwjgl.opengl.GL30.glBindVertexArray;
-import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
-import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
 import static org.lwjgl.opengl.GL31.glDrawElementsInstanced;
-import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL40.glDrawElementsIndirect;
-import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
-import static org.lwjgl.opengl.GL42.GL_FRAMEBUFFER_BARRIER_BIT;
-import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL43.*;
-import static org.lwjgl.opengl.GL45.glBindTextureUnit;
-import static org.lwjgl.opengl.GL45.nglClearNamedBufferSubData;
 
-public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46HierarchicalViewport>, AbstractRenderWorldInteractor {
+public class Gl46HierarchicalRenderer {
     private final HierarchicalOcclusionRenderer sectionSelector;
     private final MeshManager meshManager = new MeshManager();
 
@@ -76,25 +51,25 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
     protected final ConcurrentLinkedDeque<BuiltSection> buildResults = new ConcurrentLinkedDeque<>();
 
-    private final ModelManager modelManager;
+    private final ModelFactory modelManager;
     private RenderGenerationService sectionGenerationService;
     private Consumer<BuiltSection> resultConsumer;
 
-    public Gl46HierarchicalRenderer(ModelManager model) {
+    public Gl46HierarchicalRenderer(ModelFactory model) {
         this.modelManager = model;
 
         this.sectionSelector = new HierarchicalOcclusionRenderer(new INodeInteractor() {
-            @Override
+            
             public void watchUpdates(long pos) {
                 //System.err.println("Watch: " + pos);
             }
 
-            @Override
+            
             public void unwatchUpdates(long pos) {
                 //System.err.println("Unwatch: " + pos);
             }
 
-            @Override
+            
             public void requestMesh(long pos) {
                 Gl46HierarchicalRenderer.this.sectionGenerationService.enqueueTask(
                         WorldEngine.getLevel(pos),
@@ -104,14 +79,13 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
                 );
             }
 
-            @Override
+            
             public void setMeshUpdateCallback(Consumer<BuiltSection> mesh) {
                 Gl46HierarchicalRenderer.this.resultConsumer = mesh;
             }
         }, this.meshManager, this.printf);
     }
 
-    @Override
     public void setupRender(Frustum frustum, Camera camera) {
         {//Tick upload and download queues
             UploadStream.INSTANCE.tick();
@@ -143,7 +117,7 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
         }
     }
 
-    @Override
+    
     public void renderFarAwayOpaque(Gl46HierarchicalViewport viewport) {
         //Process all the build results
         while (!this.buildResults.isEmpty()) {
@@ -167,12 +141,12 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
         this.printf.download();
     }
 
-    @Override
+    
     public void renderFarAwayTranslucent(Gl46HierarchicalViewport viewport) {
 
     }
 
-    @Override
+    
     public void addDebugData(List<String> debug) {
         debug.add("Printf Queue: ");
         debug.addAll(this.printfQueue);
@@ -185,12 +159,12 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
 
 
-    @Override
+    
     public void addBlockState(Mapper.StateEntry stateEntry) {
         this.blockStateUpdates.add(stateEntry);
     }
 
-    @Override
+    
     public void addBiome(Mapper.BiomeEntry biomeEntry) {
         this.biomeUpdates.add(biomeEntry);
     }
@@ -198,21 +172,10 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
 
 
-    @Override
     public void processBuildResult(BuiltSection section) {
         this.buildResults.add(section);
     }
 
-    @Override
-    public void sectionUpdated(WorldSection worldSection) {
-
-    }
-
-
-
-
-
-    @Override
     public void initPosition(int X, int Z) {
         for (int x = -10; x <= 10; x++) {
             for (int z = -10; z <= 10; z++) {
@@ -224,27 +187,19 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
         }
     }
 
-    @Override
-    public void setCenter(int x, int y, int z) {
-
-    }
 
 
 
-
-
-
-    @Override
+    
     public boolean generateMeshlets() {
         return false;
     }
 
-    @Override
     public void setRenderGen(RenderGenerationService renderService) {
         this.sectionGenerationService = renderService;
     }
 
-    @Override
+    
     public Gl46HierarchicalViewport createViewport() {
         return new Gl46HierarchicalViewport(this);
     }
@@ -252,7 +207,7 @@ public class Gl46HierarchicalRenderer implements IRenderInterface<Gl46Hierarchic
 
 
 
-    @Override
+    
     public void shutdown() {
         this.meshManager.free();
         this.sectionSelector.free();

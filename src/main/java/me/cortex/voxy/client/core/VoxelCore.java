@@ -3,7 +3,7 @@ package me.cortex.voxy.client.core;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.model.ModelManager;
+import me.cortex.voxy.client.core.model.OffThreadModelBakerySystem;
 import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
@@ -54,11 +54,8 @@ import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
 //REMOVE setRenderGen like holy hell
 public class VoxelCore {
     private final WorldEngine world;
-    private final RenderGenerationService renderGen;
-    private final ModelManager modelManager;
-    private final AbstractRenderWorldInteractor interactor;
 
-    private final IRenderInterface renderer;
+    private final RenderService renderer;
     private final ViewportSelector viewportSelector;
     private final PostProcessing postProcessing;
 
@@ -73,45 +70,11 @@ public class VoxelCore {
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         Capabilities.init();//Ensure clinit is called
-        this.modelManager = new ModelManager(16);
-        this.renderer = this.createRenderBackend();
+
+        this.renderer = new RenderService(this.world);
         System.out.println("Using " + this.renderer.getClass().getSimpleName());
         this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
-
-        //Ungodly hacky code
-        if (this.renderer instanceof AbstractRenderWorldInteractor) {
-            this.interactor = (AbstractRenderWorldInteractor) this.renderer;
-        } else {
-            this.interactor = new DefaultRenderWorldInteractor(cfg, this.world, this.renderer);
-        }
-        System.out.println("Renderer initialized");
-
-        this.renderGen = new RenderGenerationService(this.world, this.modelManager, VoxyConfig.CONFIG.renderThreads, this.interactor::processBuildResult, this.renderer.generateMeshlets());
-        this.world.setDirtyCallback(this.interactor::sectionUpdated);
-        this.interactor.setRenderGen(this.renderGen);
-        System.out.println("Render tracker and generator initialized");
-
-
-
         this.postProcessing = new PostProcessing();
-
-        this.world.getMapper().setCallbacks(this.renderer::addBlockState, this.renderer::addBiome);
-
-
-        ////Resave the db incase it failed a recovery
-        //this.world.getMapper().forceResaveStates();
-
-        var biomeRegistry = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME);
-        for (var biome : this.world.getMapper().getBiomeEntries()) {
-            //this.renderer.getModelManager().addBiome(biome.id, biomeRegistry.get(new Identifier(biome.biome)));
-            this.renderer.addBiome(biome);
-        }
-
-        for (var state : this.world.getMapper().getStateEntries()) {
-            //this.renderer.getModelManager().addEntry(state.id, state.state);
-            this.renderer.addBlockState(state);
-        }
-        //this.renderer.getModelManager().updateEntry(0, Blocks.GRASS_BLOCK.getDefaultState());
 
         System.out.println("Voxy core initialized");
     }
@@ -120,16 +83,8 @@ public class VoxelCore {
         this.world.ingestService.enqueueIngest(worldChunk);
     }
 
-    boolean firstTime = true;
     public void renderSetup(Frustum frustum, Camera camera) {
-        if (this.firstTime) {
-            //TODO: remove initPosition
-            this.interactor.initPosition(camera.getBlockPos().getX(), camera.getBlockPos().getZ());
-            this.firstTime = false;
-            //this.renderTracker.addLvl0(0,6,0);
-        }
-        this.interactor.setCenter(camera.getBlockPos().getX(), camera.getBlockPos().getY(), camera.getBlockPos().getZ());
-        this.renderer.setupRender(frustum, camera);
+        this.renderer.setup(camera);
     }
 
     private static Matrix4f makeProjectionMatrix(float near, float far) {
@@ -147,6 +102,7 @@ public class VoxelCore {
         return projection;
     }
 
+    //TODO: Make a reverse z buffer
     private static Matrix4f computeProjectionMat() {
         return new Matrix4f(RenderSystem.getProjectionMatrix()).mulLocal(
                 makeProjectionMatrix(0.05f, MinecraftClient.getInstance().gameRenderer.getFarPlaneDistance()).invert()
@@ -160,16 +116,9 @@ public class VoxelCore {
         matrices.push();
         matrices.translate(-cameraX, -cameraY, -cameraZ);
         matrices.pop();
-        //this.renderer.getModelManager().updateEntry(0, Blocks.DIRT_PATH.getDefaultState());
-
-        //this.renderer.getModelManager().updateEntry(0, Blocks.COMPARATOR.getDefaultState());
-        //this.renderer.getModelManager().updateEntry(0, Blocks.OAK_LEAVES.getDefaultState());
-
-        //var fb = Iris.getPipelineManager().getPipelineNullable().getSodiumTerrainPipeline().getTerrainSolidFramebuffer();
-        //fb.bind();
 
         var projection = computeProjectionMat();
-        //var projection = RenderSystem.getProjectionMatrix();//computeProjectionMat();
+
         var viewport = this.viewportSelector.getViewport();
         viewport
                 .setProjection(projection)
@@ -183,7 +132,7 @@ public class VoxelCore {
         this.renderer.renderFarAwayOpaque(viewport);
 
         //Compute the SSAO of the rendered terrain
-        //this.postProcessing.computeSSAO(projection, matrices);
+        this.postProcessing.computeSSAO(projection, matrices);
 
         //We can render the translucent directly after as it is the furthest translucent objects
         this.renderer.renderFarAwayTranslucent(viewport);
@@ -202,9 +151,8 @@ public class VoxelCore {
         debug.add("Saving service tasks: " + this.world.savingService.getTaskCount());
         debug.add("Render service tasks: " + this.renderGen.getTaskCount());
          */
-        debug.add("I/S/R tasks: " + this.world.ingestService.getTaskCount() + "/"+this.world.savingService.getTaskCount()+"/"+this.renderGen.getTaskCount());
-        debug.add("Loaded cache sizes: " + Arrays.toString(this.world.getLoadedSectionCacheSizes()));
-        debug.add("Mesh cache count: " + this.renderGen.getMeshCacheCount());
+        debug.add("I/S tasks: " + this.world.ingestService.getTaskCount() + "/"+this.world.savingService.getTaskCount());
+        debug.add("SCS: " + Arrays.toString(this.world.getLoadedSectionCacheSizes()));
         this.renderer.addDebugData(debug);
     }
 
@@ -226,11 +174,9 @@ public class VoxelCore {
             try {this.importer.shutdown();this.importer = null;} catch (Exception e) {e.printStackTrace();}
         }
         System.out.println("Shutting down voxel core");
-        try {this.renderGen.shutdown();} catch (Exception e) {e.printStackTrace();}
-        System.out.println("Render gen shut down");
         try {this.world.shutdown();} catch (Exception e) {e.printStackTrace();}
         System.out.println("World engine shut down");
-        try {this.renderer.shutdown(); this.viewportSelector.free(); this.modelManager.free();} catch (Exception e) {e.printStackTrace();}
+        try {this.renderer.shutdown(); this.viewportSelector.free();} catch (Exception e) {e.printStackTrace();}
         System.out.println("Renderer shut down");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {e.printStackTrace();}}
         System.out.println("Voxel core shut down");
@@ -263,21 +209,5 @@ public class VoxelCore {
 
     public WorldEngine getWorldEngine() {
         return this.world;
-    }
-
-
-
-    private IRenderInterface<?> createRenderBackend() {
-        if (true) {
-            return new Gl46HierarchicalRenderer(this.modelManager);
-        } else if (false) {
-            return new Gl46MeshletsFarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-        } else {
-            if (VoxyConfig.CONFIG.useMeshShaders()) {
-                return new NvMeshFarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-            } else {
-                return new Gl46FarWorldRenderer(this.modelManager, VoxyConfig.CONFIG.geometryBufferSize, VoxyConfig.CONFIG.maxSections);
-            }
-        }
     }
 }

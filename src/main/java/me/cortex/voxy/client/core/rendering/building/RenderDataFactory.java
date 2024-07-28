@@ -2,22 +2,21 @@ package me.cortex.voxy.client.core.rendering.building;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import me.cortex.voxy.client.core.Capabilities;
-import me.cortex.voxy.client.core.model.ModelManager;
+import me.cortex.voxy.client.core.model.ModelFactory;
+import me.cortex.voxy.client.core.model.ModelQueries;
 import me.cortex.voxy.client.core.util.Mesher2D;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
-import net.minecraft.block.FluidBlock;
 import org.lwjgl.system.MemoryUtil;
 
-import java.lang.reflect.Array;
 import java.util.Arrays;
 
 
 public class RenderDataFactory {
     private final WorldEngine world;
-    private final ModelManager modelMan;
+    private final ModelFactory modelMan;
 
     private final Mesher2D negativeMesher = new Mesher2D(5, 15);
     private final Mesher2D positiveMesher = new Mesher2D(5, 15);
@@ -39,7 +38,7 @@ public class RenderDataFactory {
     private int maxX;
     private int maxY;
     private int maxZ;
-    public RenderDataFactory(WorldEngine world, ModelManager modelManager, boolean emitMeshlets) {
+    public RenderDataFactory(WorldEngine world, ModelFactory modelManager, boolean emitMeshlets) {
         this.world = world;
         this.modelMan = modelManager;
         this.generateMeshlets = emitMeshlets;
@@ -333,14 +332,13 @@ public class RenderDataFactory {
                     if (Mapper.isAir(self)) continue;
 
                     int selfBlockId = Mapper.getBlockId(self);
-                    long selfMetadata = this.modelMan.getModelMetadata(selfBlockId);
-
-
+                    int selfClientModelId = this.modelMan.getModelId(selfBlockId);
+                    long selfMetadata = this.modelMan.getModelMetadataFromClientId(selfClientModelId);
 
                     boolean putFace = false;
 
                     //Branch into 2 paths, the + direction and -direction, doing it at once makes it much faster as it halves the number of loops
-                    if (ModelManager.faceExists(selfMetadata, axisId<<1) || ModelManager.containsFluid(selfMetadata)) {//- direction
+                    if (ModelQueries.faceExists(selfMetadata, axisId<<1) || ModelQueries.containsFluid(selfMetadata)) {//- direction
                         long facingState = Mapper.AIR;
                         //Need to access the other connecting section
                         if (primary == 0) {
@@ -359,14 +357,16 @@ public class RenderDataFactory {
                             facingState = this.sectionCache[WorldSection.getIndex(x-aX, y-aY, z-aZ)];
                         }
 
-                        if (!ModelManager.isFluid(selfMetadata)) {
-                            putFace |= this.putFaceIfCan(this.negativeMesher, (axisId << 1), (axisId << 1)|1, self, selfMetadata, selfBlockId, facingState, a, b);
+                        int facingClientModelId = this.modelMan.getModelId(Mapper.getBlockId(facingState));
+                        long facingMetadata = this.modelMan.getModelMetadataFromClientId(facingClientModelId);
+                        if (!ModelQueries.isFluid(selfMetadata)) {
+                            putFace |= this.putFaceIfCan(this.negativeMesher, (axisId << 1), (axisId << 1)|1, self, selfMetadata, selfClientModelId, selfBlockId, facingState, facingMetadata, a, b);
                         }
-                        if (ModelManager.containsFluid(selfMetadata)) {
-                            putFace |= this.putFluidFaceIfCan(this.negativeFluidMesher, (axisId << 1), (axisId << 1)|1, self, selfMetadata, selfBlockId, facingState, a, b);
+                        if (ModelQueries.containsFluid(selfMetadata)) {
+                            putFace |= this.putFluidFaceIfCan(this.negativeFluidMesher, (axisId << 1), (axisId << 1)|1, self, selfMetadata, selfClientModelId, selfBlockId, facingState, facingMetadata, facingClientModelId, a, b);
                         }
                     }
-                    if (ModelManager.faceExists(selfMetadata, (axisId<<1)|1) || ModelManager.containsFluid(selfMetadata)) {//+ direction
+                    if (ModelQueries.faceExists(selfMetadata, (axisId<<1)|1) || ModelQueries.containsFluid(selfMetadata)) {//+ direction
                         long facingState = Mapper.AIR;
                         //Need to access the other connecting section
                         if (primary == 31) {
@@ -384,11 +384,14 @@ public class RenderDataFactory {
                         } else {
                             facingState = this.sectionCache[WorldSection.getIndex(x+aX, y+aY, z+aZ)];
                         }
-                        if (!ModelManager.isFluid(selfMetadata)) {
-                            putFace |= this.putFaceIfCan(this.positiveMesher, (axisId << 1) | 1, (axisId << 1), self, selfMetadata, selfBlockId, facingState, a, b);
+
+                        int facingClientModelId = this.modelMan.getModelId(Mapper.getBlockId(facingState));
+                        long facingMetadata = this.modelMan.getModelMetadataFromClientId(facingClientModelId);
+                        if (!ModelQueries.isFluid(selfMetadata)) {
+                            putFace |= this.putFaceIfCan(this.positiveMesher, (axisId << 1) | 1, (axisId << 1), self, selfMetadata, selfClientModelId, selfBlockId, facingState, facingMetadata, a, b);
                         }
-                        if (ModelManager.containsFluid(selfMetadata)) {
-                            putFace |= this.putFluidFaceIfCan(this.positiveFluidMesher, (axisId << 1) | 1, (axisId << 1), self, selfMetadata, selfBlockId, facingState, a, b);
+                        if (ModelQueries.containsFluid(selfMetadata)) {
+                            putFace |= this.putFluidFaceIfCan(this.positiveFluidMesher, (axisId << 1) | 1, (axisId << 1), self, selfMetadata, selfClientModelId, selfBlockId, facingState, facingMetadata, facingClientModelId, a, b);
                         }
                     }
 
@@ -414,15 +417,13 @@ public class RenderDataFactory {
 
 
     //Returns true if a face was placed
-    private boolean putFluidFaceIfCan(Mesher2D mesher, int face, int opposingFace, long self, long metadata, int selfBlockId, long facingState, int a, int b) {
-        long facingMetadata = this.modelMan.getModelMetadata(Mapper.getBlockId(facingState));
-
-        int selfFluidClientId = this.modelMan.getFluidClientStateId(this.modelMan.getModelId(selfBlockId));
+    private boolean putFluidFaceIfCan(Mesher2D mesher, int face, int opposingFace, long self, long metadata, int selfClientModelId, int selfBlockId, long facingState, long facingMetadata, int facingClientModelId, int a, int b) {
+        int selfFluidClientId = this.modelMan.getFluidClientStateId(selfClientModelId);
         long selfFluidMetadata = this.modelMan.getModelMetadataFromClientId(selfFluidClientId);
 
         int facingFluidClientId = -1;
-        if (ModelManager.containsFluid(facingMetadata)) {
-            facingFluidClientId = this.modelMan.getFluidClientStateId(this.modelMan.getModelId(Mapper.getBlockId(facingState)));
+        if (ModelQueries.containsFluid(facingMetadata)) {
+            facingFluidClientId = this.modelMan.getFluidClientStateId(facingClientModelId);
         }
 
         //If both of the states are the same, then dont render the fluid face
@@ -431,18 +432,19 @@ public class RenderDataFactory {
         }
 
         if (facingFluidClientId != -1) {
+            //TODO: OPTIMIZE
             if (this.world.getMapper().getBlockStateFromBlockId(selfBlockId).getBlock() == this.world.getMapper().getBlockStateFromBlockId(Mapper.getBlockId(facingState)).getBlock()) {
                return false;
             }
         }
 
 
-        if (ModelManager.faceOccludes(facingMetadata, opposingFace)) {
+        if (ModelQueries.faceOccludes(facingMetadata, opposingFace)) {
             return false;
         }
 
         //if the model has a fluid state but is not a liquid need to see if the solid state had a face rendered and that face is occluding, if so, dont render the fluid state face
-        if ((!ModelManager.isFluid(metadata)) && ModelManager.faceOccludes(metadata, face)) {
+        if ((!ModelQueries.isFluid(metadata)) && ModelQueries.faceOccludes(metadata, face)) {
             return false;
         }
 
@@ -458,32 +460,28 @@ public class RenderDataFactory {
 
 
         long otherFlags = 0;
-        otherFlags |= ModelManager.isTranslucent(selfFluidMetadata)?1L<<33:0;
-        otherFlags |= ModelManager.isDoubleSided(selfFluidMetadata)?1L<<34:0;
-        mesher.put(a, b, ((long)selfFluidClientId) | (((long) Mapper.getLightId(ModelManager.faceUsesSelfLighting(selfFluidMetadata, face)?self:facingState))<<16) | ((((long) Mapper.getBiomeId(self))<<24) * (ModelManager.isBiomeColoured(selfFluidMetadata)?1:0)) | otherFlags);
+        otherFlags |= ModelQueries.isTranslucent(selfFluidMetadata)?1L<<33:0;
+        otherFlags |= ModelQueries.isDoubleSided(selfFluidMetadata)?1L<<34:0;
+        mesher.put(a, b, ((long)selfFluidClientId) | (((long) Mapper.getLightId(ModelQueries.faceUsesSelfLighting(selfFluidMetadata, face)?self:facingState))<<16) | ((((long) Mapper.getBiomeId(self))<<24) * (ModelQueries.isBiomeColoured(selfFluidMetadata)?1:0)) | otherFlags);
         return true;
     }
 
     //Returns true if a face was placed
-    private boolean putFaceIfCan(Mesher2D mesher, int face, int opposingFace, long self, long metadata, int selfBlockId, long facingState, int a, int b) {
-        long facingMetadata = this.modelMan.getModelMetadata(Mapper.getBlockId(facingState));
-
+    private boolean putFaceIfCan(Mesher2D mesher, int face, int opposingFace, long self, long metadata, int clientModelId, int selfBlockId, long facingState, long facingMetadata, int a, int b) {
         //If face can be occluded and is occluded from the facing block, then dont render the face
-        if (ModelManager.faceCanBeOccluded(metadata, face) && ModelManager.faceOccludes(facingMetadata, opposingFace)) {
+        if (ModelQueries.faceCanBeOccluded(metadata, face) && ModelQueries.faceOccludes(facingMetadata, opposingFace)) {
             return false;
         }
 
-        if (ModelManager.cullsSame(metadata) && selfBlockId == Mapper.getBlockId(facingState)) {
+        if (ModelQueries.cullsSame(metadata) && selfBlockId == Mapper.getBlockId(facingState)) {
             //If we are facing a block, and we are both the same state, dont render that face
             return false;
         }
 
-
-        int clientModelId = this.modelMan.getModelId(selfBlockId);
         long otherFlags = 0;
-        otherFlags |= ModelManager.isTranslucent(metadata)?1L<<33:0;
-        otherFlags |= ModelManager.isDoubleSided(metadata)?1L<<34:0;
-        mesher.put(a, b, ((long)clientModelId) | (((long) Mapper.getLightId(ModelManager.faceUsesSelfLighting(metadata, face)?self:facingState))<<16) | ((((long) Mapper.getBiomeId(self))<<24) * (ModelManager.isBiomeColoured(metadata)?1:0)) | otherFlags);
+        otherFlags |= ModelQueries.isTranslucent(metadata)?1L<<33:0;
+        otherFlags |= ModelQueries.isDoubleSided(metadata)?1L<<34:0;
+        mesher.put(a, b, ((long)clientModelId) | (((long) Mapper.getLightId(ModelQueries.faceUsesSelfLighting(metadata, face)?self:facingState))<<16) | ((((long) Mapper.getBiomeId(self))<<24) * (ModelQueries.isBiomeColoured(metadata)?1:0)) | otherFlags);
         return true;
     }
 

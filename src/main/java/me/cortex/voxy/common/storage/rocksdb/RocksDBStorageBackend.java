@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.LongConsumer;
 
 public class RocksDBStorageBackend extends StorageBackend {
     private final RocksDB db;
@@ -78,6 +79,11 @@ public class RocksDBStorageBackend extends StorageBackend {
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public void iterateStoredSectionPositions(LongConsumer consumer) {
+        throw new IllegalStateException("Not yet implemented");
     }
 
     @Override

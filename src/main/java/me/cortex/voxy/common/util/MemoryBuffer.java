@@ -13,7 +13,7 @@ public class MemoryBuffer extends TrackedObject {
 
     public void cpyTo(long dst) {
         super.assertNotFreed();
-        MemoryUtil.memCopy(this.address, dst, this.size);
+        UnsafeUtil.memcpy(this.address, dst, this.size);
     }
 
     @Override

@@ -12,6 +12,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.LongConsumer;
 
 //Segments the section data into multiple dbs
 public class FragmentedStorageBackendAdaptor extends StorageBackend {
@@ -27,6 +28,11 @@ public class FragmentedStorageBackendAdaptor extends StorageBackend {
 
     private int getSegmentId(long key) {
         return (int) (RandomSeed.mixStafford13(RandomSeed.mixStafford13(key)^key)&(this.backends.length-1));
+    }
+
+    @Override
+    public void iterateStoredSectionPositions(LongConsumer consumer) {
+        throw new IllegalStateException("Not yet implemented");
     }
 
     //TODO: reencode the key to be shifted one less OR

@@ -1,6 +1,5 @@
 package me.cortex.voxy.client.core;
 
-import me.cortex.voxy.client.core.rendering.AbstractFarWorldRenderer;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import net.fabricmc.loader.api.FabricLoader;
 import org.vivecraft.client_vr.ClientDataHolderVR;
@@ -9,7 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
-public class ViewportSelector <T extends Viewport> {
+public class ViewportSelector <T extends Viewport<?>> {
     public static final boolean VIVECRAFT_INSTALLED = FabricLoader.getInstance().isModLoaded("vivecraft");
 
     private final Supplier<T> creator;

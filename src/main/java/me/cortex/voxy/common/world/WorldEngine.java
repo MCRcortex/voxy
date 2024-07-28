@@ -95,6 +95,10 @@ public class WorldEngine {
         return (int) ((id<<12)>>40);
     }
 
+    public static String pprintPos(long pos) {
+        return getLevel(pos)+"@["+getX(pos)+", "+getY(pos)+", " + getZ(pos)+"]";
+    }
+
     //Marks a section as dirty, enqueuing it for saving and or render data rebuilding
     public void markDirty(WorldSection section) {
         if (this.dirtyCallback != null) {

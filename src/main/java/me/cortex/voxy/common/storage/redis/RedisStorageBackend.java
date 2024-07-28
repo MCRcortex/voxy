@@ -9,6 +9,7 @@ import redis.clients.jedis.JedisPool;
 
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.function.LongConsumer;
 
 public class RedisStorageBackend extends StorageBackend {
     private final JedisPool pool;
@@ -27,6 +28,11 @@ public class RedisStorageBackend extends StorageBackend {
         this.password = password;
         this.WORLD = (prefix+"world_sections").getBytes(StandardCharsets.UTF_8);
         this.MAPPINGS = (prefix+"id_mappings").getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public void iterateStoredSectionPositions(LongConsumer consumer) {
+        throw new IllegalStateException("Not yet implemented");
     }
 
     @Override

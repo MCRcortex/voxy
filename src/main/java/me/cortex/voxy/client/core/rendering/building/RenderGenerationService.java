@@ -1,23 +1,26 @@
 package me.cortex.voxy.client.core.rendering.building;
 
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import me.cortex.voxy.client.core.model.IdNotYetComputedException;
-import me.cortex.voxy.client.core.model.ModelManager;
+import me.cortex.voxy.client.core.model.ModelFactory;
+import me.cortex.voxy.client.core.model.OffThreadModelBakerySystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
+import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 
-import java.util.concurrent.ConcurrentHashMap;
+import java.lang.ref.WeakReference;
+import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.function.ToIntFunction;
 
 //TODO: Add a render cache
 public class RenderGenerationService {
     public interface TaskChecker {boolean check(int lvl, int x, int y, int z);}
-    private record BuildTask(long position, Supplier<WorldSection> sectionSupplier) {}
+    private record BuildTask(long position, Supplier<WorldSection> sectionSupplier, boolean[] hasDoneModelRequest) {}
 
     private volatile boolean running = true;
     private final Thread[] workers;
@@ -26,15 +29,15 @@ public class RenderGenerationService {
 
     private final Semaphore taskCounter = new Semaphore(0);
     private final WorldEngine world;
-    private final ModelManager modelManager;
+    private final OffThreadModelBakerySystem modelBakery;
     private final Consumer<BuiltSection> resultConsumer;
     private final BuiltSectionMeshCache meshCache = new BuiltSectionMeshCache();
     private final boolean emitMeshlets;
 
-    public RenderGenerationService(WorldEngine world, ModelManager modelManager, int workers, Consumer<BuiltSection> consumer, boolean emitMeshlets) {
+    public RenderGenerationService(WorldEngine world, OffThreadModelBakerySystem modelBakery, int workers, Consumer<BuiltSection> consumer, boolean emitMeshlets) {
         this.emitMeshlets = emitMeshlets;
         this.world = world;
-        this.modelManager = modelManager;
+        this.modelBakery = modelBakery;
         this.resultConsumer = consumer;
         this.workers =  new Thread[workers];
         for (int i = 0; i < workers; i++) {
@@ -45,10 +48,26 @@ public class RenderGenerationService {
         }
     }
 
+    //NOTE: the biomes are always fully populated/kept up to date
+
+    //Asks the Model system to bake all blocks that currently dont have a model
+    private void computeAndRequestRequiredModels(WorldSection section) {
+        var raw = section.copyData();//TODO: replace with copyDataTo and use a "thread local"/context array to reduce allocation rates
+        IntOpenHashSet seen = new IntOpenHashSet(128);
+        for (long state : raw) {
+            int block = Mapper.getBlockId(state);
+            if (!this.modelBakery.factory.hasModelForBlockId(block)) {
+                if (seen.add(block)) {
+                    this.modelBakery.requestBlockBake(block);
+                }
+            }
+        }
+    }
+
     //TODO: add a generated render data cache
     private void renderWorker() {
         //Thread local instance of the factory
-        var factory = new RenderDataFactory(this.world, this.modelManager, this.emitMeshlets);
+        var factory = new RenderDataFactory(this.world, this.modelBakery.factory, this.emitMeshlets);
         while (this.running) {
             this.taskCounter.acquireUninterruptibly();
             if (!this.running) break;
@@ -67,17 +86,28 @@ public class RenderGenerationService {
                 try {
                     mesh = factory.generateMesh(section);
                 } catch (IdNotYetComputedException e) {
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException ex) {
-                        throw new RuntimeException(ex);
+                    if (task.hasDoneModelRequest[0]) {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException ex) {
+                            throw new RuntimeException(ex);
+                        }
+                    } else {
+                        this.computeAndRequestRequiredModels(section);
                     }
                     //We need to reinsert the build task into the queue
                     //System.err.println("Render task failed to complete due to un-computed client id");
                     synchronized (this.taskQueue) {
-                        this.taskQueue.computeIfAbsent(section.key, key->{this.taskCounter.release(); return task;});
+                        var queuedTask = this.taskQueue.computeIfAbsent(section.key, (a)->task);
+                        queuedTask.hasDoneModelRequest[0] = true;//Mark (or remark) the section as having chunks requested
+
+                        if (queuedTask == task) {//use the == not .equal to see if we need to release a permit
+                            this.taskCounter.release();//Since we put in queue, release permit
+                        }
                     }
                 }
+
+                //TODO: if the section was _not_ built, maybe dont release it, or release it with the hint
                 section.release();
                 if (mesh != null) {
                     //TODO: if the mesh is null, need to clear the cache at that point
@@ -136,7 +166,7 @@ public class RenderGenerationService {
                     } else {
                         return null;
                     }
-                });
+                }, new boolean[1]);
             });
         }
     }
@@ -195,5 +225,9 @@ public class RenderGenerationService {
             this.taskQueue.removeFirst();
         }
         this.meshCache.free();
+    }
+
+    public void addDebugData(List<String> debug) {
+
     }
 }

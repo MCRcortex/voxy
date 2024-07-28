@@ -64,6 +64,7 @@ public final class WorldSection {
         return this.atomicState.get()>>1;
     }
 
+    //TODO: add the ability to hint to the tracker that yes the section is unloaded, try to cache it in a secondary cache since it will be reused/needed later
     public int release() {
         int state = this.atomicState.addAndGet(-2);
         if (state < 1) {

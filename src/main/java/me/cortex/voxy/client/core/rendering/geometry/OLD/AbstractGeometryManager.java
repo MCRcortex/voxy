@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering;
+package me.cortex.voxy.client.core.rendering.geometry.OLD;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;

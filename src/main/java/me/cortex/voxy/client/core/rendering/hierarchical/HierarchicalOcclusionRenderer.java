@@ -4,10 +4,9 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
-import me.cortex.voxy.client.core.rendering.Gl46HierarchicalViewport;
+import me.cortex.voxy.client.core.rendering.geometry.OLD.Gl46HierarchicalViewport;
 import me.cortex.voxy.client.core.rendering.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
-import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -87,6 +86,8 @@ public class HierarchicalOcclusionRenderer {
 
 
         UploadStream.INSTANCE.commit();
+
+        //FIXME: need to have the hiz respect the stencil mask aswell to mask away normal terrain, (much increase perf)
 
         //Make hiz
         this.hiz.buildMipChain(depthBuffer, viewport.width, viewport.height);

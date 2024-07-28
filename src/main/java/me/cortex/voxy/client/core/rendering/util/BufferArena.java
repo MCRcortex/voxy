@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering.util;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.util.AllocationArena;
 import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.util.UnsafeUtil;
 import org.lwjgl.system.MemoryUtil;
 
 public class BufferArena {
@@ -32,7 +33,7 @@ public class BufferArena {
             return -1;
         }
         long uploadPtr = UploadStream.INSTANCE.upload(this.buffer, addr * this.elementSize, buffer.size);
-        MemoryUtil.memCopy(buffer.address, uploadPtr, buffer.size);
+        UnsafeUtil.memcpy(buffer.address, uploadPtr, buffer.size);
         this.used += size;
         return addr;
     }

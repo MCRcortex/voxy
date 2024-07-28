@@ -3,7 +3,6 @@ package me.cortex.voxy.client.core.model;
 import com.mojang.blaze3d.platform.GlConst;
 import com.mojang.blaze3d.platform.GlStateManager;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import it.unimi.dsi.fastutil.objects.ObjectOpenCustomHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import me.cortex.voxy.client.core.IGetVoxelCore;
@@ -11,9 +10,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.world.other.Mapper;
-import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
-import net.minecraft.block.Blocks;
 import net.minecraft.block.FluidBlock;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.client.MinecraftClient;
@@ -38,6 +35,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.util.*;
 import java.util.stream.Stream;
 
+import static me.cortex.voxy.client.core.model.ModelStore.MODEL_SIZE;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL11C.GL_NEAREST;
 import static org.lwjgl.opengl.GL11C.GL_NEAREST_MIPMAP_LINEAR;
@@ -55,7 +53,13 @@ import static org.lwjgl.opengl.GL45C.glTextureSubImage2D;
 //TODO: support more than 65535 states, what should actually happen is a blockstate is registered, the model data is generated, then compared
 // to all other models already loaded, if it is a duplicate, create a mapping from the id to the already loaded id, this will help with meshing aswell
 // as leaves and such will be able to be merged
-public class ModelManager {
+
+
+
+//TODO: NOTE!!! is it worth even uploading as a 16x16 texture, since automatic lod selection... doing 8x8 textures might be perfectly ok!!!
+// this _quarters_ the memory requirements for the texture atlas!!! WHICH IS HUGE saving
+public class ModelFactory {
+    public static final int MODEL_TEXTURE_SIZE = 16;
 
     //TODO: replace the fluid BlockState with a client model id integer of the fluidState, requires looking up
     // the fluid state in the mipper
@@ -65,14 +69,11 @@ public class ModelManager {
         }
     }
 
-    public static final int MODEL_SIZE = 64;
+    private final Biome DEFAULT_BIOME = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME).get(BiomeKeys.PLAINS);
+
     public final ModelTextureBakery bakery;
-    private final GlBuffer modelBuffer;
-    private final GlBuffer modelColourBuffer;
-    private final GlTexture textures;
     private final int blockSampler = glGenSamplers();
 
-    private final int modelTextureSize;
 
     //Model data might also contain a constant colour if the colour resolver produces a constant colour, this saves space in the
     // section buffer reverse indexing
@@ -108,21 +109,20 @@ public class ModelManager {
     private final int[] idMappings;
     private final Object2IntOpenHashMap<ModelEntry> modelTexture2id = new Object2IntOpenHashMap<>();
 
+    private final Mapper mapper;
 
     private final List<Biome> biomes = new ArrayList<>();
     private final List<Pair<Integer, BlockState>> modelsRequiringBiomeColours = new ArrayList<>();
 
     private static final ObjectSet<BlockState> LOGGED_SELF_CULLING_WARNING = new ObjectOpenHashSet<>();
 
-    public ModelManager(int modelTextureSize) {
-        this.modelTextureSize = modelTextureSize;
-        this.bakery = new ModelTextureBakery(modelTextureSize, modelTextureSize);
-        this.modelBuffer = new GlBuffer(MODEL_SIZE * (1<<16));
 
-        this.modelColourBuffer = new GlBuffer(4 * (1<<16));
+    //TODO: NOTE!!! is it worth even uploading as a 16x16 texture, since automatic lod selection... doing 8x8 textures might be perfectly ok!!!
+    // this _quarters_ the memory requirements for the texture atlas!!! WHICH IS HUGE saving
+    public ModelFactory(Mapper mapper) {
+        this.mapper = mapper;
+        this.bakery = new ModelTextureBakery(MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
 
-        //TODO: figure out how to do mipping :blobfox_pineapple:
-        this.textures = new GlTexture().store(GL_RGBA8, 4, modelTextureSize*3*256,modelTextureSize*2*256);
         this.metadataCache = new long[1<<16];
         this.fluidStateLUT = new int[1<<16];
         this.idMappings = new int[1<<20];//Max of 1 million blockstates mapping to 65k model states
@@ -141,15 +141,23 @@ public class ModelManager {
 
 
 
+    public void addEntry(int blockId) {
+        if (this.idMappings[blockId] != -1) {
+            System.err.println("Block id already added: " + blockId);
+            return;
+        }
+        this.addEntry(blockId, this.mapper.getBlockStateFromBlockId(blockId));
+    }
+
     //TODO: what i need to do is seperate out fluid states from blockStates
 
 
     //TODO: so need a few things, per face sizes and offsets, the sizes should be computed from the pixels and find the minimum bounding pixel
     // while the depth is computed from the depth buffer data
-    public int addEntry(int blockId, BlockState blockState) {
+    public void addEntry(int blockId, BlockState blockState) {
         if (this.idMappings[blockId] != -1) {
             System.err.println("Block id already added: " + blockId + " for state: " + blockState);
-            return this.idMappings[blockId];
+            return;
         }
 
         boolean isFluid = blockState.getBlock() instanceof FluidBlock;
@@ -162,13 +170,13 @@ public class ModelManager {
             //Insert into the fluid LUT
             var fluidState = blockState.getFluidState().getBlockState();
 
-            //TODO:FIXME: PASS IN THE Mapper instead of grabbing it!!! THIS IS CRTICIAL TO FIX
-            int fluidStateId = ((IGetVoxelCore)MinecraftClient.getInstance().worldRenderer).getVoxelCore().getWorldEngine().getMapper().getIdForBlockState(fluidState);
+            int fluidStateId = this.mapper.getIdForBlockState(fluidState);
 
 
             clientFluidStateId = this.idMappings[fluidStateId];
             if (clientFluidStateId == -1) {
-                clientFluidStateId = this.addEntry(fluidStateId, fluidState);
+                this.addEntry(fluidStateId, fluidState);
+                clientFluidStateId = this.idMappings[fluidStateId];
             }
         }
 
@@ -178,10 +186,11 @@ public class ModelManager {
             if (possibleDuplicate != -1) {//Duplicate found
                 this.idMappings[blockId] = possibleDuplicate;
                 modelId = possibleDuplicate;
-                return possibleDuplicate;
+                return;
             } else {//Not a duplicate so create a new entry
                 modelId = this.modelTexture2id.size();
-                this.idMappings[blockId] = modelId;
+                //NOTE: we set the mapping at the very end so that race conditions with this and getMetadata dont occur
+                //this.idMappings[blockId] = modelId;
                 this.modelTexture2id.put(entry, modelId);
             }
         }
@@ -208,7 +217,8 @@ public class ModelManager {
 
 
 
-        long uploadPtr = UploadStream.INSTANCE.upload(this.modelBuffer, (long) modelId * MODEL_SIZE, MODEL_SIZE);
+        final long uploadPtrConst = MemoryUtil.nmemAlloc(MODEL_SIZE);
+        long uploadPtr = uploadPtrConst;
 
 
         //TODO: implement;
@@ -282,7 +292,7 @@ public class ModelManager {
             int writeCount = TextureUtils.getWrittenPixelCount(textureData[face], checkMode);
 
             boolean faceCoversFullBlock = faceSize[0] == 0 && faceSize[2] == 0 &&
-                    faceSize[1] == (this.modelTextureSize-1) && faceSize[3] == (this.modelTextureSize-1);
+                    faceSize[1] == (MODEL_TEXTURE_SIZE-1) && faceSize[3] == (MODEL_TEXTURE_SIZE-1);
 
             metadata |= faceCoversFullBlock?2:0;
 
@@ -294,7 +304,7 @@ public class ModelManager {
             occludesFace &= offset < 0.1;//If the face is rendered far away from the other face, then it doesnt occlude
 
             if (occludesFace) {
-                occludesFace &= ((float)writeCount)/(this.modelTextureSize * this.modelTextureSize) > 0.9;// only occlude if the face covers more than 90% of the face
+                occludesFace &= ((float)writeCount)/(MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE) > 0.9;// only occlude if the face covers more than 90% of the face
             }
             metadata |= occludesFace?1:0;
 
@@ -313,7 +323,7 @@ public class ModelManager {
 
             //Scale face size from 0->this.modelTextureSize-1 to 0->15
             for (int i = 0; i < 4; i++) {
-                faceSize[i] = Math.round((((float)faceSize[i])/(this.modelTextureSize-1))*15);
+                faceSize[i] = Math.round((((float)faceSize[i])/(MODEL_TEXTURE_SIZE-1))*15);
             }
 
             int faceModelData = 0;
@@ -348,20 +358,23 @@ public class ModelManager {
 
         //modelFlags |= blockRenderLayer == RenderLayer.getSolid()?0:1;// should discard alpha
         MemoryUtil.memPutInt(uploadPtr, modelFlags);
+
+        int[] biomeData = null;
+        int biomeIndex = -1;
         //Temporary override to always be non biome specific
         if (colourProvider == null) {
             MemoryUtil.memPutInt(uploadPtr + 4, -1);//Set the default to nothing so that its faster on the gpu
         } else if (!hasBiomeColourResolver) {
-            Biome defaultBiome = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME).get(BiomeKeys.PLAINS);
-            MemoryUtil.memPutInt(uploadPtr + 4, captureColourConstant(colourProvider, blockState, defaultBiome)|0xFF000000);
+            MemoryUtil.memPutInt(uploadPtr + 4, captureColourConstant(colourProvider, blockState, DEFAULT_BIOME)|0xFF000000);
         } else if (!this.biomes.isEmpty()) {
             //Populate the list of biomes for the model state
-            int biomeIndex = this.modelsRequiringBiomeColours.size() * this.biomes.size();
+            biomeIndex = this.modelsRequiringBiomeColours.size() * this.biomes.size();
             MemoryUtil.memPutInt(uploadPtr + 4, biomeIndex);
             this.modelsRequiringBiomeColours.add(new Pair<>(modelId, blockState));
-            long clrUploadPtr = UploadStream.INSTANCE.upload(this.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
-            for (var biome : this.biomes) {
-                MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(colourProvider, blockState, biome)|0xFF000000); clrUploadPtr += 4;
+            //long clrUploadPtr = UploadStream.INSTANCE.upload(this.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
+            biomeData = new int[this.biomes.size()];
+            for (int biomeId = 0; biomeId < this.biomes.size(); biomeId++) {
+                biomeData[biomeId] = captureColourConstant(colourProvider, blockState, this.biomes.get(biomeId))|0xFF000000;
             }
         }
 
@@ -371,13 +384,21 @@ public class ModelManager {
         //TODO
 
 
-        this.putTextures(modelId, textureData);
+        var textureUpload = this.putTextures(modelId, textureData);
 
         //glGenerateTextureMipmap(this.textures.id);
-        return modelId;
+
+        //Set the mapping at the very end
+        this.idMappings[blockId] = modelId;
+
+
+        new NewModelBufferDelta(modelId, uploadPtrConst, biomeIndex, biomeData, textureUpload);
     }
 
     public void addBiome(int id, Biome biome) {
+        throw new IllegalStateException("IMPLEMENT");
+
+        /*
         this.biomes.add(biome);
         if (this.biomes.size()-1 != id) {
             throw new IllegalStateException("Biome ordering not consistent with biome id for biome " + biome + " expected id: " + (this.biomes.size()-1) + " got id: " + id);
@@ -391,12 +412,13 @@ public class ModelManager {
             }
             //Populate the list of biomes for the model state
             int biomeIndex = (i++) * this.biomes.size();
-            MemoryUtil.memPutInt( UploadStream.INSTANCE.upload(this.modelBuffer, (entry.getLeft()*MODEL_SIZE)+ 4*6 + 4, 4), biomeIndex);
+            MemoryUtil.memPutInt(UploadStream.INSTANCE.upload(this.modelBuffer, (entry.getLeft()* MODEL_SIZE)+ 4*6 + 4, 4), biomeIndex);
             long clrUploadPtr = UploadStream.INSTANCE.upload(this.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
             for (var biomeE : this.biomes) {
                 MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(colourProvider, entry.getRight(), biomeE)|0xFF000000); clrUploadPtr += 4;
             }
         }
+         */
     }
 
 
@@ -506,93 +528,20 @@ public class ModelManager {
         return biomeDependent[0];
     }
 
-
-
-
-    public static boolean faceExists(long metadata, int face) {
-        return ((metadata>>(8*face))&0xFF)!=0xFF;
-    }
-
-    public static boolean faceCanBeOccluded(long metadata, int face) {
-        return ((metadata>>(8*face))&0b100)==0b100;
-    }
-
-    public static boolean faceOccludes(long metadata, int face) {
-        return faceExists(metadata, face) && ((metadata>>(8*face))&0b1)==0b1;
-    }
-
-    public static boolean faceUsesSelfLighting(long metadata, int face) {
-        return ((metadata>>(8*face))&0b1000) != 0;
-    }
-
-    public static boolean isDoubleSided(long metadata) {
-        return ((metadata>>(8*6))&4) != 0;
-    }
-
-    public static boolean isTranslucent(long metadata) {
-        return ((metadata>>(8*6))&2) != 0;
-    }
-
-    public static boolean containsFluid(long metadata) {
-        return ((metadata>>(8*6))&8) != 0;
-    }
-
-    public static boolean isFluid(long metadata) {
-        return ((metadata>>(8*6))&16) != 0;
-    }
-
-    public static boolean isBiomeColoured(long metadata) {
-        return ((metadata>>(8*6))&1) != 0;
-    }
-
-    //NOTE: this might need to be moved to per face
-    public static boolean cullsSame(long metadata) {
-        return ((metadata>>(8*6))&32) != 0;
-    }
-
-
-
-
-
-
-
-
-
-
     private float[] computeModelDepth(ColourDepthTextureData[] textures, int checkMode) {
         float[] res = new float[6];
         for (var dir : Direction.values()) {
             var data = textures[dir.getId()];
             float fd = TextureUtils.computeDepth(data, TextureUtils.DEPTH_MODE_AVG, checkMode);//Compute the min float depth, smaller means closer to the camera, range 0-1
-            int depth = Math.round(fd * this.modelTextureSize);
+            int depth = Math.round(fd * MODEL_TEXTURE_SIZE);
             //If fd is -1, it means that there was nothing rendered on that face and it should be discarded
             if (fd < -0.1) {
                 res[dir.ordinal()] = -1;
             } else {
-                res[dir.ordinal()] = ((float) depth)/this.modelTextureSize;
+                res[dir.ordinal()] = ((float) depth)/MODEL_TEXTURE_SIZE;
             }
         }
         return res;
-    }
-
-    public long getModelMetadata(int blockId) {
-        int map = this.idMappings[blockId];
-        if (map == -1) {
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            map = this.idMappings[blockId];
-        }
-        if (map == -1) {
-            throw new IdNotYetComputedException(blockId);
-        }
-        return this.metadataCache[map];
-    }
-
-    public long getModelMetadataFromClientId(int clientId) {
-        return this.metadataCache[clientId];
     }
 
     public int getModelId(int blockId) {
@@ -603,6 +552,10 @@ public class ModelManager {
         return map;
     }
 
+    public boolean hasModelForBlockId(int blockId) {
+        return this.idMappings[blockId] != -1;
+    }
+
     public int getFluidClientStateId(int clientBlockStateId) {
         int map = this.fluidStateLUT[clientBlockStateId];
         if (map == -1) {
@@ -611,24 +564,24 @@ public class ModelManager {
         return map;
     }
 
-    private void putTextures(int id, ColourDepthTextureData[] textures) {
-        int X = (id&0xFF) * this.modelTextureSize*3;
-        int Y = ((id>>8)&0xFF) * this.modelTextureSize*2;
+    public long getModelMetadataFromClientId(int clientId) {
+        return this.metadataCache[clientId];
+    }
 
+    private ModelTextureUpload putTextures(int id, ColourDepthTextureData[] textures) {
+        int X = (id&0xFF) * MODEL_TEXTURE_SIZE*3;
+        int Y = ((id>>8)&0xFF) * MODEL_TEXTURE_SIZE*2;
+
+        int texIndex = 0;
+        int[][] texData = new int[6*4][];
         for (int subTex = 0; subTex < 6; subTex++) {
-            int x = X + (subTex>>1)*this.modelTextureSize;
-            int y = Y + (subTex&1)*this.modelTextureSize;
 
-            GlStateManager._pixelStore(GlConst.GL_UNPACK_ROW_LENGTH, 0);
-            GlStateManager._pixelStore(GlConst.GL_UNPACK_SKIP_PIXELS, 0);
-            GlStateManager._pixelStore(GlConst.GL_UNPACK_SKIP_ROWS, 0);
-            GlStateManager._pixelStore(GlConst.GL_UNPACK_ALIGNMENT, 4);
             var current = textures[subTex].colour();
             var next = new int[current.length>>1];
             for (int i = 0; i < 4; i++) {
-                glTextureSubImage2D(this.textures.id, i, x>>i, y>>i, this.modelTextureSize>>i, this.modelTextureSize>>i, GL_RGBA, GL_UNSIGNED_BYTE, current);
+                texData[texIndex++] = Arrays.copyOf(current, current.length);
 
-                int size = this.modelTextureSize>>(i+1);
+                int size = MODEL_TEXTURE_SIZE>>(i+1);
                 for (int pX = 0; pX < size; pX++) {
                     for (int pY = 0; pY < size; pY++) {
                         int C00 = current[(pY*2)*size+pX*2];
@@ -643,29 +596,15 @@ public class ModelManager {
                 next = new int[current.length>>1];
             }
         }
-    }
-
-    public int getBufferId() {
-        return this.modelBuffer.id;
-    }
-
-    public int getTextureId() {
-        return this.textures.id;
+        return new ModelTextureUpload(id, texData);
     }
 
     public int getSamplerId() {
         return this.blockSampler;
     }
 
-    public int getColourBufferId() {
-        return this.modelColourBuffer.id;
-    }
-
     public void free() {
         this.bakery.free();
-        this.modelBuffer.free();
-        this.modelColourBuffer.free();
-        this.textures.free();
         glDeleteSamplers(this.blockSampler);
     }
 

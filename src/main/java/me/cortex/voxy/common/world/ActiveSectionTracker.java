@@ -1,5 +1,6 @@
 package me.cortex.voxy.common.world;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import me.cortex.voxy.common.util.VolatileHolder;
 import me.cortex.voxy.common.world.other.Mapper;
@@ -14,7 +15,10 @@ public class ActiveSectionTracker {
 
     private final Long2ObjectOpenHashMap<VolatileHolder<WorldSection>>[] loadedSectionCache;
     private final SectionLoader loader;
-    //private final SectionDataCache dataCache;
+
+    //private static final int SECONDARY_CACHE_CAPACITY = 256;
+    //private final Long2ObjectLinkedOpenHashMap<long[]> secondaryDataCache = new Long2ObjectLinkedOpenHashMap<>(SECONDARY_CACHE_CAPACITY*2);//Its x2 due to race conditions
+
 
     @SuppressWarnings("unchecked")
     public ActiveSectionTracker(int numSlicesBits, SectionLoader loader) {
@@ -43,6 +47,7 @@ public class ActiveSectionTracker {
                 return section;
             }
         }
+
         //If this thread was the one to create the reference then its the thread to load the section
         if (isLoader) {
             var section = new WorldSection(lvl, x, y, z, this);
@@ -84,11 +89,13 @@ public class ActiveSectionTracker {
 
     void tryUnload(WorldSection section) {
         var cache = this.loadedSectionCache[this.getCacheArrayIndex(section.key)];
+        boolean removed = false;
         synchronized (cache) {
             if (section.trySetFreed()) {
                 if (cache.remove(section.key).obj != section) {
                     throw new IllegalStateException("Removed section not the same as the referenced section in the cache");
                 }
+                removed = true;
             }
         }
     }

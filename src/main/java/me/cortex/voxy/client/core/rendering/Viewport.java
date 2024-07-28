@@ -5,7 +5,7 @@ import org.joml.Matrix4f;
 public abstract class Viewport <A extends Viewport<A>> {
     public int width;
     public int height;
-    int frameId;
+    public int frameId;
     public Matrix4f projection;
     public Matrix4f modelView;
     public double cameraX;
