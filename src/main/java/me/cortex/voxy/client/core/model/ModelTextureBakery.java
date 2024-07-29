@@ -15,6 +15,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.GlUniform;
 import net.minecraft.client.render.*;
 import net.minecraft.client.render.model.BakedModel;
+import net.minecraft.client.util.BufferAllocator;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.fluid.FluidState;
 import net.minecraft.util.Identifier;
@@ -118,15 +119,14 @@ public class ModelTextureBakery {
         var entityModel = state.hasBlockEntity()?BakedBlockEntityModel.bake(state):null;
 
         int oldFB = GlStateManager.getBoundFramebuffer();
-        var oldProjection = new Matrix4f(RenderSystem.getProjectionMatrix());
         GL11C.glViewport(0, 0, this.width, this.height);
 
-        RenderSystem.setProjectionMatrix(new Matrix4f().identity().set(new float[]{
+        var projection = new Matrix4f().identity().set(new float[]{
                 2,0,0,0,
                 0, 2,0,0,
                 0,0, -1f,0,
                 -1,-1,0,1,
-        }), VertexSorter.BY_Z);
+        });
 
 
 
@@ -176,7 +176,7 @@ public class ModelTextureBakery {
 
         var faces = new ColourDepthTextureData[FACE_VIEWS.size()];
         for (int i = 0; i < faces.length; i++) {
-            faces[i] = captureView(state, model, entityModel, FACE_VIEWS.get(i), randomValue, i, renderFluid, texId);
+            faces[i] = captureView(state, model, entityModel, FACE_VIEWS.get(i), randomValue, i, renderFluid, texId, projection);
             //glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,300*(i>>1),300*(i&1),300*(i>>1)+256,300*(i&1)+256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         }
 
@@ -184,7 +184,6 @@ public class ModelTextureBakery {
         glDisable(GL_STENCIL_TEST);
         glDisable(GL_BLEND);
 
-        RenderSystem.setProjectionMatrix(oldProjection, VertexSorter.BY_DISTANCE);
         glBindFramebuffer(GL_FRAMEBUFFER, oldFB);
         GL11C.glViewport(GlStateManager.Viewport.getX(), GlStateManager.Viewport.getY(), GlStateManager.Viewport.getWidth(), GlStateManager.Viewport.getHeight());
 
@@ -194,13 +193,11 @@ public class ModelTextureBakery {
         return faces;
     }
 
-
-    private ColourDepthTextureData captureView(BlockState state, BakedModel model, BakedBlockEntityModel blockEntityModel, MatrixStack stack, long randomValue, int face, boolean renderFluid, int textureId) {
-        var vc = Tessellator.getInstance();
+    private final BufferAllocator allocator = new BufferAllocator(786432);
+    private ColourDepthTextureData captureView(BlockState state, BakedModel model, BakedBlockEntityModel blockEntityModel, MatrixStack stack, long randomValue, int face, boolean renderFluid, int textureId, Matrix4f projection) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
         float[] mat = new float[4*4];
-        new Matrix4f(RenderSystem.getProjectionMatrix()).mul(stack.peek().getPositionMatrix()).get(mat);
+        new Matrix4f(projection).mul(stack.peek().getPositionMatrix()).get(mat);
         glUniformMatrix4fv(1, false, mat);
 
 
@@ -208,7 +205,7 @@ public class ModelTextureBakery {
             blockEntityModel.renderOut();
         }
 
-        var bb = vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
+        var bb = new BufferBuilder(this.allocator, VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
         if (!renderFluid) {
             renderQuads(bb, state, model, new MatrixStack(), randomValue);
         } else {
@@ -282,6 +279,7 @@ public class ModelTextureBakery {
 
         glBindTexture(GL_TEXTURE_2D, textureId);
         try {
+            //System.err.println("REPLACE THE UPLOADING WITH THREAD SAFE VARIENT");
             BufferRenderer.draw(bb.end());
         } catch (IllegalStateException e) {
             System.err.println("Got empty buffer builder! for block " + state);
@@ -311,5 +309,6 @@ public class ModelTextureBakery {
         this.colourTex.free();
         this.depthTex.free();
         this.rasterShader.free();
+        this.allocator.close();
     }
 }

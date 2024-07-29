@@ -143,7 +143,6 @@ public class ModelFactory {
 
     public void addEntry(int blockId) {
         if (this.idMappings[blockId] != -1) {
-            System.err.println("Block id already added: " + blockId);
             return;
         }
         this.addEntry(blockId, this.mapper.getBlockStateFromBlockId(blockId));
@@ -156,7 +155,7 @@ public class ModelFactory {
     // while the depth is computed from the depth buffer data
     public void addEntry(int blockId, BlockState blockState) {
         if (this.idMappings[blockId] != -1) {
-            System.err.println("Block id already added: " + blockId + " for state: " + blockState);
+            //System.err.println("Block id already added: " + blockId + " for state: " + blockState);
             return;
         }
 

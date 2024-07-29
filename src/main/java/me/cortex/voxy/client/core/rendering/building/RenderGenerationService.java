@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import me.cortex.voxy.client.core.model.IdNotYetComputedException;
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.client.core.model.OffThreadModelBakerySystem;
+import me.cortex.voxy.client.core.model.OnThreadModelBakerySystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
@@ -29,12 +30,12 @@ public class RenderGenerationService {
 
     private final Semaphore taskCounter = new Semaphore(0);
     private final WorldEngine world;
-    private final OffThreadModelBakerySystem modelBakery;
+    private final OnThreadModelBakerySystem modelBakery;
     private final Consumer<BuiltSection> resultConsumer;
     private final BuiltSectionMeshCache meshCache = new BuiltSectionMeshCache();
     private final boolean emitMeshlets;
 
-    public RenderGenerationService(WorldEngine world, OffThreadModelBakerySystem modelBakery, int workers, Consumer<BuiltSection> consumer, boolean emitMeshlets) {
+    public RenderGenerationService(WorldEngine world, OnThreadModelBakerySystem modelBakery, int workers, Consumer<BuiltSection> consumer, boolean emitMeshlets) {
         this.emitMeshlets = emitMeshlets;
         this.world = world;
         this.modelBakery = modelBakery;

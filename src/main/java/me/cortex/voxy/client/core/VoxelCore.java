@@ -2,10 +2,7 @@ package me.cortex.voxy.client.core;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.Voxy;
-import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.model.OffThreadModelBakerySystem;
 import me.cortex.voxy.client.core.rendering.*;
-import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.util.IrisUtil;

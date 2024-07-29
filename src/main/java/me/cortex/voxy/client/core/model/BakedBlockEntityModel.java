@@ -101,21 +101,26 @@ public class BakedBlockEntityModel {
     }
 
     public void renderOut() {
-        var vc = Tessellator.getInstance();
-        for (var layer : this.layers) {
-            if (layer.isEmpty()) continue;
-            var bb = vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
-            if (layer.layer instanceof RenderLayer.MultiPhase mp) {
-                Identifier textureId = mp.phases.texture.getId().orElse(null);
-                if (textureId == null) {
-                    System.err.println("ERROR: Empty texture id for layer: " + layer);
-                } else {
-                    var texture = MinecraftClient.getInstance().getTextureManager().getTexture(textureId);
-                    glBindTexture(GL_TEXTURE_2D, texture.getGlId());
+        //TODO:FIXME: CANT RUN ON RENDER THREAD
+        if (false) {
+            System.err.println("Model entity baking not yet supported offthread baking");
+        } else {
+            var vc = Tessellator.getInstance();
+            for (var layer : this.layers) {
+                if (layer.isEmpty()) continue;
+                var bb = vc.begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE_COLOR);
+                if (layer.layer instanceof RenderLayer.MultiPhase mp) {
+                    Identifier textureId = mp.phases.texture.getId().orElse(null);
+                    if (textureId == null) {
+                        System.err.println("ERROR: Empty texture id for layer: " + layer);
+                    } else {
+                        var texture = MinecraftClient.getInstance().getTextureManager().getTexture(textureId);
+                        glBindTexture(GL_TEXTURE_2D, texture.getGlId());
+                    }
                 }
+                layer.putInto(bb);
+                BufferRenderer.draw(bb.end());
             }
-            layer.putInto(bb);
-            BufferRenderer.draw(bb.end());
         }
     }
 

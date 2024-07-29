@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.model.OffThreadModelBakerySystem;
+import me.cortex.voxy.client.core.model.OnThreadModelBakerySystem;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -10,14 +11,19 @@ import net.minecraft.client.render.Camera;
 import java.util.List;
 
 public class RenderService {
-    private final OffThreadModelBakerySystem modelService;
+    private final OnThreadModelBakerySystem modelService;
     private final RenderGenerationService renderGen;
 
     public RenderService(WorldEngine world) {
-        this.modelService = new OffThreadModelBakerySystem(world.getMapper());
+        this.modelService = new OnThreadModelBakerySystem(world.getMapper());
         this.renderGen = new RenderGenerationService(world, this.modelService, VoxyConfig.CONFIG.renderThreads, this::consumeRenderBuildResult, false);
-
-        this.renderGen.enqueueTask(0,0,0,0);
+        for(int x = -10; x<=10;x++) {
+            for (int z = -10; z <= 10; z++) {
+                for (int y = -3; y <= 3; y++) {
+                    this.renderGen.enqueueTask(0, x, y, z);
+                }
+            }
+        }
     }
 
     private void consumeRenderBuildResult(BuiltSection section) {
@@ -26,7 +32,7 @@ public class RenderService {
     }
 
     public void setup(Camera camera) {
-        this.modelService.syncChanges();
+        this.modelService.tick();
     }
 
     public void renderFarAwayOpaque(Viewport viewport) {
