@@ -1,7 +1,7 @@
 package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.model.OnThreadModelBakerySystem;
+import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -10,11 +10,11 @@ import net.minecraft.client.render.Camera;
 import java.util.List;
 
 public class RenderService {
-    private final OnThreadModelBakerySystem modelService;
+    private final ModelBakerySubsystem modelService;
     private final RenderGenerationService renderGen;
 
     public RenderService(WorldEngine world) {
-        this.modelService = new OnThreadModelBakerySystem(world.getMapper());
+        this.modelService = new ModelBakerySubsystem(world.getMapper());
         this.renderGen = new RenderGenerationService(world, this.modelService, VoxyConfig.CONFIG.renderThreads, this::consumeRenderBuildResult, false);
         for(int x = -200; x<=200;x++) {
             for (int z = -200; z <= 200; z++) {
@@ -35,6 +35,12 @@ public class RenderService {
     }
 
     public void renderFarAwayOpaque(Viewport viewport) {
+        //Render previous geometry with the abstract renderer
+        //Execute the hieracial selector
+        // render delta sections
+
+        //Hieracial is not an abstract thing but
+        // the section renderer is as it might have different backends, but they all accept a buffer containing the section list
 
     }
 

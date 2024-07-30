@@ -109,18 +109,21 @@ public class ModelFactory {
     private final int[] idMappings;
     private final Object2IntOpenHashMap<ModelEntry> modelTexture2id = new Object2IntOpenHashMap<>();
 
-    private final Mapper mapper;
 
     private final List<Biome> biomes = new ArrayList<>();
     private final List<Pair<Integer, BlockState>> modelsRequiringBiomeColours = new ArrayList<>();
 
     private static final ObjectSet<BlockState> LOGGED_SELF_CULLING_WARNING = new ObjectOpenHashSet<>();
 
+    private final Mapper mapper;
+    private final ModelStore storage;
+
 
     //TODO: NOTE!!! is it worth even uploading as a 16x16 texture, since automatic lod selection... doing 8x8 textures might be perfectly ok!!!
     // this _quarters_ the memory requirements for the texture atlas!!! WHICH IS HUGE saving
-    public ModelFactory(Mapper mapper) {
+    public ModelFactory(Mapper mapper, ModelStore storage) {
         this.mapper = mapper;
+        this.storage = storage;
         this.bakery = new ModelTextureBakery(MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
 
         this.metadataCache = new long[1<<16];
@@ -150,6 +153,10 @@ public class ModelFactory {
 
     //TODO: what i need to do is seperate out fluid states from blockStates
 
+    //Processes the results of the baking, its a seperate function due to the flight
+    private void processBakingResult() {
+
+    }
 
     //TODO: so need a few things, per face sizes and offsets, the sizes should be computed from the pixels and find the minimum bounding pixel
     // while the depth is computed from the depth buffer data
@@ -161,6 +168,11 @@ public class ModelFactory {
 
         boolean isFluid = blockState.getBlock() instanceof FluidBlock;
         int modelId = -1;
+
+        //TODO: FIRST!! dispatch a face request the fluid state if it doesnt exist!!!
+        // THEN dispatch this block face request, the ordering should result in a gurentee that the fluid block state is
+        // computed before this block state
+
         var textureData = this.bakery.renderFaces(blockState, 123456, isFluid);
 
         int clientFluidStateId = -1;
@@ -216,8 +228,7 @@ public class ModelFactory {
 
 
 
-        final long uploadPtrConst = MemoryUtil.nmemAlloc(MODEL_SIZE);
-        long uploadPtr = uploadPtrConst;
+        long uploadPtr = UploadStream.INSTANCE.upload(this.storage.modelBuffer, (long) modelId * MODEL_SIZE, MODEL_SIZE);;
 
 
         //TODO: implement;
@@ -358,8 +369,6 @@ public class ModelFactory {
         //modelFlags |= blockRenderLayer == RenderLayer.getSolid()?0:1;// should discard alpha
         MemoryUtil.memPutInt(uploadPtr, modelFlags);
 
-        int[] biomeData = null;
-        int biomeIndex = -1;
         //Temporary override to always be non biome specific
         if (colourProvider == null) {
             MemoryUtil.memPutInt(uploadPtr + 4, -1);//Set the default to nothing so that its faster on the gpu
@@ -367,13 +376,14 @@ public class ModelFactory {
             MemoryUtil.memPutInt(uploadPtr + 4, captureColourConstant(colourProvider, blockState, DEFAULT_BIOME)|0xFF000000);
         } else if (!this.biomes.isEmpty()) {
             //Populate the list of biomes for the model state
-            biomeIndex = this.modelsRequiringBiomeColours.size() * this.biomes.size();
+            int biomeIndex = this.modelsRequiringBiomeColours.size() * this.biomes.size();
             MemoryUtil.memPutInt(uploadPtr + 4, biomeIndex);
             this.modelsRequiringBiomeColours.add(new Pair<>(modelId, blockState));
-            //long clrUploadPtr = UploadStream.INSTANCE.upload(this.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
-            biomeData = new int[this.biomes.size()];
-            for (int biomeId = 0; biomeId < this.biomes.size(); biomeId++) {
-                biomeData[biomeId] = captureColourConstant(colourProvider, blockState, this.biomes.get(biomeId))|0xFF000000;
+            //NOTE: UploadStream.INSTANCE is called _after_ uploadPtr is finished being used, this is cause the upload pointer
+            // may be invalidated as soon as another upload stream is invoked
+            long clrUploadPtr = UploadStream.INSTANCE.upload(this.storage.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
+            for (var biome : this.biomes) {
+                MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(colourProvider, blockState, biome)|0xFF000000); clrUploadPtr += 4;
             }
         }
 
@@ -383,21 +393,19 @@ public class ModelFactory {
         //TODO
 
 
-        var textureUpload = this.putTextures(modelId, textureData);
+        this.putTextures(modelId, textureData);
 
         //glGenerateTextureMipmap(this.textures.id);
 
         //Set the mapping at the very end
         this.idMappings[blockId] = modelId;
 
-
-        new NewModelBufferDelta(modelId, uploadPtrConst, biomeIndex, biomeData, textureUpload);
+        //Upload/commit stream
+        //TODO maybe dont do it for every uploaded block?? try to batch it
+        UploadStream.INSTANCE.commit();
     }
 
     public void addBiome(int id, Biome biome) {
-        throw new IllegalStateException("IMPLEMENT");
-
-        /*
         this.biomes.add(biome);
         if (this.biomes.size()-1 != id) {
             throw new IllegalStateException("Biome ordering not consistent with biome id for biome " + biome + " expected id: " + (this.biomes.size()-1) + " got id: " + id);
@@ -411,13 +419,12 @@ public class ModelFactory {
             }
             //Populate the list of biomes for the model state
             int biomeIndex = (i++) * this.biomes.size();
-            MemoryUtil.memPutInt(UploadStream.INSTANCE.upload(this.modelBuffer, (entry.getLeft()* MODEL_SIZE)+ 4*6 + 4, 4), biomeIndex);
-            long clrUploadPtr = UploadStream.INSTANCE.upload(this.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
+            MemoryUtil.memPutInt(UploadStream.INSTANCE.upload(this.storage.modelBuffer, (entry.getLeft()* MODEL_SIZE)+ 4*6 + 4, 4), biomeIndex);
+            long clrUploadPtr = UploadStream.INSTANCE.upload(this.storage.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
             for (var biomeE : this.biomes) {
                 MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(colourProvider, entry.getRight(), biomeE)|0xFF000000); clrUploadPtr += 4;
             }
         }
-         */
     }
 
 
@@ -567,15 +574,23 @@ public class ModelFactory {
         return this.metadataCache[clientId];
     }
 
-    private ModelTextureUpload putTextures(int id, ColourDepthTextureData[] textures) {
-        int texIndex = 0;
-        int[][] texData = new int[6*4][];
-        for (int subTex = 0; subTex < 6; subTex++) {
+    private void putTextures(int id, ColourDepthTextureData[] textures) {
+        int X = (id&0xFF) * MODEL_TEXTURE_SIZE*3;
+        int Y = ((id>>8)&0xFF) * MODEL_TEXTURE_SIZE*2;
 
+        for (int subTex = 0; subTex < 6; subTex++) {
+            int x = X + (subTex>>1)*MODEL_TEXTURE_SIZE;
+            int y = Y + (subTex&1)*MODEL_TEXTURE_SIZE;
+
+            GlStateManager._pixelStore(GlConst.GL_UNPACK_ROW_LENGTH, 0);
+            GlStateManager._pixelStore(GlConst.GL_UNPACK_SKIP_PIXELS, 0);
+            GlStateManager._pixelStore(GlConst.GL_UNPACK_SKIP_ROWS, 0);
+            GlStateManager._pixelStore(GlConst.GL_UNPACK_ALIGNMENT, 4);
             var current = textures[subTex].colour();
             var next = new int[current.length>>1];
-            for (int i = 0; i < 4; i++) {
-                texData[texIndex++] = Arrays.copyOf(current, current.length);
+            final int layers = Integer.numberOfTrailingZeros(MODEL_TEXTURE_SIZE);
+            for (int i = 0; i < layers; i++) {
+                glTextureSubImage2D(this.storage.textures.id, i, x>>i, y>>i, MODEL_TEXTURE_SIZE>>i, MODEL_TEXTURE_SIZE>>i, GL_RGBA, GL_UNSIGNED_BYTE, current);
 
                 int size = MODEL_TEXTURE_SIZE>>(i+1);
                 for (int pX = 0; pX < size; pX++) {
@@ -592,7 +607,6 @@ public class ModelFactory {
                 next = new int[current.length>>1];
             }
         }
-        return new ModelTextureUpload(id, texData);
     }
 
     public int getSamplerId() {

@@ -170,12 +170,12 @@ public class VoxelCore {
             System.out.println("Shutting down importer");
             try {this.importer.shutdown();this.importer = null;} catch (Exception e) {e.printStackTrace();}
         }
-        System.out.println("Shutting down voxel core");
-        try {this.world.shutdown();} catch (Exception e) {e.printStackTrace();}
-        System.out.println("World engine shut down");
+        System.out.println("Shutting down rendering");
         try {this.renderer.shutdown(); this.viewportSelector.free();} catch (Exception e) {e.printStackTrace();}
-        System.out.println("Renderer shut down");
+        System.out.println("Shutting down post processor");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {e.printStackTrace();}}
+        System.out.println("Shutting down world engine");
+        try {this.world.shutdown();} catch (Exception e) {e.printStackTrace();}
         System.out.println("Voxel core shut down");
     }
 

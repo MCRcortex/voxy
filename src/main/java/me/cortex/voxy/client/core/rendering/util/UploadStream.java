@@ -48,11 +48,14 @@ public class UploadStream {
         if (this.caddr == -1 || !this.allocationArena.expand(this.caddr, (int) size)) {
             this.caddr = this.allocationArena.alloc((int) size);//TODO: replace with allocFromLargest
             if (this.caddr == SIZE_LIMIT) {
-                this.commit();
+                //Note! we dont commit here, we only try to flush existing memory copies, we dont commit
+                // since commit is an explicit op saying we are done any to push upload everything
+                //We dont commit since we dont want to invalidate existing upload pointers
+
                 int attempts = 10;
                 while (--attempts != 0 && this.caddr == SIZE_LIMIT) {
                     glFinish();
-                    this.tick();
+                    this.tick(false);
                     this.caddr = this.allocationArena.alloc((int) size);
                 }
                 if (this.caddr == SIZE_LIMIT) {
@@ -91,7 +94,13 @@ public class UploadStream {
     }
 
     public void tick() {
-        this.commit();
+        this.tick(true);
+    }
+    private void tick(boolean commit) {
+        if (commit) {
+            this.commit();
+        }
+
         if (!this.thisFrameAllocations.isEmpty()) {
             this.frames.add(new UploadFrame(new GlFence(), new LongArrayList(this.thisFrameAllocations)));
             this.thisFrameAllocations.clear();

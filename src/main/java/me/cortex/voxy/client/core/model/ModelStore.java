@@ -7,14 +7,14 @@ import static org.lwjgl.opengl.GL11.GL_RGBA8;
 
 public class ModelStore {
     public static final int MODEL_SIZE = 64;
-    private final GlBuffer modelBuffer;
-    private final GlBuffer modelColourBuffer;
-    private final GlTexture textures;
+    final GlBuffer modelBuffer;
+    final GlBuffer modelColourBuffer;
+    final GlTexture textures;
 
-    public ModelStore(int modelTextureSize) {
+    public ModelStore() {
         this.modelBuffer = new GlBuffer(MODEL_SIZE * (1<<16));
         this.modelColourBuffer = new GlBuffer(4 * (1<<16));
-        this.textures = new GlTexture().store(GL_RGBA8, 4, modelTextureSize*3*256,modelTextureSize*2*256);
+        this.textures = new GlTexture().store(GL_RGBA8, 4, ModelFactory.MODEL_TEXTURE_SIZE*3*256,ModelFactory.MODEL_TEXTURE_SIZE*2*256);
     }
 
 
