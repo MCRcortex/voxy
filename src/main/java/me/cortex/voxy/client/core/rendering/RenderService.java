@@ -27,7 +27,7 @@ public class RenderService {
     }
 
     private void consumeRenderBuildResult(BuiltSection section) {
-        System.err.println("Section " + WorldEngine.pprintPos(section.position));
+        //System.err.println("Section " + WorldEngine.pprintPos(section.position));
         section.free();
     }
 

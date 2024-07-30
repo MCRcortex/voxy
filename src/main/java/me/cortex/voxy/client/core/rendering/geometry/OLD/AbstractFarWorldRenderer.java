@@ -142,7 +142,6 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends Ab
     }
 
     public void addDebugData(List<String> debug) {
-        this.models.addDebugInfo(debug);
         debug.add("Geometry buffer usage: " + ((float)Math.round((this.geometry.getGeometryBufferUsage()*100000))/1000) + "%");
         debug.add("Render Sections: " + this.geometry.getSectionCount());
     }

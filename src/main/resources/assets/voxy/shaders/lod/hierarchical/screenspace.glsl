@@ -56,8 +56,10 @@ void setupScreenspace(in UnpackedNode node) {
     }
 
     //TODO: MORE ACCURATLY DETERMIN SCREENSPACE AREA, this can be done by computing and adding
-    //  the projected surface area of each face which winding order faces the camera
-    //  (this is just the dot product of 2 projected vectors afaik)
+    //  the projected surface area of each face/quad which winding order faces the camera
+    //  (this is just the dot product of 2 projected vectors)
+
+    //can do a funny by not doing the perspective divide except on the output of the area
 
     //printf("Screenspace MIN: %f, %f, %f  MAX: %f, %f, %f", minBB.x,minBB.y,minBB.z, maxBB.x,maxBB.y,maxBB.z);
 

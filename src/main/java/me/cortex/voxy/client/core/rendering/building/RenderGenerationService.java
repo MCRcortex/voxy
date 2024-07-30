@@ -229,6 +229,6 @@ public class RenderGenerationService {
     }
 
     public void addDebugData(List<String> debug) {
-
+        debug.add("RMQ: " + this.taskQueue.size());//render mesh queue
     }
 }

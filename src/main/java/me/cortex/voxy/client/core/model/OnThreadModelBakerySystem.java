@@ -23,16 +23,24 @@ public class OnThreadModelBakerySystem {
     }
 
     public void tick() {
-        if (!this.blockIdQueue.isEmpty()) {
-            int blockId = -1;
-            synchronized (this.blockIdQueue) {
-                if (!this.blockIdQueue.isEmpty()) {
-                    blockId = this.blockIdQueue.removeFirstInt();
-                    VarHandle.fullFence();//Ensure memory coherancy
+        //There should be a method to access the frame time IIRC, if the user framecap is unlimited lock it to like 60 fps for computation
+        int BUDGET = 5;//TODO: make this computed based on the remaining free time in a frame (and like div by 2 to reduce overhead) (with a min of 1)
+        for (int i = 0; i < BUDGET; i++) {
+            if (!this.blockIdQueue.isEmpty()) {
+                int blockId = -1;
+                synchronized (this.blockIdQueue) {
+                    if (!this.blockIdQueue.isEmpty()) {
+                        blockId = this.blockIdQueue.removeFirstInt();
+                        VarHandle.fullFence();//Ensure memory coherancy
+                    } else {
+                        break;
+                    }
                 }
-            }
-            if (blockId != -1) {
-                this.factory.addEntry(blockId);
+                if (blockId != -1) {
+                    this.factory.addEntry(blockId);
+                }
+            } else {
+                break;
             }
         }
     }
@@ -51,6 +59,6 @@ public class OnThreadModelBakerySystem {
     }
 
     public void addDebugData(List<String> debug) {
-
+        debug.add("MBQ/MBC: " + this.blockIdQueue.size() + "/"+ this.factory.getBakedCount());//Model bake queue/model baked count
     }
 }

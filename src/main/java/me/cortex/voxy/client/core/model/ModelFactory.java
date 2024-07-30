@@ -607,7 +607,7 @@ public class ModelFactory {
         glDeleteSamplers(this.blockSampler);
     }
 
-    public void addDebugInfo(List<String> info) {
-        info.add("BlockModels registered: " + this.modelTexture2id.size() + "/" + (1<<16));
+    public int getBakedCount() {
+        return this.modelTexture2id.size();
     }
 }
