@@ -568,9 +568,6 @@ public class ModelFactory {
     }
 
     private ModelTextureUpload putTextures(int id, ColourDepthTextureData[] textures) {
-        int X = (id&0xFF) * MODEL_TEXTURE_SIZE*3;
-        int Y = ((id>>8)&0xFF) * MODEL_TEXTURE_SIZE*2;
-
         int texIndex = 0;
         int[][] texData = new int[6*4][];
         for (int subTex = 0; subTex < 6; subTex++) {

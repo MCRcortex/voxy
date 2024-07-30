@@ -3,8 +3,6 @@ package me.cortex.voxy.client.core.rendering.building;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import me.cortex.voxy.client.core.model.IdNotYetComputedException;
-import me.cortex.voxy.client.core.model.ModelFactory;
-import me.cortex.voxy.client.core.model.OffThreadModelBakerySystem;
 import me.cortex.voxy.client.core.model.OnThreadModelBakerySystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
@@ -12,7 +10,6 @@ import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 
-import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
@@ -43,6 +40,7 @@ public class RenderGenerationService {
         this.workers =  new Thread[workers];
         for (int i = 0; i < workers; i++) {
             this.workers[i] = new Thread(this::renderWorker);
+            this.workers[i].setPriority(3);
             this.workers[i].setDaemon(true);
             this.workers[i].setName("Render generation service #" + i);
             this.workers[i].start();
@@ -89,7 +87,7 @@ public class RenderGenerationService {
                 } catch (IdNotYetComputedException e) {
                     if (task.hasDoneModelRequest[0]) {
                         try {
-                            Thread.sleep(100);
+                            Thread.sleep(10);
                         } catch (InterruptedException ex) {
                             throw new RuntimeException(ex);
                         }

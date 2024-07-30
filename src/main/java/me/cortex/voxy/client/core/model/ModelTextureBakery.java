@@ -116,7 +116,7 @@ public class ModelTextureBakery {
                 .getBlockModels()
                 .getModel(state);
 
-        var entityModel = state.hasBlockEntity()?BakedBlockEntityModel.bake(state):null;
+        BakedBlockEntityModel entityModel = state.hasBlockEntity()?BakedBlockEntityModel.bake(state):null;
 
         int oldFB = GlStateManager.getBoundFramebuffer();
         GL11C.glViewport(0, 0, this.width, this.height);
@@ -282,14 +282,17 @@ public class ModelTextureBakery {
             //System.err.println("REPLACE THE UPLOADING WITH THREAD SAFE VARIENT");
             BufferRenderer.draw(bb.end());
         } catch (IllegalStateException e) {
-            System.err.println("Got empty buffer builder! for block " + state);
+            //System.err.println("Got empty buffer builder! for block " + state);
         }
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
         int[] colourData = new int[this.width*this.height];
         int[] depthData = new int[this.width*this.height];
-        glGetTextureImage(this.colourTex.id, 0, GL_RGBA, GL_UNSIGNED_BYTE, colourData);
-        glGetTextureImage(this.depthTex.id, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, depthData);
+
+        //TODO: USE A PBO to make a download stream of the textures to a buffer to download then do a download stream
+        //glGetTextureImage(this.colourTex.id, 0, GL_RGBA, GL_UNSIGNED_BYTE, colourData);
+        //glGetTextureImage(this.depthTex.id, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, depthData);
+
         return new ColourDepthTextureData(colourData, depthData, this.width, this.height);
     }
 
