@@ -70,7 +70,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport,
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
 
         //Bind the texture atlas
-        glBindSampler(0, this.models.getSamplerId());
+        //glBindSampler(0, this.models.getSamplerId());
         //glBindTextureUnit(0, this.models.getTextureId());
     }
 
@@ -190,7 +190,7 @@ public class Gl46FarWorldRenderer extends AbstractFarWorldRenderer<Gl46Viewport,
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 
 
-        glBindSampler(0, this.models.getSamplerId());
+        //glBindSampler(0, this.models.getSamplerId());
         //glBindTextureUnit(0, this.models.getTextureId());
 
         //RenderSystem.blendFunc(GlStateManager.SrcFactor.ONE, GlStateManager.DstFactor.ONE);

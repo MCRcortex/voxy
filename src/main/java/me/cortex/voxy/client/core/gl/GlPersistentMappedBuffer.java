@@ -20,7 +20,7 @@ public class GlPersistentMappedBuffer extends TrackedObject {
     @Override
     public void free() {
         this.free0();
-        glUnmapBuffer(this.id);
+        glUnmapNamedBuffer(this.id);
         glDeleteBuffers(this.id);
     }
 

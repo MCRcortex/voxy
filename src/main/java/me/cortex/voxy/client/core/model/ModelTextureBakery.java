@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.GlConst;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.systems.VertexSorter;
+import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
@@ -34,17 +35,18 @@ import org.lwjgl.opengl.GL11C;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.lwjgl.opengl.ARBFramebufferObject.*;
+import static org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureImage;
 import static org.lwjgl.opengl.ARBImaging.GL_FUNC_ADD;
 import static org.lwjgl.opengl.ARBImaging.glBlendEquation;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glMemoryBarrier;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.*;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
+import static org.lwjgl.opengl.GL15C.glBindBuffer;
 import static org.lwjgl.opengl.GL20C.glUniformMatrix4fv;
-import static org.lwjgl.opengl.GL45C.glBlitNamedFramebuffer;
-import static org.lwjgl.opengl.GL45C.glGetTextureImage;
+import static org.lwjgl.opengl.GL21C.GL_PIXEL_PACK_BUFFER;
+import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.opengl.GL43.glCopyImageSubData;
 
 //Builds a texture for each face of a model
 public class ModelTextureBakery {
@@ -69,10 +71,12 @@ public class ModelTextureBakery {
 
     private static final List<MatrixStack> FACE_VIEWS = new ArrayList<>();
 
+    //A truly terrible hackfix for nvidia drivers murderizing performance with PBO readout with a depth texture
+    private static final GlTexture TEMPORARY = new GlTexture().store(GL_R32UI, 1, ModelFactory.MODEL_TEXTURE_SIZE, ModelFactory.MODEL_TEXTURE_SIZE);
+
 
     public ModelTextureBakery(int width, int height) {
         //TODO: Make this run in a seperate opengl context so that it can run in a seperate thread
-
 
         this.width = width;
         this.height = height;
@@ -86,6 +90,8 @@ public class ModelTextureBakery {
     }
 
     private static void AddViews() {
+        //TODO: FIXME: need to bake in the correct orientation, HOWEVER some orientations require a flipped winding order!!!!
+
         addView(-90,0, 0, false);//Direction.DOWN
         addView(90,0, 0, false);//Direction.UP
         addView(0,180, 0, true);//Direction.NORTH
@@ -109,7 +115,7 @@ public class ModelTextureBakery {
 
     //TODO: For block entities, also somehow attempt to render the default block entity, e.g. chests and stuff
     // cause that will result in ok looking micro details in the terrain
-    public ColourDepthTextureData[] renderFaces(BlockState state, long randomValue, boolean renderFluid) {
+    public void renderFacesToStream(BlockState state, long randomValue, boolean renderFluid, int streamBuffer, int streamBaseOffset) {
         this.glState.capture();
         var model = MinecraftClient.getInstance()
                 .getBakedModelManager()
@@ -174,10 +180,10 @@ public class ModelTextureBakery {
         int texId = MinecraftClient.getInstance().getTextureManager().getTexture(Identifier.of("minecraft", "textures/atlas/blocks.png")).getGlId();
         GlUniform.uniform1(0, 0);
 
-        var faces = new ColourDepthTextureData[FACE_VIEWS.size()];
-        for (int i = 0; i < faces.length; i++) {
-            faces[i] = captureView(state, model, entityModel, FACE_VIEWS.get(i), randomValue, i, renderFluid, texId, projection);
-            //glBlitNamedFramebuffer(this.framebuffer.id, oldFB, 0,0,16,16,300*(i>>1),300*(i&1),300*(i>>1)+256,300*(i&1)+256, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        final int TEXTURE_SIZE = this.width*this.height *4;//NOTE! assume here that both depth and colour are 4 bytes in size
+        for (int i = 0; i < FACE_VIEWS.size(); i++) {
+            int faceOffset = streamBaseOffset + TEXTURE_SIZE*i*2;
+            captureViewToStream(state, model, entityModel, FACE_VIEWS.get(i), randomValue, i, renderFluid, texId, projection, streamBuffer, faceOffset, faceOffset + TEXTURE_SIZE);
         }
 
         renderLayer.endDrawing();
@@ -190,11 +196,10 @@ public class ModelTextureBakery {
         //TODO: FIXME: fully revert the state of opengl
 
         this.glState.restore();
-        return faces;
     }
 
     private final BufferAllocator allocator = new BufferAllocator(786432);
-    private ColourDepthTextureData captureView(BlockState state, BakedModel model, BakedBlockEntityModel blockEntityModel, MatrixStack stack, long randomValue, int face, boolean renderFluid, int textureId, Matrix4f projection) {
+    private void captureViewToStream(BlockState state, BakedModel model, BakedBlockEntityModel blockEntityModel, MatrixStack stack, long randomValue, int face, boolean renderFluid, int textureId, Matrix4f projection, int streamBuffer, int streamColourOffset, int streamDepthOffset) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         float[] mat = new float[4*4];
         new Matrix4f(projection).mul(stack.peek().getPositionMatrix()).get(mat);
@@ -286,14 +291,28 @@ public class ModelTextureBakery {
         }
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
-        int[] colourData = new int[this.width*this.height];
-        int[] depthData = new int[this.width*this.height];
 
-        //TODO: USE A PBO to make a download stream of the textures to a buffer to download then do a download stream
-        //glGetTextureImage(this.colourTex.id, 0, GL_RGBA, GL_UNSIGNED_BYTE, colourData);
-        //glGetTextureImage(this.depthTex.id, 0, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, depthData);
+        GlStateManager._pixelStore(GL_PACK_ROW_LENGTH, 0);
+        GlStateManager._pixelStore(GL_PACK_SKIP_PIXELS, 0);
+        GlStateManager._pixelStore(GL_PACK_SKIP_ROWS, 0);
+        GlStateManager._pixelStore(GL_PACK_ALIGNMENT, 4);
 
-        return new ColourDepthTextureData(colourData, depthData, this.width, this.height);
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, streamBuffer);
+        {//Copy colour
+            glGetTextureImage(this.colourTex.id, 0, GL_RGBA, GL_UNSIGNED_BYTE, this.width*this.height*4, streamColourOffset);
+        }
+
+        //TODO: fixme!! only do this dodgy double copy if the driver is nvidia
+        {//Copy depth
+            //First copy to the temporary buffer
+            glCopyImageSubData(textureId, GL_TEXTURE_2D, 0,0,0,0,
+                    TEMPORARY.id, GL_TEXTURE_2D, 0,0,0,0,
+                    ModelFactory.MODEL_TEXTURE_SIZE, ModelFactory.MODEL_TEXTURE_SIZE, 1);
+
+            //Then download
+            glGetTextureImage(TEMPORARY.id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, this.width*this.height*4, streamDepthOffset);
+        }
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
     }
 
     private static void renderQuads(BufferBuilder builder, BlockState state, BakedModel model, MatrixStack stack, long randomValue) {

@@ -114,7 +114,8 @@ public abstract class AbstractFarWorldRenderer <T extends Viewport, J extends Ab
             //Do any BlockChanges
             while ((!this.blockStateUpdates.isEmpty()) && (maxUpdatesPerFrame-- > 0)) {
                 var update = this.blockStateUpdates.pop();
-                this.models.addEntry(update.id, update.state);
+                //this.models.addEntry(update.id, update.state);
+                System.err.println("DEFUNKED: " + update);
             }
             //this.models.bakery.renderFaces(Blocks.ROSE_BUSH.getDefaultState(), 1234, false);
         }

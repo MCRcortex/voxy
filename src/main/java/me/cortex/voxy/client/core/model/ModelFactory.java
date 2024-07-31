@@ -2,12 +2,14 @@ package me.cortex.voxy.client.core.model;
 
 import com.mojang.blaze3d.platform.GlConst;
 import com.mojang.blaze3d.platform.GlStateManager;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import me.cortex.voxy.client.core.IGetVoxelCore;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
+import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.block.BlockState;
@@ -63,7 +65,7 @@ public class ModelFactory {
 
     //TODO: replace the fluid BlockState with a client model id integer of the fluidState, requires looking up
     // the fluid state in the mipper
-    private record ModelEntry(List<ColourDepthTextureData> textures, int fluidBlockStateId){
+    private record ModelEntry(List<ColourDepthTextureData> textures, int fluidBlockStateId) {
         private ModelEntry(ColourDepthTextureData[] textures, int fluidBlockStateId) {
             this(Stream.of(textures).map(ColourDepthTextureData::clone).toList(), fluidBlockStateId);
         }
@@ -72,7 +74,6 @@ public class ModelFactory {
     private final Biome DEFAULT_BIOME = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME).get(BiomeKeys.PLAINS);
 
     public final ModelTextureBakery bakery;
-    private final int blockSampler = glGenSamplers();
 
 
     //Model data might also contain a constant colour if the colour resolver produces a constant colour, this saves space in the
@@ -109,6 +110,9 @@ public class ModelFactory {
     private final int[] idMappings;
     private final Object2IntOpenHashMap<ModelEntry> modelTexture2id = new Object2IntOpenHashMap<>();
 
+    //Contains the set of all block ids that are currently inflight/being baked
+    // this is required due to "async" nature of gpu feedback
+    private final IntOpenHashSet blockStatesInFlight = new IntOpenHashSet();
 
     private final List<Biome> biomes = new ArrayList<>();
     private final List<Pair<Integer, BlockState>> modelsRequiringBiomeColours = new ArrayList<>();
@@ -117,13 +121,15 @@ public class ModelFactory {
 
     private final Mapper mapper;
     private final ModelStore storage;
+    private final RawDownloadStream downstream;
 
 
     //TODO: NOTE!!! is it worth even uploading as a 16x16 texture, since automatic lod selection... doing 8x8 textures might be perfectly ok!!!
     // this _quarters_ the memory requirements for the texture atlas!!! WHICH IS HUGE saving
-    public ModelFactory(Mapper mapper, ModelStore storage) {
+    public ModelFactory(Mapper mapper, ModelStore storage, RawDownloadStream downstream) {
         this.mapper = mapper;
         this.storage = storage;
+        this.downstream = downstream;
         this.bakery = new ModelTextureBakery(MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
 
         this.metadataCache = new long[1<<16];
@@ -131,12 +137,6 @@ public class ModelFactory {
         this.idMappings = new int[1<<20];//Max of 1 million blockstates mapping to 65k model states
         Arrays.fill(this.idMappings, -1);
         Arrays.fill(this.fluidStateLUT, -1);
-
-
-        glSamplerParameteri(this.blockSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-        glSamplerParameteri(this.blockSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glSamplerParameteri(this.blockSampler, GL_TEXTURE_MIN_LOD, 0);
-        glSamplerParameteri(this.blockSampler, GL_TEXTURE_MAX_LOD, 4);
 
         this.modelTexture2id.defaultReturnValue(-1);
     }
@@ -148,32 +148,82 @@ public class ModelFactory {
         if (this.idMappings[blockId] != -1) {
             return;
         }
-        this.addEntry(blockId, this.mapper.getBlockStateFromBlockId(blockId));
+        //We are (probably) going to be baking the block id
+        // check that it is currently not inflight, if it is, return as its already being baked
+        // else add it to the flight as it is going to be baked
+        if (!this.blockStatesInFlight.add(blockId)) {
+            //Block baking is already in-flight
+            return;
+        }
+
+        var blockState = this.mapper.getBlockStateFromBlockId(blockId);
+
+        //Before we enqueue the baking of this blockstate, we must check if it has a fluid state associated with it
+        // if it does, we must ensure that it is (effectivly) baked BEFORE we bake this blockstate
+        boolean isFluid = blockState.getBlock() instanceof FluidBlock;
+        if ((!isFluid) && (!blockState.getFluidState().isEmpty())) {
+            //Insert into the fluid LUT
+            var fluidState = blockState.getFluidState().getBlockState();
+
+            int fluidStateId = this.mapper.getIdForBlockState(fluidState);
+
+            if (this.idMappings[fluidStateId] == -1) {
+                //Dont have to check for inflight as that is done recursively :p
+
+                //This is a hack but does work :tm: due to how the download stream is setup
+                // it should enforce that the fluid state is processed before our blockstate
+                addEntry(fluidStateId);
+            }
+        }
+
+        int TOTAL_FACES_TEXTURE_SIZE = MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*2*4*6;// since both depth and colour are packed together, 6 faces, 4 bytes per pixel
+        int allocation = this.downstream.download(TOTAL_FACES_TEXTURE_SIZE, ptr->{
+            ColourDepthTextureData[] textureData = new ColourDepthTextureData[6];
+            final int FACE_SIZE = MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE;
+            for (int face = 0; face < 6; face++) {
+                long faceDataPtr = ptr + (FACE_SIZE*4)*face*2;
+                int[] colour = new int[FACE_SIZE];
+                int[] depth = new int[FACE_SIZE];
+
+                //TODO: see if there is a memory intrinsic to help here
+                //Copy out colour
+                for (int i = 0; i < FACE_SIZE; i++) {
+                    colour[i] = MemoryUtil.memGetInt(faceDataPtr+ (i*4));
+                }
+
+                //Shift ptr and copy out depth
+                faceDataPtr += FACE_SIZE*4;
+                for (int i = 0; i < FACE_SIZE; i++) {
+                    depth[i] = MemoryUtil.memGetInt(faceDataPtr+ (i*4));
+                }
+
+                textureData[face] = new ColourDepthTextureData(colour, depth, MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
+            }
+            processTextureBakeResult(blockId, blockState, textureData);
+        });
+        this.bakery.renderFacesToStream(blockState, 123456, isFluid, this.downstream.getBufferId(), allocation);
     }
 
     //TODO: what i need to do is seperate out fluid states from blockStates
 
-    //Processes the results of the baking, its a seperate function due to the flight
-    private void processBakingResult() {
-
-    }
 
     //TODO: so need a few things, per face sizes and offsets, the sizes should be computed from the pixels and find the minimum bounding pixel
     // while the depth is computed from the depth buffer data
-    public void addEntry(int blockId, BlockState blockState) {
+
+    //This is
+    private void processTextureBakeResult(int blockId, BlockState blockState, ColourDepthTextureData[] textureData) {
         if (this.idMappings[blockId] != -1) {
-            //System.err.println("Block id already added: " + blockId + " for state: " + blockState);
-            return;
+            //This should be impossible to reach as it means that multiple bakes for the same blockId happened and where inflight at the same time!
+            throw new IllegalStateException("Block id already added: " + blockId + " for state: " + blockState);
+        }
+
+        if (!this.blockStatesInFlight.remove(blockId)) {
+            throw new IllegalStateException("processing a texture bake result but the block state was not in flight!!");
         }
 
         boolean isFluid = blockState.getBlock() instanceof FluidBlock;
         int modelId = -1;
 
-        //TODO: FIRST!! dispatch a face request the fluid state if it doesnt exist!!!
-        // THEN dispatch this block face request, the ordering should result in a gurentee that the fluid block state is
-        // computed before this block state
-
-        var textureData = this.bakery.renderFaces(blockState, 123456, isFluid);
 
         int clientFluidStateId = -1;
 
@@ -183,11 +233,9 @@ public class ModelFactory {
 
             int fluidStateId = this.mapper.getIdForBlockState(fluidState);
 
-
             clientFluidStateId = this.idMappings[fluidStateId];
             if (clientFluidStateId == -1) {
-                this.addEntry(fluidStateId, fluidState);
-                clientFluidStateId = this.idMappings[fluidStateId];
+                throw new IllegalStateException("Block has a fluid state but fluid state is not already baked!!!");
             }
         }
 
@@ -609,16 +657,15 @@ public class ModelFactory {
         }
     }
 
-    public int getSamplerId() {
-        return this.blockSampler;
-    }
-
     public void free() {
         this.bakery.free();
-        glDeleteSamplers(this.blockSampler);
     }
 
     public int getBakedCount() {
         return this.modelTexture2id.size();
+    }
+
+    public int getInflightCount() {
+        return this.blockStatesInFlight.size();
     }
 }

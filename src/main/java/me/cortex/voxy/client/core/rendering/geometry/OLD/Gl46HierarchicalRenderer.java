@@ -91,30 +91,6 @@ public class Gl46HierarchicalRenderer {
             UploadStream.INSTANCE.tick();
             DownloadStream.INSTANCE.tick();
         }
-
-        {
-            boolean didHaveBiomeChange = false;
-
-            //Do any BiomeChanges
-            while (!this.biomeUpdates.isEmpty()) {
-                var update = this.biomeUpdates.pop();
-                var biomeReg = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME);
-                this.modelManager.addBiome(update.id, biomeReg.get(Identifier.of(update.biome)));
-                didHaveBiomeChange = true;
-            }
-
-            if (didHaveBiomeChange) {
-                UploadStream.INSTANCE.commit();
-            }
-
-            int maxUpdatesPerFrame = 40;
-
-            //Do any BlockChanges
-            while ((!this.blockStateUpdates.isEmpty()) && (maxUpdatesPerFrame-- > 0)) {
-                var update = this.blockStateUpdates.pop();
-                this.modelManager.addEntry(update.id, update.state);
-            }
-        }
     }
 
     
