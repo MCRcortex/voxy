@@ -26,11 +26,8 @@ public class ModelBakerySubsystem {
     public final ModelFactory factory;
     private final IntLinkedOpenHashSet blockIdQueue = new IntLinkedOpenHashSet();
 
-    private static final GlFramebuffer TMP = new GlFramebuffer();
-
     public ModelBakerySubsystem(Mapper mapper) {
         this.factory = new ModelFactory(mapper, this.storage, this.textureDownStream);
-        TMP.bind(GL_COLOR_ATTACHMENT0, this.storage.textures).verify();
     }
 
     public void tick() {
@@ -57,10 +54,6 @@ public class ModelBakerySubsystem {
 
         //Tick the download stream
         this.textureDownStream.tick();
-
-
-        //Debug blit texture
-        glBlitNamedFramebuffer(TMP.id, GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING),0,0,256*3*16,256*2*16, 0,0, 256*3*16,256*2*16, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
 
     public void shutdown() {
