@@ -94,7 +94,8 @@ public class TextureUtils {
         //https://registry.khronos.org/OpenGL-Refpages/gl4/html/glDepthRange.xhtml
         // due to this and the unsigned bullshit, i believe the depth value needs to get multiplied by 2
 
-        depthF *= 2;
+        //Shouldent be needed due to the compute bake copy
+        //depthF *= 2;
         if (depthF > 1.00001f) {
             System.err.println("Warning: Depth greater than 1");
             depthF = 1.0f;
@@ -180,6 +181,7 @@ public class TextureUtils {
         return weightedAverageColor(weightedAverageColor(one, two), weightedAverageColor(three, four));
     }
 
+    //TODO: FIXME!!! ITS READING IT AS ABGR??? isnt the format RGBA??
     private static int weightedAverageColor(int one, int two) {
         int alphaOne = ColorHelper.Abgr.getAlpha(one);
         int alphaTwo = ColorHelper.Abgr.getAlpha(two);

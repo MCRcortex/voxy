@@ -11,6 +11,7 @@ import static org.lwjgl.opengl.GL45C.*;
 public class GlTexture extends TrackedObject {
     public final int id;
     private final int type;
+    private int format;
     public GlTexture() {
         this(GL_TEXTURE_2D);
     }
@@ -20,7 +21,17 @@ public class GlTexture extends TrackedObject {
         this.type = type;
     }
 
+    private GlTexture(int type, boolean useGenTypes) {
+        if (useGenTypes) {
+            this.id = glGenTextures();
+        } else {
+            this.id = glCreateTextures(type);
+        }
+        this.type = type;
+    }
+
     public GlTexture store(int format, int levels, int width, int height) {
+        this.format = format;
         if (this.type == GL_TEXTURE_2D) {
             glTextureStorage2D(this.id, levels, format, width, height);
         } else {
@@ -29,21 +40,15 @@ public class GlTexture extends TrackedObject {
         return this;
     }
 
+    public GlTexture createView() {
+        var view = new GlTexture(this.type, true);
+        glTextureView(view.id, this.type, this.id, this.format, 0, 1, 0, 1);
+        return view;
+    }
+
     @Override
     public void free() {
         super.free0();
         glDeleteTextures(this.id);
-    }
-
-    //TODO: FIXME, glGetTextureParameteri doesnt work
-    public static int getRawTextureType(int texture) {
-        if (!glIsTexture(texture)) {
-            throw new IllegalStateException("Not texture");
-        }
-        int immFormat = glGetTextureParameteri(texture, GL_TEXTURE_IMMUTABLE_FORMAT);
-        if (immFormat == 0) {
-            throw new IllegalStateException("Texture: " + texture + " is not immutable");
-        }
-        return immFormat;
     }
 }

@@ -1,11 +1,8 @@
 package me.cortex.voxy.client.core.model;
 
-import com.mojang.blaze3d.platform.GlConst;
 import com.mojang.blaze3d.platform.GlStateManager;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.systems.VertexSorter;
-import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
+import me.cortex.voxy.client.core.gl.GlRenderBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
@@ -30,14 +27,14 @@ import net.minecraft.world.biome.ColorResolver;
 import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL11C;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureImage;
-import static org.lwjgl.opengl.ARBImaging.GL_FUNC_ADD;
-import static org.lwjgl.opengl.ARBImaging.glBlendEquation;
+import static org.lwjgl.opengl.ARBDirectStateAccess.glTextureParameteri;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_FRAMEBUFFER_BARRIER_BIT;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.glMemoryBarrier;
 import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
@@ -46,7 +43,7 @@ import static org.lwjgl.opengl.GL15C.glBindBuffer;
 import static org.lwjgl.opengl.GL20C.glUniformMatrix4fv;
 import static org.lwjgl.opengl.GL21C.GL_PIXEL_PACK_BUFFER;
 import static org.lwjgl.opengl.GL30.*;
-import static org.lwjgl.opengl.GL43.glCopyImageSubData;
+import static org.lwjgl.opengl.GL43.*;
 
 //Builds a texture for each face of a model
 public class ModelTextureBakery {
@@ -54,6 +51,7 @@ public class ModelTextureBakery {
     private final int height;
     private final GlTexture colourTex;
     private final GlTexture depthTex;
+    private final GlTexture depthTexView;
     private final GlFramebuffer framebuffer;
     private final GlStateCapture glState = GlStateCapture.make()
             .addCapability(GL_DEPTH_TEST)
@@ -62,6 +60,7 @@ public class ModelTextureBakery {
             .addCapability(GL_CULL_FACE)
             .addTexture(GL_TEXTURE0)
             .addTexture(GL_TEXTURE1)
+            .addTexture(GL_TEXTURE2)
             .build()
             ;
     private final Shader rasterShader = Shader.make()
@@ -69,10 +68,9 @@ public class ModelTextureBakery {
             .add(ShaderType.FRAGMENT, "voxy:bakery/position_tex.fsh")
             .compile();
 
-    private static final List<MatrixStack> FACE_VIEWS = new ArrayList<>();
+    private final Shader copyOutShader;
 
-    //A truly terrible hackfix for nvidia drivers murderizing performance with PBO readout with a depth texture
-    private static final GlTexture TEMPORARY = new GlTexture().store(GL_R32UI, 1, ModelFactory.MODEL_TEXTURE_SIZE, ModelFactory.MODEL_TEXTURE_SIZE);
+    private static final List<MatrixStack> FACE_VIEWS = new ArrayList<>();
 
 
     public ModelTextureBakery(int width, int height) {
@@ -82,7 +80,18 @@ public class ModelTextureBakery {
         this.height = height;
         this.colourTex = new GlTexture().store(GL_RGBA8, 1, width, height);
         this.depthTex = new GlTexture().store(GL_DEPTH24_STENCIL8, 1, width, height);
+        this.depthTexView = this.depthTex.createView();
+
         this.framebuffer = new GlFramebuffer().bind(GL_COLOR_ATTACHMENT0, this.colourTex).bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthTex).verify();
+
+        glTextureParameteri(this.depthTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+        glTextureParameteri(this.depthTexView.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
+
+        this.copyOutShader = Shader.make()
+                .define("WIDTH", width)
+                .define("HEIGHT", height)
+                .add(ShaderType.COMPUTE, "voxy:bakery/buffercopy.comp")
+                .compile();
 
         //This is done to help make debugging easier
         FACE_VIEWS.clear();
@@ -175,15 +184,13 @@ public class ModelTextureBakery {
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         glStencilMask(0xFF);
 
-        this.rasterShader.bind();
-        glActiveTexture(GL_TEXTURE0);
+
         int texId = MinecraftClient.getInstance().getTextureManager().getTexture(Identifier.of("minecraft", "textures/atlas/blocks.png")).getGlId();
-        GlUniform.uniform1(0, 0);
 
         final int TEXTURE_SIZE = this.width*this.height *4;//NOTE! assume here that both depth and colour are 4 bytes in size
         for (int i = 0; i < FACE_VIEWS.size(); i++) {
             int faceOffset = streamBaseOffset + TEXTURE_SIZE*i*2;
-            captureViewToStream(state, model, entityModel, FACE_VIEWS.get(i), randomValue, i, renderFluid, texId, projection, streamBuffer, faceOffset, faceOffset + TEXTURE_SIZE);
+            captureViewToStream(state, model, entityModel, FACE_VIEWS.get(i), randomValue, i, renderFluid, texId, projection, streamBuffer, faceOffset);
         }
 
         renderLayer.endDrawing();
@@ -199,7 +206,11 @@ public class ModelTextureBakery {
     }
 
     private final BufferAllocator allocator = new BufferAllocator(786432);
-    private void captureViewToStream(BlockState state, BakedModel model, BakedBlockEntityModel blockEntityModel, MatrixStack stack, long randomValue, int face, boolean renderFluid, int textureId, Matrix4f projection, int streamBuffer, int streamColourOffset, int streamDepthOffset) {
+    private void captureViewToStream(BlockState state, BakedModel model, BakedBlockEntityModel blockEntityModel, MatrixStack stack, long randomValue, int face, boolean renderFluid, int textureId, Matrix4f projection, int streamBuffer, int streamOffset) {
+        this.rasterShader.bind();
+        glActiveTexture(GL_TEXTURE0);
+        GlUniform.uniform1(0, 0);
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         float[] mat = new float[4*4];
         new Matrix4f(projection).mul(stack.peek().getPositionMatrix()).get(mat);
@@ -292,27 +303,24 @@ public class ModelTextureBakery {
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT);
 
-        GlStateManager._pixelStore(GL_PACK_ROW_LENGTH, 0);
-        GlStateManager._pixelStore(GL_PACK_SKIP_PIXELS, 0);
-        GlStateManager._pixelStore(GL_PACK_SKIP_ROWS, 0);
-        GlStateManager._pixelStore(GL_PACK_ALIGNMENT, 4);
+        this.emitToStream(streamBuffer, streamOffset);
+    }
 
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, streamBuffer);
-        {//Copy colour
-            glGetTextureImage(this.colourTex.id, 0, GL_RGBA, GL_UNSIGNED_BYTE, this.width*this.height*4, streamColourOffset);
+    private void emitToStream(int streamBuffer, int streamOffset) {
+        if (streamOffset%4 != 0) {
+            throw new IllegalArgumentException();
         }
+        this.copyOutShader.bind();
+        glActiveTexture(GL_TEXTURE0);
+        GL11C.glBindTexture(GL11.GL_TEXTURE_2D, this.colourTex.id);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL11.GL_TEXTURE_2D, this.depthTex.id);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL11.GL_TEXTURE_2D, this.depthTexView.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, streamBuffer);
+        glUniform1ui(4, streamOffset/4);
 
-        //TODO: fixme!! only do this dodgy double copy if the driver is nvidia
-        {//Copy depth
-            //First copy to the temporary buffer
-            glCopyImageSubData(textureId, GL_TEXTURE_2D, 0,0,0,0,
-                    TEMPORARY.id, GL_TEXTURE_2D, 0,0,0,0,
-                    ModelFactory.MODEL_TEXTURE_SIZE, ModelFactory.MODEL_TEXTURE_SIZE, 1);
-
-            //Then download
-            glGetTextureImage(TEMPORARY.id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, this.width*this.height*4, streamDepthOffset);
-        }
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+        glDispatchCompute(1,1,1);
     }
 
     private static void renderQuads(BufferBuilder builder, BlockState state, BakedModel model, MatrixStack stack, long randomValue) {
@@ -329,8 +337,10 @@ public class ModelTextureBakery {
     public void free() {
         this.framebuffer.free();
         this.colourTex.free();
+        this.depthTexView.free();
         this.depthTex.free();
         this.rasterShader.free();
+        this.copyOutShader.free();
         this.allocator.close();
     }
 }

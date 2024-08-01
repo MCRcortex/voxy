@@ -19,6 +19,11 @@ public class GlFramebuffer extends TrackedObject {
         return this;
     }
 
+    public GlFramebuffer bind(int attachment, GlRenderBuffer buffer) {
+        glNamedFramebufferRenderbuffer(this.id, attachment, GL_RENDERBUFFER, buffer.id);
+        return this;
+    }
+
     @Override
     public void free() {
         super.free0();
