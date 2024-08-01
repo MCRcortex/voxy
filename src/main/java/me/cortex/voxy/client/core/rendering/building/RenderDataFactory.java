@@ -470,7 +470,6 @@ public class RenderDataFactory {
 
 
 
-
         //TODO:FIXME SOMEHOW THIS IS CRITICAL!!!!!!!!!!!!!!!!!!
         // so there is one more issue need to be fixed, if water is layered ontop of eachother, the side faces depend on the water state ontop
         // this has been hackfixed in the model texture bakery but a proper solution that doesnt explode the sides of the water textures needs to be done
@@ -488,13 +487,13 @@ public class RenderDataFactory {
 
     //Returns true if a face was placed
     private boolean putFaceIfCan(Mesher2D mesher, int face, int opposingFace, long self, long metadata, int clientModelId, int selfBlockId, long facingState, long facingMetadata, int a, int b) {
-        //If face can be occluded and is occluded from the facing block, then dont render the face
-        if (ModelQueries.faceCanBeOccluded(metadata, face) && ModelQueries.faceOccludes(facingMetadata, opposingFace)) {
+        if (ModelQueries.cullsSame(metadata) && selfBlockId == Mapper.getBlockId(facingState)) {
+            //If we are facing a block, and we are both the same state, dont render that face
             return false;
         }
 
-        if (ModelQueries.cullsSame(metadata) && selfBlockId == Mapper.getBlockId(facingState)) {
-            //If we are facing a block, and we are both the same state, dont render that face
+        //If face can be occluded and is occluded from the facing block, then dont render the face
+        if (ModelQueries.faceCanBeOccluded(metadata, face) && ModelQueries.faceOccludes(facingMetadata, opposingFace)) {
             return false;
         }
 

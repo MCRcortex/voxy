@@ -50,9 +50,10 @@ public class RenderGenerationService {
     //NOTE: the biomes are always fully populated/kept up to date
 
     //Asks the Model system to bake all blocks that currently dont have a model
-    private void computeAndRequestRequiredModels(WorldSection section) {
+    private void computeAndRequestRequiredModels(WorldSection section, int extraId) {
         var raw = section.copyData();//TODO: replace with copyDataTo and use a "thread local"/context array to reduce allocation rates
         IntOpenHashSet seen = new IntOpenHashSet(128);
+        seen.add(extraId);
         for (long state : raw) {
             int block = Mapper.getBlockId(state);
             if (!this.modelBakery.factory.hasModelForBlockId(block)) {
@@ -85,6 +86,9 @@ public class RenderGenerationService {
                 try {
                     mesh = factory.generateMesh(section);
                 } catch (IdNotYetComputedException e) {
+                    if (!this.modelBakery.factory.hasModelForBlockId(e.id)) {
+                        this.modelBakery.requestBlockBake(e.id);
+                    }
                     if (task.hasDoneModelRequest[0]) {
                         try {
                             Thread.sleep(10);
@@ -92,7 +96,8 @@ public class RenderGenerationService {
                             throw new RuntimeException(ex);
                         }
                     } else {
-                        this.computeAndRequestRequiredModels(section);
+                        //The reason for the extra id parameter is that we explicitly add/check against the exception id due to e.g. requesting accross a chunk boarder wont be captured in the request
+                        this.computeAndRequestRequiredModels(section, e.id);
                     }
                     //We need to reinsert the build task into the queue
                     //System.err.println("Render task failed to complete due to un-computed client id");
