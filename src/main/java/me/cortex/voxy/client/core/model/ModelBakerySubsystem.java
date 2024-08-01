@@ -2,11 +2,19 @@ package me.cortex.voxy.client.core.model;
 
 
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
+import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.common.world.other.Mapper;
+import org.lwjgl.opengl.GL11;
 
 import java.lang.invoke.VarHandle;
 import java.util.List;
+
+import static org.lwjgl.opengl.ARBFramebufferObject.GL_COLOR_ATTACHMENT0;
+import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11C.GL_NEAREST;
+import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
+import static org.lwjgl.opengl.GL45.glBlitNamedFramebuffer;
 
 public class ModelBakerySubsystem {
     //Redo to just make it request the block faces with the async texture download stream which
@@ -18,9 +26,11 @@ public class ModelBakerySubsystem {
     public final ModelFactory factory;
     private final IntLinkedOpenHashSet blockIdQueue = new IntLinkedOpenHashSet();
 
+    private static final GlFramebuffer TMP = new GlFramebuffer();
 
     public ModelBakerySubsystem(Mapper mapper) {
         this.factory = new ModelFactory(mapper, this.storage, this.textureDownStream);
+        TMP.bind(GL_COLOR_ATTACHMENT0, this.storage.textures).verify();
     }
 
     public void tick() {
@@ -47,6 +57,10 @@ public class ModelBakerySubsystem {
 
         //Tick the download stream
         this.textureDownStream.tick();
+
+
+        //Debug blit texture
+        glBlitNamedFramebuffer(TMP.id, GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING),0,0,256*3*16,256*2*16, 0,0, 256*3*16,256*2*16, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
 
     public void shutdown() {

@@ -15,7 +15,7 @@ layout(location=4) uniform uint bufferOffset;
 
 void main() {
     ivec2 point = ivec2(gl_GlobalInvocationID.xy);
-    uint writeIndex = ((gl_GlobalInvocationID.x+(gl_GlobalInvocationID.y*HEIGHT))*2)+bufferOffset;
+    uint writeIndex = ((gl_GlobalInvocationID.x+(gl_GlobalInvocationID.y*WIDTH))*2)+bufferOffset;
     uvec4 colour = clamp(uvec4(texelFetch(colourTexIn, point, 0)*255), uvec4(0), uvec4(255));//TODO: check that this actually gets to the range of 255
     colour <<= uvec4(0,8,16,24);//ABGR format!!!
     outBuffer[writeIndex] = colour.r|colour.g|colour.b|colour.a;

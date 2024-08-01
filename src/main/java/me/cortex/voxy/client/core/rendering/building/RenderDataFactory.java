@@ -120,7 +120,11 @@ public class RenderDataFactory {
             //Ordering is: translucent, double sided quads, directional quads
             offsets[0] = meshlet;
             int mix = 32, miy = 32, miz = 32, max = 0, may = 0, maz = 0;
-            for (long data : this.translucentQuadCollector) {
+
+            final int TSIZE = this.translucentQuadCollector.size();
+            LongArrayList arrayList = this.translucentQuadCollector;
+            for (int i = 0; i < TSIZE; i++) {
+                long data = arrayList.getLong(i);
                 if (innerQuadCount == 0) {
                     //Write out meshlet header
 
@@ -171,7 +175,11 @@ public class RenderDataFactory {
             }
 
             offsets[1] = meshlet;
-            for (long data : this.doubleSidedQuadCollector) {
+
+            final int DSIZE = this.doubleSidedQuadCollector.size();
+            arrayList = this.doubleSidedQuadCollector;
+            for (int i = 0; i < DSIZE; i++) {
+                long data = arrayList.getLong(i);
                 if (innerQuadCount == 0) {
                     //Write out meshlet header
 
@@ -221,7 +229,10 @@ public class RenderDataFactory {
 
             for (int face = 0; face < 6; face++) {
                 offsets[face + 2] = meshlet;
-                for (long data : this.directionalQuadCollectors[face]) {
+                final var faceArray = this.directionalQuadCollectors[face];
+                final int FSIZE = faceArray.size();
+                for (int i = 0; i < FSIZE; i++) {
+                    long data = faceArray.getLong(i);
                     if (innerQuadCount == 0) {
                         //Write out meshlet header
 
@@ -276,18 +287,27 @@ public class RenderDataFactory {
 
             //Ordering is: translucent, double sided quads, directional quads
             offsets[0] = coff;
-            for (long data : this.translucentQuadCollector) {
+            int size = this.translucentQuadCollector.size();
+            LongArrayList arrayList = this.translucentQuadCollector;
+            for (int i = 0; i < size; i++) {
+                long data = arrayList.getLong(i);
                 MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
             }
 
             offsets[1] = coff;
-            for (long data : this.doubleSidedQuadCollector) {
+            size = this.doubleSidedQuadCollector.size();
+            arrayList = this.doubleSidedQuadCollector;
+            for (int i = 0; i < size; i++) {
+                long data = arrayList.getLong(i);
                 MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
             }
 
             for (int face = 0; face < 6; face++) {
                 offsets[face + 2] = coff;
-                for (long data : this.directionalQuadCollectors[face]) {
+                final LongArrayList faceArray = this.directionalQuadCollectors[face];
+                size = faceArray.size();
+                for (int i = 0; i < size; i++) {
+                    long data = faceArray.getLong(i);
                     MemoryUtil.memPutLong(ptr + ((coff++) * 8L), data);
                 }
             }

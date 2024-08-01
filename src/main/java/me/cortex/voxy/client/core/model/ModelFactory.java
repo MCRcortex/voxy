@@ -188,8 +188,8 @@ public class ModelFactory {
                 //Copy out colour
                 for (int i = 0; i < FACE_SIZE; i++) {
                     //De-interpolate results
-                    colour[i] = MemoryUtil.memGetInt(faceDataPtr+ (i*4));
-                    depth[i] = MemoryUtil.memGetInt(faceDataPtr+ (i*4)+4);
+                    colour[i] = MemoryUtil.memGetInt(faceDataPtr+ (i*4*2));
+                    depth[i] = MemoryUtil.memGetInt(faceDataPtr+ (i*4*2)+4);
                 }
 
                 textureData[face] = new ColourDepthTextureData(colour, depth, MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
