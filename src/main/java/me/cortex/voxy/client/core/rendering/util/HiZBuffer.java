@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering;
+package me.cortex.voxy.client.core.rendering.util;
 
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;

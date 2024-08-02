@@ -25,7 +25,8 @@ import org.lwjgl.opengl.GL11;
 import java.io.File;
 import java.util.*;
 
-import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
+import static org.lwjgl.opengl.ARBDirectStateAccess.glGetNamedFramebufferAttachmentParameteri;
+import static org.lwjgl.opengl.GL30C.*;
 
 //Core class that ingests new data from sources and updates the required systems
 
@@ -121,6 +122,11 @@ public class VoxelCore {
                 .setScreenSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
 
         int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
+        if (boundFB == 0) {
+            throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
+        }
+        //TODO: use the raw depth buffer texture instead
+        //int boundDepthBuffer = glGetNamedFramebufferAttachmentParameteri(boundFB, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
         this.postProcessing.setup(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight, boundFB);
 
         this.renderer.renderFarAwayOpaque(viewport);

@@ -5,7 +5,7 @@ import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.geometry.OLD.Gl46HierarchicalViewport;
-import me.cortex.voxy.client.core.rendering.HiZBuffer;
+import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;

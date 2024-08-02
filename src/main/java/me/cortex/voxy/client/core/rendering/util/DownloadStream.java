@@ -133,6 +133,7 @@ public class DownloadStream {
 
     //Synchonize force flushes everything
     public void flushWaitClear() {
+        glFinish();
         this.tick();
         var fence = new GlFence();
         glFinish();

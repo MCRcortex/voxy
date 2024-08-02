@@ -4,8 +4,10 @@ import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
-import me.cortex.voxy.client.core.rendering.hierarchical.HierarchicalOcclusionTraverser;
+import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalNodeManager;
+import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalOcclusionTraverser;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
+import me.cortex.voxy.client.core.rendering.section.IUsesMeshlets;
 import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
@@ -14,40 +16,47 @@ import net.minecraft.client.render.Camera;
 
 import java.util.List;
 
+import static org.lwjgl.opengl.ARBDirectStateAccess.glGetNamedFramebufferAttachmentParameteri;
+import static org.lwjgl.opengl.GL42.*;
+
 public class RenderService<T extends AbstractSectionRenderer<J>, J extends Viewport<J>> {
+    private static AbstractSectionRenderer<?> createSectionRenderer() {
+        return new MDICSectionRenderer();
+    }
+
     private final ViewportSelector<?> viewportSelector;
-    private final T sectionRenderer;
+    private final AbstractSectionRenderer<J> sectionRenderer;
+
+    private final HierarchicalNodeManager nodeManager;
     private final HierarchicalOcclusionTraverser traversal;
     private final ModelBakerySubsystem modelService;
     private final RenderGenerationService renderGen;
 
+
     public RenderService(WorldEngine world) {
         this.modelService = new ModelBakerySubsystem(world.getMapper());
+        this.nodeManager = new HierarchicalNodeManager(1<<21);
+
         this.sectionRenderer = (T) createSectionRenderer();
-        this.renderGen = new RenderGenerationService(world, this.modelService, VoxyConfig.CONFIG.renderThreads, this::consumeBuiltSection, false);
-        this.traversal = new HierarchicalOcclusionTraverser(this.renderGen, null);
+        this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
+        this.renderGen = new RenderGenerationService(world, this.modelService, VoxyConfig.CONFIG.renderThreads, this::consumeBuiltSection, this.sectionRenderer instanceof IUsesMeshlets);
+
+        this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 512);
 
         world.setDirtyCallback(section -> System.out.println("Section updated!!: " + WorldEngine.pprintPos(section.key)));
 
-        this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
-
-
-        for(int x = -400; x<=400;x++) {
-            for (int z = -400; z <= 400; z++) {
-                for (int y = -6; y <= 6; y++) {
+        /*
+        for(int x = -200; x<=200;x++) {
+            for (int z = -200; z <= 200; z++) {
+                for (int y = -3; y <= 3; y++) {
                     this.renderGen.enqueueTask(0, x, y, z);
                 }
             }
-        }
+        }*/
     }
 
-    private void consumeBuiltSection(BuiltSection section) {
-        this.traversal.consumeBuiltSection(section);
-    }
-
-    private static AbstractSectionRenderer<?> createSectionRenderer() {
-        return new MDICSectionRenderer();
-    }
+    //Cant do a lambda in the constructor cause "this.nodeManager" could be null??? even tho this does the exact same thing, java is stupid
+    private void consumeBuiltSection(BuiltSection section) {this.nodeManager.processBuildResult(section);}
 
     public void setup(Camera camera) {
         this.modelService.tick();
@@ -62,12 +71,16 @@ public class RenderService<T extends AbstractSectionRenderer<J>, J extends Viewp
         // the section renderer is as it might have different backends, but they all accept a buffer containing the section list
 
         this.sectionRenderer.renderOpaque(viewport);
+
         //NOTE: need to do the upload and download tick here, after the section renderer renders the world, to ensure "stable"
         // sections
-        UploadStream.INSTANCE.tick();
         DownloadStream.INSTANCE.tick();
+        UploadStream.INSTANCE.tick();
 
-        this.traversal.doTraversal(viewport);
+        glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_PIXEL_BUFFER_BARRIER_BIT);
+
+        int depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
+        this.traversal.doTraversal(viewport, depthBuffer);
 
         this.sectionRenderer.buildDrawCallsAndRenderTemporal(viewport, null);
     }

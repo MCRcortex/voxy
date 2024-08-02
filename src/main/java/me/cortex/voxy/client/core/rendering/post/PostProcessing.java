@@ -98,6 +98,9 @@ public class PostProcessing {
     }
 
     public void setup(int width, int height, int sourceFB) {
+        //TODO: use the raw depth texture instead
+        //TODO: when blitting, also set the depth value of where the mask is created to 0 (I.E. closest to the camera)
+        // cause of hiz computing, it makes alot of sections visible
         this.didSSAO = false;
         this.glStateCapture.capture();
 
