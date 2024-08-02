@@ -4,18 +4,27 @@ import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
+import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
+import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.client.render.Camera;
 
 import java.util.List;
 
 public class RenderService {
+    private final ViewportSelector<?> viewportSelector;
+    private final AbstractSectionRenderer sectionRenderer;
     private final ModelBakerySubsystem modelService;
     private final RenderGenerationService renderGen;
 
     public RenderService(WorldEngine world) {
         this.modelService = new ModelBakerySubsystem(world.getMapper());
+        this.sectionRenderer = new MDICSectionRenderer();
         this.renderGen = new RenderGenerationService(world, this.modelService, VoxyConfig.CONFIG.renderThreads, this::consumeRenderBuildResult, false);
+
+        this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
+
+
         for(int x = -200; x<=200;x++) {
             for (int z = -200; z <= 200; z++) {
                 for (int y = -3; y <= 3; y++) {
@@ -53,15 +62,13 @@ public class RenderService {
         this.renderGen.addDebugData(debug);
     }
 
-    public Viewport<?> createViewport() {
-        return new RenderServiceViewport();
-    }
-
-
-
-
     public void shutdown() {
         this.modelService.shutdown();
         this.renderGen.shutdown();
+        this.viewportSelector.free();
+    }
+
+    public Viewport<?> getViewport() {
+        return this.viewportSelector.getViewport();
     }
 }

@@ -15,7 +15,6 @@ import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.boss.BossBar;
-import net.minecraft.registry.RegistryKeys;
 import net.minecraft.text.Text;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.world.World;
@@ -53,7 +52,6 @@ public class VoxelCore {
     private final WorldEngine world;
 
     private final RenderService renderer;
-    private final ViewportSelector viewportSelector;
     private final PostProcessing postProcessing;
 
     //private final Thread shutdownThread = new Thread(this::shutdown);
@@ -70,7 +68,6 @@ public class VoxelCore {
 
         this.renderer = new RenderService(this.world);
         System.out.println("Using " + this.renderer.getClass().getSimpleName());
-        this.viewportSelector = new ViewportSelector<>(this.renderer::createViewport);
         this.postProcessing = new PostProcessing();
 
         System.out.println("Voxy core initialized");
@@ -116,7 +113,7 @@ public class VoxelCore {
 
         var projection = computeProjectionMat();
 
-        var viewport = this.viewportSelector.getViewport();
+        var viewport = this.renderer.getViewport();
         viewport
                 .setProjection(projection)
                 .setModelView(matrices.peek().getPositionMatrix())
@@ -171,7 +168,7 @@ public class VoxelCore {
             try {this.importer.shutdown();this.importer = null;} catch (Exception e) {e.printStackTrace();}
         }
         System.out.println("Shutting down rendering");
-        try {this.renderer.shutdown(); this.viewportSelector.free();} catch (Exception e) {e.printStackTrace();}
+        try {this.renderer.shutdown();} catch (Exception e) {e.printStackTrace();}
         System.out.println("Shutting down post processor");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {e.printStackTrace();}}
         System.out.println("Shutting down world engine");

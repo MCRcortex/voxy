@@ -5,9 +5,26 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.geometry.OLD.Gl46HierarchicalViewport;
 
 //Uses MDIC to render the sections
-public class MDICSectionRenderer extends AbstractSectionRenderer {
-    @Override
-    public void renderOpaque(Gl46HierarchicalViewport viewport, GlBuffer renderList) {
+public class MDICSectionRenderer extends AbstractSectionRenderer<BasicViewport> {
 
+
+    @Override
+    public void renderOpaque(BasicViewport viewport) {
+
+    }
+
+    @Override
+    public void buildDrawCallsAndRenderTemporal(BasicViewport viewport, GlBuffer sectionRenderList) {
+
+    }
+
+    @Override
+    public void renderTranslucent(BasicViewport viewport) {
+
+    }
+
+    @Override
+    public BasicViewport createViewport() {
+        return new BasicViewport();
     }
 }

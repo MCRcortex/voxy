@@ -131,8 +131,8 @@ public class BakedBlockEntityModel {
             return null;
         }
         var renderer = MinecraftClient.getInstance().getBlockEntityRenderDispatcher().get(entity);
+        entity.setWorld(MinecraftClient.getInstance().world);
         if (renderer != null) {
-            entity.setWorld(MinecraftClient.getInstance().world);
             try {
                 renderer.render(entity, 0.0f, new MatrixStack(), layer->map.computeIfAbsent(layer, BakedVertices::new), 0, 0);
             } catch (Exception e) {
