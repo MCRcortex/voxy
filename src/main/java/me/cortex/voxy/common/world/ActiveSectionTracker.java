@@ -66,7 +66,7 @@ public class ActiveSectionTracker {
             //TODO: REWRITE THE section tracker _again_ to not be so shit and jank, and so that Arrays.fill is not 10% of the execution time
             if (status == 1) {
                 //We need to set the data to air as it is undefined state
-                Arrays.fill(section.data, Mapper.withLight(Mapper.AIR, 15));//Since lighting is inverted
+                Arrays.fill(section.data, 0);//Max skylight
             }
             section.acquire();
             holder.obj = section;
