@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.config.VoxyConfig;
+import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
@@ -14,6 +15,7 @@ import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.client.render.Camera;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.lwjgl.opengl.ARBDirectStateAccess.glGetNamedFramebufferAttachmentParameteri;

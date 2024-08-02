@@ -22,6 +22,7 @@ public class HierarchicalOcclusionTraverser {
     private final GlBuffer requestBuffer;
 
     private final GlBuffer nodeBuffer;
+    private final GlBuffer uniformBuffer = new GlBuffer(1024);
 
     private final HiZBuffer hiZBuffer = new HiZBuffer();
 
@@ -79,5 +80,6 @@ public class HierarchicalOcclusionTraverser {
         this.requestBuffer.free();
         this.hiZBuffer.free();
         this.nodeBuffer.free();
+        this.uniformBuffer.free();
     }
 }

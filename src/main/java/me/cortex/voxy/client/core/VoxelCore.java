@@ -80,6 +80,7 @@ public class VoxelCore {
 
     public void renderSetup(Frustum frustum, Camera camera) {
         this.renderer.setup(camera);
+        PrintfDebugUtil.tick();
     }
 
     private static Matrix4f makeProjectionMatrix(float near, float far) {
@@ -154,6 +155,8 @@ public class VoxelCore {
         debug.add("I/S tasks: " + this.world.ingestService.getTaskCount() + "/"+this.world.savingService.getTaskCount());
         debug.add("SCS: " + Arrays.toString(this.world.getLoadedSectionCacheSizes()));
         this.renderer.addDebugData(debug);
+
+        PrintfDebugUtil.addToOut(debug);
     }
 
     //Note: when doing translucent rendering, only need to sort when generating the geometry, or when crossing into the center zone
