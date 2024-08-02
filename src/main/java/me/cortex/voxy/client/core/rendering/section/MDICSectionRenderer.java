@@ -6,8 +6,6 @@ import me.cortex.voxy.client.core.rendering.geometry.OLD.Gl46HierarchicalViewpor
 
 //Uses MDIC to render the sections
 public class MDICSectionRenderer extends AbstractSectionRenderer<BasicViewport> {
-
-
     @Override
     public void renderOpaque(BasicViewport viewport) {
 
@@ -26,5 +24,10 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<BasicViewport> 
     @Override
     public BasicViewport createViewport() {
         return new BasicViewport();
+    }
+
+    @Override
+    public void free() {
+
     }
 }

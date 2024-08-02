@@ -9,6 +9,6 @@ public abstract class AbstractSectionRenderer <T extends Viewport<T>> {
     public abstract void renderOpaque(T viewport);
     public abstract void buildDrawCallsAndRenderTemporal(T viewport, GlBuffer sectionRenderList);
     public abstract void renderTranslucent(T viewport);
-
     public abstract T createViewport();
+    public abstract void free();
 }

@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.model;
 
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
+import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.common.world.other.Mapper;
 import org.lwjgl.opengl.GL11;
