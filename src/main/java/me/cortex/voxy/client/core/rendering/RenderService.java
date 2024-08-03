@@ -51,14 +51,14 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         world.setDirtyCallback(this.nodeManager::sectionUpdate);
 
-        /*
+
         for(int x = -200; x<=200;x++) {
             for (int z = -200; z <= 200; z++) {
                 for (int y = -3; y <= 3; y++) {
                     this.renderGen.enqueueTask(0, x, y, z);
                 }
             }
-        }*/
+        }
     }
 
     //Cant do a lambda in the constructor cause "this.nodeManager" could be null??? even tho this does the exact same thing, java is stupid
