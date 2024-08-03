@@ -1,6 +1,7 @@
 package me.cortex.voxy.common.util;
 
 public class HierarchicalBitSet {
+    public static final int SET_FULL = -1;
     private final int limit;
     private int cnt;
     //If a bit is 1 it means all children are also set
@@ -24,7 +25,7 @@ public class HierarchicalBitSet {
             return -1;
         }
         if (this.cnt+1>this.limit) {
-            return -2;//Limit reached
+            return -1;//Limit reached
         }
         int idx = Long.numberOfTrailingZeros(~this.A);
         long bp = this.B[idx];

@@ -5,12 +5,17 @@ import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL20C;
 
+import static org.lwjgl.opengl.GL32.glGetInteger64;
+import static org.lwjgl.opengl.GL32C.glGetInteger64i;
+import static org.lwjgl.opengl.GL43C.GL_MAX_SHADER_STORAGE_BLOCK_SIZE;
+
 public class Capabilities {
 
     public static final Capabilities INSTANCE = new Capabilities();
 
     public final boolean meshShaders;
     public final boolean INT64_t;
+    public final long ssboMaxSize;
     public Capabilities() {
         var cap = GL.getCapabilities();
         this.meshShaders = cap.GL_NV_mesh_shader && cap.GL_NV_representative_fragment_test;
@@ -24,6 +29,8 @@ public class Capabilities {
                     uint64_t a = 1234;
                 }
                 """);
+
+        this.ssboMaxSize = glGetInteger64(GL_MAX_SHADER_STORAGE_BLOCK_SIZE);
     }
 
     public static void init() {

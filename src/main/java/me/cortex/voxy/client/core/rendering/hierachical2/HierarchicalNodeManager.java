@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.rendering.hierachical2;
 
 
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
+import me.cortex.voxy.common.world.WorldSection;
 import me.jellysquid.mods.sodium.client.util.MathUtil;
 import org.lwjgl.system.MemoryUtil;
 
@@ -31,6 +32,11 @@ public class HierarchicalNodeManager {
     }
 
     public void processBuildResult(BuiltSection section) {
+
+    }
+
+    //Called when a section is updated in the world engine
+    public void sectionUpdate(WorldSection section) {
 
     }
 }

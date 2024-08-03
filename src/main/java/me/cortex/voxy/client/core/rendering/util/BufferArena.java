@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.rendering.util;
 
+import me.cortex.voxy.client.core.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.util.AllocationArena;
 import me.cortex.voxy.common.util.MemoryBuffer;
@@ -16,6 +17,9 @@ public class BufferArena {
     public BufferArena(long capacity, int elementSize) {
         if (capacity%elementSize != 0) {
             throw new IllegalArgumentException("Capacity not a multiple of element size");
+        }
+        if (capacity > Capabilities.INSTANCE.ssboMaxSize) {
+            throw new IllegalArgumentException("Buffer is bigger than max ssbo size");
         }
         this.size = capacity;
         this.elementSize = elementSize;

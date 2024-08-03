@@ -21,13 +21,13 @@ import java.util.List;
 import static org.lwjgl.opengl.ARBDirectStateAccess.glGetNamedFramebufferAttachmentParameteri;
 import static org.lwjgl.opengl.GL42.*;
 
-public class RenderService<T extends AbstractSectionRenderer<J>, J extends Viewport<J>> {
-    private static AbstractSectionRenderer<?> createSectionRenderer() {
-        return new MDICSectionRenderer();
+public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Viewport<J>> {
+    private static AbstractSectionRenderer<?, ?> createSectionRenderer(int maxSectionCount, long geometryCapacity) {
+        return new MDICSectionRenderer(maxSectionCount, geometryCapacity);
     }
 
     private final ViewportSelector<?> viewportSelector;
-    private final AbstractSectionRenderer<J> sectionRenderer;
+    private final AbstractSectionRenderer<J, ?> sectionRenderer;
 
     private final HierarchicalNodeManager nodeManager;
     private final HierarchicalOcclusionTraverser traversal;
@@ -37,15 +37,19 @@ public class RenderService<T extends AbstractSectionRenderer<J>, J extends Viewp
 
     public RenderService(WorldEngine world) {
         this.modelService = new ModelBakerySubsystem(world.getMapper());
+
+        //Max sections: ~500k
+        //Max geometry: 1 gb
+        this.sectionRenderer = (T) createSectionRenderer(1<<19, 1<<30);
+
         this.nodeManager = new HierarchicalNodeManager(1<<21);
 
-        this.sectionRenderer = (T) createSectionRenderer();
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
-        this.renderGen = new RenderGenerationService(world, this.modelService, VoxyConfig.CONFIG.renderThreads, this::consumeBuiltSection, this.sectionRenderer instanceof IUsesMeshlets);
+        this.renderGen = new RenderGenerationService(world, this.modelService, VoxyConfig.CONFIG.renderThreads, this::consumeBuiltSection, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
 
         this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 512);
 
-        world.setDirtyCallback(section -> System.out.println("Section updated!!: " + WorldEngine.pprintPos(section.key)));
+        world.setDirtyCallback(this.nodeManager::sectionUpdate);
 
         /*
         for(int x = -200; x<=200;x++) {
