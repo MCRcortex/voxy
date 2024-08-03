@@ -32,7 +32,7 @@ public class HierarchicalNodeManager {
     }
 
     public void processBuildResult(BuiltSection section) {
-
+        section.free();
     }
 
     //Called when a section is updated in the world engine
