@@ -3,9 +3,9 @@ package me.cortex.voxy.client.core.rendering.hierarchical;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
-import me.cortex.voxy.client.core.rendering.geometry.OLD.AbstractFarWorldRenderer;
-import me.cortex.voxy.client.core.rendering.geometry.OLD.Gl46HierarchicalViewport;
+import me.cortex.voxy.client.core.rendering.RenderService;
 import me.cortex.voxy.client.core.rendering.SharedIndexBuffer;
+import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
@@ -36,7 +36,7 @@ public class DebugRenderer {
     private final GlBuffer uniformBuffer = new GlBuffer(1024).zero();
     private final GlBuffer drawBuffer = new GlBuffer(1024).zero();
 
-    private void uploadUniform(Gl46HierarchicalViewport viewport) {
+    private void uploadUniform(Viewport<?> viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 1024);
         int sx = MathHelper.floor(viewport.cameraX)>>5;
         int sy = MathHelper.floor(viewport.cameraY)>>5;
@@ -55,7 +55,7 @@ public class DebugRenderer {
         MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
     }
 
-    public void render(Gl46HierarchicalViewport viewport, GlBuffer nodeData, GlBuffer nodeList) {
+    public void render(Viewport<?> viewport, GlBuffer nodeData, GlBuffer nodeList) {
         this.uploadUniform(viewport);
         UploadStream.INSTANCE.commit();
 
@@ -67,7 +67,7 @@ public class DebugRenderer {
 
         glEnable(GL_DEPTH_TEST);
         this.debugShader.bind();
-        glBindVertexArray(AbstractFarWorldRenderer.STATIC_VAO);
+        glBindVertexArray(RenderService.STATIC_VAO);
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawBuffer.id);
         GL15.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BYTE.id());
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);

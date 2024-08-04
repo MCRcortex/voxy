@@ -4,7 +4,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
-import me.cortex.voxy.client.core.rendering.geometry.OLD.Gl46HierarchicalViewport;
+import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import net.minecraft.util.math.MathHelper;
@@ -46,7 +46,8 @@ public class HierarchicalOcclusionRenderer {
                 .compile();
     }
 
-    private void uploadUniform(Gl46HierarchicalViewport viewport) {
+
+    private void uploadUniform(Viewport<?> viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 1024);
         int sx = MathHelper.floor(viewport.cameraX)>>5;
         int sy = MathHelper.floor(viewport.cameraY)>>5;
@@ -71,7 +72,7 @@ public class HierarchicalOcclusionRenderer {
         MemoryUtil.memPutFloat(ptr, 64*64); ptr += 4;
     }
 
-    public void doHierarchicalTraversalSelection(Gl46HierarchicalViewport viewport, int depthBuffer, GlBuffer renderSelectionResult, GlBuffer debugNodeOutput) {
+    public void doHierarchicalTraversalSelection(Viewport<?> viewport, int depthBuffer, GlBuffer renderSelectionResult, GlBuffer debugNodeOutput) {
         this.uploadUniform(viewport);
         this.nodeManager.upload();
 
