@@ -22,6 +22,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.util.List;
 
 import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
+import static org.lwjgl.opengl.ARBIndirectParameters.glMultiDrawElementsIndirectCountARB;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.glBindBuffer;
@@ -32,23 +33,32 @@ import static org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex;
 import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
 import static org.lwjgl.opengl.GL42.glDrawElementsInstancedBaseVertexBaseInstance;
-import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
+import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL45.glBindTextureUnit;
 
 //Uses MDIC to render the sections
-public class MDICSectionRenderer extends AbstractSectionRenderer<BasicViewport, BasicSectionGeometryManager> {
+public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryManager> {
     private final Shader terrainShader = Shader.make()
             .add(ShaderType.VERTEX, "voxy:lod/gl46/quads2.vert")
             .add(ShaderType.FRAGMENT, "voxy:lod/gl46/quads.frag")
             .compile();
+
+
+    private final Shader commandGen = Shader.make()
+            .add(ShaderType.COMPUTE, "voxy:lod/gl46/cmdgen.comp")
+            .compile();
+
     private final GlBuffer uniform = new GlBuffer(1024).zero();
+
+    private final GlBuffer drawCountBuffer = new GlBuffer(64).zero();
+    private final GlBuffer drawCallBuffer  = new GlBuffer(5*4*400000).zero();//400k draw calls
 
     public MDICSectionRenderer(ModelStore modelStore, int maxSectionCount, long geometryCapacity) {
         super(modelStore, new BasicSectionGeometryManager(maxSectionCount, geometryCapacity));
     }
 
 
-    private void uploadUniformBuffer(BasicViewport viewport) {
+    private void uploadUniformBuffer(MDICViewport viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniform, 0, 1024);
 
         int sx = MathHelper.floor(viewport.cameraX)>>5;
@@ -77,16 +87,11 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<BasicViewport, 
         LightMapHelper.bind(5);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
-        //glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.glCommandBuffer.id);
-        //glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.glCommandCountBuffer.id);
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawCallBuffer.id);
+        glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.drawCountBuffer.id);
 
     }
 
-    //Prep the terrain draw calls for this frame, also sets up the
-    // remaining render pipeline for this frame
-    private void prepTerrainCallsAndPrep() {
-
-    }
 
     private void renderTerrain() {
         RenderLayer.getCutoutMipped().startDrawing();
@@ -97,12 +102,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<BasicViewport, 
         glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
         this.bindRenderingBuffers();
 
-        glDrawElementsInstancedBaseVertexBaseInstance(GL_TRIANGLES, 1000*6, GL_UNSIGNED_SHORT, 0,1,0,0);
-
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, Math.min((int)(this.geometryManager.getSectionCount()*4.4), 400_000), 0);
 
         glEnable(GL_CULL_FACE);
-
-
         glBindVertexArray(0);
         glBindSampler(0, 0);
         glBindTextureUnit(0, 0);
@@ -110,27 +112,45 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<BasicViewport, 
     }
 
     @Override
-    public void renderOpaque(BasicViewport viewport) {
+    public void renderOpaque(MDICViewport viewport) {
         if (this.geometryManager.getSectionCount() == 0) return;
+
+
+
+        //Tick the geometry manager to upload all invalidated metadata changes to the gpu before invoking the command gen shader
+        this.geometryManager.tick();
+
         this.uploadUniformBuffer(viewport);
+
+        //TODO compute the draw calls
+        {
+            this.commandGen.bind();
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.drawCallBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.drawCountBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBufferId());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.visibilityBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.indirectLookupBuffer.id);
+            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.drawCountBuffer.id);
+            glDispatchComputeIndirect(0);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        }
+
+        this.renderTerrain();
     }
 
     @Override
-    public void buildDrawCallsAndRenderTemporal(BasicViewport viewport, GlBuffer sectionRenderList) {
+    public void buildDrawCallsAndRenderTemporal(MDICViewport viewport, GlBuffer sectionRenderList) {
         //Can do a sneeky trick, since the sectionRenderList is a list to things to render, it invokes the culler
         // which only marks visible sections
 
-
-
-        //Tick the geometry manager to upload all invalidated metadata changes to the gpu
-        this.geometryManager.tick();
 
 
         this.renderTerrain();
     }
 
     @Override
-    public void renderTranslucent(BasicViewport viewport) {
+    public void renderTranslucent(MDICViewport viewport) {
 
     }
 
@@ -141,8 +161,8 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<BasicViewport, 
     }
 
     @Override
-    public BasicViewport createViewport() {
-        return new BasicViewport();
+    public MDICViewport createViewport() {
+        return new MDICViewport();
     }
 
     @Override
@@ -150,5 +170,6 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<BasicViewport, 
         super.free();
         this.uniform.free();
         this.terrainShader.free();
+        this.commandGen.free();
     }
 }

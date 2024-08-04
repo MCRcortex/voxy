@@ -3,6 +3,12 @@
 
 layout(local_size_x = 128) in;
 
+#define DRAW_BUFFER_BINDING 1
+#define DRAW_COUNT_BUFFER_BINDING 2
+#define SECTION_METADA_BUFFER_BINDING 3
+#define VISIBILITY_BUFFER_BINDING 4
+#define INDIRECT_SECTION_LOOKUP_BINDING 5
+
 #import <voxy:lod/quad_format.glsl>
 #import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/section.glsl>
@@ -42,13 +48,16 @@ void main() {
     if (gl_GlobalInvocationID.x >= sectionCount) {
         return;
     }
-    SectionMeta meta = sectionData[gl_GlobalInvocationID.x];
+    uint sectionId = indirectLookup[gl_GlobalInvocationID.x];
+    SectionMeta meta = sectionData[sectionId];
     uint detail = extractDetail(meta);
     ivec3 ipos = extractPosition(meta);
 
     vec3 cornerPos = vec3(((ipos<<detail)-baseSectionPos)<<5)-cameraSubPos;
 
 
+    //Note! its not with respect to the sectionId
+    //
     //Check the occlusion data from last frame
     bool shouldRender = visibilityData[gl_GlobalInvocationID.x] == frameId - 1;
 
