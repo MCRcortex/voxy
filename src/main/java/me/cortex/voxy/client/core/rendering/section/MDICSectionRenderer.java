@@ -8,11 +8,7 @@ import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.LightMapHelper;
 import me.cortex.voxy.client.core.rendering.RenderService;
 import me.cortex.voxy.client.core.rendering.SharedIndexBuffer;
-import me.cortex.voxy.client.core.rendering.geometry.OLD.AbstractFarWorldRenderer;
-import me.cortex.voxy.client.core.rendering.geometry.OLD.AbstractGeometryManager;
-import me.cortex.voxy.client.core.rendering.geometry.OLD.Gl46HierarchicalViewport;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
-import me.cortex.voxy.client.mixin.joml.AccessFrustumIntersection;
 import net.minecraft.client.render.RenderLayer;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
@@ -29,12 +25,11 @@ import static org.lwjgl.opengl.GL15.glBindBuffer;
 import static org.lwjgl.opengl.GL30.glBindBufferBase;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
 import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
-import static org.lwjgl.opengl.GL32.glDrawElementsInstancedBaseVertex;
 import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
-import static org.lwjgl.opengl.GL42.glDrawElementsInstancedBaseVertexBaseInstance;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL45.glBindTextureUnit;
+import static org.lwjgl.opengl.GL45.glCopyNamedBufferSubData;
 
 //Uses MDIC to render the sections
 public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryManager> {
@@ -43,14 +38,23 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             .add(ShaderType.FRAGMENT, "voxy:lod/gl46/quads.frag")
             .compile();
 
-
-    private final Shader commandGen = Shader.make()
+    private final Shader commandGenShader = Shader.make()
             .add(ShaderType.COMPUTE, "voxy:lod/gl46/cmdgen.comp")
+            .compile();
+
+    private final Shader prepShader = Shader.make()
+            .add(ShaderType.COMPUTE, "voxy:lod/gl46/prep.comp")
+            .compile();
+
+    private final Shader cullShader = Shader.make()
+            .add(ShaderType.VERTEX, "voxy:lod/gl46/cull/raster.vert")
+            .add(ShaderType.FRAGMENT, "voxy:lod/gl46/cull/raster.frag")
             .compile();
 
     private final GlBuffer uniform = new GlBuffer(1024).zero();
 
-    private final GlBuffer drawCountBuffer = new GlBuffer(64).zero();
+    //TODO: needs to be in the viewport, since it contains the compute indirect call/values
+    private final GlBuffer drawCountCallBuffer = new GlBuffer(1024).zero();
     private final GlBuffer drawCallBuffer  = new GlBuffer(5*4*400000).zero();//400k draw calls
 
     public MDICSectionRenderer(ModelStore modelStore, int maxSectionCount, long geometryCapacity) {
@@ -72,7 +76,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         MemoryUtil.memPutInt(ptr, sx); ptr += 4;
         MemoryUtil.memPutInt(ptr, sy); ptr += 4;
         MemoryUtil.memPutInt(ptr, sz); ptr += 4;
-        MemoryUtil.memPutInt(ptr, viewport.frameId++); ptr += 4;
+        MemoryUtil.memPutInt(ptr, viewport.frameId); ptr += 4;
         innerTranslation.getToAddress(ptr); ptr += 4*3;
 
         UploadStream.INSTANCE.commit();
@@ -88,7 +92,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawCallBuffer.id);
-        glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.drawCountBuffer.id);
+        glBindBuffer(GL_PARAMETER_BUFFER_ARB, this.drawCountCallBuffer.id);
 
     }
 
@@ -102,7 +106,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glBindVertexArray(RenderService.STATIC_VAO);//Needs to be before binding
         this.bindRenderingBuffers();
 
-        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 0, Math.min((int)(this.geometryManager.getSectionCount()*4.4), 400_000), 0);
+        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, 0, 4*3, Math.min((int)(this.geometryManager.getSectionCount()*4.4), 400_000), 0);
 
         glEnable(GL_CULL_FACE);
         glBindVertexArray(0);
@@ -124,16 +128,16 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         //TODO compute the draw calls
         {
-            this.commandGen.bind();
+            this.commandGenShader.bind();
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.drawCallBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.drawCountBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.drawCountCallBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBufferId());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.visibilityBuffer.id);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.indirectLookupBuffer.id);
-            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.drawCountBuffer.id);
+            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.drawCountCallBuffer.id);
             glDispatchComputeIndirect(0);
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+            glMemoryBarrier(GL_COMMAND_BARRIER_BIT);
         }
 
         this.renderTerrain();
@@ -146,7 +150,39 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
 
 
-        this.renderTerrain();
+        //TODO: dont do a copy
+        // make it so that the viewport contains the original indirectLookupBuffer list!!!
+        // that way dont need to copy the array
+        glCopyNamedBufferSubData(sectionRenderList.id, viewport.indirectLookupBuffer.id, 0, 0, sectionRenderList.size());
+
+        {//Dispatch prep
+            this.prepShader.bind();
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.drawCountCallBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, sectionRenderList.id);
+            glDispatchCompute(1,1,1);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+        }
+
+        {//Test occlusion
+            this.cullShader.bind();
+            glBindVertexArray(RenderService.STATIC_VAO);
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getMetadataBufferId());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.visibilityBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, viewport.indirectLookupBuffer.id);
+            glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawCountCallBuffer.id);
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
+            glEnable(GL_DEPTH_TEST);
+            glColorMask(false, false, false, false);
+            glDepthMask(false);
+            glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_BYTE, 6*4);
+            glDepthMask(true);
+            glColorMask(true, true, true, true);
+            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+            glDisable(GL_DEPTH_TEST);
+        }
+
     }
 
     @Override
@@ -170,6 +206,10 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         super.free();
         this.uniform.free();
         this.terrainShader.free();
-        this.commandGen.free();
+        this.commandGenShader.free();
+        this.cullShader.free();
+        this.prepShader.free();
+        this.drawCallBuffer.free();
+        this.drawCountCallBuffer.free();
     }
 }

@@ -55,8 +55,8 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         world.setDirtyCallback(this.nodeManager::sectionUpdate);
 
 
-        for(int x = -10; x<=10;x++) {
-            for (int z = -10; z <= 10; z++) {
+        for(int x = -1; x<=1;x++) {
+            for (int z = -1; z <= 1; z++) {
                 for (int y = -3; y <= 3; y++) {
                     this.renderGen.enqueueTask(0, x, y, z);
                 }
@@ -104,7 +104,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         int depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
         this.traversal.doTraversal(viewport, depthBuffer);
 
-        this.sectionRenderer.buildDrawCallsAndRenderTemporal(viewport, null);
+        this.sectionRenderer.buildDrawCallsAndRenderTemporal(viewport, this.traversal.getRenderListBuffer());
     }
 
     public void renderFarAwayTranslucent(J viewport) {

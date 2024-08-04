@@ -1,6 +1,11 @@
 #version 460 core
 #extension GL_ARB_gpu_shader_int64 : enable
 #define VISIBILITY_ACCESS writeonly
+
+#define SECTION_METADATA_BUFFER_BINDING 1
+#define VISIBILITY_BUFFER_BINDING 2
+#define INDIRECT_SECTION_LOOKUP_BINDING 3
+
 #import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/section.glsl>
 
@@ -8,7 +13,7 @@ flat out uint id;
 flat out uint value;
 
 void main() {
-    uint sid = gl_InstanceID;
+    uint sid = indirectLookup[gl_InstanceID];
 
     SectionMeta section = sectionData[sid];
 
@@ -25,6 +30,6 @@ void main() {
     gl_Position = MVP * vec4(vec3(pos),1);
 
     //Write to this id
-    id = sid;
+    id = gl_InstanceID;//Note!! we write to the instance id _not_ the section id
     value = frameId;
 }

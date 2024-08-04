@@ -60,13 +60,17 @@ layout(binding = DRAW_COUNT_BUFFER_BINDING, std430) restrict buffer DrawCommandC
     uint cmdGenDispatchX;
     uint cmdGenDispatchY;
     uint cmdGenDispatchZ;
+
     uint opaqueDrawCount;
     uint translucentDrawCount;
+
+    uint pad_A;
+    DrawCommand cullDrawIndirectCommand;
 };
 #endif
 
-#ifdef SECTION_METADA_BUFFER_BINDING
-layout(binding = SECTION_METADA_BUFFER_BINDING, std430) readonly restrict buffer SectionBuffer {
+#ifdef SECTION_METADATA_BUFFER_BINDING
+layout(binding = SECTION_METADATA_BUFFER_BINDING, std430) readonly restrict buffer SectionBuffer {
     SectionMeta sectionData[];
 };
 #endif

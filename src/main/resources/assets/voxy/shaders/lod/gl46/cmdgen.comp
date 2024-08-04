@@ -5,7 +5,7 @@ layout(local_size_x = 128) in;
 
 #define DRAW_BUFFER_BINDING 1
 #define DRAW_COUNT_BUFFER_BINDING 2
-#define SECTION_METADA_BUFFER_BINDING 3
+#define SECTION_METADATA_BUFFER_BINDING 3
 #define VISIBILITY_BUFFER_BINDING 4
 #define INDIRECT_SECTION_LOOKUP_BINDING 5
 
@@ -97,8 +97,8 @@ void main() {
         //Translucency
         count = meta.cntA&0xFFFF;
         if (count != 0) {
-            uint translucentCommandPtr = atomicAdd(translucentDrawCount, 1) + 400000;//FIXME: dont hardcode this offset
-            writeCmd(translucentCommandPtr, encodedPos, ptr, count);
+            //uint translucentCommandPtr = atomicAdd(translucentDrawCount, 1) + 400000;//FIXME: dont hardcode this offset
+            //writeCmd(translucentCommandPtr, encodedPos, ptr, count);
         }
         ptr += count;
 

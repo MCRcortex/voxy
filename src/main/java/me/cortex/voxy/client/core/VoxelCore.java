@@ -113,7 +113,7 @@ public class VoxelCore {
         matrices.translate(-cameraX, -cameraY, -cameraZ);
         matrices.pop();
 
-        var projection = computeProjectionMat();
+        var projection = computeProjectionMat();//RenderSystem.getProjectionMatrix();
 
         var viewport = this.renderer.getViewport();
         viewport
@@ -121,6 +121,7 @@ public class VoxelCore {
                 .setModelView(matrices.peek().getPositionMatrix())
                 .setCamera(cameraX, cameraY, cameraZ)
                 .setScreenSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight);
+        viewport.frameId++;
 
         int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         if (boundFB == 0) {

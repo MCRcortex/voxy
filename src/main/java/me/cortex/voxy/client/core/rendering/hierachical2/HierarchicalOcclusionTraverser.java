@@ -22,7 +22,8 @@ public class HierarchicalOcclusionTraverser {
     private final GlBuffer requestBuffer;
 
     private final GlBuffer nodeBuffer;
-    private final GlBuffer uniformBuffer = new GlBuffer(1024);
+    private final GlBuffer uniformBuffer = new GlBuffer(1024).zero();
+    private final GlBuffer renderList = new GlBuffer(100_000 * 4 + 4).zero();//100k sections max to render
 
     private final HiZBuffer hiZBuffer = new HiZBuffer();
 
@@ -50,6 +51,15 @@ public class HierarchicalOcclusionTraverser {
         // TODO: swap to persistent gpu thread instead
 
 
+        long uploadPtr = UploadStream.INSTANCE.upload(this.renderList, 0, 1024);
+
+        MemoryUtil.memPutInt(uploadPtr, 1024/4-1);
+        for (int i = 1; i < 1024/4; i++) {
+            MemoryUtil.memPutInt(uploadPtr + 4*i, i-1);
+        }
+
+        UploadStream.INSTANCE.commit();
+
         this.downloadResetRequestQueue();
     }
 
@@ -58,6 +68,10 @@ public class HierarchicalOcclusionTraverser {
         DownloadStream.INSTANCE.download(this.requestBuffer, this::forwardDownloadResult);
         DownloadStream.INSTANCE.commit();
         nglClearNamedBufferSubData(this.requestBuffer.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+    }
+
+    public GlBuffer getRenderListBuffer() {
+        return this.renderList;
     }
 
     private void forwardDownloadResult(long ptr, long size) {
@@ -81,5 +95,6 @@ public class HierarchicalOcclusionTraverser {
         this.hiZBuffer.free();
         this.nodeBuffer.free();
         this.uniformBuffer.free();
+        this.renderList.free();
     }
 }

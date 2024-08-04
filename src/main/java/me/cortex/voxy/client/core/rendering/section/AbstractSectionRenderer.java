@@ -4,7 +4,6 @@ package me.cortex.voxy.client.core.rendering.section;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.Viewport;
-import me.cortex.voxy.client.core.rendering.geometry.OLD.AbstractGeometryManager;
 
 import java.util.List;
 
