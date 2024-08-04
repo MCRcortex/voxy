@@ -25,6 +25,7 @@ public class SharedIndexBuffer {
 
         quadIndexBuff.free();
         cubeBuff.free();
+        UploadStream.INSTANCE.commit();
     }
 
     private SharedIndexBuffer(boolean type2) {

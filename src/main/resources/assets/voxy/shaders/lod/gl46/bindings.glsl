@@ -1,15 +1,10 @@
 #line 1
-struct Frustum {
-    vec4 planes[6];
-};
 
 layout(binding = 0, std140) uniform SceneUniform {
     mat4 MVP;
     ivec3 baseSectionPos;
-    int sectionCount;
-    Frustum frustum;
-    vec3 cameraSubPos;
     uint frameId;
+    vec3 cameraSubPos;
 };
 
 struct BlockModel {
@@ -39,44 +34,63 @@ struct DrawCommand {
     uint  baseInstance;
 };
 
-layout(binding = 0) uniform sampler2D blockModelAtlas;
+
+#ifdef BLOCK_MODEL_TEXTURE_BINDING
+layout(binding = BLOCK_MODEL_TEXTURE_BINDING) uniform sampler2D blockModelAtlas;
+#endif
+
 
 #ifndef Quad
 #define Quad ivec2
 #endif
-layout(binding = 1, std430) readonly restrict buffer QuadBuffer {
+#ifdef QUAD_BUFFER_BINDING
+layout(binding = QUAD_BUFFER_BINDING, std430) readonly restrict buffer QuadBuffer {
     Quad quadData[];
 };
+#endif
 
-layout(binding = 2, std430) writeonly restrict buffer DrawBuffer {
+#ifdef DRAW_BUFFER_BINDING
+layout(binding = DRAW_BUFFER_BINDING, std430) writeonly restrict buffer DrawBuffer {
     DrawCommand cmdBuffer[];
 };
+#endif
 
-layout(binding = 3, std430) restrict buffer DrawCommandCountBuffer {
+#ifdef DRAW_COUNT_BUFFER_BINDING
+layout(binding = DRAW_COUNT_BUFFER_BINDING, std430) restrict buffer DrawCommandCountBuffer {
     uint opaqueDrawCount;
     uint translucentDrawCount;
 };
+#endif
 
-layout(binding = 4, std430) readonly restrict buffer SectionBuffer {
+#ifdef SECTION_METADA_BUFFER_BINDING
+layout(binding = SECTION_METADA_BUFFER_BINDING, std430) readonly restrict buffer SectionBuffer {
     SectionMeta sectionData[];
 };
+#endif
 
 #ifndef VISIBILITY_ACCESS
 #define VISIBILITY_ACCESS readonly
 #endif
-layout(binding = 5, std430) VISIBILITY_ACCESS restrict buffer VisibilityBuffer {
+#ifdef VISIBILITY_BUFFER_BINDING
+layout(binding = VISIBILITY_BUFFER_BINDING, std430) VISIBILITY_ACCESS restrict buffer VisibilityBuffer {
     uint visibilityData[];
 };
+#endif
 
-layout(binding = 6, std430) readonly restrict buffer ModelBuffer {
+#ifdef MODEL_BUFFER_BINDING
+layout(binding = MODEL_BUFFER_BINDING, std430) readonly restrict buffer ModelBuffer {
     BlockModel modelData[];
 };
+#endif
 
-layout(binding = 7, std430) readonly restrict buffer ModelColourBuffer {
+#ifdef MODEL_COLOUR_BUFFER_BINDING
+layout(binding = MODEL_COLOUR_BUFFER_BINDING, std430) readonly restrict buffer ModelColourBuffer {
     uint colourData[];
 };
+#endif
 
-layout(binding = 8, std430) readonly restrict buffer LightingBuffer {
+#ifdef LIGHTING_BUFFER_BINDING
+layout(binding = LIGHTING_BUFFER_BINDING, std430) readonly restrict buffer LightingBuffer {
     uint lightData[];
 };
 
@@ -86,5 +100,5 @@ vec4 getLighting(uint index) {
     arr = arr & uvec4(0xFF);
     return vec4(arr)*vec4(1.0f/255.0f);
 }
-
+#endif
 

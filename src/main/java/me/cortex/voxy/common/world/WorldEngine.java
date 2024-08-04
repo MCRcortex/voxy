@@ -118,6 +118,7 @@ public class WorldEngine {
     public void insertUpdate(VoxelizedSection section) {//TODO: add a bitset of levels to update and if it should force update
         //The >>1 is cause the world sections size is 32x32x32 vs the 16x16x16 of the voxelized section
         for (int lvl = 0; lvl < this.maxMipLevels; lvl++) {
+            int nonAirCountDelta = 0;
             var worldSection = this.acquire(lvl, section.x >> (lvl + 1), section.y >> (lvl + 1), section.z >> (lvl + 1));
             int msk = (1<<(lvl+1))-1;
             int bx = (section.x&msk)<<(4-lvl);
@@ -129,10 +130,18 @@ public class WorldEngine {
                     for (int x = bx; x < (16>>lvl)+bx; x++) {
                         long newId = section.get(lvl, x-bx, y-by, z-bz);
                         long oldId = worldSection.set(x, y, z, newId);
+                        nonAirCountDelta += Mapper.isAir(oldId)==Mapper.isAir(newId)?0:(Mapper.isAir(newId)?-1:1 );
                         didChange |= newId != oldId;
                     }
                 }
             }
+
+            //Branch into 2 paths, if at lod 0, update the atomic count, if that update resulted in a state transition
+            // then aquire the next lod, lock it, recheck our counter, if it is still ok, then atomically update the parent metadata
+            //if not lod 0 check that the current occupied state matches the parent lod bit
+            // if it doesnt, aquire and lock the next lod level
+            // and do the update propagation
+
 
             //Need to release the section after using it
             if (didChange) {

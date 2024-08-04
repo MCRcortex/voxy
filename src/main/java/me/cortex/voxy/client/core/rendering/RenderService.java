@@ -1,8 +1,8 @@
 package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.gl.shader.PrintfInjector;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
+import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalNodeManager;
@@ -15,15 +15,16 @@ import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.client.render.Camera;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
-import static org.lwjgl.opengl.ARBDirectStateAccess.glGetNamedFramebufferAttachmentParameteri;
 import static org.lwjgl.opengl.GL42.*;
 
 public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Viewport<J>> {
-    private static AbstractSectionRenderer<?, ?> createSectionRenderer(int maxSectionCount, long geometryCapacity) {
-        return new MDICSectionRenderer(maxSectionCount, geometryCapacity);
+    public static final int STATIC_VAO = glGenVertexArrays();
+
+    private static AbstractSectionRenderer<?, ?> createSectionRenderer(ModelStore store, int maxSectionCount, long geometryCapacity) {
+        return new MDICSectionRenderer(store, maxSectionCount, geometryCapacity);
     }
 
     private final ViewportSelector<?> viewportSelector;
@@ -34,26 +35,28 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     private final ModelBakerySubsystem modelService;
     private final RenderGenerationService renderGen;
 
+    private final ConcurrentLinkedDeque<BuiltSection> sectionBuildResultQueue = new ConcurrentLinkedDeque<>();
+
 
     public RenderService(WorldEngine world) {
         this.modelService = new ModelBakerySubsystem(world.getMapper());
 
         //Max sections: ~500k
         //Max geometry: 1 gb
-        this.sectionRenderer = (T) createSectionRenderer(1<<19, 1<<30);
+        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<19, (1L<<30)-1024);
 
-        this.nodeManager = new HierarchicalNodeManager(1<<21);
+        this.nodeManager = new HierarchicalNodeManager(1<<21, this.sectionRenderer.getGeometryManager());
 
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
-        this.renderGen = new RenderGenerationService(world, this.modelService, VoxyConfig.CONFIG.renderThreads, this::consumeBuiltSection, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
+        this.renderGen = new RenderGenerationService(world, this.modelService, VoxyConfig.CONFIG.renderThreads, this.sectionBuildResultQueue::add, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
 
         this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 512);
 
         world.setDirtyCallback(this.nodeManager::sectionUpdate);
 
 
-        for(int x = -200; x<=200;x++) {
-            for (int z = -200; z <= 200; z++) {
+        for(int x = -10; x<=10;x++) {
+            for (int z = -10; z <= 10; z++) {
                 for (int y = -3; y <= 3; y++) {
                     this.renderGen.enqueueTask(0, x, y, z);
                 }
@@ -61,14 +64,13 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         }
     }
 
-    //Cant do a lambda in the constructor cause "this.nodeManager" could be null??? even tho this does the exact same thing, java is stupid
-    private void consumeBuiltSection(BuiltSection section) {this.nodeManager.processBuildResult(section);}
-
     public void setup(Camera camera) {
         this.modelService.tick();
     }
 
     public void renderFarAwayOpaque(J viewport) {
+        LightMapHelper.tickLightmap();
+
         //Render previous geometry with the abstract renderer
         //Execute the hieracial selector
         // render delta sections
@@ -78,9 +80,23 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         this.sectionRenderer.renderOpaque(viewport);
 
+
         //NOTE: need to do the upload and download tick here, after the section renderer renders the world, to ensure "stable"
         // sections
-        DownloadStream.INSTANCE.tick();
+
+
+        //FIXME: we only want to tick once per full frame, this is due to how the data of sections is updated
+        // we basicly need the data to stay stable from one frame to the next, till after renderOpaque
+        // this is because e.g. shadows, cause this pipeline to be invoked multiple times
+        // which may cause the geometry to become outdated resulting in corruption rendering in renderOpaque
+        //TODO: Need to find a proper way to fix this (if there even is one)
+        if (true /* firstInvocationThisFrame */) {
+            DownloadStream.INSTANCE.tick();
+            //Process the build results here (this is done atomically/on the render thread)
+            while (!this.sectionBuildResultQueue.isEmpty()) {
+                this.nodeManager.processBuildResult(this.sectionBuildResultQueue.poll());
+            }
+        }
         UploadStream.INSTANCE.tick();
 
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_PIXEL_BUFFER_BARRIER_BIT);
@@ -98,6 +114,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     public void addDebugData(List<String> debug) {
         this.modelService.addDebugData(debug);
         this.renderGen.addDebugData(debug);
+        this.sectionRenderer.addDebug(debug);
     }
 
     public void shutdown() {
@@ -106,6 +123,9 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.viewportSelector.free();
         this.sectionRenderer.free();
         this.traversal.free();
+        //Release all the unprocessed built geometry
+        this.sectionBuildResultQueue.forEach(BuiltSection::free);
+        this.sectionBuildResultQueue.clear();
     }
 
     public Viewport<?> getViewport() {

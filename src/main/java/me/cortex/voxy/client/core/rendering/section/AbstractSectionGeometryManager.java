@@ -17,10 +17,11 @@ public abstract class AbstractSectionGeometryManager {
         this.geometryCapacity = geometryCapacity;
     }
 
+    //Note, calling uploadSection or uploadReplaceSection will free the supplied BuiltSection
     public int uploadSection(BuiltSection section) {return this.uploadReplaceSection(-1, section);}
     public abstract int uploadReplaceSection(int oldId, BuiltSection section);
     public abstract void removeSection(int id);
-    public void free() {
+    void tick() {}
 
-    }
+    public void free() {}
 }

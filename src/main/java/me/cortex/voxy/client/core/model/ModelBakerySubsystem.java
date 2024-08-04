@@ -74,4 +74,8 @@ public class ModelBakerySubsystem {
     public void addDebugData(List<String> debug) {
         debug.add("MQ/IF/MC: " + this.blockIdQueue.size() + "/" + this.factory.getInflightCount() + "/" + this.factory.getBakedCount());//Model bake queue/in flight/model baked count
     }
+
+    public ModelStore getStore() {
+        return this.storage;
+    }
 }

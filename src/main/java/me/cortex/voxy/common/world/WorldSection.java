@@ -6,6 +6,8 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 
 //Represents a loaded world section at a specific detail level
 // holds a 32x32x32 region of detail
@@ -21,7 +23,16 @@ public final class WorldSection {
     public final int z;
     public final long key;
 
+
+    //Serialized states
+    long metadata;
     long[] data = null;
+
+
+    //Computed on load, updated on insertion
+    private final AtomicInteger nonAirCount = new AtomicInteger(0);
+
+
     private final ActiveSectionTracker tracker;
     public final AtomicBoolean inSaveQueue = new AtomicBoolean();
 

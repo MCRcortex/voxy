@@ -19,7 +19,7 @@ public class BufferArena {
             throw new IllegalArgumentException("Capacity not a multiple of element size");
         }
         if (capacity > Capabilities.INSTANCE.ssboMaxSize) {
-            throw new IllegalArgumentException("Buffer is bigger than max ssbo size");
+            throw new IllegalArgumentException("Buffer is bigger than max ssbo size (requested " + capacity + " but has max of " + Capabilities.INSTANCE.ssboMaxSize+")");
         }
         this.size = capacity;
         this.elementSize = elementSize;
@@ -57,5 +57,9 @@ public class BufferArena {
 
     public float usage() {
         return (float) ((double)this.used/(this.buffer.size()/this.elementSize));
+    }
+
+    public long getUsedBytes() {
+        return this.used*this.elementSize;
     }
 }

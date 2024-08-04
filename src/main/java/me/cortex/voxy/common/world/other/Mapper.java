@@ -52,7 +52,9 @@ public class Mapper {
 
 
     public static boolean isAir(long id) {
-        return ((id>>27)&((1<<20)-1)) == 0;
+        int bId = getBlockId(id);
+        //Note: air can mean void, cave or normal air, as the block state is remapped during ingesting
+        return bId == 0;
     }
 
     public static int getBlockId(long id) {
@@ -185,6 +187,9 @@ public class Mapper {
 
     //TODO: replace lambda with a class cached lambda ref (cause doing this:: still does a lambda allocation)
     public int getIdForBlockState(BlockState state) {
+        if (state.isAir()) {
+            return 0;
+        }
         return this.block2stateEntry.computeIfAbsent(state, this::registerNewBlockState).id;
     }
 
