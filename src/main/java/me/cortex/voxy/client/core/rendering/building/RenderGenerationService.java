@@ -151,9 +151,15 @@ public class RenderGenerationService {
         this.enqueueTask(lvl, x, y, z, (l,x1,y1,z1)->true);
     }
 
+    public void enqueueTask(long position) {
+        this.enqueueTask(position, (l,x1,y1,z1)->true);
+    }
 
     public void enqueueTask(int lvl, int x, int y, int z, TaskChecker checker) {
-        long ikey = WorldEngine.getWorldSectionId(lvl, x, y, z);
+        this.enqueueTask(WorldEngine.getWorldSectionId(lvl, x, y, z), checker);
+    }
+
+    public void enqueueTask(long ikey, TaskChecker checker) {
         {
             var cache = this.meshCache.getMesh(ikey);
             if (cache != null) {
@@ -165,8 +171,8 @@ public class RenderGenerationService {
             this.taskQueue.computeIfAbsent(ikey, key->{
                 this.taskCounter.release();
                 return new BuildTask(ikey, ()->{
-                    if (checker.check(lvl, x, y, z)) {
-                        return this.world.acquireIfExists(lvl, x, y, z);
+                    if (checker.check(WorldEngine.getLevel(ikey), WorldEngine.getX(ikey), WorldEngine.getY(ikey), WorldEngine.getZ(ikey))) {
+                        return this.world.acquireIfExists(WorldEngine.getLevel(ikey), WorldEngine.getX(ikey), WorldEngine.getY(ikey), WorldEngine.getZ(ikey));
                     } else {
                         return null;
                     }

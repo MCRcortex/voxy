@@ -5,6 +5,7 @@ import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
+import me.cortex.voxy.client.core.rendering.building.SectionPositionUpdateFilterer;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalOcclusionTraverser;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
@@ -13,6 +14,7 @@ import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.common.world.WorldSection;
 import net.minecraft.client.render.Camera;
 
 import java.util.Arrays;
@@ -38,7 +40,6 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
     private final ConcurrentLinkedDeque<BuiltSection> sectionBuildResultQueue = new ConcurrentLinkedDeque<>();
 
-
     public RenderService(WorldEngine world) {
         this.modelService = new ModelBakerySubsystem(world.getMapper());
 
@@ -46,26 +47,21 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         //Max geometry: 1 gb
         this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<19, (1L<<30)-1024);
 
-        this.nodeManager = new HierarchicalNodeManager(1<<21, this.sectionRenderer.getGeometryManager());
+        //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
+        var positionFilterForwarder = new SectionPositionUpdateFilterer();
+
+        this.nodeManager = new HierarchicalNodeManager(1<<21, this.sectionRenderer.getGeometryManager(), positionFilterForwarder);
 
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
         this.renderGen = new RenderGenerationService(world, this.modelService, VoxyConfig.CONFIG.renderThreads, this.sectionBuildResultQueue::add, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
+        positionFilterForwarder.setCallback(this.renderGen::enqueueTask);
 
         this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 512);
 
-        world.setDirtyCallback(this.nodeManager::sectionUpdate);
+        world.setDirtyCallback(positionFilterForwarder::maybeForward);
 
         Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
-
-
-        for(int x = -1; x<=1;x++) {
-            for (int z = -1; z <= 1; z++) {
-                for (int y = -3; y <= 3; y++) {
-                    this.renderGen.enqueueTask(0, x, y, z);
-                }
-            }
-        }
     }
 
     public void setup(Camera camera) {
