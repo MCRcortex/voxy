@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering.hierachical2;
 
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
+import me.cortex.voxy.common.util.HierarchicalBitSet;
 import me.cortex.voxy.common.world.WorldSection;
 import me.jellysquid.mods.sodium.client.util.MathUtil;
 import org.lwjgl.system.MemoryUtil;
@@ -13,6 +14,7 @@ public class HierarchicalNodeManager {
     public final int maxNodeCount;
     private final long[] localNodeData;
     private final AbstractSectionGeometryManager geometryManager;
+    private final HierarchicalBitSet allocationSet;
 
     public HierarchicalNodeManager(int maxNodeCount, AbstractSectionGeometryManager geometryManager) {
         if (!MathUtil.isPowerOfTwo(maxNodeCount)) {
@@ -21,6 +23,7 @@ public class HierarchicalNodeManager {
         if (maxNodeCount>(1<<24)) {
             throw new IllegalArgumentException("Max node count cannot exceed 2^24");
         }
+        this.allocationSet = new HierarchicalBitSet(maxNodeCount);
         this.maxNodeCount = maxNodeCount;
         this.localNodeData = new long[maxNodeCount*4];
         this.geometryManager = geometryManager;

@@ -449,9 +449,16 @@ public class ModelFactory {
     }
 
     public void addBiome(int id, Biome biome) {
-        this.biomes.add(biome);
-        if (this.biomes.size()-1 != id) {
-            throw new IllegalStateException("Biome ordering not consistent with biome id for biome " + biome + " expected id: " + (this.biomes.size()-1) + " got id: " + id);
+        for (int i = this.biomes.size(); i <= id; i++) {
+            this.biomes.add(null);
+        }
+        var oldBiome = this.biomes.set(id, biome);
+
+        if (oldBiome != null && oldBiome != biome) {
+            throw new IllegalStateException("Biome was put in an id that was not null");
+        }
+        if (oldBiome == biome) {
+            System.err.println("Biome added was a duplicate");
         }
 
         int i = 0;
@@ -465,6 +472,9 @@ public class ModelFactory {
             MemoryUtil.memPutInt(UploadStream.INSTANCE.upload(this.storage.modelBuffer, (entry.getLeft()* MODEL_SIZE)+ 4*6 + 4, 4), biomeIndex);
             long clrUploadPtr = UploadStream.INSTANCE.upload(this.storage.modelColourBuffer, biomeIndex * 4L, 4L * this.biomes.size());
             for (var biomeE : this.biomes) {
+                if (biomeE == null) {
+                    continue;//If null, ignore
+                }
                 MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(colourProvider, entry.getRight(), biomeE)|0xFF000000); clrUploadPtr += 4;
             }
         }

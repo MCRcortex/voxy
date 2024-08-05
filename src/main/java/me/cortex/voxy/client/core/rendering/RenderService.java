@@ -15,6 +15,7 @@ import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.client.render.Camera;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -53,6 +54,9 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 512);
 
         world.setDirtyCallback(this.nodeManager::sectionUpdate);
+
+        Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
+        world.getMapper().setBiomeCallback(this.modelService::addBiome);
 
 
         for(int x = -1; x<=1;x++) {

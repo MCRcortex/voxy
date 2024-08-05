@@ -73,8 +73,11 @@ public class Mapper {
         return (id&(~(0xFFL<<56)))|(Integer.toUnsignedLong(light)<<56);
     }
 
-    public void setCallbacks(Consumer<StateEntry> stateCallback, Consumer<BiomeEntry> biomeCallback) {
+    public void setStateCallback(Consumer<StateEntry> stateCallback) {
         this.newStateCallback = stateCallback;
+    }
+
+    public void setBiomeCallback(Consumer<BiomeEntry> biomeCallback) {
         this.newBiomeCallback = biomeCallback;
     }
 

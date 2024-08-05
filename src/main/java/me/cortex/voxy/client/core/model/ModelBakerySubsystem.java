@@ -6,10 +6,14 @@ import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.common.world.other.Mapper;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.Identifier;
 import org.lwjgl.opengl.GL11;
 
 import java.lang.invoke.VarHandle;
 import java.util.List;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 import static org.lwjgl.opengl.ARBFramebufferObject.GL_COLOR_ATTACHMENT0;
 import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
@@ -26,6 +30,7 @@ public class ModelBakerySubsystem {
     private final ModelStore storage = new ModelStore();
     public final ModelFactory factory;
     private final IntLinkedOpenHashSet blockIdQueue = new IntLinkedOpenHashSet();
+    private final ConcurrentLinkedDeque<Mapper.BiomeEntry> biomeQueue = new ConcurrentLinkedDeque<>();
 
     public ModelBakerySubsystem(Mapper mapper) {
         this.factory = new ModelFactory(mapper, this.storage, this.textureDownStream);
@@ -50,6 +55,13 @@ public class ModelBakerySubsystem {
             }
         }
 
+        //Upload all biomes
+        while (!this.biomeQueue.isEmpty()) {
+            var biome = this.biomeQueue.poll();
+            var biomeReg = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME);
+            this.factory.addBiome(biome.id, biomeReg.get(Identifier.of(biome.biome)));
+        }
+
         //Submit is effectively free if nothing is submitted
         this.textureDownStream.submit();
 
@@ -69,6 +81,10 @@ public class ModelBakerySubsystem {
                 VarHandle.fullFence();//Ensure memory coherancy
             }
         }
+    }
+
+    public void addBiome(Mapper.BiomeEntry biomeEntry) {
+        this.biomeQueue.add(biomeEntry);
     }
 
     public void addDebugData(List<String> debug) {
