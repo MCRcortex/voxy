@@ -53,7 +53,7 @@ public class WorldEngine {
                     return 0;
                 }
             } finally {
-                MemoryUtil.memFree(data);
+                data.free();
             }
         } else {
             //TODO: if we need to fetch an lod from a server, send the request here and block until the request is finished

@@ -3,6 +3,9 @@ package me.cortex.voxy.common.storage.compressors;
 import me.cortex.voxy.common.storage.StorageCompressor;
 import me.cortex.voxy.common.storage.config.CompressorConfig;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
+import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.world.SaveLoadSystem;
+import me.cortex.voxy.common.world.service.SectionSavingService;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -26,10 +29,10 @@ public class ZSTDCompressor implements StorageCompressor {
     }
 
     @Override
-    public ByteBuffer decompress(ByteBuffer saveData) {
-        var decompressed = MemoryUtil.memAlloc(32*32*32*8*2);
-        long size = ZSTD_decompress(decompressed, saveData);
-        decompressed.limit((int) size);
+    public MemoryBuffer decompress(MemoryBuffer saveData) {
+        var decompressed = new MemoryBuffer(SaveLoadSystem.BIGGEST_SERIALIZED_SECTION_SIZE);
+        //TODO: mark the size of the decompressed data to verify its length later
+        long size = nZSTD_decompress(decompressed.address, decompressed.size, saveData.address, saveData.size);
         return decompressed;
     }
 

@@ -4,6 +4,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
+import me.cortex.voxy.common.util.MemoryBuffer;
+import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.util.List;
@@ -19,7 +21,7 @@ public class ReadonlyCachingLayer extends StorageBackend {
     }
 
     @Override
-    public ByteBuffer getSectionData(long key) {
+    public MemoryBuffer getSectionData(long key) {
         var result = this.cache.getSectionData(key);
         if (result != null) {
             return result;
@@ -37,7 +39,7 @@ public class ReadonlyCachingLayer extends StorageBackend {
     }
 
     @Override
-    public void setSectionData(long key, ByteBuffer data) {
+    public void setSectionData(long key, MemoryBuffer data) {
         this.cache.setSectionData(key, data);
     }
 

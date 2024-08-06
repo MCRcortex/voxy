@@ -3,6 +3,7 @@ package me.cortex.voxy.common.storage.other;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
+import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.world.WorldEngine;
 
 import java.nio.ByteBuffer;
@@ -47,7 +48,7 @@ public class TranslocatingStorageAdaptor extends DelegatingStorageAdaptor {
     }
 
     @Override
-    public ByteBuffer getSectionData(long key) {
+    public MemoryBuffer getSectionData(long key) {
         for (var transform : this.transforms) {
             long tpos = transform.transformIfInBox(key);
             if (tpos != -1) {
@@ -72,7 +73,7 @@ public class TranslocatingStorageAdaptor extends DelegatingStorageAdaptor {
     }
 
     @Override
-    public void setSectionData(long key, ByteBuffer data) {
+    public void setSectionData(long key, MemoryBuffer data) {
         //Dont save data if its a transformed position
         for (var transform : this.transforms) {
             long tpos = transform.transformIfInBox(key);

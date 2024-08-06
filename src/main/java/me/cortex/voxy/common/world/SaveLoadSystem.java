@@ -2,6 +2,8 @@ package me.cortex.voxy.common.world;
 
 import it.unimi.dsi.fastutil.longs.Long2ShortOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
+import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.util.UnsafeUtil;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -9,6 +11,7 @@ import java.nio.ByteBuffer;
 import static org.lwjgl.util.zstd.Zstd.*;
 
 public class SaveLoadSystem {
+    public static final int BIGGEST_SERIALIZED_SECTION_SIZE = 32 * 32 * 32 * 8 * 2;
 
     public static int lin2z(int i) {
         int x = i&0x1F;
@@ -25,7 +28,7 @@ public class SaveLoadSystem {
     }
 
     //TODO: Cache like long2short and the short and other data to stop allocs
-    public static ByteBuffer serialize(WorldSection section) {
+    public static MemoryBuffer serialize(WorldSection section) {
         var data = section.copyData();
         var compressed = new short[data.length];
         Long2ShortOpenHashMap LUT = new Long2ShortOpenHashMap(data.length);
@@ -62,21 +65,22 @@ public class SaveLoadSystem {
         }
 
         raw.putLong(hash);
-
-        raw.limit(raw.position());
-        raw.rewind();
-
-        return raw;
+        //The amount of memory copies are not ideal
+        var out = new MemoryBuffer(raw.position());
+        UnsafeUtil.memcpy(MemoryUtil.memAddress(raw), out.address, out.size);
+        MemoryUtil.memFree(raw);
+        return out;
     }
 
-    public static boolean deserialize(WorldSection section, ByteBuffer data, boolean ignoreMismatchPosition) {
+    public static boolean deserialize(WorldSection section, MemoryBuffer data, boolean ignoreMismatchPosition) {
+        long ptr = data.address;
         long hash = 0;
-        long key = data.getLong();
-        int lutLen = data.getInt();
+        long key = MemoryUtil.memGetLong(ptr); ptr += 8;
+        int lutLen = MemoryUtil.memGetInt(ptr); ptr += 4;
         long[] lut = new long[lutLen];
         hash = key^(lut.length*1293481298141L);
         for (int i = 0; i < lutLen; i++) {
-            lut[i] = data.getLong();
+            lut[i] = MemoryUtil.memGetLong(ptr); ptr += 8;
             hash *= 1230987149811L;
             hash += 12831;
             hash ^= lut[i];
@@ -89,7 +93,7 @@ public class SaveLoadSystem {
         }
 
         for (int i = 0; i < section.data.length; i++) {
-            section.data[z2lin(i)] = lut[data.getShort()];
+            section.data[z2lin(i)] = lut[MemoryUtil.memGetShort(ptr)]; ptr += 2;
         }
 
         long pHash = 99;
@@ -101,18 +105,13 @@ public class SaveLoadSystem {
         }
         hash ^= pHash;
 
-        long expectedHash = data.getLong();
+        long expectedHash = MemoryUtil.memGetLong(ptr); ptr += 8;
         if (expectedHash != hash) {
             //throw new IllegalStateException("Hash mismatch got: " + hash + " expected: " + expectedHash);
             System.err.println("Hash mismatch got: " + hash + " expected: " + expectedHash + " removing region");
             return false;
         }
 
-        if (data.hasRemaining()) {
-            //throw new IllegalStateException("Decompressed section had excess data");
-            System.err.println("Decompressed section had excess data removing region");
-            return false;
-        }
         return true;
     }
 }

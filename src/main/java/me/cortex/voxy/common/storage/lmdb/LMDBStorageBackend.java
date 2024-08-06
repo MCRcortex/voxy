@@ -4,6 +4,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
+import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.util.UnsafeUtil;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.util.lmdb.MDBVal;
 
@@ -89,7 +91,7 @@ public class LMDBStorageBackend extends StorageBackend {
     }
 
     //TODO: make batch get and updates
-    public ByteBuffer getSectionData(long key) {
+    public MemoryBuffer getSectionData(long key) {
         return this.synchronizedTransaction(() -> this.sectionDatabase.transaction(MDB_RDONLY, transaction->{
             var buff = transaction.stack.malloc(8);
             buff.putLong(0, key);
@@ -97,19 +99,19 @@ public class LMDBStorageBackend extends StorageBackend {
             if (bb == null) {
                 return null;
             }
-            var copy = MemoryUtil.memAlloc(bb.remaining());
-            MemoryUtil.memCopy(bb, copy);
+            var copy = new MemoryBuffer(bb.remaining());
+            UnsafeUtil.memcpy(MemoryUtil.memAddress(bb), copy.address, copy.size);
             return copy;
         }));
     }
 
     //TODO: pad data to like some alignemnt so that when the section gets saved or updated
     // it can use the same allocation
-    public void setSectionData(long key, ByteBuffer data) {
+    public void setSectionData(long key, MemoryBuffer data) {
         this.resizingTransaction(() -> this.sectionDatabase.transaction(transaction->{
             var keyBuff = transaction.stack.malloc(8);
             keyBuff.putLong(0, key);
-            transaction.put(keyBuff, data, 0);
+            transaction.put(keyBuff, MemoryUtil.memByteBuffer(data.address, (int) data.size), 0);
             return null;
         }));
     }

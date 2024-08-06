@@ -6,6 +6,7 @@ import me.cortex.voxy.common.storage.StorageCompressor;
 import me.cortex.voxy.common.storage.config.CompressorConfig;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
+import me.cortex.voxy.common.util.MemoryBuffer;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -22,12 +23,12 @@ public class DelegatingStorageAdaptor extends StorageBackend {
     public void iterateStoredSectionPositions(LongConsumer consumer) {this.delegate.iterateStoredSectionPositions(consumer);}
 
     @Override
-    public ByteBuffer getSectionData(long key) {
+    public MemoryBuffer getSectionData(long key) {
         return this.delegate.getSectionData(key);
     }
 
     @Override
-    public void setSectionData(long key, ByteBuffer data) {
+    public void setSectionData(long key, MemoryBuffer data) {
         this.delegate.setSectionData(key, data);
     }
 

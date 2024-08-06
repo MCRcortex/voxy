@@ -6,6 +6,7 @@ import me.cortex.voxy.common.storage.StorageCompressor;
 import me.cortex.voxy.common.storage.config.CompressorConfig;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
+import me.cortex.voxy.common.util.MemoryBuffer;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -20,21 +21,21 @@ public class CompressionStorageAdaptor extends DelegatingStorageAdaptor {
     }
 
     @Override
-    public ByteBuffer getSectionData(long key) {
+    public MemoryBuffer getSectionData(long key) {
         var data = this.delegate.getSectionData(key);
         if (data == null) {
             return null;
         }
         var decompressed = this.compressor.decompress(data);
-        MemoryUtil.memFree(data);
+        data.free();
         return decompressed;
     }
 
     @Override
-    public void setSectionData(long key, ByteBuffer data) {
+    public void setSectionData(long key, MemoryBuffer data) {
         var cdata = this.compressor.compress(data);
         this.delegate.setSectionData(key, cdata);
-        MemoryUtil.memFree(cdata);
+        cdata.free();
     }
 
     @Override

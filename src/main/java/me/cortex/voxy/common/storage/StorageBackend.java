@@ -1,6 +1,7 @@
 package me.cortex.voxy.common.storage;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import me.cortex.voxy.common.util.MemoryBuffer;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -10,9 +11,9 @@ import java.util.function.LongConsumer;
 public abstract class StorageBackend {
     public abstract void iterateStoredSectionPositions(LongConsumer consumer);
 
-    public abstract ByteBuffer getSectionData(long key);
+    public abstract MemoryBuffer getSectionData(long key);
 
-    public abstract void setSectionData(long key, ByteBuffer data);
+    public abstract void setSectionData(long key, MemoryBuffer data);
 
     public abstract void deleteSectionData(long key);
 

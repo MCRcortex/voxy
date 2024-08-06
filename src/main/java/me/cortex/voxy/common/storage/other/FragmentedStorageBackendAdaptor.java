@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
+import me.cortex.voxy.common.util.MemoryBuffer;
 import net.minecraft.util.math.random.RandomSeed;
 
 import java.nio.ByteBuffer;
@@ -40,12 +41,12 @@ public class FragmentedStorageBackendAdaptor extends StorageBackend {
     // multiple layers of spliced storage backends can be stacked
 
     @Override
-    public ByteBuffer getSectionData(long key) {
+    public MemoryBuffer getSectionData(long key) {
         return this.backends[this.getSegmentId(key)].getSectionData(key);
     }
 
     @Override
-    public void setSectionData(long key, ByteBuffer data) {
+    public void setSectionData(long key, MemoryBuffer data) {
         this.backends[this.getSegmentId(key)].setSectionData(key, data);
     }
 

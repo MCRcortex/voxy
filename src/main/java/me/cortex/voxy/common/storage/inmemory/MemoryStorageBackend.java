@@ -8,6 +8,7 @@ import it.unimi.dsi.fastutil.objects.ObjectCollection;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
+import me.cortex.voxy.common.util.MemoryBuffer;
 import net.minecraft.util.math.random.RandomSeed;
 import org.apache.commons.lang3.stream.Streams;
 import org.lwjgl.system.MemoryUtil;
@@ -16,14 +17,14 @@ import java.nio.ByteBuffer;
 import java.util.function.LongConsumer;
 
 public class MemoryStorageBackend extends StorageBackend {
-    private final Long2ObjectMap<ByteBuffer>[] maps;
+    private final Long2ObjectMap<MemoryBuffer>[] maps;
     private final Int2ObjectMap<ByteBuffer> idMappings = new Int2ObjectOpenHashMap<>();
 
     public MemoryStorageBackend() {
         this(4);
     }
 
-    private Long2ObjectMap<ByteBuffer> getMap(long key) {
+    private Long2ObjectMap<MemoryBuffer> getMap(long key) {
         return this.maps[(int) (RandomSeed.mixStafford13(RandomSeed.mixStafford13(key)^key)&(this.maps.length-1))];
     }
 
@@ -44,14 +45,12 @@ public class MemoryStorageBackend extends StorageBackend {
     }
 
     @Override
-    public ByteBuffer getSectionData(long key) {
+    public MemoryBuffer getSectionData(long key) {
         var map = this.getMap(key);
         synchronized (map) {
             var data = map.get(key);
             if (data != null) {
-                var cpy = MemoryUtil.memAlloc(data.remaining());
-                MemoryUtil.memCopy(data, cpy);
-                return cpy;
+                return data.copy();
             } else {
                 return null;
             }
@@ -59,14 +58,13 @@ public class MemoryStorageBackend extends StorageBackend {
     }
 
     @Override
-    public void setSectionData(long key, ByteBuffer data) {
+    public void setSectionData(long key, MemoryBuffer data) {
         var map = this.getMap(key);
         synchronized (map) {
-            var cpy = MemoryUtil.memAlloc(data.remaining());
-            MemoryUtil.memCopy(data, cpy);
+            var cpy = data.copy();
             var old = map.put(key, cpy);
             if (old != null) {
-                MemoryUtil.memFree(old);
+                old.free();
             }
         }
     }
@@ -77,7 +75,7 @@ public class MemoryStorageBackend extends StorageBackend {
         synchronized (map) {
             var data = map.remove(key);
             if (data != null) {
-                MemoryUtil.memFree(data);
+                data.free();
             }
         }
     }
@@ -115,7 +113,7 @@ public class MemoryStorageBackend extends StorageBackend {
 
     @Override
     public void close() {
-        Streams.of(this.maps).map(Long2ObjectMap::values).flatMap(ObjectCollection::stream).forEach(MemoryUtil::memFree);
+        Streams.of(this.maps).map(Long2ObjectMap::values).flatMap(ObjectCollection::stream).forEach(MemoryBuffer::free);
         this.idMappings.values().forEach(MemoryUtil::memFree);
     }
 

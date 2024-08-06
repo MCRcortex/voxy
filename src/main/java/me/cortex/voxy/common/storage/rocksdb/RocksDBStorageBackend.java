@@ -4,6 +4,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.storage.StorageBackend;
 import me.cortex.voxy.common.storage.config.ConfigBuildCtx;
 import me.cortex.voxy.common.storage.config.StorageConfig;
+import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.util.UnsafeUtil;
 import org.lwjgl.system.MemoryUtil;
 import org.rocksdb.*;
 
@@ -87,16 +89,15 @@ public class RocksDBStorageBackend extends StorageBackend {
     }
 
     @Override
-    public ByteBuffer getSectionData(long key) {
+    public MemoryBuffer getSectionData(long key) {
         try {
             var result = this.db.get(this.worldSections, longToBytes(key));
             if (result == null) {
                 return null;
             }
             //Need to copy to native memory
-            var buffer = MemoryUtil.memAlloc(result.length);
-            buffer.put(result);
-            buffer.rewind();
+            var buffer = new MemoryBuffer(result.length);
+            UnsafeUtil.memcpy(result, buffer.address);
             return buffer;
         } catch (RocksDBException e) {
             throw new RuntimeException(e);
@@ -104,11 +105,10 @@ public class RocksDBStorageBackend extends StorageBackend {
     }
 
     @Override
-    public void setSectionData(long key, ByteBuffer data) {
+    public void setSectionData(long key, MemoryBuffer data) {
         try {
-            var buffer = new byte[data.remaining()];
-            data.get(buffer);
-            data.rewind();
+            var buffer = new byte[(int) data.size];
+            UnsafeUtil.memcpy(data.address, buffer);
             this.db.put(this.worldSections, longToBytes(key), buffer);
         } catch (RocksDBException e) {
             throw new RuntimeException(e);

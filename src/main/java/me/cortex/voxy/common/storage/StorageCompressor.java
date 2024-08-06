@@ -1,11 +1,13 @@
 package me.cortex.voxy.common.storage;
 
+import me.cortex.voxy.common.util.MemoryBuffer;
+
 import java.nio.ByteBuffer;
 
 public interface StorageCompressor {
-    ByteBuffer compress(ByteBuffer saveData);
+    MemoryBuffer compress(MemoryBuffer saveData);
 
-    ByteBuffer decompress(ByteBuffer saveData);
+    MemoryBuffer decompress(MemoryBuffer saveData);
 
     void close();
 }
