@@ -1,11 +1,11 @@
-package me.cortex.voxy.client.core.rendering.util;
+package me.cortex.voxy.client.core.util;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectFunction;
 import me.cortex.voxy.common.util.HierarchicalBitSet;
 
 import java.util.function.Supplier;
 
-public class MarkedObjectList<T> {
+public class MarkedCachedObjectList<T> {
     private static final float GROWTH_FACTOR = 0.75f;
 
     private final Int2ObjectFunction<T[]> arrayGenerator;
@@ -13,7 +13,7 @@ public class MarkedObjectList<T> {
     private final HierarchicalBitSet bitSet = new HierarchicalBitSet();
     private T[] objects;//Should maybe make a getter function instead
 
-    public MarkedObjectList(Int2ObjectFunction<T[]> arrayGenerator, Supplier<T> nullSupplier) {
+    public MarkedCachedObjectList(Int2ObjectFunction<T[]> arrayGenerator, Supplier<T> nullSupplier) {
         this.arrayGenerator = arrayGenerator;
         this.nullSupplier = nullSupplier;
         this.objects = this.arrayGenerator.apply(16);

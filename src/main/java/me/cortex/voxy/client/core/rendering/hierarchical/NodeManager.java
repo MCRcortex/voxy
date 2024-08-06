@@ -6,7 +6,7 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
-import me.cortex.voxy.client.core.rendering.util.MarkedObjectList;
+import me.cortex.voxy.client.core.util.MarkedCachedObjectList;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.util.HierarchicalBitSet;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -302,7 +302,7 @@ public class NodeManager {
 
     //The request queue should be like some array that can reuse objects to prevent gc nightmare + like a bitset to find an avalible free slot
     // hashmap might work bar the gc overhead
-    private final MarkedObjectList<LeafRequest> leafRequests = new MarkedObjectList<>(LeafRequest[]::new, LeafRequest::new);
+    private final MarkedCachedObjectList<LeafRequest> leafRequests = new MarkedCachedObjectList<>(LeafRequest[]::new, LeafRequest::new);
 
     private static int pos2octnode(long pos) {
         return (WorldEngine.getX(pos)&1)|((WorldEngine.getY(pos)&1)<<1)|((WorldEngine.getZ(pos)&1)<<2);
