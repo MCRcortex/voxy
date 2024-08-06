@@ -74,6 +74,7 @@ public class ServiceSlice extends TrackedObject {
         if (!this.alive) {
             throw new IllegalStateException("Tried to do work on a dead service");
         }
+        this.jobCount.release();
         this.threadPool.execute(this);
     }
 

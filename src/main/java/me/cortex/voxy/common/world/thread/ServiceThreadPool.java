@@ -42,6 +42,10 @@ public class ServiceThreadPool {
     synchronized void removeService(ServiceSlice service) {
         this.removeServiceFromArray(service);
         this.totalJobWeight.addAndGet(-((long) service.weightPerJob) * service.jobCount.availablePermits());
+        //Need to acquire all the shut-down jobs
+        if (!this.jobCounter.tryAcquire(service.jobCount.availablePermits())) {
+            throw new IllegalStateException("Failed to acquire all the permits for the shut down jobs");
+        }
     }
 
     private synchronized void removeServiceFromArray(ServiceSlice service) {
@@ -80,16 +84,24 @@ public class ServiceThreadPool {
     private void worker(int threadId) {
         long seed = 1234342;
         while (true) {
-            seed = (seed ^ seed >>> 30) * -4658895280553007687L;
-            seed = (seed ^ seed >>> 27) * -7723592293110705685L;
-            long clamped = seed&((1L<<63)-1);
             this.jobCounter.acquireUninterruptibly();
             if (!this.running) {
                 break;
             }
 
+            int attempts = 50;
             while (true) {
+                if (attempts-- == 0) {
+                    throw new IllegalStateException("All attempts at executing a job failed! something critically wrong has occurred");
+                }
+                seed = (seed ^ seed >>> 30) * -4658895280553007687L;
+                seed = (seed ^ seed >>> 27) * -7723592293110705685L;
+                long clamped = seed&((1L<<63)-1);
                 var ref = this.serviceSlices;
+                if (ref.length == 0) {
+                    System.err.println("Service worker tried to run but had 0 slices");
+                    break;
+                }
                 long chosenNumber = clamped % this.totalJobWeight.get();
                 ServiceSlice service = ref[(int) (clamped % ref.length)];
                 for (var slice : ref) {
@@ -138,6 +150,10 @@ public class ServiceThreadPool {
                 worker.join();
             }
         } catch (InterruptedException e) {throw new RuntimeException(e);}
+
+        if (this.totalJobWeight.get() != 0) {
+            throw new IllegalStateException("Service pool job weight not 0 after shutdown");
+        }
     }
 
     public int getThreadCount() {
