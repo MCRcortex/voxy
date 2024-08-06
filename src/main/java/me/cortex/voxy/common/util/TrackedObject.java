@@ -8,8 +8,12 @@ public abstract class TrackedObject {
     public static final boolean TRACK_OBJECT_ALLOCATION_STACKS = System.getProperty("voxy.trackObjectAllocationStacks", "false").equals("true");
 
     private final Ref ref;
-    public TrackedObject() {
-        this.ref = register(this);
+    protected TrackedObject() {
+        this(true);
+    }
+
+    protected TrackedObject(boolean shouldTrack) {
+        this.ref = register(shouldTrack, this);
     }
 
     protected void free0() {
@@ -44,10 +48,10 @@ public abstract class TrackedObject {
             cleaner = null;
         }
     }
-    public static Ref register(Object obj) {
+    public static Ref register(boolean track, Object obj) {
         boolean[] freed = new boolean[1];
         Cleaner.Cleanable cleanable = null;
-        if (TRACK_OBJECT_ALLOCATIONS) {
+        if (TRACK_OBJECT_ALLOCATIONS && track) {
             String clazz = obj.getClass().getName();
             Throwable trace;
             if (TRACK_OBJECT_ALLOCATION_STACKS) {

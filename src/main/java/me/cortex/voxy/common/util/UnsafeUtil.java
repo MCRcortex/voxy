@@ -15,6 +15,7 @@ public class UnsafeUtil {
     }
 
     private static final long BYTE_ARRAY_BASE_OFFSET = UNSAFE.arrayBaseOffset(byte[].class);
+    private static final long SHORT_ARRAY_BASE_OFFSET = UNSAFE.arrayBaseOffset(short[].class);
 
     public static void memcpy(long src, long dst, long length) {
         UNSAFE.copyMemory(src, dst, length);
@@ -30,6 +31,9 @@ public class UnsafeUtil {
     //Copy the entire length of src to the dst memory where src is a byte array (source length from src)
     public static void memcpy(byte[] src, long dst) {
         UNSAFE.copyMemory(src, BYTE_ARRAY_BASE_OFFSET, null, dst, src.length);
+    }
+    public static void memcpy(short[] src, long dst) {
+        UNSAFE.copyMemory(src, SHORT_ARRAY_BASE_OFFSET, null, dst, (long) src.length <<1);
     }
 
 

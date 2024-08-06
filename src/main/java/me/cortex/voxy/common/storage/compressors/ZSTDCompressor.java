@@ -20,20 +20,17 @@ public class ZSTDCompressor implements StorageCompressor {
     }
 
     @Override
-    public ByteBuffer compress(ByteBuffer saveData) {
-        ByteBuffer compressedData  = MemoryUtil.memAlloc((int)ZSTD_COMPRESSBOUND(saveData.remaining()));
-        long compressedSize = ZSTD_compress(compressedData, saveData, this.level);
-        compressedData.limit((int) compressedSize);
-        compressedData.rewind();
-        return compressedData;
+    public MemoryBuffer compress(MemoryBuffer saveData) {
+        MemoryBuffer compressedData  = new MemoryBuffer((int)ZSTD_COMPRESSBOUND(saveData.size));
+        long compressedSize = nZSTD_compress(compressedData.address, compressedData.size, saveData.address, saveData.size, this.level);
+        return compressedData.subSize(compressedSize);
     }
 
     @Override
     public MemoryBuffer decompress(MemoryBuffer saveData) {
         var decompressed = new MemoryBuffer(SaveLoadSystem.BIGGEST_SERIALIZED_SECTION_SIZE);
-        //TODO: mark the size of the decompressed data to verify its length later
         long size = nZSTD_decompress(decompressed.address, decompressed.size, saveData.address, saveData.size);
-        return decompressed;
+        return decompressed.subSize(size);
     }
 
     @Override

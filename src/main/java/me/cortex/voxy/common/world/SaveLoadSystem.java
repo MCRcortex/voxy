@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 import static org.lwjgl.util.zstd.Zstd.*;
 
 public class SaveLoadSystem {
+    public static final boolean VERIFY_HASH_ON_LOAD = System.getProperty("voxy.verifySectionOnLoad", "true").equals("true");
     public static final int BIGGEST_SERIALIZED_SECTION_SIZE = 32 * 32 * 32 * 8 * 2;
 
     public static int lin2z(int i) {
@@ -47,46 +48,46 @@ public class SaveLoadSystem {
             pHash ^= block;
         }
         long[] lut = LUTVAL.toLongArray();
-        ByteBuffer raw = MemoryUtil.memAlloc(compressed.length*2+lut.length*8+512);
+        MemoryBuffer raw = new MemoryBuffer(compressed.length*2L+lut.length*8L+512);
+        long ptr = raw.address;
 
         long hash = section.key^(lut.length*1293481298141L);
-        raw.putLong(section.key);
-        raw.putInt(lut.length);
+        MemoryUtil.memPutLong(ptr, section.key); ptr += 8;
+        MemoryUtil.memPutInt(ptr, lut.length); ptr += 8;
         for (long id : lut) {
-            raw.putLong(id);
+            MemoryUtil.memPutLong(ptr, id); ptr += 8;
             hash *= 1230987149811L;
             hash += 12831;
             hash ^= id;
         }
         hash ^= pHash;
 
-        for (short block : compressed) {
-            raw.putShort(block);
-        }
+        UnsafeUtil.memcpy(compressed, ptr); ptr += compressed.length*2L;
 
-        raw.putLong(hash);
-        //The amount of memory copies are not ideal
-        var out = new MemoryBuffer(raw.position());
-        UnsafeUtil.memcpy(MemoryUtil.memAddress(raw), out.address, out.size);
-        MemoryUtil.memFree(raw);
-        return out;
+        MemoryUtil.memPutLong(ptr, hash); ptr += 8;
+
+        return raw.subSize(ptr-raw.address);
     }
 
-    public static boolean deserialize(WorldSection section, MemoryBuffer data, boolean ignoreMismatchPosition) {
+    public static boolean deserialize(WorldSection section, MemoryBuffer data) {
         long ptr = data.address;
         long hash = 0;
         long key = MemoryUtil.memGetLong(ptr); ptr += 8;
         int lutLen = MemoryUtil.memGetInt(ptr); ptr += 4;
         long[] lut = new long[lutLen];
-        hash = key^(lut.length*1293481298141L);
+        if (VERIFY_HASH_ON_LOAD) {
+            hash = key ^ (lut.length * 1293481298141L);
+        }
         for (int i = 0; i < lutLen; i++) {
             lut[i] = MemoryUtil.memGetLong(ptr); ptr += 8;
-            hash *= 1230987149811L;
-            hash += 12831;
-            hash ^= lut[i];
+            if (VERIFY_HASH_ON_LOAD) {
+                hash *= 1230987149811L;
+                hash += 12831;
+                hash ^= lut[i];
+            }
         }
 
-        if ((!ignoreMismatchPosition) && section.key != key) {
+        if (section.key != key) {
             //throw new IllegalStateException("Decompressed section not the same as requested. got: " + key + " expected: " + section.key);
             System.err.println("Decompressed section not the same as requested. got: " + key + " expected: " + section.key);
             return false;
@@ -96,22 +97,23 @@ public class SaveLoadSystem {
             section.data[z2lin(i)] = lut[MemoryUtil.memGetShort(ptr)]; ptr += 2;
         }
 
-        long pHash = 99;
-        for (long block : section.data) {
-            pHash *= 127817112311121L;
-            pHash ^= pHash>>31;
-            pHash += 9918322711L;
-            pHash ^= block;
-        }
-        hash ^= pHash;
+        if (VERIFY_HASH_ON_LOAD) {
+            long pHash = 99;
+            for (long block : section.data) {
+                pHash *= 127817112311121L;
+                pHash ^= pHash >> 31;
+                pHash += 9918322711L;
+                pHash ^= block;
+            }
+            hash ^= pHash;
 
-        long expectedHash = MemoryUtil.memGetLong(ptr); ptr += 8;
-        if (expectedHash != hash) {
-            //throw new IllegalStateException("Hash mismatch got: " + hash + " expected: " + expectedHash);
-            System.err.println("Hash mismatch got: " + hash + " expected: " + expectedHash + " removing region");
-            return false;
+            long expectedHash = MemoryUtil.memGetLong(ptr); ptr += 8;
+            if (expectedHash != hash) {
+                //throw new IllegalStateException("Hash mismatch got: " + hash + " expected: " + expectedHash);
+                System.err.println("Hash mismatch got: " + hash + " expected: " + expectedHash + " removing region");
+                return false;
+            }
         }
-
         return true;
     }
 }
