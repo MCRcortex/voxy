@@ -106,20 +106,20 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
 
         /*
-        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.threads.service"), config.serviceThreads, 1, Runtime.getRuntime().availableProcessors())
-                .setTooltip(Text.translatable("voxy.config.threads.tooltip"))
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.threads.ingest"), config.ingestThreads, 1, Runtime.getRuntime().availableProcessors())
+                .setTooltip(Text.translatable("voxy.config.threads.ingest.tooltip"))
                 .setSaveConsumer(val -> config.ingestThreads = val)
                 .setDefaultValue(DEFAULT.ingestThreads)
                 .build());
 
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.threads.saving"), config.savingThreads, 1, Runtime.getRuntime().availableProcessors())
-                .setTooltip(Text.translatable("voxy.config.saving.tooltip"))
+                .setTooltip(Text.translatable("voxy.config.threads.saving.tooltip"))
                 .setSaveConsumer(val -> config.savingThreads = val)
                 .setDefaultValue(DEFAULT.savingThreads)
                 .build());
 
         category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.threads.render"), config.renderThreads, 1, Runtime.getRuntime().availableProcessors())
-                .setTooltip(Text.translatable("voxy.config.render.tooltip"))
+                .setTooltip(Text.translatable("voxy.config.threads.render.tooltip"))
                 .setSaveConsumer(val -> config.renderThreads = val)
                 .setDefaultValue(DEFAULT.renderThreads)
                 .build());
