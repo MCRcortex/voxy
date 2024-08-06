@@ -112,7 +112,13 @@ public class WorldImporter {
 
     public void shutdown() {
         this.isRunning = false;
-        try {this.worker.join();} catch (InterruptedException e) {throw new RuntimeException(e);}
+        if (this.worker != null) {
+            try {
+                this.worker.join();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
         this.threadPool.shutdown();
     }
 
