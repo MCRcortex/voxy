@@ -3,6 +3,10 @@ package me.cortex.voxy.common.util;
 import java.lang.ref.Cleaner;
 
 public abstract class TrackedObject {
+    //TODO: maybe make this false? for performance overhead?
+    public static final boolean TRACK_OBJECT_ALLOCATIONS = System.getProperty("voxy.ensureTrackedObjectsAreFreed", "true").equals("true");
+    public static final boolean TRACK_OBJECT_ALLOCATION_STACKS = System.getProperty("voxy.trackObjectAllocationStacks", "false").equals("true");
+
     private final Ref ref;
     public TrackedObject() {
         this.ref = register(this);
@@ -13,7 +17,9 @@ public abstract class TrackedObject {
             throw new IllegalStateException("Object " + this + " was double freed.");
         }
         this.ref.freedRef[0] = true;
-        this.ref.cleanable.clean();
+        if (TRACK_OBJECT_ALLOCATIONS) {
+            this.ref.cleanable.clean();
+        }
     }
 
     public abstract void free();
@@ -30,28 +36,38 @@ public abstract class TrackedObject {
 
     public record Ref(Cleaner.Cleanable cleanable, boolean[] freedRef) {}
 
-    private static final Cleaner cleaner = Cleaner.create();
-    public static Ref register(Object obj) {
-        String clazz = obj.getClass().getName();
-        Throwable trace;
-        if (true) {
-            trace = new Throwable();
-            trace.fillInStackTrace();
+    private static final Cleaner cleaner;
+    static {
+        if (TRACK_OBJECT_ALLOCATIONS) {
+            cleaner = Cleaner.create();
         } else {
-            trace = null;
+            cleaner = null;
         }
+    }
+    public static Ref register(Object obj) {
         boolean[] freed = new boolean[1];
-        var clean = cleaner.register(obj, ()->{
-            if (!freed[0]) {
-                System.err.println("Object named: "+ clazz+" was not freed, location at:\n");
-                if (trace != null) {
-                    trace.printStackTrace();
-                } else {
-                    System.err.println("Enable error tracing");
-                }
-                System.err.flush();
+        Cleaner.Cleanable cleanable = null;
+        if (TRACK_OBJECT_ALLOCATIONS) {
+            String clazz = obj.getClass().getName();
+            Throwable trace;
+            if (TRACK_OBJECT_ALLOCATION_STACKS) {
+                trace = new Throwable();
+                trace.fillInStackTrace();
+            } else {
+                trace = null;
             }
-        });
-        return new Ref(clean, freed);
+            cleanable = cleaner.register(obj, () -> {
+                if (!freed[0]) {
+                    System.err.println("Object named: " + clazz + " was not freed, location at:\n");
+                    if (trace != null) {
+                        trace.printStackTrace();
+                    } else {
+                        System.err.println("Enable allocation stack tracing");
+                    }
+                    System.err.flush();
+                }
+            });
+        }
+        return new Ref(cleanable, freed);
     }
 }
