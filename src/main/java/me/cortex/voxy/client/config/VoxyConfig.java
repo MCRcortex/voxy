@@ -24,7 +24,7 @@ public class VoxyConfig {
 
     public boolean enabled = true;
     public boolean ingestEnabled = true;
-    public int renderDistance = 128;//Unused at the present
+    public int renderDistance = 128;
     public int serviceThreads = Math.max(Runtime.getRuntime().availableProcessors()/2, 1);
     public String defaultSaveConfig;
     public int renderQuality = 256;//Smaller is higher quality

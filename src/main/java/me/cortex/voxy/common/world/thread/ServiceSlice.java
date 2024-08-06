@@ -100,4 +100,8 @@ public class ServiceSlice extends TrackedObject {
     public int getJobCount() {
         return this.jobCount.availablePermits();
     }
+
+    public boolean hasJobs() {
+        return this.jobCount.availablePermits() != 0;
+    }
 }

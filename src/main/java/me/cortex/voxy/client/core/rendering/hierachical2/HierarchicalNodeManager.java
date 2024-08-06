@@ -40,11 +40,11 @@ public class HierarchicalNodeManager {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            for(int x = -1; x<=1;x++) {
-                for (int z = -1; z <= 1; z++) {
+            for(int x = -100; x<=100;x++) {
+                for (int z = -100; z <= 100; z++) {
                     for (int y = -3; y <= 3; y++) {
-                        updateFilterer.watch(4,x,y,z);
-                        updateFilterer.unwatch(4,x,y,z);
+                        updateFilterer.watch(0,x,y,z);
+                        updateFilterer.unwatch(0,x,y,z);
                     }
                 }
             }
@@ -102,6 +102,15 @@ public class HierarchicalNodeManager {
     }
 
     public void processBuildResult(BuiltSection section) {
+        section.free();
+        /*
+        if (!section.isEmpty()) {
+            this.geometryManager.uploadSection(section);
+        } else {
+            section.free();
+        }
+         */
+
         int nodeId = this.activeSectionMap.get(section.position);
         if (nodeId == -1) {
             //Not tracked or mapped to a node!!!

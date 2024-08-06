@@ -126,7 +126,7 @@ public class WorldImporter {
                 this.totalRegions.addAndGet(1);
                 workers.submit(() -> {
                     try {
-                        if (!isRunning) {
+                        if (!this.isRunning) {
                             return;
                         }
                         this.importRegionFile(file.toPath(), rx, rz);

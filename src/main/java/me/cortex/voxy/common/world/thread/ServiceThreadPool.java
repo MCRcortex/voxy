@@ -83,6 +83,7 @@ public class ServiceThreadPool {
 
     private void worker(int threadId) {
         long seed = 1234342;
+        int revolvingSelector = 0;
         while (true) {
             this.jobCounter.acquireUninterruptibly();
             if (!this.running) {
@@ -102,12 +103,29 @@ public class ServiceThreadPool {
                     System.err.println("Service worker tried to run but had 0 slices");
                     break;
                 }
-                long chosenNumber = clamped % this.totalJobWeight.get();
+
+
                 ServiceSlice service = ref[(int) (clamped % ref.length)];
-                for (var slice : ref) {
-                    chosenNumber -= ((long) slice.weightPerJob) * slice.jobCount.availablePermits();
-                    if (chosenNumber <= 0) {
-                        service = slice;
+                //1 in 64 chance just to pick a service that has a task, in a cycling manor, this is to keep at least one service from overloading all services constantly
+                if (((seed>>10)&63) == 0) {
+                    for (int i = 0; i < ref.length; i++) {
+                        int idx = (i+revolvingSelector)%ref.length;
+                        var slice = ref[idx];
+                        if (slice.hasJobs()) {
+                            service = slice;
+                            revolvingSelector = (idx+1)%ref.length;
+                            break;
+                        }
+                    }
+
+                } else {
+                    long chosenNumber = clamped % this.totalJobWeight.get();
+                    for (var slice : ref) {
+                        chosenNumber -= ((long) slice.weightPerJob) * slice.jobCount.availablePermits();
+                        if (chosenNumber <= 0) {
+                            service = slice;
+                            break;
+                        }
                     }
                 }
 
