@@ -3,6 +3,7 @@ package me.cortex.voxy.common.world.thread;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 
@@ -30,10 +31,14 @@ public class ServiceThreadPool {
     }
 
     public synchronized ServiceSlice createService(String name, int weight, Supplier<Runnable> workGenerator) {
+        return this.createService(name, weight, workGenerator, ()->true);
+    }
+
+    public synchronized ServiceSlice createService(String name, int weight, Supplier<Runnable> workGenerator, BooleanSupplier executionCondition) {
         var current = this.serviceSlices;
         var newList = new ServiceSlice[current.length + 1];
         System.arraycopy(current, 0, newList, 0, current.length);
-        var service = new ServiceSlice(this, workGenerator, name, weight);
+        var service = new ServiceSlice(this, workGenerator, name, weight, executionCondition);
         newList[current.length] = service;
         this.serviceSlices = newList;
         return service;

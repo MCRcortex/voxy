@@ -6,6 +6,8 @@ import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.other.Mipper;
+import me.cortex.voxy.common.world.thread.ServiceSlice;
+import me.cortex.voxy.common.world.thread.ServiceThreadPool;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -28,6 +30,8 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,6 +40,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 public class WorldImporter {
+
     public interface UpdateCallback {
         void update(int finished, int outof);
     }
@@ -43,12 +48,16 @@ public class WorldImporter {
     private final WorldEngine world;
     private final ReadableContainer<RegistryEntry<Biome>> defaultBiomeProvider;
     private final Codec<ReadableContainer<RegistryEntry<Biome>>> biomeCodec;
-    private final AtomicInteger totalRegions = new AtomicInteger();
-    private final AtomicInteger regionsProcessed = new AtomicInteger();
+    private final AtomicInteger totalChunks = new AtomicInteger();
+    private final AtomicInteger chunksProcessed = new AtomicInteger();
+
+    private final ConcurrentLinkedDeque<Runnable> jobQueue = new ConcurrentLinkedDeque<>();
+    private final ServiceSlice threadPool;
 
     private volatile boolean isRunning;
-    public WorldImporter(WorldEngine worldEngine, World mcWorld) {
+    public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool) {
         this.world = worldEngine;
+        this.threadPool = servicePool.createService("World importer", 1, ()-> ()->jobQueue.poll().run(), ()->this.world.savingService.getTaskCount() < 4000);
 
         var biomeRegistry = mcWorld.getRegistryManager().get(RegistryKeys.BIOME);
         var defaultBiome = biomeRegistry.entryOf(BiomeKeys.PLAINS);
@@ -103,13 +112,17 @@ public class WorldImporter {
     public void shutdown() {
         this.isRunning = false;
         try {this.worker.join();} catch (InterruptedException e) {throw new RuntimeException(e);}
+        this.threadPool.shutdown();
     }
 
-    private Thread worker;
-    public void importWorldAsyncStart(File directory, int threads, UpdateCallback updateCallback, Runnable onCompletion) {
+    private volatile Thread worker;
+    private UpdateCallback updateCallback;
+    public void importWorldAsyncStart(File directory, UpdateCallback updateCallback, Runnable onCompletion) {
+        this.totalChunks.set(0);
+        this.chunksProcessed.set(0);
+        this.updateCallback = updateCallback;
         this.worker = new Thread(() -> {
             this.isRunning = true;
-            var workers = new ForkJoinPool(threads);
             var files = directory.listFiles();
             for (var file : files) {
                 if (!file.isFile()) {
@@ -123,29 +136,32 @@ public class WorldImporter {
                 }
                 int rx = Integer.parseInt(sections[1]);
                 int rz = Integer.parseInt(sections[2]);
-                this.totalRegions.addAndGet(1);
-                workers.submit(() -> {
-                    try {
-                        if (!this.isRunning) {
-                            return;
-                        }
-                        this.importRegionFile(file.toPath(), rx, rz);
-                        int regionsProcessedCount = this.regionsProcessed.addAndGet(1);
-                        updateCallback.update(regionsProcessedCount, this.totalRegions.get());
-                    } catch (
-                            Exception e) {
-                        e.printStackTrace();
-                    }
-                });
+                try {
+                    this.importRegionFile(file.toPath(), rx, rz);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                while ((this.totalChunks.get()-this.chunksProcessed.get() > 10_000) && this.isRunning) {
+                    Thread.onSpinWait();
+                }
+                if (!this.isRunning) {
+                    return;
+                }
             }
-            workers.shutdown();
-            try {
-                workers.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-            } catch (InterruptedException e) {}
+            this.threadPool.blockTillEmpty();
+            while (this.chunksProcessed.get() != this.totalChunks.get() && this.isRunning) {
+                Thread.onSpinWait();
+            }
             onCompletion.run();
+            this.worker = null;
         });
         this.worker.setName("World importer");
         this.worker.start();
+
+    }
+
+    public boolean isBusy() {
+        return this.worker != null;
     }
 
     private void importRegionFile(Path file, int x, int z) throws IOException {
@@ -171,6 +187,7 @@ public class WorldImporter {
                 var data = MemoryUtil.memAlloc(sectorCount*4096).order(ByteOrder.BIG_ENDIAN);
                 fileStream.read(data, sectorStart*4096L);
                 data.flip();
+                boolean addedToQueue = false;
                 {
                     int m = data.getInt();
                     byte b = data.get();
@@ -188,19 +205,34 @@ public class WorldImporter {
                         } else if (n < 0) {
                             System.err.println("Declared size of chunk is negative");
                         } else {
-                            try (var decompressedData = this.decompress(b, new ByteBufferBackedInputStream(data))) {
-                                if (decompressedData == null) {
-                                    System.err.println("Error decompressing chunk data");
-                                } else {
-                                    var nbt = NbtIo.readCompound(decompressedData);
-                                    this.importChunkNBT(nbt);
+                            addedToQueue = true;
+                            this.jobQueue.add(()-> {
+                                if (!this.isRunning) {
+                                    return;
                                 }
-                            }
+                                try {
+                                    try (var decompressedData = this.decompress(b, new ByteBufferBackedInputStream(data))) {
+                                        if (decompressedData == null) {
+                                            System.err.println("Error decompressing chunk data");
+                                        } else {
+                                            var nbt = NbtIo.readCompound(decompressedData);
+                                            this.importChunkNBT(nbt);
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    throw new RuntimeException(e);
+                                } finally {
+                                    MemoryUtil.memFree(data);
+                                }
+                            });
+                            this.totalChunks.incrementAndGet();
+                            this.threadPool.execute();
                         }
                     }
                 }
-
-                MemoryUtil.memFree(data);
+                if (!addedToQueue) {
+                    MemoryUtil.memFree(data);
+                }
             }
 
             MemoryUtil.memFree(sectorsSavesBB);
@@ -230,6 +262,8 @@ public class WorldImporter {
             System.err.println("Exception importing world chunk:");
             e.printStackTrace();
         }
+
+        this.updateCallback.update(this.chunksProcessed.incrementAndGet(), this.totalChunks.get());
     }
 
     private static int getIndex(int x, int y, int z) {
@@ -291,13 +325,6 @@ public class WorldImporter {
         WorldConversionFactory.mipSection(csec, this.world.getMapper());
 
         this.world.insertUpdate(csec);
-        while (this.world.savingService.getTaskCount() > 4000) {
-            try {
-                Thread.sleep(250);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-        }
     }
 
 }

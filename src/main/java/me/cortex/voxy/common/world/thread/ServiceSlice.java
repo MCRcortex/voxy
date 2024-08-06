@@ -7,6 +7,7 @@ import net.minecraft.text.Text;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 public class ServiceSlice extends TrackedObject {
@@ -18,9 +19,12 @@ public class ServiceSlice extends TrackedObject {
     final Semaphore jobCount = new Semaphore(0);
     private final Runnable[] runningCtxs;
     private final AtomicInteger activeCount = new AtomicInteger();
+    private final AtomicInteger jobCount2 = new AtomicInteger();
+    private final BooleanSupplier condition;
 
-    ServiceSlice(ServiceThreadPool threadPool, Supplier<Runnable> workerGenerator, String name, int weightPerJob) {
+    ServiceSlice(ServiceThreadPool threadPool, Supplier<Runnable> workerGenerator, String name, int weightPerJob, BooleanSupplier condition) {
         this.threadPool = threadPool;
+        this.condition = condition;
         this.runningCtxs = new Runnable[threadPool.getThreadCount()];
         this.workerGenerator = workerGenerator;
         this.name = name;
@@ -28,6 +32,11 @@ public class ServiceSlice extends TrackedObject {
     }
 
     boolean doRun(int threadIndex) {
+        //If executable
+        if (!this.condition.getAsBoolean()) {
+            return false;
+        }
+
         //Run this thread once if possible
         if (!this.jobCount.tryAcquire()) {
             return false;
@@ -65,6 +74,7 @@ public class ServiceSlice extends TrackedObject {
             if (this.activeCount.decrementAndGet() < 0) {
                 throw new IllegalStateException("Alive count negative!");
             }
+            this.jobCount2.decrementAndGet();
         }
         return true;
     }
@@ -75,6 +85,7 @@ public class ServiceSlice extends TrackedObject {
             throw new IllegalStateException("Tried to do work on a dead service");
         }
         this.jobCount.release();
+        this.jobCount2.incrementAndGet();
         this.threadPool.execute(this);
     }
 
@@ -103,5 +114,19 @@ public class ServiceSlice extends TrackedObject {
 
     public boolean hasJobs() {
         return this.jobCount.availablePermits() != 0;
+    }
+
+    public void blockTillEmpty() {
+        while (this.activeCount.get() != 0 && this.alive) {
+            while (this.jobCount2.get() != 0 && this.alive) {
+                Thread.onSpinWait();
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+            Thread.yield();
+        }
     }
 }

@@ -193,15 +193,18 @@ public class VoxelCore {
 
     public boolean createWorldImporter(World mcWorld, File worldPath) {
         if (this.importer != null) {
+            this.importer = new WorldImporter(this.world, mcWorld, this.serviceThreadPool);
+        }
+        if (this.importer.isBusy()) {
             return false;
         }
-        var importer = new WorldImporter(this.world, mcWorld);
+
         var bossBar = new ClientBossBar(MathHelper.randomUuid(), Text.of("Voxy world importer"), 0.0f, BossBar.Color.GREEN, BossBar.Style.PROGRESS, false, false, false);
         MinecraftClient.getInstance().inGameHud.getBossBarHud().bossBars.put(bossBar.getUuid(), bossBar);
-        importer.importWorldAsyncStart(worldPath, 4, (a,b)->
+        this.importer.importWorldAsyncStart(worldPath, (a,b)->
                 MinecraftClient.getInstance().executeSync(()-> {
                     bossBar.setPercent(((float) a)/((float) b));
-                    bossBar.setName(Text.of("Voxy import: "+ a+"/"+b + " region files"));
+                    bossBar.setName(Text.of("Voxy import: "+ a+"/"+b + " chunks"));
                 }),
                 ()-> {
                     MinecraftClient.getInstance().executeSync(()-> {
@@ -210,9 +213,7 @@ public class VoxelCore {
                         MinecraftClient.getInstance().inGameHud.getChatHud().addMessage(Text.literal(msg));
                         System.err.println(msg);
                     });
-                    this.importer = null;
                 });
-        this.importer = importer;
         return true;
     }
 

@@ -1,5 +1,6 @@
 package me.cortex.voxy.common.world;
 
+import it.unimi.dsi.fastutil.longs.Long2ShortFunction;
 import it.unimi.dsi.fastutil.longs.Long2ShortOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import me.cortex.voxy.common.util.MemoryBuffer;
@@ -33,28 +34,32 @@ public class SaveLoadSystem {
         var data = section.copyData();
         var compressed = new short[data.length];
         Long2ShortOpenHashMap LUT = new Long2ShortOpenHashMap(data.length);
-        LongArrayList LUTVAL = new LongArrayList();
+        LUT.defaultReturnValue((short) -1);
+        long[] lutValues = new long[32*16*16];//If there are more than this many states in a section... im concerned
+        short lutIndex = 0;
         long pHash = 99;
         for (int i = 0; i < data.length; i++) {
             long block = data[i];
-            short mapping = LUT.computeIfAbsent(block, id->{
-                LUTVAL.add(id);
-                return (short)(LUTVAL.size()-1);
-            });
+            short mapping = LUT.putIfAbsent(block, lutIndex);
+            if (mapping == -1) {
+                mapping = lutIndex++;
+                lutValues[mapping] = block;
+            }
             compressed[lin2z(i)] = mapping;
             pHash *= 127817112311121L;
             pHash ^= pHash>>31;
             pHash += 9918322711L;
             pHash ^= block;
         }
-        long[] lut = LUTVAL.toLongArray();
-        MemoryBuffer raw = new MemoryBuffer(compressed.length*2L+lut.length*8L+512);
+
+        MemoryBuffer raw = new MemoryBuffer(compressed.length*2L+lutIndex*8L+512);
         long ptr = raw.address;
 
-        long hash = section.key^(lut.length*1293481298141L);
+        long hash = section.key^(lutIndex*1293481298141L);
         MemoryUtil.memPutLong(ptr, section.key); ptr += 8;
-        MemoryUtil.memPutInt(ptr, lut.length); ptr += 8;
-        for (long id : lut) {
+        MemoryUtil.memPutInt(ptr, lutIndex); ptr += 4;
+        for (int i = 0; i < lutIndex; i++) {
+            long id = lutValues[i];
             MemoryUtil.memPutLong(ptr, id); ptr += 8;
             hash *= 1230987149811L;
             hash += 12831;

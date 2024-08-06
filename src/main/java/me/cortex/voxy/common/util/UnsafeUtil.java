@@ -25,7 +25,7 @@ public class UnsafeUtil {
 
     //Copy the entire length of src to the dst memory where dst is a byte array (source length from dst)
     public static void memcpy(long src, byte[] dst) {
-        UNSAFE.copyMemory(0, src, dst, BYTE_ARRAY_BASE_OFFSET, dst.length);
+        UNSAFE.copyMemory(null, src, dst, BYTE_ARRAY_BASE_OFFSET, dst.length);
     }
 
     //Copy the entire length of src to the dst memory where src is a byte array (source length from src)
