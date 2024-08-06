@@ -192,7 +192,7 @@ public class VoxelCore {
     }
 
     public boolean createWorldImporter(World mcWorld, File worldPath) {
-        if (this.importer != null) {
+        if (this.importer == null) {
             this.importer = new WorldImporter(this.world, mcWorld, this.serviceThreadPool);
         }
         if (this.importer.isBusy()) {
