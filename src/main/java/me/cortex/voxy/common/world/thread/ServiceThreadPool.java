@@ -96,8 +96,21 @@ public class ServiceThreadPool {
             }
 
             int attempts = 50;
+            outer:
             while (true) {
                 if (attempts-- == 0) {
+                    for (var service : this.serviceSlices) {
+                        //Run the job
+                        if (!service.doRun(threadId)) {
+                            //Didnt consume the job, find a new job
+                            continue;
+                        }
+                        //Consumed a job from the service, decrease weight by the amount
+                        if (this.totalJobWeight.addAndGet(-service.weightPerJob)<0) {
+                            throw new IllegalStateException("Total job weight is negative");
+                        }
+                        break outer;
+                    }
                     throw new IllegalStateException("All attempts at executing a job failed! something critically wrong has occurred");
                 }
                 seed = (seed ^ seed >>> 30) * -4658895280553007687L;
