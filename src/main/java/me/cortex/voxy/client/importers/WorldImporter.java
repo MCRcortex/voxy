@@ -48,6 +48,7 @@ public class WorldImporter {
     private final WorldEngine world;
     private final ReadableContainer<RegistryEntry<Biome>> defaultBiomeProvider;
     private final Codec<ReadableContainer<RegistryEntry<Biome>>> biomeCodec;
+    private final AtomicInteger estimatedTotalChunks = new AtomicInteger();//Slowly converges to the true value
     private final AtomicInteger totalChunks = new AtomicInteger();
     private final AtomicInteger chunksProcessed = new AtomicInteger();
 
@@ -119,11 +120,13 @@ public class WorldImporter {
     private UpdateCallback updateCallback;
     public void importWorldAsyncStart(File directory, UpdateCallback updateCallback, Runnable onCompletion) {
         this.totalChunks.set(0);
+        this.estimatedTotalChunks.set(0);
         this.chunksProcessed.set(0);
         this.updateCallback = updateCallback;
         this.worker = new Thread(() -> {
             this.isRunning = true;
             var files = directory.listFiles();
+            this.estimatedTotalChunks.addAndGet(files.length*1024);
             for (var file : files) {
                 if (!file.isFile()) {
                     continue;
@@ -136,6 +139,7 @@ public class WorldImporter {
                 }
                 int rx = Integer.parseInt(sections[1]);
                 int rz = Integer.parseInt(sections[2]);
+                this.estimatedTotalChunks.addAndGet(-1024);
                 try {
                     this.importRegionFile(file.toPath(), rx, rz);
                 } catch (IOException e) {
@@ -226,6 +230,7 @@ public class WorldImporter {
                                 }
                             });
                             this.totalChunks.incrementAndGet();
+                            this.estimatedTotalChunks.incrementAndGet();
                             this.threadPool.execute();
                         }
                     }
@@ -263,7 +268,7 @@ public class WorldImporter {
             e.printStackTrace();
         }
 
-        this.updateCallback.update(this.chunksProcessed.incrementAndGet(), this.totalChunks.get());
+        this.updateCallback.update(this.chunksProcessed.incrementAndGet(), this.estimatedTotalChunks.get());
     }
 
     private static int getIndex(int x, int y, int z) {
