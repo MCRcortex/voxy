@@ -23,7 +23,6 @@ public class Voxy implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             dispatcher.register(WorldImportCommand.register());
         });

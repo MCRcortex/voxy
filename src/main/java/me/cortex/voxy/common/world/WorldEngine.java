@@ -1,11 +1,11 @@
 package me.cortex.voxy.common.world;
 
-import me.cortex.voxy.common.storage.StorageCompressor;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.service.SectionSavingService;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.common.storage.StorageBackend;
+import me.cortex.voxy.common.world.thread.ServiceThreadPool;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.Arrays;
@@ -22,22 +22,21 @@ public class WorldEngine {
     private Consumer<WorldSection> dirtyCallback;
     private final int maxMipLevels;
 
-
     public void setDirtyCallback(Consumer<WorldSection> tracker) {
         this.dirtyCallback = tracker;
     }
 
     public Mapper getMapper() {return this.mapper;}
 
-    public WorldEngine(StorageBackend storageBackend, int ingestWorkers, int savingServiceWorkers, int maxMipLayers) {
+    public WorldEngine(StorageBackend storageBackend, ServiceThreadPool serviceThreadPool, int maxMipLayers) {
         this.maxMipLevels = maxMipLayers;
         this.storage = storageBackend;
         this.mapper = new Mapper(this.storage);
         //4 cache size bits means that the section tracker has 16 separate maps that it uses
         this.sectionTracker = new ActiveSectionTracker(3, this::unsafeLoadSection);
 
-        this.savingService = new SectionSavingService(this, savingServiceWorkers);
-        this.ingestService  = new VoxelIngestService(this, ingestWorkers);
+        this.savingService = new SectionSavingService(this, serviceThreadPool);
+        this.ingestService  = new VoxelIngestService(this, serviceThreadPool);
     }
 
     private int unsafeLoadSection(WorldSection into) {

@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.Voxy;
+import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.rendering.*;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
@@ -9,6 +10,7 @@ import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
+import me.cortex.voxy.common.world.thread.ServiceThreadPool;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.ClientBossBar;
 import net.minecraft.client.render.Camera;
@@ -54,20 +56,21 @@ public class VoxelCore {
 
     private final RenderService renderer;
     private final PostProcessing postProcessing;
-
-    //private final Thread shutdownThread = new Thread(this::shutdown);
+    private final ServiceThreadPool serviceThreadPool;
 
     private WorldImporter importer;
     public VoxelCore(ContextSelectionSystem.Selection worldSelection) {
-        this.world = worldSelection.createEngine();
         var cfg = worldSelection.getConfig();
+        this.serviceThreadPool = new ServiceThreadPool(VoxyConfig.CONFIG.serviceThreads);
+
+        this.world = worldSelection.createEngine(this.serviceThreadPool);
         System.out.println("Initializing voxy core");
 
         //Trigger the shared index buffer loading
         SharedIndexBuffer.INSTANCE.id();
         Capabilities.init();//Ensure clinit is called
 
-        this.renderer = new RenderService(this.world);
+        this.renderer = new RenderService(this.world, this.serviceThreadPool);
         System.out.println("Using " + this.renderer.getClass().getSimpleName());
         this.postProcessing = new PostProcessing();
 
@@ -183,6 +186,8 @@ public class VoxelCore {
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {e.printStackTrace();}}
         System.out.println("Shutting down world engine");
         try {this.world.shutdown();} catch (Exception e) {e.printStackTrace();}
+        System.out.println("Shutting down service thread pool");
+        this.serviceThreadPool.shutdown();
         System.out.println("Voxel core shut down");
     }
 

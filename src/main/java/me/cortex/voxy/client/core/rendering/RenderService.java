@@ -15,6 +15,7 @@ import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
+import me.cortex.voxy.common.world.thread.ServiceThreadPool;
 import net.minecraft.client.render.Camera;
 
 import java.util.Arrays;
@@ -40,7 +41,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
     private final ConcurrentLinkedDeque<BuiltSection> sectionBuildResultQueue = new ConcurrentLinkedDeque<>();
 
-    public RenderService(WorldEngine world) {
+    public RenderService(WorldEngine world, ServiceThreadPool serviceThreadPool) {
         this.modelService = new ModelBakerySubsystem(world.getMapper());
 
         //Max sections: ~500k
@@ -53,7 +54,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.nodeManager = new HierarchicalNodeManager(1<<21, this.sectionRenderer.getGeometryManager(), positionFilterForwarder);
 
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
-        this.renderGen = new RenderGenerationService(world, this.modelService, VoxyConfig.CONFIG.renderThreads, this.sectionBuildResultQueue::add, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
+        this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool, this.sectionBuildResultQueue::add, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
         positionFilterForwarder.setCallback(this.renderGen::enqueueTask);
 
         this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 512);

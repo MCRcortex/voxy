@@ -9,6 +9,7 @@ import me.cortex.voxy.common.storage.config.StorageConfig;
 import me.cortex.voxy.common.storage.other.CompressionStorageAdaptor;
 import me.cortex.voxy.common.storage.rocksdb.RocksDBStorageBackend;
 import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.common.world.thread.ServiceThreadPool;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.WorldSavePath;
@@ -96,8 +97,8 @@ public class ContextSelectionSystem {
             return this.config.storageConfig.build(ctx);
         }
 
-        public WorldEngine createEngine() {
-            return new WorldEngine(this.createStorageBackend(), VoxyConfig.CONFIG.ingestThreads, VoxyConfig.CONFIG.savingThreads, 5);
+        public WorldEngine createEngine(ServiceThreadPool serviceThreadPool) {
+            return new WorldEngine(this.createStorageBackend(), serviceThreadPool, 5);
         }
 
         //Saves the config for the world selection or something, need to figure out how to make it work with dimensional configs maybe?

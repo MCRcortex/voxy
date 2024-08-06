@@ -24,15 +24,10 @@ public class VoxyConfig {
 
     public boolean enabled = true;
     public boolean ingestEnabled = true;
-    public int qualityScale = 12;
-    public int maxSections = 200_000;
-    public int renderDistance = 128;
-    public int geometryBufferSize = (1<<30)/8;
-    public int ingestThreads = 2;
-    public int savingThreads = 4;
-    public int renderThreads = 5;
-    public boolean useMeshShaderIfPossible = true;
+    public int renderDistance = 128;//Unused at the present
+    public int serviceThreads = Math.max(Runtime.getRuntime().availableProcessors()/2, 1);
     public String defaultSaveConfig;
+    public int renderQuality = 256;//Smaller is higher quality
 
 
     public static VoxyConfig loadOrCreate() {
@@ -68,9 +63,5 @@ public class VoxyConfig {
         return FabricLoader.getInstance()
                 .getConfigDir()
                 .resolve("voxy-config.json");
-    }
-
-    public boolean useMeshShaders() {
-        return this.useMeshShaderIfPossible && Capabilities.INSTANCE.meshShaders;
     }
 }
