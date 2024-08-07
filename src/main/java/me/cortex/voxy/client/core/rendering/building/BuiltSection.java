@@ -6,6 +6,7 @@ import java.util.Arrays;
 
 //TODO: also have an AABB size stored
 public final class BuiltSection {
+    public static final boolean VERIFY_BUILT_SECTION_OFFSETS = System.getProperty("voxy.verifyBuiltSectionOffsets", "true").equals("true");
     public final long position;
     public final int aabb;
     public final MemoryBuffer geometryBuffer;
@@ -20,7 +21,7 @@ public final class BuiltSection {
         this.aabb = aabb;
         this.geometryBuffer = geometryBuffer;
         this.offsets = offsets;
-        if (offsets != null) {
+        if (offsets != null && VERIFY_BUILT_SECTION_OFFSETS) {
             for (int i = 0; i < offsets.length-1; i++) {
                 int delta = offsets[i+1] - offsets[i];
                 if (delta<0||delta>=(1<<16)) {
