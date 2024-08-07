@@ -10,7 +10,7 @@ import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.client.saver.ContextSelectionSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.client.importers.WorldImporter;
-import me.cortex.voxy.common.world.thread.ServiceThreadPool;
+import me.cortex.voxy.common.thread.ServiceThreadPool;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.ClientBossBar;
 import net.minecraft.client.render.Camera;
@@ -27,7 +27,6 @@ import org.lwjgl.opengl.GL11;
 import java.io.File;
 import java.util.*;
 
-import static org.lwjgl.opengl.ARBDirectStateAccess.glGetNamedFramebufferAttachmentParameteri;
 import static org.lwjgl.opengl.GL30C.*;
 
 //Core class that ingests new data from sources and updates the required systems

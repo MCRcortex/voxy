@@ -5,9 +5,8 @@ import me.cortex.voxy.client.core.util.ByteBufferBackedInputStream;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.common.world.other.Mipper;
-import me.cortex.voxy.common.world.thread.ServiceSlice;
-import me.cortex.voxy.common.world.thread.ServiceThreadPool;
+import me.cortex.voxy.common.thread.ServiceSlice;
+import me.cortex.voxy.common.thread.ServiceThreadPool;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -30,13 +29,9 @@ import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Predicate;
 
 public class WorldImporter {

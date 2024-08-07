@@ -9,7 +9,7 @@ import me.cortex.voxy.common.storage.config.StorageConfig;
 import me.cortex.voxy.common.storage.other.CompressionStorageAdaptor;
 import me.cortex.voxy.common.storage.rocksdb.RocksDBStorageBackend;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.common.world.thread.ServiceThreadPool;
+import me.cortex.voxy.common.thread.ServiceThreadPool;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.world.ClientWorld;
 import net.minecraft.util.WorldSavePath;

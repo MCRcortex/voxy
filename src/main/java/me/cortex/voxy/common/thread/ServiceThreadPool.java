@@ -1,8 +1,7 @@
-package me.cortex.voxy.common.world.thread;
+package me.cortex.voxy.common.thread;
 
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;

@@ -7,13 +7,10 @@ import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
-import me.cortex.voxy.common.world.thread.ServiceSlice;
-import me.cortex.voxy.common.world.thread.ServiceThreadPool;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.Text;
+import me.cortex.voxy.common.thread.ServiceSlice;
+import me.cortex.voxy.common.thread.ServiceThreadPool;
 
 import java.util.List;
-import java.util.concurrent.Semaphore;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 

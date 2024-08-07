@@ -3,11 +3,10 @@ package me.cortex.voxy.common.world.service;
 import me.cortex.voxy.common.world.SaveLoadSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
-import me.cortex.voxy.common.world.thread.ServiceSlice;
-import me.cortex.voxy.common.world.thread.ServiceThreadPool;
+import me.cortex.voxy.common.thread.ServiceSlice;
+import me.cortex.voxy.common.thread.ServiceThreadPool;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
-import org.lwjgl.system.MemoryUtil;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 

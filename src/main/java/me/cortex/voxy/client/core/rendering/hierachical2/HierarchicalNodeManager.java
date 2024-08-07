@@ -102,14 +102,11 @@ public class HierarchicalNodeManager {
     }
 
     public void processBuildResult(BuiltSection section) {
-        section.free();
-        /*
         if (!section.isEmpty()) {
             this.geometryManager.uploadSection(section);
         } else {
             section.free();
         }
-         */
 
         int nodeId = this.activeSectionMap.get(section.position);
         if (nodeId == -1) {

@@ -1,13 +1,11 @@
 package me.cortex.voxy.common.world;
 
-import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.service.SectionSavingService;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.common.storage.StorageBackend;
-import me.cortex.voxy.common.world.thread.ServiceThreadPool;
-import org.lwjgl.system.MemoryUtil;
+import me.cortex.voxy.common.thread.ServiceThreadPool;
 
 import java.util.Arrays;
 import java.util.function.Consumer;

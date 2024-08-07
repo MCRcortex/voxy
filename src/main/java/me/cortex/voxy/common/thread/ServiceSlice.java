@@ -1,4 +1,4 @@
-package me.cortex.voxy.common.world.thread;
+package me.cortex.voxy.common.thread;
 
 import me.cortex.voxy.common.util.TrackedObject;
 import net.minecraft.client.MinecraftClient;
@@ -6,7 +6,6 @@ import net.minecraft.text.Text;
 
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
