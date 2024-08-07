@@ -328,7 +328,6 @@ public class WorldImporter {
                     if (skyLight != null) {
                         sky = skyLight.get(bx, by, bz);
                     }
-                    sky = 15-sky;
                     return (byte) (sky|(block<<4));
                 }
         );

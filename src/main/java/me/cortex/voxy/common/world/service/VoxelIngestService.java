@@ -1,6 +1,7 @@
 package me.cortex.voxy.common.world.service;
 
 import it.unimi.dsi.fastutil.Pair;
+import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -37,7 +38,7 @@ public class VoxelIngestService {
         for (var section : chunk.getSectionArray()) {
             i++;
             var lighting = this.captureLightMap.remove(ChunkSectionPos.from(chunk.getPos(), i).asLong());
-            if (section.isEmpty()) {
+            if (section.isEmpty() && lighting==null) {//If the chunk section has lighting data, propagate it
                 //TODO: add local cache so that it doesnt constantly create new sections
                 this.world.insertUpdate(VoxelizedSection.createEmpty().setPosition(chunk.getPos().x, i, chunk.getPos().z));
             } else {
@@ -48,7 +49,7 @@ public class VoxelIngestService {
                         section.getBiomeContainer(),
                         (x, y, z, state) -> {
                             if (lighting == null || ((lighting.first() != null && lighting.first().isUninitialized())&&(lighting.second()!=null&&lighting.second().isUninitialized()))) {
-                                return (byte) 0x0f;
+                                return (byte) 0;
                             } else {
                                 //Lighting is hell
                                 int block = lighting.first()!=null?Math.min(15,lighting.first().get(x, y, z)):0;
@@ -56,7 +57,6 @@ public class VoxelIngestService {
                                 if (block<state.getLuminance()) {
                                     block = state.getLuminance();
                                 }
-                                sky = 15-sky;//This is cause sky light is inverted which saves memory when saving empty sections
                                 return (byte) (sky|(block<<4));
                             }
                         }
@@ -76,7 +76,7 @@ public class VoxelIngestService {
         for (var section : chunk.getSectionArray()) {
             i++;
             if (section == null) continue;
-            if (section.isEmpty()) continue;
+            //if (section.isEmpty()) continue;
             var pos = ChunkSectionPos.from(chunk.getPos(), i);
             var bl = blp.getLightSection(pos);
             if (!(bl == null || bl.isUninitialized())) {

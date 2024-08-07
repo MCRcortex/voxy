@@ -40,8 +40,8 @@ public class HierarchicalNodeManager {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-            for(int x = -100; x<=100;x++) {
-                for (int z = -100; z <= 100; z++) {
+            for(int x = -50; x<=50;x++) {
+                for (int z = -50; z <= 50; z++) {
                     for (int y = -3; y <= 3; y++) {
                         updateFilterer.watch(0,x,y,z);
                         updateFilterer.unwatch(0,x,y,z);

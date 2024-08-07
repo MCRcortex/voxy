@@ -35,4 +35,8 @@ public class Voxy implements ClientModInitializer {
         var selection = selector.getBestSelectionOrCreate(world);
         return new VoxelCore(selection);
     }
+
+    public static void breakpoint() {
+        int breakpoint = 0;
+    }
 }

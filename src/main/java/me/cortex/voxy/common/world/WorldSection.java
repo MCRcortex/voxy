@@ -29,10 +29,6 @@ public final class WorldSection {
     long[] data = null;
 
 
-    //Computed on load, updated on insertion
-    private final AtomicInteger nonAirCount = new AtomicInteger(0);
-
-
     private final ActiveSectionTracker tracker;
     public final AtomicBoolean inSaveQueue = new AtomicBoolean();
 

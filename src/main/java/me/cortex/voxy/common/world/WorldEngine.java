@@ -1,5 +1,6 @@
 package me.cortex.voxy.common.world;
 
+import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.service.SectionSavingService;
@@ -131,6 +132,10 @@ public class WorldEngine {
                         long oldId = worldSection.set(x, y, z, newId);
                         nonAirCountDelta += Mapper.isAir(oldId)==Mapper.isAir(newId)?0:(Mapper.isAir(newId)?-1:1 );
                         didChange |= newId != oldId;
+                        /*
+                        if (oldId != newId && Mapper.isAir(oldId) && Mapper.isAir(newId)) {
+                            Voxy.breakpoint();
+                        }*/
                     }
                 }
             }

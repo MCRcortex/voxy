@@ -368,7 +368,7 @@ public class RenderDataFactory {
                                     connectedSection.copyDataTo(this.connectedSectionCache);
                                     connectedSection.release();
                                 } else {
-                                    Arrays.fill(this.connectedSectionCache, Mapper.withLight(Mapper.AIR, 15));
+                                    Arrays.fill(this.connectedSectionCache, 0);
                                 }
                                 obtainedOppositeSection0 = true;
                             }
@@ -396,7 +396,7 @@ public class RenderDataFactory {
                                     connectedSection.copyDataTo(this.connectedSectionCache);
                                     connectedSection.release();
                                 } else {
-                                    Arrays.fill(this.connectedSectionCache, Mapper.withLight(Mapper.AIR, 15));
+                                    Arrays.fill(this.connectedSectionCache, 0);
                                 }
                                 obtainedOppositeSection31 = true;
                             }

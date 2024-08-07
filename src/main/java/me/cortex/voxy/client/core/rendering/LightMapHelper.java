@@ -18,7 +18,7 @@ public class LightMapHelper {
             int y = ((light>>4)&0xF);
             int sample = lmt.getColor(x,y);
             sample = ((sample&0xFF0000)>>16)|(sample&0xFF00)|((sample&0xFF)<<16);
-            MemoryUtil.memPutInt(upload + (((x<<4)|(15-y))*4), sample|(0xFF<<28));//Skylight is inverted
+            MemoryUtil.memPutInt(upload + (((x<<4)|(y))*4), sample|(0xFF<<28));
         }
     }
 
