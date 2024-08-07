@@ -13,7 +13,7 @@ import java.util.function.Supplier;
 public class ServiceSlice extends TrackedObject {
     private final String name;
     final int weightPerJob;
-    private volatile boolean alive = true;
+    volatile boolean alive = true;
     private final ServiceThreadPool threadPool;
     private final Supplier<Runnable> workerGenerator;
     final Semaphore jobCount = new Semaphore(0);
@@ -82,7 +82,8 @@ public class ServiceSlice extends TrackedObject {
     //Tells the system that a single instance of this service needs executing
     public void execute() {
         if (!this.alive) {
-            throw new IllegalStateException("Tried to do work on a dead service");
+            System.err.println("Tried to do work on a dead service");
+            return;
         }
         this.jobCount.release();
         this.jobCount2.incrementAndGet();
