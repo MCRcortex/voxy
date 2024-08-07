@@ -20,6 +20,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.Semaphore;
 
 public class VoxelIngestService {
+    private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);
     private final ServiceSlice threads;
     private final ConcurrentLinkedDeque<WorldChunk> ingestQueue = new ConcurrentLinkedDeque<>();
     private final ConcurrentHashMap<Long, Pair<ChunkNibbleArray, ChunkNibbleArray>> captureLightMap = new ConcurrentHashMap<>(1000,0.75f, 7);
@@ -41,7 +42,7 @@ public class VoxelIngestService {
                 this.world.insertUpdate(VoxelizedSection.createEmpty().setPosition(chunk.getPos().x, i, chunk.getPos().z));
             } else {
                 VoxelizedSection csec = WorldConversionFactory.convert(
-                        VoxelizedSection.createEmpty().setPosition(chunk.getPos().x, i, chunk.getPos().z),
+                        SECTION_CACHE.get().setPosition(chunk.getPos().x, i, chunk.getPos().z),
                         this.world.getMapper(),
                         section.getBlockStateContainer(),
                         section.getBiomeContainer(),
@@ -49,7 +50,7 @@ public class VoxelIngestService {
                             if (lighting == null || ((lighting.first() != null && lighting.first().isUninitialized())&&(lighting.second()!=null&&lighting.second().isUninitialized()))) {
                                 return (byte) 0x0f;
                             } else {
-                                //Lighting is a piece of shit cause its done per face
+                                //Lighting is hell
                                 int block = lighting.first()!=null?Math.min(15,lighting.first().get(x, y, z)):0;
                                 int sky = lighting.second()!=null?Math.min(15,lighting.second().get(x, y, z)):0;
                                 if (block<state.getLuminance()) {
