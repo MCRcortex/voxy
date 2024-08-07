@@ -99,6 +99,12 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setSaveConsumer(val -> config.renderDistance = val)
                 .setDefaultValue(DEFAULT.renderDistance)
                 .build());
+
+        category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.serviceThreads"), config.serviceThreads, 1, Runtime.getRuntime().availableProcessors())
+                .setTooltip(Text.translatable("voxy.config.general.serviceThreads.tooltip"))
+                .setSaveConsumer(val -> config.serviceThreads = val)
+                .setDefaultValue(DEFAULT.serviceThreads)
+                .build());
     }
 
     private static void addThreadsCategory(ConfigBuilder builder, VoxyConfig config) {

@@ -25,5 +25,7 @@
   "voxy.config.threads.saving": "Saving",
   "voxy.config.threads.saving.tooltip": "How many threads voxy will use for saving sections to the storage backend",
   "voxy.config.threads.render": "Render",
-  "voxy.config.threads.render.tooltip": "How many threads voxy will use for generating render data"
+  "voxy.config.threads.render.tooltip": "How many threads voxy will use for generating render data",
+  "voxy.config.general.serviceThreads.tooltip": "Number of threads the ServiceThreadPool can use",
+  "voxy.config.general.serviceThreads": "Service threads"
 }
