@@ -204,12 +204,6 @@ public final class WorldSection {
     }
 
     public int addNonEmptyBlockCount(int delta) {
-        if (VERIFY_WORLD_SECTION_EXECUTION) {
-            if (this.lvl != 0) {
-                throw new IllegalStateException("Tried updating a level 0 lod when its not level 0: " + WorldEngine.pprintPos(this.key));
-            }
-        }
-
         int count = ((int)NON_EMPTY_BLOCK_HANDLE.getAndAdd(this, delta)) + delta;
         if (VERIFY_WORLD_SECTION_EXECUTION) {
             if (count < 0) {
@@ -220,6 +214,11 @@ public final class WorldSection {
     }
 
     public boolean updateLvl0State() {
+        if (VERIFY_WORLD_SECTION_EXECUTION) {
+            if (this.lvl != 0) {
+                throw new IllegalStateException("Tried updating a level 0 lod when its not level 0: " + WorldEngine.pprintPos(this.key));
+            }
+        }
         byte prev, next;
         do {
             prev = this.getNonEmptyChildren();
