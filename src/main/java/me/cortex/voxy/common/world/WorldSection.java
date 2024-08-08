@@ -1,18 +1,36 @@
 package me.cortex.voxy.common.world;
 
 
+import me.cortex.voxy.client.Voxy;
+import net.minecraft.util.Pair;
+
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 
 //Represents a loaded world section at a specific detail level
 // holds a 32x32x32 region of detail
 public final class WorldSection {
     public static final boolean VERIFY_WORLD_SECTION_EXECUTION = System.getProperty("voxy.verifyWorldSectionExecution", "true").equals("true");
+
+
+    private static final VarHandle ATOMIC_STATE_HANDLE;
+    private static final VarHandle NON_EMPTY_CHILD_HANDLE;
+    private static final VarHandle NON_EMPTY_BLOCK_HANDLE;
+
+    static {
+        try {
+            ATOMIC_STATE_HANDLE = MethodHandles.lookup().findVarHandle(WorldSection.class, "atomicState", int.class);
+            NON_EMPTY_CHILD_HANDLE = MethodHandles.lookup().findVarHandle(WorldSection.class, "nonEmptyChildren", byte.class);
+            NON_EMPTY_BLOCK_HANDLE = MethodHandles.lookup().findVarHandle(WorldSection.class, "nonEmptyBlockCount", int.class);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 
     //TODO: should make it dynamically adjust the size allowance based on memory pressure/WorldSection allocation rate (e.g. is it doing a world import)
     private static final int ARRAY_REUSE_CACHE_SIZE = 300;
@@ -30,13 +48,14 @@ public final class WorldSection {
     //Serialized states
     long metadata;
     long[] data = null;
-
+    volatile int nonEmptyBlockCount = 0;
+    volatile byte nonEmptyChildren;
 
     private final ActiveSectionTracker tracker;
     public final AtomicBoolean inSaveQueue = new AtomicBoolean();
 
     //When the first bit is set it means its loaded
-    private final AtomicInteger atomicState = new AtomicInteger(1);
+    private volatile int atomicState = 1;
 
     WorldSection(int lvl, int x, int y, int z, ActiveSectionTracker tracker) {
         this.lvl = lvl;
@@ -62,17 +81,16 @@ public final class WorldSection {
     }
 
     public boolean tryAcquire() {
-        int state = this.atomicState.updateAndGet(val -> {
-            if ((val&1) != 0) {
-                return val+2;
-            }
-            return val;
-        });
-        return (state&1) != 0;
+        int prev, next;
+        do {
+            prev = (int) ATOMIC_STATE_HANDLE.get(this);
+            next = ((prev&1) != 0)?prev+2:prev;
+        } while (!ATOMIC_STATE_HANDLE.compareAndSet(this, prev, next));
+        return (next&1) != 0;
     }
 
     public int acquire() {
-        int state = this.atomicState.addAndGet(2);
+        int state =((int)  ATOMIC_STATE_HANDLE.getAndAdd(this, 2)) + 2;
         if (VERIFY_WORLD_SECTION_EXECUTION) {
             if ((state & 1) == 0) {
                 throw new IllegalStateException("Tried to acquire unloaded section");
@@ -82,12 +100,12 @@ public final class WorldSection {
     }
 
     public int getRefCount() {
-        return this.atomicState.get()>>1;
+        return ((int)ATOMIC_STATE_HANDLE.get(this))>>1;
     }
 
     //TODO: add the ability to hint to the tracker that yes the section is unloaded, try to cache it in a secondary cache since it will be reused/needed later
     public int release() {
-        int state = this.atomicState.addAndGet(-2);
+        int state = ((int) ATOMIC_STATE_HANDLE.getAndAdd(this, -2)) - 2;
         if (VERIFY_WORLD_SECTION_EXECUTION) {
             if (state < 1) {
                 throw new IllegalStateException("Section got into an invalid state");
@@ -104,7 +122,7 @@ public final class WorldSection {
 
     //Returns true on success, false on failure
     boolean trySetFreed() {
-        int witness = this.atomicState.compareAndExchange(1, 0);
+        int witness = (int) ATOMIC_STATE_HANDLE.compareAndExchange(this, 1, 0);
         if (VERIFY_WORLD_SECTION_EXECUTION) {
             if ((witness & 1) == 0 && witness != 0) {
                 throw new IllegalStateException("Section marked as free but has refs");
@@ -124,7 +142,7 @@ public final class WorldSection {
 
     public void assertNotFree() {
         if (VERIFY_WORLD_SECTION_EXECUTION) {
-            if ((this.atomicState.get() & 1) == 0) {
+            if ((((int) ATOMIC_STATE_HANDLE.get(this)) & 1) == 0) {
                 throw new IllegalStateException();
             }
         }
@@ -158,6 +176,55 @@ public final class WorldSection {
         if (cache.length != this.data.length) throw new IllegalArgumentException();
         System.arraycopy(this.data, 0, cache, 0, this.data.length);
     }
-}
 
-//TODO: for serialization, make a huffman encoding tree on the integers since that should be very very efficent for compression
+    public static int getChildIndex(int x, int y, int z) {
+        return (x&1)|((y&1)<<2)|((z&1)<<1);
+    }
+
+    public byte getNonEmptyChildren() {
+        return (byte) NON_EMPTY_CHILD_HANDLE.get(this);
+    }
+
+    //Updates this.nonEmptyChildren atomically with respect to the child passed in
+    // returns 0 if no change, 1 if it just updated and didnt do a major state change, 2 if it was a major state change (something -> nothing, nothing -> something)
+    public int updateEmptyChildState(WorldSection child) {
+        int childIdx = getChildIndex(child.x, child.y, child.z);
+        byte msk = (byte) (1<<childIdx);
+        byte prev, next;
+        do {
+            prev = this.getNonEmptyChildren();
+            next = (byte) ((prev&(~msk))|(child.getNonEmptyChildren()!=0?msk:0));
+        } while (!NON_EMPTY_CHILD_HANDLE.compareAndSet(this, prev, next));
+
+        return ((prev!=0)^(next!=0))?2:(prev!=next?1:0);
+    }
+
+    public int getNonEmptyBlockCount() {
+        return (int) NON_EMPTY_BLOCK_HANDLE.get(this);
+    }
+
+    public int addNonEmptyBlockCount(int delta) {
+        if (VERIFY_WORLD_SECTION_EXECUTION) {
+            if (this.lvl != 0) {
+                throw new IllegalStateException("Tried updating a level 0 lod when its not level 0: " + WorldEngine.pprintPos(this.key));
+            }
+        }
+
+        int count = ((int)NON_EMPTY_BLOCK_HANDLE.getAndAdd(this, delta)) + delta;
+        if (VERIFY_WORLD_SECTION_EXECUTION) {
+            if (count < 0) {
+                throw new IllegalStateException("Count is negative!");
+            }
+        }
+        return count;
+    }
+
+    public boolean updateLvl0State() {
+        byte prev, next;
+        do {
+            prev = this.getNonEmptyChildren();
+            next = (byte) (((int)NON_EMPTY_BLOCK_HANDLE.get(this))==0?0:0xFF);
+        } while (!NON_EMPTY_CHILD_HANDLE.compareAndSet(this, prev, next));
+        return prev != next;
+    }
+}

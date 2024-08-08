@@ -76,6 +76,7 @@ public class VoxelCore {
         System.out.println("Voxy core initialized");
     }
 
+
     public void enqueueIngest(WorldChunk worldChunk) {
         this.world.ingestService.enqueueIngest(worldChunk);
     }
@@ -218,5 +219,35 @@ public class VoxelCore {
 
     public WorldEngine getWorldEngine() {
         return this.world;
+    }
+
+    private void verifyTopNodeChildren(int X, int Y, int Z) {
+        for (int lvl = 0; lvl < 5; lvl++) {
+            for (int y = (Y<<5)>>lvl; y < ((Y+1)<<5)>>lvl; y++) {
+                for (int x = (X<<5)>>lvl; x < ((X+1)<<5)>>lvl; x++) {
+                    for (int z = (Z<<5)>>lvl; z < ((Z+1)<<5)>>lvl; z++) {
+                        if (lvl == 0) {
+                            var own = this.world.acquire(lvl, x, y, z);
+                            if ((own.getNonEmptyChildren() != 0) ^ (own.getNonEmptyBlockCount() != 0)) {
+                                System.err.println("Lvl 0 node not marked correctly " + WorldEngine.pprintPos(own.key));
+                            }
+                            own.release();
+                        } else {
+                            byte msk = 0;
+                            for (int child = 0; child < 8; child++) {
+                                var section = this.world.acquire(lvl-1, (child&1)+(x<<1), ((child>>2)&1)+(y<<1), ((child>>1)&1)+(z<<1));
+                                msk |= (byte) (section.getNonEmptyBlockCount()!=0?(1<<child):0);
+                                section.release();
+                            }
+                            var own = this.world.acquire(lvl, x, y, z);
+                            if (own.getNonEmptyChildren() != msk) {
+                                System.err.println("Section empty child mask not correct " + WorldEngine.pprintPos(own.key) + " got: " + String.format("%8s", Integer.toBinaryString(Byte.toUnsignedInt(own.getNonEmptyChildren()))).replace(' ', '0') + " expected: " + String.format("%8s", Integer.toBinaryString(Byte.toUnsignedInt(msk))).replace(' ', '0'));
+                            }
+                            own.release();
+                        }
+                    }
+                }
+            }
+        }
     }
 }

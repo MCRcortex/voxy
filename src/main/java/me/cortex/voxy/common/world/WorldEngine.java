@@ -1,5 +1,6 @@
 package me.cortex.voxy.common.world;
 
+import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.service.SectionSavingService;
@@ -114,47 +115,75 @@ public class WorldEngine {
 
     //NOTE: THIS RUNS ON THE THREAD IT WAS EXECUTED ON, when this method exits, the calling method may assume that VoxelizedSection is no longer needed
     public void insertUpdate(VoxelizedSection section) {//TODO: add a bitset of levels to update and if it should force update
-        //The >>1 is cause the world sections size is 32x32x32 vs the 16x16x16 of the voxelized section
+        boolean shouldCheckEmptiness = false;
+        WorldSection previousSection = null;
+
         for (int lvl = 0; lvl < this.maxMipLevels; lvl++) {
-            int nonAirCountDelta = 0;
             var worldSection = this.acquire(lvl, section.x >> (lvl + 1), section.y >> (lvl + 1), section.z >> (lvl + 1));
+
+            int emptinessStateChange = 0;
+            //Propagate the child existence state of the previous iteration to this section
+            if (lvl != 0 && shouldCheckEmptiness) {
+                emptinessStateChange = worldSection.updateEmptyChildState(previousSection);
+                //We kept the previous section acquired, so we need to release it
+                previousSection.release();
+                previousSection = null;
+            }
+
+
             int msk = (1<<(lvl+1))-1;
             int bx = (section.x&msk)<<(4-lvl);
             int by = (section.y&msk)<<(4-lvl);
             int bz = (section.z&msk)<<(4-lvl);
-            boolean didChange = false;
+
+            int nonAirCountDelta = 0;
+            boolean didStateChange = false;
             for (int y = by; y < (16>>lvl)+by; y++) {
                 for (int z = bz; z < (16>>lvl)+bz; z++) {
                     for (int x = bx; x < (16>>lvl)+bx; x++) {
                         long newId = section.get(lvl, x-bx, y-by, z-bz);
                         long oldId = worldSection.set(x, y, z, newId);
                         nonAirCountDelta += Mapper.isAir(oldId)==Mapper.isAir(newId)?0:(Mapper.isAir(newId)?-1:1 );
-                        didChange |= newId != oldId;
-                        /*
-                        if (oldId != newId && Mapper.isAir(oldId) && Mapper.isAir(newId)) {
-                            Voxy.breakpoint();
-                        }*/
+                        didStateChange |= newId != oldId;
                     }
                 }
             }
 
-            //Branch into 2 paths, if at lod 0, update the atomic count, if that update resulted in a state transition
-            // then aquire the next lod, lock it, recheck our counter, if it is still ok, then atomically update the parent metadata
-            //if not lod 0 check that the current occupied state matches the parent lod bit
-            // if it doesnt, aquire and lock the next lod level
-            // and do the update propagation
+            if (nonAirCountDelta != 0) {
+                worldSection.addNonEmptyBlockCount(nonAirCountDelta);
+                if (lvl == 0) {
+                    emptinessStateChange = worldSection.updateLvl0State() ? 2 : 0;
+                }
+            }
 
+            if (didStateChange||(emptinessStateChange!=0)) {
+                //Mark the section as dirty (enqueuing saving and geometry rebuild) and move to parent mip level
+                //TODO: have an update type! so that then e.g. if the child empty set changes it doesnt cause chunk rebuilds!
+                this.markDirty(worldSection);
+            }
 
             //Need to release the section after using it
-            if (didChange) {
-                //Mark the section as dirty (enqueuing saving and geometry rebuild) and move to parent mip level
-                this.markDirty(worldSection);
-                worldSection.release();
+            if (didStateChange||(emptinessStateChange==2)) {
+                if (emptinessStateChange==2) {
+                    //Major state emptiness change, bubble up
+                    shouldCheckEmptiness = true;
+                    //Dont release the section, it will be released on the next loop
+                    previousSection = worldSection;
+                } else {
+                    //Propagate up without state change
+                    shouldCheckEmptiness = false;
+                    previousSection = null;
+                    worldSection.release();
+                }
             } else {
                 //If nothing changed just need to release, dont need to update parent mips
                 worldSection.release();
                 break;
             }
+        }
+
+        if (previousSection != null) {
+            previousSection.release();
         }
     }
 

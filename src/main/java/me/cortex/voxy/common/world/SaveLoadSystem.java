@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.longs.Long2ShortOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
+import me.cortex.voxy.common.world.other.Mapper;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -13,7 +14,7 @@ import static org.lwjgl.util.zstd.Zstd.*;
 
 public class SaveLoadSystem {
     public static final boolean VERIFY_HASH_ON_LOAD = System.getProperty("voxy.verifySectionOnLoad", "true").equals("true");
-    public static final int BIGGEST_SERIALIZED_SECTION_SIZE = 32 * 32 * 32 * 8 * 2;
+    public static final int BIGGEST_SERIALIZED_SECTION_SIZE = 32 * 32 * 32 * 8 * 2 + 8;
 
     public static int lin2z(int i) {
         int x = i&0x1F;
@@ -57,6 +58,13 @@ public class SaveLoadSystem {
 
         long hash = section.key^(lutIndex*1293481298141L);
         MemoryUtil.memPutLong(ptr, section.key); ptr += 8;
+
+        long metadata = 0;
+        metadata |= Byte.toUnsignedLong(section.nonEmptyChildren);
+        MemoryUtil.memPutLong(ptr, metadata); ptr += 8;
+
+        hash ^= metadata; hash *= 1242629872171L;
+
         MemoryUtil.memPutInt(ptr, lutIndex); ptr += 4;
         for (int i = 0; i < lutIndex; i++) {
             long id = lutValues[i];
@@ -76,12 +84,17 @@ public class SaveLoadSystem {
 
     public static boolean deserialize(WorldSection section, MemoryBuffer data) {
         long ptr = data.address;
-        long hash = 0;
         long key = MemoryUtil.memGetLong(ptr); ptr += 8;
+
+        long metadata = MemoryUtil.memGetLong(ptr); ptr += 8;
+        section.nonEmptyChildren = (byte) (metadata&0xFF);
+
         int lutLen = MemoryUtil.memGetInt(ptr); ptr += 4;
         long[] lut = new long[lutLen];
+        long hash = 0;
         if (VERIFY_HASH_ON_LOAD) {
             hash = key ^ (lut.length * 1293481298141L);
+            hash ^= metadata; hash *= 1242629872171L;
         }
         for (int i = 0; i < lutLen; i++) {
             lut[i] = MemoryUtil.memGetLong(ptr); ptr += 8;
@@ -98,9 +111,13 @@ public class SaveLoadSystem {
             return false;
         }
 
+        int nonEmptyBlockCount = 0;
         for (int i = 0; i < section.data.length; i++) {
-            section.data[z2lin(i)] = lut[MemoryUtil.memGetShort(ptr)]; ptr += 2;
+            long state = lut[MemoryUtil.memGetShort(ptr)]; ptr += 2;
+            nonEmptyBlockCount += Mapper.isAir(state)?0:1;
+            section.data[z2lin(i)] = state;
         }
+        section.nonEmptyBlockCount = nonEmptyBlockCount;
 
         if (VERIFY_HASH_ON_LOAD) {
             long pHash = 99;
