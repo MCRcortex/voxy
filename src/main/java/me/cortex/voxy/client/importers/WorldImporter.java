@@ -258,10 +258,13 @@ public class WorldImporter {
 
     private void importChunkNBT(NbtCompound chunk) {
         if (!chunk.contains("Status")) {
+            //Its not real so decrement the chunk
+            this.totalChunks.decrementAndGet();
             return;
         }
         //Dont process non full chunk sections
         if (ChunkStatus.byId(chunk.getString("Status")) != ChunkStatus.FULL) {
+            this.totalChunks.decrementAndGet();
             return;
         }
         try {
