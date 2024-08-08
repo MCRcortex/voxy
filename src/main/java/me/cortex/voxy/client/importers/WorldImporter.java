@@ -19,6 +19,7 @@ import net.minecraft.world.World;
 import net.minecraft.world.biome.Biome;
 import net.minecraft.world.biome.BiomeKeys;
 import net.minecraft.world.chunk.ChunkNibbleArray;
+import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.chunk.PalettedContainer;
 import net.minecraft.world.chunk.ReadableContainer;
 import net.minecraft.world.storage.ChunkCompressionFormat;
@@ -256,6 +257,13 @@ public class WorldImporter {
     }
 
     private void importChunkNBT(NbtCompound chunk) {
+        if (!chunk.contains("Status")) {
+            return;
+        }
+        //Dont process non full chunk sections
+        if (ChunkStatus.byId(chunk.getString("Status")) != ChunkStatus.FULL) {
+            return;
+        }
         try {
             int x = chunk.getInt("xPos");
             int z = chunk.getInt("zPos");
@@ -271,12 +279,6 @@ public class WorldImporter {
 
         this.updateCallback.update(this.chunksProcessed.incrementAndGet(), this.estimatedTotalChunks.get());
     }
-
-    private static int getIndex(int x, int y, int z) {
-        return y << 8 | z << 4 | x;
-    }
-
-
 
     private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);
     private static final Codec<PalettedContainer<BlockState>> BLOCK_STATE_CODEC = PalettedContainer.createPalettedContainerCodec(Block.STATE_IDS, BlockState.CODEC, PalettedContainer.PaletteProvider.BLOCK_STATE, Blocks.AIR.getDefaultState());
