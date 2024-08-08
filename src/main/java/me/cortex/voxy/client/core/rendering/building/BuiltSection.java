@@ -12,8 +12,12 @@ public final class BuiltSection {
     public final MemoryBuffer geometryBuffer;
     public final int[] offsets;
 
-    public BuiltSection(long position) {
+    private BuiltSection(long position) {
         this(position, -1, null, null);
+    }
+
+    public static BuiltSection empty(long position) {
+        return new BuiltSection(position);
     }
 
     public BuiltSection(long position, int aabb, MemoryBuffer geometryBuffer, int[] offsets) {

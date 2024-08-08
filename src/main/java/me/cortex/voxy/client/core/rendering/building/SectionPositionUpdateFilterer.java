@@ -52,7 +52,7 @@ public class SectionPositionUpdateFilterer {
         }
     }
 
-    public void maybeForward(WorldSection section) {
+    public void maybeForward(WorldSection section, int updateType) {
         this.maybeForward(section.key);
     }
 

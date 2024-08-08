@@ -103,7 +103,7 @@ public class RenderDataFactory {
         }
 
         if (bufferSize == 0) {
-            return new BuiltSection(section.key);
+            return BuiltSection.empty(section.key);
         }
 
         //TODO: generate the meshlets here

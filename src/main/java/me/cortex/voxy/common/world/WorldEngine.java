@@ -1,6 +1,5 @@
 package me.cortex.voxy.common.world;
 
-import me.cortex.voxy.client.Voxy;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.service.SectionSavingService;
@@ -14,16 +13,22 @@ import java.util.function.Consumer;
 //Use an LMDB backend to store the world, use a local inmemory cache for lod sections
 // automatically manages and invalidates sections of the world as needed
 public class WorldEngine {
+    public static final int UPDATE_TYPE_BLOCK_BIT = 1;
+    public static final int UPDATE_TYPE_CHILD_EXISTENCE_BIT = 2;
+    public static final int UPDATE_FLAGS = UPDATE_TYPE_BLOCK_BIT | UPDATE_TYPE_CHILD_EXISTENCE_BIT;
+    public interface ISectionChangeCallback {void accept(WorldSection section, int updateFlags);}
+
+
     public final StorageBackend storage;
     private final Mapper mapper;
     private final ActiveSectionTracker sectionTracker;
     public final VoxelIngestService ingestService;
     public final SectionSavingService savingService;
-    private Consumer<WorldSection> dirtyCallback;
+    private ISectionChangeCallback dirtyCallback;
     private final int maxMipLevels;
 
-    public void setDirtyCallback(Consumer<WorldSection> tracker) {
-        this.dirtyCallback = tracker;
+    public void setDirtyCallback(ISectionChangeCallback callback) {
+        this.dirtyCallback = callback;
     }
 
     public Mapper getMapper() {return this.mapper;}
@@ -100,12 +105,13 @@ public class WorldEngine {
 
     //Marks a section as dirty, enqueuing it for saving and or render data rebuilding
     public void markDirty(WorldSection section) {
+        this.markDirty(section, UPDATE_FLAGS);
+    }
+
+    public void markDirty(WorldSection section, int changeState) {
         if (this.dirtyCallback != null) {
-            this.dirtyCallback.accept(section);
+            this.dirtyCallback.accept(section, changeState);
         }
-        //TODO: add an option for having synced saving, that is when call enqueueSave, that will instead, instantly
-        // save to the db, this can be useful for just reducing the amount of thread pools in total
-        // might have some issues with threading if the same section is saved from multiple threads?
         this.savingService.enqueueSave(section);
     }
 

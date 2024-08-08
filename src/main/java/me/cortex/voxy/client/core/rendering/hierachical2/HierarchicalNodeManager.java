@@ -4,6 +4,7 @@ package me.cortex.voxy.client.core.rendering.hierachical2;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.SectionPositionUpdateFilterer;
+import me.cortex.voxy.client.core.rendering.building.SectionUpdate;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
 import me.cortex.voxy.client.core.util.ExpandingObjectAllocationList;
 import me.cortex.voxy.common.world.WorldEngine;
@@ -31,24 +32,6 @@ public class HierarchicalNodeManager {
         this.maxNodeCount = maxNodeCount;
         this.nodeData = new NodeStore(maxNodeCount);
         this.geometryManager = geometryManager;
-
-
-
-        new Thread(()->{
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            for(int x = -50; x<=50;x++) {
-                for (int z = -50; z <= 50; z++) {
-                    for (int y = -3; y <= 3; y++) {
-                        updateFilterer.watch(0,x,y,z);
-                        updateFilterer.unwatch(0,x,y,z);
-                    }
-                }
-            }
-        }).start();
     }
 
 
@@ -101,7 +84,11 @@ public class HierarchicalNodeManager {
         }
     }
 
-    public void processBuildResult(BuiltSection section) {
+    public void processBuildResult(SectionUpdate section) {
+        if (section.geometry() != null) {
+            section.geometry().free();
+        }
+        /*
         if (!section.isEmpty()) {
             this.geometryManager.uploadSection(section);
         } else {
@@ -120,7 +107,7 @@ public class HierarchicalNodeManager {
                 // however could result in a reallocation if it needs to mark a child position as being possibly visible
 
             }
-        }
+        }*/
     }
 
     private static long makeChildPos(long basePos, int addin) {

@@ -12,7 +12,6 @@ import net.minecraft.world.chunk.ReadableContainer;
 public class WorldConversionFactory {
     private static final ThreadLocal<Reference2IntOpenHashMap<BlockState>> BLOCK_CACHE = ThreadLocal.withInitial(Reference2IntOpenHashMap::new);
 
-    //TODO: add a local mapper cache since it should be smaller and faster
     public static VoxelizedSection convert(VoxelizedSection section,
                                            Mapper stateMapper,
                                            PalettedContainer<BlockState> blockContainer,
@@ -76,7 +75,6 @@ public class WorldConversionFactory {
         return ((y<<2)|(z<<1)|x) + 4*4*4 + 8*8*8 + 16*16*16;
     }
 
-    //TODO: Instead of this mip section as we are updating the data in the world
     public static void mipSection(VoxelizedSection section, Mapper mapper) {
         var data = section.section;
 

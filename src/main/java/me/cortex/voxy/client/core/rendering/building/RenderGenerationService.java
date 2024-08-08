@@ -23,14 +23,13 @@ public class RenderGenerationService {
 
     private final WorldEngine world;
     private final ModelBakerySubsystem modelBakery;
-    private final Consumer<BuiltSection> resultConsumer;
-    private final BuiltSectionMeshCache meshCache = new BuiltSectionMeshCache();
+    private final Consumer<SectionUpdate> resultConsumer;
     private final boolean emitMeshlets;
 
     private final ServiceSlice threads;
 
 
-    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, Consumer<BuiltSection> consumer, boolean emitMeshlets) {
+    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, Consumer<SectionUpdate> consumer, boolean emitMeshlets) {
         this.emitMeshlets = emitMeshlets;
         this.world = world;
         this.modelBakery = modelBakery;
@@ -68,9 +67,10 @@ public class RenderGenerationService {
         synchronized (this.taskQueue) {
             task = this.taskQueue.removeFirst();
         }
+        long time = System.nanoTime();
         var section = task.sectionSupplier.get();
         if (section == null) {
-            this.resultConsumer.accept(new BuiltSection(task.position));
+            this.resultConsumer.accept(new SectionUpdate(task.position, time, BuiltSection.empty(task.position), (byte) 0));
             return;
         }
         section.assertNotFree();
@@ -103,37 +103,12 @@ public class RenderGenerationService {
             }
         }
 
-        //TODO: if the section was _not_ built, maybe dont release it, or release it with the hint
+        byte childMask = section.getNonEmptyChildren();
         section.release();
-        if (mesh != null) {
-            //TODO: if the mesh is null, need to clear the cache at that point
-            this.resultConsumer.accept(mesh.clone());
-            if (!this.meshCache.putMesh(mesh)) {
-                mesh.free();
-            }
-        }
+        //Time is the time at the start of the update
+        this.resultConsumer.accept(new SectionUpdate(section.key, time, mesh, childMask));
     }
 
-    public int getMeshCacheCount() {
-        return this.meshCache.getCount();
-    }
-
-    //TODO: Add a priority system, higher detail sections must always be updated before lower detail
-    // e.g. priorities NONE->lvl0 and lvl1 -> lvl0 over lvl0 -> lvl1
-
-
-    //TODO: make it pass either a world section, _or_ coodinates so that the render thread has to do the loading of the sections
-    // not the calling method
-
-    //TODO: maybe make it so that it pulls from the world to stop the inital loading absolutly butt spamming the queue
-    // and thus running out of memory
-
-    //TODO: REDO THIS ENTIRE THING
-    // render tasks should not be bound to a WorldSection, instead it should be bound to either a WorldSection or
-    // an LoD position, the issue is that if we bound to a LoD position we loose all the info of the WorldSection
-    // like if its in the render queue and if we should abort building the render data
-    //1 proposal fix is a Long2ObjectLinkedOpenHashMap<WorldSection> which means we can abort if needed,
-    // also gets rid of dependency on a WorldSection (kinda)
     public void enqueueTask(int lvl, int x, int y, int z) {
         this.enqueueTask(lvl, x, y, z, (l,x1,y1,z1)->true);
     }
@@ -147,13 +122,6 @@ public class RenderGenerationService {
     }
 
     public void enqueueTask(long ikey, TaskChecker checker) {
-        {
-            var cache = this.meshCache.getMesh(ikey);
-            if (cache != null) {
-                this.resultConsumer.accept(cache);
-                return;
-            }
-        }
         synchronized (this.taskQueue) {
             this.taskQueue.computeIfAbsent(ikey, key->{
                 this.threads.execute();
@@ -168,31 +136,6 @@ public class RenderGenerationService {
         }
     }
 
-    //Tells the render cache that the mesh at the specified position should be cached
-    public void markCache(int lvl, int x, int y, int z) {
-        this.meshCache.markCache(WorldEngine.getWorldSectionId(lvl, x, y, z));
-    }
-
-    //Tells the render cache that the mesh at the specified position should not be cached/any previous cache result, freed
-    public void unmarkCache(int lvl, int x, int y, int z) {
-        this.meshCache.unmarkCache(WorldEngine.getWorldSectionId(lvl, x, y, z));
-    }
-
-    //Resets a chunks cache mesh
-    public void clearCache(int lvl, int x, int y, int z) {
-        this.meshCache.clearMesh(WorldEngine.getWorldSectionId(lvl, x, y, z));
-    }
-
-    /*
-    public void removeTask(int lvl, int x, int y, int z) {
-        synchronized (this.taskQueue) {
-            if (this.taskQueue.remove(WorldEngine.getWorldSectionId(lvl, x, y, z)) != null) {
-                this.taskCounter.acquireUninterruptibly();
-            }
-        }
-    }
-     */
-
     public int getTaskCount() {
         return this.threads.getJobCount();
     }
@@ -204,7 +147,6 @@ public class RenderGenerationService {
         while (!this.taskQueue.isEmpty()) {
             this.taskQueue.removeFirst();
         }
-        this.meshCache.free();
     }
 
     public void addDebugData(List<String> debug) {

@@ -5,6 +5,7 @@ import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.building.SectionPositionUpdateFilterer;
+import me.cortex.voxy.client.core.rendering.building.SectionUpdate;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical2.HierarchicalOcclusionTraverser;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
@@ -37,7 +38,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     private final ModelBakerySubsystem modelService;
     private final RenderGenerationService renderGen;
 
-    private final ConcurrentLinkedDeque<BuiltSection> sectionBuildResultQueue = new ConcurrentLinkedDeque<>();
+    private final ConcurrentLinkedDeque<SectionUpdate> sectionUpdateQueue = new ConcurrentLinkedDeque<>();
 
     public RenderService(WorldEngine world, ServiceThreadPool serviceThreadPool) {
         this.modelService = new ModelBakerySubsystem(world.getMapper());
@@ -52,7 +53,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.nodeManager = new HierarchicalNodeManager(1<<21, this.sectionRenderer.getGeometryManager(), positionFilterForwarder);
 
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
-        this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool, this.sectionBuildResultQueue::add, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
+        this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool, this.sectionUpdateQueue::add, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
         positionFilterForwarder.setCallback(this.renderGen::enqueueTask);
 
         this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 512);
@@ -92,8 +93,8 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         if (true /* firstInvocationThisFrame */) {
             DownloadStream.INSTANCE.tick();
             //Process the build results here (this is done atomically/on the render thread)
-            while (!this.sectionBuildResultQueue.isEmpty()) {
-                this.nodeManager.processBuildResult(this.sectionBuildResultQueue.poll());
+            while (!this.sectionUpdateQueue.isEmpty()) {
+                this.nodeManager.processBuildResult(this.sectionUpdateQueue.poll());
             }
         }
         UploadStream.INSTANCE.tick();
@@ -123,8 +124,8 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.sectionRenderer.free();
         this.traversal.free();
         //Release all the unprocessed built geometry
-        this.sectionBuildResultQueue.forEach(BuiltSection::free);
-        this.sectionBuildResultQueue.clear();
+        this.sectionUpdateQueue.forEach(update -> {if(update.geometry()!=null)update.geometry().free();});
+        this.sectionUpdateQueue.clear();
     }
 
     public Viewport<?> getViewport() {
