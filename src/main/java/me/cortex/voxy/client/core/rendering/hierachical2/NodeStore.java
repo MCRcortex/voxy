@@ -31,4 +31,10 @@ public final class NodeStore {
         return false;
     }
 
+
+    //Writes out a nodes data to the ptr in the compacted/reduced format
+    public void writeNode(long ptr, int nodeId) {
+        
+    }
+
 }

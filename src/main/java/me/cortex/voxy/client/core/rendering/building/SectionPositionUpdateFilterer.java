@@ -8,6 +8,8 @@ import java.util.function.LongConsumer;
 
 public class SectionPositionUpdateFilterer {
     private static final int SLICES = 1<<2;
+    public interface IChildUpdate {void accept(WorldSection section);}
+
     private final LongOpenHashSet[] slices = new LongOpenHashSet[SLICES];
     {
         for (int i = 0; i < this.slices.length; i++) {
@@ -15,13 +17,15 @@ public class SectionPositionUpdateFilterer {
         }
     }
 
-    private LongConsumer forwardTo;
+    private LongConsumer renderForwardTo;
+    private IChildUpdate childUpdateCallback;
 
-    public void setCallback(LongConsumer forwardTo) {
-        if (this.forwardTo != null) {
+    public void setCallbacks(LongConsumer forwardTo, IChildUpdate childUpdateCallback) {
+        if (this.renderForwardTo != null) {
             throw new IllegalStateException();
         }
-        this.forwardTo = forwardTo;
+        this.renderForwardTo = forwardTo;
+        this.childUpdateCallback = childUpdateCallback;
     }
 
     public boolean watch(int lvl, int x, int y, int z) {
@@ -36,7 +40,7 @@ public class SectionPositionUpdateFilterer {
         }
         if (added) {
             //If we added it, immediately invoke for an update
-            this.forwardTo.accept(position);
+            this.renderForwardTo.accept(position);
         }
         return added;
     }
@@ -52,18 +56,23 @@ public class SectionPositionUpdateFilterer {
         }
     }
 
-    public void maybeForward(WorldSection section, int updateType) {
-        this.maybeForward(section.key);
-    }
-
-    public void maybeForward(long position) {
+    public void maybeForward(WorldSection section, int type) {
+        final long position = section.key;
         var set = this.slices[getSliceIndex(position)];
         boolean contains;
         synchronized (set) {
             contains = set.contains(position);
         }
         if (contains) {
-            this.forwardTo.accept(position);
+            if (type == 3) {//If its both, propagate to the render service
+                this.renderForwardTo.accept(position);
+            } else {
+                if (type == 2) {//If its only a existance update
+                    this.childUpdateCallback.accept(section);
+                } else {//If its only a geometry update
+                    this.renderForwardTo.accept(position);
+                }
+            }
         }
     }
 

@@ -2,7 +2,6 @@ package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
-import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.building.SectionPositionUpdateFilterer;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdate;
@@ -54,7 +53,13 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
         this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool, this.sectionUpdateQueue::add, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets);
-        positionFilterForwarder.setCallback(this.renderGen::enqueueTask);
+
+        positionFilterForwarder.setCallbacks(this.renderGen::enqueueTask, section -> {
+            long time = System.nanoTime();
+            byte childExistence = section.getNonEmptyChildren();
+
+            this.sectionUpdateQueue.add(new SectionUpdate(section.key, time, null, childExistence));
+        });
 
         this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, 512);
 
@@ -62,6 +67,16 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
+
+
+        for (int x = -10; x <= 10; x++) {
+            for (int y = -3; y <= 3; y++) {
+                for (int z = -10; z <= 10; z++) {
+                    positionFilterForwarder.watch(0, x, y ,z);
+                }
+            }
+        }
+
     }
 
     public void setup(Camera camera) {
@@ -94,7 +109,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
             DownloadStream.INSTANCE.tick();
             //Process the build results here (this is done atomically/on the render thread)
             while (!this.sectionUpdateQueue.isEmpty()) {
-                this.nodeManager.processBuildResult(this.sectionUpdateQueue.poll());
+                this.nodeManager.processResult(this.sectionUpdateQueue.poll());
             }
         }
         UploadStream.INSTANCE.tick();

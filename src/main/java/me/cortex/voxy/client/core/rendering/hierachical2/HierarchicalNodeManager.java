@@ -2,7 +2,6 @@ package me.cortex.voxy.client.core.rendering.hierachical2;
 
 
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.SectionPositionUpdateFilterer;
 import me.cortex.voxy.client.core.rendering.building.SectionUpdate;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
@@ -84,20 +83,24 @@ public class HierarchicalNodeManager {
         }
     }
 
-    public void processBuildResult(SectionUpdate section) {
-        if (section.geometry() != null) {
-            section.geometry().free();
+    public void processResult(SectionUpdate update) {
+        if (update.geometry() != null) {
+            if (!update.geometry().isEmpty()) {
+                HierarchicalOcclusionTraverser.HACKY_SECTION_COUNT++;
+                this.geometryManager.uploadSection(update.geometry());
+            } else {
+                update.geometry().free();
+            }
         }
-        /*
-        if (!section.isEmpty()) {
-            this.geometryManager.uploadSection(section);
-        } else {
-            section.free();
-        }
+        if (true)
+            return;
 
-        int nodeId = this.activeSectionMap.get(section.position);
+        int nodeId = this.activeSectionMap.get(update.position());
         if (nodeId == -1) {
-            //Not tracked or mapped to a node!!!
+            //Not tracked or mapped to a node!, discard it, it was probably in progress when it was removed from the map
+            if (update.geometry() != null) {
+                update.geometry().free();
+            }
         } else {
             //Part of a request (top bit is set to 1)
             if ((nodeId&(1<<31))!=0) {
@@ -107,7 +110,7 @@ public class HierarchicalNodeManager {
                 // however could result in a reallocation if it needs to mark a child position as being possibly visible
 
             }
-        }*/
+        }
     }
 
     private static long makeChildPos(long basePos, int addin) {

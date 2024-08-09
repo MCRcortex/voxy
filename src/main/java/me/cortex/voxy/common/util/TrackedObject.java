@@ -5,7 +5,7 @@ import java.lang.ref.Cleaner;
 public abstract class TrackedObject {
     //TODO: maybe make this false? for performance overhead?
     public static final boolean TRACK_OBJECT_ALLOCATIONS = System.getProperty("voxy.ensureTrackedObjectsAreFreed", "true").equals("true");
-    public static final boolean TRACK_OBJECT_ALLOCATION_STACKS = System.getProperty("voxy.trackObjectAllocationStacks", "false").equals("true");
+    public static final boolean TRACK_OBJECT_ALLOCATION_STACKS = System.getProperty("voxy.trackObjectAllocationStacks", "true").equals("true");
 
     private final Ref ref;
     protected TrackedObject() {
