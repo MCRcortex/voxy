@@ -77,6 +77,7 @@ public class RawDownloadStream {
     }
 
     public void free() {
+        this.frames.forEach(a->a.fence.free());
         this.downloadBuffer.free();
     }
 }
