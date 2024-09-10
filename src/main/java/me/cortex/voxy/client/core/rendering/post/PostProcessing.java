@@ -5,6 +5,7 @@ import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.GlStateCapture;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL11C;
@@ -135,6 +136,8 @@ public class PostProcessing {
     //Computes ssao on the current framebuffer data and updates it
     // this means that translucency wont be effected etc
     public void computeSSAO(Matrix4f projection, MatrixStack stack) {
+        if (!MinecraftClient.isAmbientOcclusionEnabled()) return;
+
         this.didSSAO = true;
 
         this.ssaoComp.bind();
