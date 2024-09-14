@@ -56,7 +56,7 @@ public abstract class MixinWorldRenderer implements IGetVoxelCore {
         if (this.world != null && this.core != null) {
             this.core.shutdown();
             this.core = null;
-            if (VoxyConfig.CONFIG.enabled) {
+            if (VoxyConfig.CONFIG.VoxyShouldBeEnabled()) {
                 this.populateCore();
             }
         }
@@ -76,7 +76,7 @@ public abstract class MixinWorldRenderer implements IGetVoxelCore {
             this.core.shutdown();
             this.core = null;
         }
-        if (VoxyConfig.CONFIG.enabled) {
+        if (VoxyConfig.CONFIG.VoxyShouldBeEnabled()) {
             this.populateCore();
         }
     }
@@ -87,7 +87,7 @@ public abstract class MixinWorldRenderer implements IGetVoxelCore {
             this.core.shutdown();
             this.core = null;
         }
-        if (this.world != null && VoxyConfig.CONFIG.enabled) {
+        if (this.world != null && VoxyConfig.CONFIG.VoxyShouldBeEnabled()) {
             this.populateCore();
         }
     }

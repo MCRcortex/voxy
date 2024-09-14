@@ -11,7 +11,8 @@
     "nvidium.MixinRenderPipeline",
     "sodium.MixinDefaultChunkRenderer",
     "sodium.MixinRenderSectionManager",
-    "sodium.MixinSodiumWorldRender"
+    "sodium.MixinSodiumWorldRender",
+    "iris.MixinIrisShaders"
   ],
   "injectors": {
     "defaultRequire": 1
