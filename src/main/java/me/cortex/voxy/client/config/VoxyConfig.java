@@ -31,6 +31,7 @@ public class VoxyConfig {
     public int ingestThreads = 2;
     public int savingThreads = 4;
     public int renderThreads = 5;
+    public int nearZScale = 1;
     public boolean useMeshShaderIfPossible = true;
     public String defaultSaveConfig;
 

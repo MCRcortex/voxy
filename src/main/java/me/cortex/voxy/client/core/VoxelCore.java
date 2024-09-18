@@ -164,7 +164,7 @@ public class VoxelCore {
     private static Matrix4f computeProjectionMat() {
         return new Matrix4f(RenderSystem.getProjectionMatrix()).mulLocal(
                 makeProjectionMatrix(0.05f, MinecraftClient.getInstance().gameRenderer.getFarPlaneDistance()).invert()
-        ).mulLocal(makeProjectionMatrix(16, 16*3000));
+        ).mulLocal(makeProjectionMatrix(16*VoxyConfig.CONFIG.nearZScale, 16*3000));
     }
 
     public void renderOpaque(MatrixStack matrices, double cameraX, double cameraY, double cameraZ) {

@@ -106,6 +106,12 @@ public class VoxyConfigScreenFactory implements ModMenuApi {
                 .setDefaultValue(DEFAULT.useMeshShaderIfPossible)
                 .build());
 
+        category.addEntry(entryBuilder.startIntField(Text.translatable("voxy.config.general.nearz"), config.nearZScale)
+                .setTooltip(Text.translatable("voxy.config.general.nearz.tooltip"))
+                .setSaveConsumer(val -> config.nearZScale = val)
+                .setDefaultValue(DEFAULT.nearZScale)
+                .build());
+
         //category.addEntry(entryBuilder.startIntSlider(Text.translatable("voxy.config.general.compression"), config.savingCompressionLevel, 1, 21)
         //        .setTooltip(Text.translatable("voxy.config.general.compression.tooltip"))
         //        .setSaveConsumer(val -> config.savingCompressionLevel = val)
