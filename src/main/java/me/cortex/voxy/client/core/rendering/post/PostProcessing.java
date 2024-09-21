@@ -188,9 +188,17 @@ public class PostProcessing {
         glBindTexture(GL_TEXTURE_2D, this.didSSAO?this.colourSSAO.id:this.colour.id);
         glEnable(GL_DEPTH_TEST);
         glDepthMask(true);
+
+        // This helps avoid some overlap and z fighting in transparency.
+        glEnable( GL_POLYGON_OFFSET_FILL );
+        glPolygonOffset( 1.0f, 4.0f );
+        glDepthFunc(GL_LESS);
+
         this.blitTexture.blit();
         glDisable(GL_DEPTH_TEST);
         glDepthMask(true);
+        glDisable( GL_POLYGON_OFFSET_FILL );
+        glDepthFunc(GL_LEQUAL);
 
         this.glStateCapture.restore();
     }
