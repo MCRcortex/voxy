@@ -11,6 +11,7 @@
     "minecraft.MixinThreadExecutor",
     "minecraft.MixinWindow",
     "minecraft.MixinWorldRenderer",
+    "nvidium.MixinRenderPipeline",
     "sodium.MixinDefaultChunkRenderer",
     "sodium.MixinRenderSectionManager",
     "sodium.MixinSodiumOptionsGUI"

@@ -81,8 +81,8 @@ dependencies {
 
     modImplementation("maven.modrinth:lithium:mc1.21.5-0.16.0-fabric")
 
-    //modRuntimeOnly "maven.modrinth:nvidium:0.2.6-beta"
-    //modCompileOnly "maven.modrinth:nvidium:0.2.8-beta"
+    //modRuntimeOnly "maven.modrinth:nvidium:0.3.1"
+    modCompileOnly "maven.modrinth:nvidium:0.3.1"
 
     modCompileOnly("maven.modrinth:modmenu:14.0.0-rc.2")
     modRuntimeOnly("maven.modrinth:modmenu:14.0.0-rc.2")
