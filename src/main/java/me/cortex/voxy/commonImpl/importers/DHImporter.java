@@ -25,7 +25,10 @@ import org.tukaani.xz.BasicArrayCache;
 import org.tukaani.xz.ResettableArrayCache;
 import org.tukaani.xz.XZInputStream;
 
-import java.io.*;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
 import java.nio.ByteOrder;
@@ -100,7 +103,6 @@ public class DHImporter implements IDataImporter {
             }
         }, ()->savingService.getTaskCount() < 500);
     }
-
 
     public void runImport(IUpdateCallback updateCallback, ICompletionCallback completionCallback) {
         if (this.isRunning()) {

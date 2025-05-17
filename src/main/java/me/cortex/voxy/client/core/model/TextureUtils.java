@@ -96,8 +96,8 @@ public class TextureUtils {
 
         //Shouldent be needed due to the compute bake copy
         depthF *= 2;
-        if (depthF > 1.00001f) {
-            System.err.println("Warning: Depth greater than 1");
+        if (depthF > 1.00001f) {//Basicly only happens when a model goes out of bounds (thing)
+            //System.err.println("Warning: Depth greater than 1");
             depthF = 1.0f;
         }
         return depthF;
@@ -182,40 +182,42 @@ public class TextureUtils {
     }
 
     //TODO: FIXME!!! ITS READING IT AS ABGR??? isnt the format RGBA??
-    private static int weightedAverageColor(int one, int two) {
-        int alphaOne = ColorHelper.getAlpha(one);
-        int alphaTwo = ColorHelper.getAlpha(two);
-        if (alphaOne == alphaTwo) {
-            return averageRgb(one, two, alphaOne);
-        } else if (alphaOne == 0) {
-            return two & 16777215 | alphaTwo >> 2 << 24;
-        } else if (alphaTwo == 0) {
-            return one & 16777215 | alphaOne >> 2 << 24;
-        } else {
-            float scale = 1.0F / (float)(alphaOne + alphaTwo);
-            float relativeWeightOne = (float)alphaOne * scale;
-            float relativeWeightTwo = (float)alphaTwo * scale;
-            float oneR = ColorSRGB.srgbToLinear(ColorHelper.getRed(one)) * relativeWeightOne;
-            float oneG = ColorSRGB.srgbToLinear(ColorHelper.getGreen(one)) * relativeWeightOne;
-            float oneB = ColorSRGB.srgbToLinear(ColorHelper.getBlue(one)) * relativeWeightOne;
-            float twoR = ColorSRGB.srgbToLinear(ColorHelper.getRed(two)) * relativeWeightTwo;
-            float twoG = ColorSRGB.srgbToLinear(ColorHelper.getGreen(two)) * relativeWeightTwo;
-            float twoB = ColorSRGB.srgbToLinear(ColorHelper.getBlue(two)) * relativeWeightTwo;
-            float linearR = oneR + twoR;
-            float linearG = oneG + twoG;
-            float linearB = oneB + twoB;
-            int averageAlpha = alphaOne + alphaTwo >> 1;
-            return ColorSRGB.linearToSrgb(linearR, linearG, linearB, averageAlpha);
+    private static int weightedAverageColor(int a, int b) {
+        //We specifically want the entire other component if the alpha is zero
+        // this prevents black mips from generating due to A) non filled colours, and B) when the sampler samples everything it doesnt detonate
+        if ((a&0xFF000000) == 0) {
+            return b;
+        }
+        if ((b&0xFF000000) == 0) {
+            return a;
+        }
+
+        if (((a^b)&0xFF000000)==0) {
+            return ColorSRGB.linearToSrgb(
+                    addHalfLinear(0, a,b),
+                    addHalfLinear(8, a,b),
+                    addHalfLinear(16, a,b),
+                    a>>>24);
+        }
+
+        {
+            int A = (a>>>24);
+            int B = (a>>>24);
+            float mul = 1.0F / (float)(A+B);
+            float wA = A * mul;
+            float wB = B * mul;
+            return ColorSRGB.linearToSrgb(
+                    addMulLinear(0, a,b,wA,wB),
+                    addMulLinear(8, a,b,wA,wB),
+                    addMulLinear(16, a,b,wA,wB)
+                    , (A + B)/2);
         }
     }
 
-    private static int averageRgb(int a, int b, int alpha) {
-        float ar = ColorSRGB.srgbToLinear(ColorHelper.getRed(a));
-        float ag = ColorSRGB.srgbToLinear(ColorHelper.getGreen(a));
-        float ab = ColorSRGB.srgbToLinear(ColorHelper.getBlue(a));
-        float br = ColorSRGB.srgbToLinear(ColorHelper.getRed(b));
-        float bg = ColorSRGB.srgbToLinear(ColorHelper.getGreen(b));
-        float bb = ColorSRGB.srgbToLinear(ColorHelper.getBlue(b));
-        return ColorSRGB.linearToSrgb((ar + br) * 0.5F, (ag + bg) * 0.5F, (ab + bb) * 0.5F, alpha);
+    private static float addHalfLinear(int shift, int a, int b) {
+        return addMulLinear(shift, a, b, 0.5f, 0.5f);
+    }
+    private static float addMulLinear(int shift, int a, int b, float mulA, float mulB) {
+        return Math.fma(ColorSRGB.srgbToLinear((a>>shift)&0xFF),mulA, ColorSRGB.srgbToLinear((b>>shift)&0xFF)*mulB);
     }
 }

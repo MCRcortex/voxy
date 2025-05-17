@@ -148,11 +148,11 @@ void main() {
         if (isShaded) {
             //TODO: make branchless, infact apply ahead of time to the texture itself in ModelManager since that is
             // per face
-            if ((face>>1) == 1) {
+            if ((face>>1) == 1) {//NORTH, SOUTH
                 tinting.xyz *= 0.8f;
-            } else if ((face>>1) == 2) {
+            } else if ((face>>1) == 2) {//EAST, WEST
                 tinting.xyz *= 0.6f;
-            } else if (face == 0){
+            } else if (face == 0) {//DOWN
                 tinting.xyz *= 0.5f;
             }
         }

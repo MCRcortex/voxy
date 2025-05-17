@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.rendering;
 
+import me.cortex.voxy.client.core.gl.GlBuffer;
 import net.minecraft.util.math.MathHelper;
 import org.joml.*;
 
@@ -90,4 +91,6 @@ public abstract class Viewport <A extends Viewport<A>> {
 
         return (A) this;
     }
+
+    public abstract GlBuffer getRenderList();
 }

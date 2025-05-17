@@ -22,9 +22,11 @@ import java.util.function.Consumer;
 public class MixinClientLoginNetworkHandler {
     @Inject(method = "<init>", at = @At(value = "TAIL"))
     private void voxy$init(ClientConnection connection, MinecraftClient client, ServerInfo serverInfo, Screen parentScreen, boolean newWorld, Duration worldLoadTime, Consumer statusConsumer, CookieStorage cookieStorage, CallbackInfo ci) {
-        VoxyClientInstance.isInGame = true;
-        if (VoxyConfig.CONFIG.enabled) {
-            VoxyCommon.createInstance();
+        if (VoxyCommon.isAvailable()) {
+            VoxyClientInstance.isInGame = true;
+            if (VoxyConfig.CONFIG.enabled) {
+                VoxyCommon.createInstance();
+            }
         }
     }
 }

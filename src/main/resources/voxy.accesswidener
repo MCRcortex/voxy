@@ -29,3 +29,5 @@ accessible field net/minecraft/client/gl/GlGpuBuffer id I
 
 accessible field net/minecraft/client/gl/GlResourceManager currentProgram Lnet/minecraft/client/gl/ShaderProgram;
 accessible field net/minecraft/client/gl/GlResourceManager currentPipeline Lcom/mojang/blaze3d/pipeline/RenderPipeline;
+
+accessible class net/minecraft/client/gl/GlDebug$DebugMessage

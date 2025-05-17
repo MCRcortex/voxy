@@ -6,6 +6,9 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.TrackedObject;
 import org.lwjgl.opengl.GL20C;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -177,8 +180,12 @@ public class Shader extends TrackedObject {
 
             if (result != GL20C.GL_TRUE) {
                 GL20C.glDeleteShader(shader);
-
-                throw new RuntimeException("Shader compilation failed of type " + type.name() + ", see log for details");
+                try {
+                    Files.writeString(Path.of("SHADER_DUMP.txt"), src);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                throw new RuntimeException("Shader compilation failed of type " + type.name() + ", see log for details, dumped shader");
             }
 
             return shader;

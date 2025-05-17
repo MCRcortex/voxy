@@ -1,17 +1,15 @@
 #version 430
 
-layout(location=0) in vec3 pos;
+layout(location=0) in vec4 pos;
 layout(location=1) in vec2 uv;
-layout(location=2) in vec4 _metadata;
 
-uniform mat4 transform;
+layout(location=1) uniform mat4 transform;
 out vec2 texCoord;
 out flat uint metadata;
 
 void main() {
-    uvec4 meta = uvec4(_metadata*255);
-    metadata = (meta.r<<16)|(meta.g<<8)|(meta.b);
+    metadata = floatBitsToUint(pos.w);//Fuck you intel
 
-    gl_Position = transform * vec4(pos, 1.0);
+    gl_Position = transform * vec4(pos.xyz, 1.0);
     texCoord = uv;
 }

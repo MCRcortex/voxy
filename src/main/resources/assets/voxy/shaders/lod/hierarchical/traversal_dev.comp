@@ -78,14 +78,18 @@ void enqueueSelfForRender(in UnpackedNode node) {
     if (renderQueueIndex < renderQueueMaxSize) {
         lastRenderFrame[getId(node)] = frameId;
         if (!isEmptyMesh(node)) {
-            renderQueue[atomicAdd(renderQueueIndex, 1)] = getMesh(node);
-            #ifdef IS_DEBUG
-            debugRenderNodeQueue[atomicAdd(debugRenderNodeQueueIndex, 1)] = node.nodeId;
-            #endif
+            uint renderIndex = atomicAdd(renderQueueIndex, 1);
+            if (renderIndex < renderQueueMaxSize) {
+                renderQueue[renderIndex] = getMesh(node);
 
-            #ifdef HAS_STATISTICS
-            atomicAdd(renderCounts[node.lodLevel], 1);
-            #endif
+                #ifdef IS_DEBUG
+                debugRenderNodeQueue[atomicAdd(debugRenderNodeQueueIndex, 1)] = node.nodeId;
+                #endif
+
+                #ifdef HAS_STATISTICS
+                atomicAdd(renderCounts[node.lodLevel], 1);
+                #endif
+            }
         }
     }
 }

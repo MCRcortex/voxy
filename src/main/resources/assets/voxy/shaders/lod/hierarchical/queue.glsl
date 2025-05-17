@@ -21,6 +21,8 @@ uint getCurrentNode() {
     return nodeQueueSource[gl_GlobalInvocationID.x];
 }
 
+
+//TODO: limit the size/writing out of bounds
 uint nodePushIndex = -1;
 void pushNodesInit(uint nodeCount) {
     //Debug

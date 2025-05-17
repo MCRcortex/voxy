@@ -93,7 +93,7 @@ public class ServiceSlice extends TrackedObject {
     //Tells the system that a single instance of this service needs executing
     public void execute() {
         if (!this.alive) {
-            Logger.error("Tried to do work on a dead service: " + this.name);
+            Logger.error("Tried to do work on a dead service: " + this.name, new Throwable());
             return;
         }
         this.jobCount.release();

@@ -1,16 +1,18 @@
 package me.cortex.voxy.client.core;
 
 import com.mojang.blaze3d.opengl.GlConst;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.rendering.ChunkBoundRenderer;
 import me.cortex.voxy.client.core.rendering.RenderDistanceTracker;
 import me.cortex.voxy.client.core.rendering.RenderService;
-import me.cortex.voxy.client.core.rendering.building.RenderDataFactory45;
+import me.cortex.voxy.client.core.rendering.building.RenderDataFactory;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.post.PostProcessing;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
@@ -30,7 +32,6 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gl.GlBackend;
 import net.minecraft.client.render.Camera;
 import net.minecraft.client.render.Frustum;
-import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL11;
@@ -43,6 +44,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
 import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
+import static org.lwjgl.opengl.GL33.glBindSampler;
 
 public class VoxyRenderSystem {
     private final RenderService renderer;
@@ -186,20 +188,32 @@ public class VoxyRenderSystem {
             throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
         }
 
+        TimingStatistics.E.start();
         this.chunkBoundRenderer.render(viewport);
+        TimingStatistics.E.stop();
 
+        TimingStatistics.F.start();
         this.postProcessing.setup(target.textureWidth, target.textureHeight, boundFB);
+        TimingStatistics.F.stop();
 
         this.renderer.renderFarAwayOpaque(viewport, this.chunkBoundRenderer.getDepthBoundTexture(), startTime);
 
+
+        TimingStatistics.F.start();
         //Compute the SSAO of the rendered terrain, TODO: fix it breaking depth or breaking _something_ am not sure what
         this.postProcessing.computeSSAO(viewport.MVP);
+        TimingStatistics.F.stop();
 
+        TimingStatistics.G.start();
         //We can render the translucent directly after as it is the furthest translucent objects
         this.renderer.renderFarAwayTranslucent(viewport, this.chunkBoundRenderer.getDepthBoundTexture());
+        TimingStatistics.G.stop();
 
 
+        TimingStatistics.F.start();
         this.postProcessing.renderPost(projection, matrices.projection(), boundFB);
+        TimingStatistics.F.stop();
+
         TimingStatistics.main.stop();
         TimingStatistics.postDynamic.start();
 
@@ -213,20 +227,38 @@ public class VoxyRenderSystem {
             this.renderDistanceTracker.setCenterAndProcess(cameraX, cameraZ);
 
             //Done here as is allows less gl state resetup
-            this.renderer.tickModelService(Math.max(5_000_000-(System.nanoTime()-startTime), 75_000));
+            this.renderer.tickModelService(Math.max(3_000_000-(System.nanoTime()-startTime), 500_000));
         }
         TimingStatistics.postDynamic.stop();
 
         glBindFramebuffer(GlConst.GL_FRAMEBUFFER, oldFB);
+
+        {//Reset state manager stuffs
+            GlStateManager._glBindVertexArray(0);//Clear binding
+
+            GlStateManager._activeTexture(GlConst.GL_TEXTURE0);
+            GlStateManager._bindTexture(0);
+            glBindSampler(0, 0);
+
+            GlStateManager._activeTexture(GlConst.GL_TEXTURE1);
+            GlStateManager._bindTexture(0);
+            glBindSampler(1, 0);
+
+            GlStateManager._activeTexture(GlConst.GL_TEXTURE2);
+            GlStateManager._bindTexture(0);
+            glBindSampler(2, 0);
+        }
         TimingStatistics.all.stop();
     }
 
     public void addDebugInfo(List<String> debug) {
-        debug.add("GlBuffer, Count/Size (mb): " + GlBuffer.getCount() + "/" + (GlBuffer.getTotalSize()/1_000_000));
+        debug.add("Buf/Tex [#/Mb]: [" + GlBuffer.getCount() + "/" + (GlBuffer.getTotalSize()/1_000_000) + "],[" + GlTexture.getCount() + "/" + (GlTexture.getEstimatedTotalSize()/1_000_000)+"]");
         this.renderer.addDebugData(debug);
         {
             TimingStatistics.update();
             debug.add("Voxy frame runtime (millis): " + TimingStatistics.dynamic.pVal() + ", " + TimingStatistics.main.pVal()+ ", " + TimingStatistics.postDynamic.pVal()+ ", " + TimingStatistics.all.pVal());
+            debug.add("Extra time: " + TimingStatistics.A.pVal() + ", " + TimingStatistics.B.pVal() + ", " + TimingStatistics.C.pVal() + ", " + TimingStatistics.D.pVal());
+            debug.add("Extra 2 time: " + TimingStatistics.E.pVal() + ", " + TimingStatistics.F.pVal() + ", " + TimingStatistics.G.pVal() + ", " + TimingStatistics.H.pVal() + ", " + TimingStatistics.I.pVal());
         }
         PrintfDebugUtil.addToOut(debug);
     }
@@ -248,7 +280,7 @@ public class VoxyRenderSystem {
 
     private void testMeshingPerformance() {
         var modelService = new ModelBakerySubsystem(this.worldIn.getMapper());
-        var factory = new RenderDataFactory45(this.worldIn, modelService.factory, false);
+        var factory = new RenderDataFactory(this.worldIn, modelService.factory, false);
 
         List<WorldSection> sections = new ArrayList<>();
 

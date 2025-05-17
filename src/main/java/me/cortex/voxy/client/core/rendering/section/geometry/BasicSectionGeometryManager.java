@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.core.rendering.section;
+package me.cortex.voxy.client.core.rendering.section.geometry;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -12,7 +12,7 @@ import org.lwjgl.system.MemoryUtil;
 import java.util.function.Consumer;
 
 public class BasicSectionGeometryManager extends AbstractSectionGeometryManager {
-    private static final int SECTION_METADATA_SIZE = 32;
+    public static final int SECTION_METADATA_SIZE = 32;
     private final GlBuffer sectionMetadataBuffer;
     private final BufferArena geometry;
     private final HierarchicalBitSet allocationSet;

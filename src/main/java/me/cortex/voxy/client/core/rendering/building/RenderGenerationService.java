@@ -1,12 +1,9 @@
 package me.cortex.voxy.client.core.rendering.building;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
-import it.unimi.dsi.fastutil.longs.Long2ObjectFunction;
-import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import me.cortex.voxy.client.core.model.IdNotYetComputedException;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
-import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
@@ -14,15 +11,12 @@ import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.thread.ServiceSlice;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
 
-import java.util.Comparator;
 import java.util.List;
-import java.util.PriorityQueue;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 //TODO: Add a render cache
 
@@ -30,6 +24,9 @@ import java.util.function.Supplier;
 //TODO: to add remove functionallity add a "defunked" variable to the build task and set it to true on remove
 // and process accordingly
 public class RenderGenerationService {
+    private static final int MAX_HOLDING_SECTION_COUNT = 1000;
+
+    public static final AtomicInteger MESH_FAILED_COUNTER = new AtomicInteger();
     private static final AtomicInteger COUNTER = new AtomicInteger();
     private static final class BuildTask {
         WorldSection section;
@@ -46,10 +43,12 @@ public class RenderGenerationService {
             int unique = COUNTER.incrementAndGet();
             int lvl = WorldEngine.MAX_LOD_LAYER-WorldEngine.getLevel(this.position);
             lvl = Math.min(lvl, 3);//Make the 2 highest quality have equal priority
-            this.priority = (((lvl*3L + Math.min(this.attempts, 4))*2 + this.addin) <<32) + Integer.toUnsignedLong(unique);
+            this.priority = (((lvl*3L + Math.min(this.attempts, 5))*2 + this.addin) <<32) + Integer.toUnsignedLong(unique);
             this.addin = 0;
         }
     }
+
+    private final AtomicInteger holdingSectionCount = new AtomicInteger();//Used to limit section holding
 
     private final AtomicInteger taskQueueCount = new AtomicInteger();
     private final PriorityBlockingQueue<BuildTask> taskQueue = new PriorityBlockingQueue<>(320000, (a,b)-> Long.compareUnsigned(a.priority, b.priority));
@@ -76,7 +75,7 @@ public class RenderGenerationService {
 
         this.threads = serviceThreadPool.createService("Section mesh generation service", 100, ()->{
             //Thread local instance of the factory
-            var factory = new RenderDataFactory45(this.world, this.modelBakery.factory, this.emitMeshlets);
+            var factory = new RenderDataFactory(this.world, this.modelBakery.factory, this.emitMeshlets);
             IntOpenHashSet seenMissed = new IntOpenHashSet(128);
             return new Pair<>(() -> {
                 this.processJob(factory, seenMissed);
@@ -125,7 +124,7 @@ public class RenderGenerationService {
     }
 
     //TODO: add a generated render data cache
-    private void processJob(RenderDataFactory45 factory, IntOpenHashSet seenMissedIds) {
+    private void processJob(RenderDataFactory factory, IntOpenHashSet seenMissedIds) {
         BuildTask task = this.taskQueue.poll();
         this.taskQueueCount.decrementAndGet();
 
@@ -181,6 +180,9 @@ public class RenderGenerationService {
                     if (task.hasDoneModelRequestOuter) {
                         other.hasDoneModelRequestOuter = true;
                     }
+                    if (task.section != null) {
+                        this.holdingSectionCount.decrementAndGet();
+                    }
                     task.section = null;
                     shouldFreeSection = true;
                     task = null;
@@ -199,6 +201,10 @@ public class RenderGenerationService {
                     }
                 }
 
+                if (task.hasDoneModelRequestOuter || task.hasDoneModelRequestInner) {
+                    MESH_FAILED_COUNTER.incrementAndGet();
+                }
+
                 if (task.hasDoneModelRequestInner && task.hasDoneModelRequestOuter) {
                     task.attempts++;
                     try {
@@ -207,6 +213,10 @@ public class RenderGenerationService {
                         throw new RuntimeException(ex);
                     }
                 } else {
+                    if (task.hasDoneModelRequestInner) {
+                        task.attempts++;//This is because it can be baking and just model thing isnt keeping up
+                    }
+
                     if (!task.hasDoneModelRequestInner) {
                         //The reason for the extra id parameter is that we explicitly add/check against the exception id due to e.g. requesting accross a chunk boarder wont be captured in the request
                         if (e.auxData == null)//the null check this is because for it to be, the inner must already be computed
@@ -227,8 +237,15 @@ public class RenderGenerationService {
                 }
 
                 //Keep the lock on the section, and attach it to the task, this prevents needing to re-aquire it later
-                task.section = section;
-                shouldFreeSection = false;
+                if (task.section == null) {
+                    if (this.holdingSectionCount.get() < MAX_HOLDING_SECTION_COUNT) {
+                        this.holdingSectionCount.incrementAndGet();
+                        task.section = section;
+                        shouldFreeSection = false;
+                    }
+                } else {
+                    shouldFreeSection = false;
+                }
 
                 task.updatePriority();
                 this.taskQueue.add(task);
@@ -241,6 +258,9 @@ public class RenderGenerationService {
         }
 
         if (shouldFreeSection) {
+            if (task != null && task.section != null) {
+                this.holdingSectionCount.decrementAndGet();
+            }
             section.release();
         }
 
@@ -251,6 +271,9 @@ public class RenderGenerationService {
 
 
     public void enqueueTask(long pos) {
+        if (!this.threads.isAlive()) {
+            return;
+        }
         boolean[] isOurs = new boolean[1];
         long stamp = this.taskMapLock.writeLock();
         BuildTask task = this.taskMap.computeIfAbsent(pos, p->{
@@ -285,6 +308,7 @@ public class RenderGenerationService {
                     var task = this.taskQueue.remove();
                     if (task.section != null) {
                         task.section.release();
+                        this.holdingSectionCount.decrementAndGet();
                     }
                     if (this.taskMap.remove(task.position) != task) {
                         throw new IllegalStateException();
@@ -304,6 +328,7 @@ public class RenderGenerationService {
             this.taskQueueCount.decrementAndGet();
             if (task.section != null) {
                 task.section.release();
+                this.holdingSectionCount.decrementAndGet();
             }
 
             long stamp = this.taskMapLock.writeLock();
@@ -314,8 +339,16 @@ public class RenderGenerationService {
         }
     }
 
+    private long lastChangedTime = 0;
+    private int failedCounter = 0;
     public void addDebugData(List<String> debug) {
-        debug.add("RSSQ: " + this.taskQueueCount.get());//render section service queue
+        if (System.currentTimeMillis()-this.lastChangedTime > 1000) {
+            this.failedCounter = 0;
+            this.lastChangedTime = System.currentTimeMillis();
+        }
+        this.failedCounter += MESH_FAILED_COUNTER.getAndSet(0);
+        debug.add("RSSQ/TFC: " + this.taskQueueCount.get() + "/" + this.failedCounter);//render section service queue, Task Fail Counter
+
     }
 
     public int getTaskCount() {

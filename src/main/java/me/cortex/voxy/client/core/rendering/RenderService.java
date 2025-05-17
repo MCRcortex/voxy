@@ -1,91 +1,83 @@
 package me.cortex.voxy.client.core.rendering;
 
-import io.netty.util.internal.MathUtil;
 import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
-import me.cortex.voxy.client.core.model.ModelStore;
-import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
+import me.cortex.voxy.client.core.rendering.hierachical.AsyncNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser;
 import me.cortex.voxy.client.core.rendering.hierachical.NodeCleaner;
-import me.cortex.voxy.client.core.rendering.hierachical.NodeManager;
 import me.cortex.voxy.client.core.rendering.section.AbstractSectionRenderer;
+import me.cortex.voxy.client.core.rendering.section.geometry.*;
 import me.cortex.voxy.client.core.rendering.section.IUsesMeshlets;
 import me.cortex.voxy.client.core.rendering.section.MDICSectionRenderer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
-import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
-import me.cortex.voxy.common.util.MessageQueue;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.thread.ServiceThreadPool;
-import me.cortex.voxy.common.world.WorldSection;
-import net.minecraft.client.render.Camera;
 
-import java.lang.invoke.VarHandle;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.lwjgl.opengl.GL42.*;
 
-public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Viewport<J>> {
+public class RenderService<T extends AbstractSectionRenderer<J, Q>, J extends Viewport<J>, Q extends IGeometryData> {
     public static final int STATIC_VAO = glGenVertexArrays();
 
-    private static AbstractSectionRenderer<?, ?> createSectionRenderer(ModelStore store, int maxSectionCount, long geometryCapacity) {
-        return new MDICSectionRenderer(store, maxSectionCount, geometryCapacity);
-    }
-
     private final ViewportSelector<?> viewportSelector;
-    private final AbstractSectionRenderer<J, ?> sectionRenderer;
+    private final Q geometryData;
+    private final AbstractSectionRenderer<J, Q> sectionRenderer;
 
-    private final NodeManager nodeManager;
+    private final AsyncNodeManager nodeManager;
     private final NodeCleaner nodeCleaner;
     private final HierarchicalOcclusionTraverser traversal;
     private final ModelBakerySubsystem modelService;
     private final RenderGenerationService renderGen;
 
-    private final MessageQueue<WorldSection> sectionUpdateQueue;
-    private final MessageQueue<BuiltSection> geometryUpdateQueue;
-
     private final WorldEngine world;
+
+    private static long getGeometryBufferSize() {
+        long geometryCapacity = Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/;
+        //Limit to available dedicated memory if possible
+        if (Capabilities.INSTANCE.canQueryGpuMemory) {
+            //512mb less than avalible,
+            long limit = Capabilities.INSTANCE.getFreeDedicatedGpuMemory() - 512*1024*1024;
+            // Give a minimum of 512 mb requirement
+            limit = Math.max(512*1024*1024, limit);
+
+            geometryCapacity = Math.min(geometryCapacity, limit);
+        }
+        //geometryCapacity = 1<<24;
+        return geometryCapacity;
+    }
 
     @SuppressWarnings("unchecked")
     public RenderService(WorldEngine world, ServiceThreadPool serviceThreadPool) {
         this.world = world;
         this.modelService = new ModelBakerySubsystem(world.getMapper());
 
-        //Max geometry: 1 gb
-        long geometryCapacity = Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/;
-        //geometryCapacity = 1<<24;
+        long geometryCapacity = getGeometryBufferSize();
+        this.geometryData = (Q) new BasicSectionGeometryData(1<<20, geometryCapacity);
+
         //Max sections: ~500k
-        this.sectionRenderer = (T) createSectionRenderer(this.modelService.getStore(),1<<20, geometryCapacity);
+        this.sectionRenderer = (T) new MDICSectionRenderer(this.modelService.getStore(), (BasicSectionGeometryData) this.geometryData);
         Logger.info("Using renderer: " + this.sectionRenderer.getClass().getSimpleName());
 
         //Do something incredibly hacky, we dont need to keep the reference to this around, so just connect and discard
         var router = new SectionUpdateRouter();
 
-        this.nodeManager = new NodeManager(1<<21, this.sectionRenderer.getGeometryManager(), router);
+        this.nodeManager = new AsyncNodeManager(1<<21, router, this.geometryData);
         this.nodeCleaner = new NodeCleaner(this.nodeManager);
-
-        this.sectionUpdateQueue = new MessageQueue<>(section -> {
-            byte childExistence = section.getNonEmptyChildren();
-            section.release();//TODO: move this to another thread (probably a service job to free, this is because freeing can cause a DB save which should not happen on the render thread)
-            this.nodeManager.processChildChange(section.key, childExistence);
-        });
-        this.geometryUpdateQueue = new MessageQueue<>(this.nodeManager::processGeometryResult);
 
         this.viewportSelector = new ViewportSelector<>(this.sectionRenderer::createViewport);
         this.renderGen = new RenderGenerationService(world, this.modelService, serviceThreadPool,
-                this.geometryUpdateQueue::push, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets,
-                ()->this.geometryUpdateQueue.count()<1000 && this.modelService.getProcessingCount()< 1000);
+                this.nodeManager::submitGeometryResult, this.sectionRenderer.getGeometryManager() instanceof IUsesMeshlets,
+                ()->true);
 
-        router.setCallbacks(this.renderGen::enqueueTask, section -> {
-            section.acquire();
-            this.sectionUpdateQueue.push(section);
-        });
+        router.setCallbacks(this.renderGen::enqueueTask, this.nodeManager::submitChildChange);
 
         this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, this.nodeCleaner);
 
@@ -93,14 +85,16 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
 
         Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
         world.getMapper().setBiomeCallback(this.modelService::addBiome);
+
+        this.nodeManager.start();
     }
 
     public void addTopLevelNode(long pos) {
-        this.nodeManager.insertTopLevelNode(pos);
+        this.nodeManager.addTopLevel(pos);
     }
 
     public void removeTopLevelNode(long pos) {
-        this.nodeManager.removeTopLevelNode(pos);
+        this.nodeManager.removeTopLevel(pos);
     }
 
     public void tickModelService(long budget) {
@@ -118,8 +112,9 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         // the section renderer is as it might have different backends, but they all accept a buffer containing the section list
 
 
+        TimingStatistics.G.start();
         this.sectionRenderer.renderOpaque(viewport, depthBoundTexture);
-
+        TimingStatistics.G.stop();
 
         //NOTE: need to do the upload and download tick here, after the section renderer renders the world, to ensure "stable"
         // sections
@@ -134,25 +129,28 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
             TimingStatistics.main.stop();
             TimingStatistics.dynamic.start();
 
-            //Tick download stream
-            //TODO: make this so that can
-            DownloadStream.INSTANCE.tick();
-
+            /*
             this.sectionUpdateQueue.consume(128);
 
             //if (this.modelService.getProcessingCount() < 750)
             {//Very bad hack to try control things
-                this.geometryUpdateQueue.consumeNano(3_000_000 - (System.nanoTime() - frameStart));
+                this.geometryUpdateQueue.consumeNano(Math.max(3_000_000 - (System.nanoTime() - frameStart), 50_000));
             }
-
-            this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
 
             if (this.nodeManager.writeChanges(this.traversal.getNodeBuffer())) {//TODO: maybe move the node buffer out of the traversal class
                 UploadStream.INSTANCE.commit();
-            }
+            }*/
 
-            //this needs to go after, due to geometry updates committed by the nodeManager
-            this.sectionRenderer.getGeometryManager().tick();
+
+            TimingStatistics.D.start();
+            //Tick download stream
+            DownloadStream.INSTANCE.tick();
+            TimingStatistics.D.stop();
+
+            this.nodeManager.tick(this.traversal.getNodeBuffer(), this.nodeCleaner);
+            //glFlush();
+
+            this.nodeCleaner.tick(this.traversal.getNodeBuffer());//Probably do this here??
 
             TimingStatistics.dynamic.stop();
             TimingStatistics.main.start();
@@ -164,10 +162,17 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         if (depthBuffer == 0) {
             depthBuffer = glGetFramebufferAttachmentParameteri(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
         }
+        TimingStatistics.I.start();
         this.traversal.doTraversal(viewport, depthBuffer);
+        TimingStatistics.I.stop();
 
-        this.sectionRenderer.buildDrawCalls(viewport, this.traversal.getRenderListBuffer());
+        TimingStatistics.H.start();
+        this.sectionRenderer.buildDrawCalls(viewport);
+        TimingStatistics.H.stop();
+
+        TimingStatistics.G.start();
         this.sectionRenderer.renderTemporal(depthBoundTexture);
+        TimingStatistics.G.stop();
     }
 
     public void renderFarAwayTranslucent(J viewport, GlTexture depthBoundTexture) {
@@ -177,7 +182,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
     public void addDebugData(List<String> debug) {
         this.modelService.addDebugData(debug);
         this.renderGen.addDebugData(debug);
-        this.sectionRenderer.addDebug(debug);   
+        this.sectionRenderer.addDebug(debug);
         this.nodeManager.addDebug(debug);
 
         if (RenderStatistics.enabled) {
@@ -203,8 +208,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.world.getMapper().setBiomeCallback(null);
         this.world.getMapper().setStateCallback(null);
 
-        //Release all the unprocessed built geometry
-        this.geometryUpdateQueue.clear(BuiltSection::free);
+        this.nodeManager.stop();
 
         this.modelService.shutdown();
         this.renderGen.shutdown();
@@ -213,9 +217,7 @@ public class RenderService<T extends AbstractSectionRenderer<J, ?>, J extends Vi
         this.traversal.free();
         this.nodeCleaner.free();
 
-        //Release all the unprocessed built geometry
-        this.geometryUpdateQueue.clear(BuiltSection::free);
-        this.sectionUpdateQueue.clear(WorldSection::release);//Release anything thats in the queue
+        this.geometryData.free();
     }
 
     public Viewport<?> getViewport() {

@@ -37,8 +37,7 @@ public class VoxyInstance {
     public void addDebug(List<String> debug) {
         debug.add("Voxy Core: " + VoxyCommon.MOD_VERSION);
         debug.add("MemoryBuffer, Count/Size (mb): " + MemoryBuffer.getCount() + "/" + (MemoryBuffer.getTotalSize()/1_000_000));
-        debug.add("I/S: " + this.ingestService.getTaskCount() + "/" + this.savingService.getTaskCount());
-        debug.add("AWSC: [" + this.activeWorlds.stream().map(a->""+a.getActiveSectionCount()).collect(Collectors.joining(", ")) + "]");//Active world section count
+        debug.add("I/S/AWSC: " + this.ingestService.getTaskCount() + "/" + this.savingService.getTaskCount() + "/[" + this.activeWorlds.stream().map(a->""+a.getActiveSectionCount()).collect(Collectors.joining(", ")) + "]");//Active world section count
     }
 
     public void shutdown() {

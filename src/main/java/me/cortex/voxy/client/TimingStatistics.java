@@ -75,6 +75,17 @@ public class TimingStatistics {
     public static TimeSampler dynamic = new TimeSampler();
     public static TimeSampler postDynamic = new TimeSampler();
 
+    public static TimeSampler A = new TimeSampler();
+    public static TimeSampler B = new TimeSampler();
+    public static TimeSampler C = new TimeSampler();
+    public static TimeSampler D = new TimeSampler();
+
+    public static TimeSampler E = new TimeSampler();
+    public static TimeSampler F = new TimeSampler();
+    public static TimeSampler G = new TimeSampler();
+    public static TimeSampler H = new TimeSampler();
+    public static TimeSampler I = new TimeSampler();
+
 
     public static void update() {
         updateSamplers();

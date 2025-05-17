@@ -17,5 +17,6 @@ void main() {
     if (count <= id) {
         return;
     }
-    visiblity[ids[id]] = setTo;
+    uint pos = ids[id];
+    visiblity[pos&((1u<<31)-1)] = mix(setTo, uint(-1), (pos&(1u<<31)) == 0);
 }

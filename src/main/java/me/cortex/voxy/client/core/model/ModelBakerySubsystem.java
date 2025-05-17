@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.model;
 
 
 import it.unimi.dsi.fastutil.ints.IntLinkedOpenHashSet;
+import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
@@ -16,11 +17,16 @@ import java.lang.invoke.VarHandle;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.StampedLock;
 
 import static org.lwjgl.opengl.ARBFramebufferObject.GL_COLOR_ATTACHMENT0;
 import static org.lwjgl.opengl.GL11.GL_COLOR_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11.glGetInteger;
 import static org.lwjgl.opengl.GL11C.GL_NEAREST;
+import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER;
+import static org.lwjgl.opengl.GL30.GL_FRAMEBUFFER_BINDING;
 import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
+import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
 import static org.lwjgl.opengl.GL45.glBlitNamedFramebuffer;
 
 public class ModelBakerySubsystem {
@@ -77,19 +83,24 @@ public class ModelBakerySubsystem {
             Integer i = this.blockIdQueue.poll();
             int j = 0;
             if (i != null) {
+                int fbBinding = glGetInteger(GL_FRAMEBUFFER_BINDING);
+
                 do {
                     this.factory.addEntry(i);
                     j++;
-                    if (budget<(System.nanoTime() - start)+1000)
+                    if (24<j)//budget<(System.nanoTime() - start)+1000
                         break;
                     i = this.blockIdQueue.poll();
                 } while (i != null);
+
+                glBindFramebuffer(GL_FRAMEBUFFER, fbBinding);//This is done here as stops needing to set then unset the fb in the thing 1000x
             }
             this.blockIdCount.addAndGet(-j);
         }
 
         this.factory.tick();
 
+        start = System.nanoTime();
         while (!this.factory.resultJobs.isEmpty()) {
             this.factory.resultJobs.poll().run();
             if (totalBudget<(System.nanoTime()-start))
@@ -103,7 +114,16 @@ public class ModelBakerySubsystem {
         this.storage.free();
     }
 
+    //This is on this side only and done like this as only worker threads call this code
+    private final StampedLock seenIdsLock = new StampedLock();
+    private final IntOpenHashSet seenIds = new IntOpenHashSet(6000);
     public void requestBlockBake(int blockId) {
+        long stamp = this.seenIdsLock.writeLock();
+        if (!this.seenIds.add(blockId)) {
+            this.seenIdsLock.unlockWrite(stamp);
+            return;
+        }
+        this.seenIdsLock.unlockWrite(stamp);
         this.blockIdQueue.add(blockId);
         this.blockIdCount.incrementAndGet();
     }

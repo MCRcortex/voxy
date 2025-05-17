@@ -5,7 +5,7 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.*;
 import me.cortex.voxy.client.core.rendering.ISectionWatcher;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
-import me.cortex.voxy.client.core.rendering.section.AbstractSectionGeometryManager;
+import me.cortex.voxy.client.core.rendering.section.geometry.AbstractSectionGeometryManager;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.HierarchicalBitSet;
 import me.cortex.voxy.common.util.MemoryBuffer;

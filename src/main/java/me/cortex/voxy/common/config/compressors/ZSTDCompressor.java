@@ -12,14 +12,17 @@ import static org.lwjgl.util.zstd.Zstd.*;
 public class ZSTDCompressor implements StorageCompressor {
     private static final Cleaner CLEANER = Cleaner.create();
     private record Ref(long ptr) {}
+
     private static Ref createCleanableCompressionContext() {
         long ctx = ZSTD_createCCtx();
         var ref = new Ref(ctx);
         CLEANER.register(ref, ()->ZSTD_freeCCtx(ctx));
         return ref;
     }
+
     private static Ref createCleanableDecompressionContext() {
         long ctx = ZSTD_createDCtx();
+        nZSTD_DCtx_setParameter(ctx, ZSTD_d_experimentalParam3, 1);//experimental ZSTD_d_forceIgnoreChecksum
         var ref = new Ref(ctx);
         CLEANER.register(ref, ()->ZSTD_freeDCtx(ctx));
         return ref;

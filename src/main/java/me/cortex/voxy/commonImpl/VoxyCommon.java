@@ -66,12 +66,18 @@ public class VoxyCommon implements ModInitializer {
     }
 
     public static void createInstance() {
+        if (FACTORY == null) {
+            //Logger.info("Voxy factory");
+            return;
+        }
         if (INSTANCE != null) {
             throw new IllegalStateException("Cannot create multiple instances");
         }
-        if (FACTORY == null) {
-            throw new IllegalStateException("Instance factory null");
-        }
         INSTANCE = FACTORY.create();
+    }
+
+    //Is voxy available in any capacity
+    public static boolean isAvailable() {
+        return FACTORY != null;
     }
 }

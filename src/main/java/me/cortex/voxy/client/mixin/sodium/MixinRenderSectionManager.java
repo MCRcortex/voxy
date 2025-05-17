@@ -101,11 +101,12 @@ public class MixinRenderSectionManager {
         return true;
     }
 
+    /*
     @ModifyReturnValue(method = "getSearchDistance", at = @At("RETURN"))
     private float voxy$increaseSearchDistanceFix(float searchDistance) {
         if (((IGetVoxyRenderSystem)(this.level.worldRenderer)).getVoxyRenderSystem() == null) {
             return searchDistance;
         }
         return searchDistance + 32;
-    }
+    }*/
 }

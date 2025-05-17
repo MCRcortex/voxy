@@ -1,18 +1,14 @@
 package me.cortex.voxy.client.core.gl.shader;
 
-import com.mojang.blaze3d.opengl.GlConst;
-import com.mojang.blaze3d.opengl.GlStateManager;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlDebug;
 import me.cortex.voxy.client.core.gl.GlTexture;
-import me.cortex.voxy.common.util.Pair;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.lwjgl.opengl.ARBDirectStateAccess.glBindTextureUnit;
-import static org.lwjgl.opengl.GL11.glBindTexture;
 import static org.lwjgl.opengl.GL30.glBindBufferBase;
 import static org.lwjgl.opengl.GL30.glBindBufferRange;
 import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
@@ -117,8 +113,6 @@ public class AutoBindingShader extends Shader {
             for (var binding : this.textureBindings) {
                 if (binding.texture != null) {
                     binding.texture.assertNotFreed();
-                    GlStateManager._activeTexture(GlConst.GL_TEXTURE0+binding.unit);
-                    GlStateManager._bindTexture(0);
                     glBindTextureUnit(binding.unit, binding.texture.id);
                 }
                 if (binding.sampler != -1) {

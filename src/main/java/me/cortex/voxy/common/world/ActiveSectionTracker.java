@@ -125,14 +125,18 @@ public class ActiveSectionTracker {
             }
 
             section.acquire();
+            VarHandle.fullFence();//Do not reorder setting this object
             holder.obj = section;
+            VarHandle.fullFence();
             if (nullOnEmpty && status == 1) {//If its air return null as stated, release the section aswell
                 section.release();
                 return null;
             }
             return section;
         } else {
+            VarHandle.fullFence();
             while ((section = holder.obj) == null) {
+                VarHandle.fullFence();
                 Thread.onSpinWait();
                 Thread.yield();
             }
@@ -169,21 +173,26 @@ public class ActiveSectionTracker {
                 sec = section;
             }
         }
+
+        WorldSection aa = null;
+        if (sec != null) {
+            long stamp2 = this.lruLock.writeLock();
+            WorldSection a = this.lruSecondaryCache.put(section.key, section);
+            if (a != null) {
+                throw new IllegalStateException("duplicate sections in cache is impossible");
+            }
+            //If cache is bigger than its ment to be, remove the least recently used and free it
+            if (this.lruSize < this.lruSecondaryCache.size()) {
+                aa = this.lruSecondaryCache.removeFirst();
+            }
+            this.lruLock.unlockWrite(stamp2);
+
+        }
+
         lock.unlockWrite(stamp);
 
-        if (sec != null) {
-            stamp = this.lruLock.writeLock();
-
-            WorldSection a = this.lruSecondaryCache.put(section.key, section);
-            //If cache is bigger than its ment to be, remove the least recently used and free it
-            if (a == null && this.lruSize < this.lruSecondaryCache.size()) {
-                a = this.lruSecondaryCache.removeFirst();
-            }
-            this.lruLock.unlockWrite(stamp);
-
-            if (a != null) {
-                a._releaseArray();
-            }
+        if (aa != null) {
+            aa._releaseArray();
         }
     }
 

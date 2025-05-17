@@ -2,6 +2,7 @@ package me.cortex.voxy.common.thread;
 
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.Pair;
+import me.cortex.voxy.common.util.ThreadUtils;
 
 import java.lang.invoke.VarHandle;
 import java.lang.management.ManagementFactory;
@@ -17,12 +18,6 @@ import java.util.function.Supplier;
 //TODO: could also probably replace all of this with just VirtualThreads and a Executors.newThreadPerTaskExecutor with a fixed thread pool
 // it is probably better anyway
 public class ServiceThreadPool {
-
-    private static final ThreadMXBean THREAD_BEAN = ManagementFactory.getThreadMXBean();
-    static {
-        THREAD_BEAN.setThreadCpuTimeEnabled(true);
-    }
-
     private volatile boolean running = true;
     private volatile boolean releaseNow = false;
     private Thread[] workers = new Thread[0];
@@ -138,133 +133,131 @@ public class ServiceThreadPool {
     }
 
     private void worker(int threadId) {
-        long seed = 1234342;
-        int revolvingSelector = 0;
+        ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_PRIORITY_LOWEST);
+        //ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_MODE_BACKGROUND_BEGIN);
 
-        double rollRuntimeRatio = 0;
-        double rollCpuTimeDelta = 0;
+        long[] seed = new long[]{1234342^(threadId*124987198651981L+215987981111L)};
+        int[] revolvingSelector = new int[1];
+        long[] logIO = new long[] {0, System.currentTimeMillis()};
         while (true) {
             this.jobCounter.acquireUninterruptibly();
             if (!this.running) {
                 break;
             }
+            //This is because of JIT moment (it cant really replace methods while they are executing afak)
+            this.worker_work(threadId, seed, revolvingSelector, logIO);
+        }
+    }
 
-            final int ATTEMPT_COUNT = 50;
-            int attempts = ATTEMPT_COUNT;
-            outer:
-            while (true) {
-                if (attempts < ATTEMPT_COUNT-2) {
-                    try {
-                        Thread.sleep(20);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-                if (this.releaseNow) {
-                    this.jobCounter.release();
-                    try {
-                        Thread.sleep(20);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                    break;
-                }
-                var ref = this.serviceSlices;
-                if (ref.length == 0) {
-                    Logger.error("Service worker tried to run but had 0 slices");
-                    break;
-                }
-                if (attempts-- == 0) {
-                    Logger.warn("Unable to execute service after many attempts, releasing");
-                    try {
-                        Thread.sleep(100);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                    this.jobCounter.release();//Release the job we acquired
-                    break;
-                }
-
-                seed = (seed ^ seed >>> 30) * -4658895280553007687L;
-                seed = (seed ^ seed >>> 27) * -7723592293110705685L;
-                long clamped = seed&((1L<<63)-1);
-                long weight = this.totalJobWeight.get();
-                if (weight == 0) {
-                    this.jobCounter.release();
-                    break;
-                }
-
-                ServiceSlice service = ref[0];
-                for (int i = 0; i < ref.length; i++) {
-                    service = ref[(int) ((clamped+i) % ref.length)];
-                    if (service.workConditionMet()) {
-                        break;
-                    }
-                }
-
-                //1 in 64 chance just to pick a service that has a task, in a cycling manor, this is to keep at least one service from overloading all services constantly
-                if (((seed>>10)&63) == 0) {
-                    for (int i = 0; i < ref.length; i++) {
-                        int idx = (i+revolvingSelector)%ref.length;
-                        var slice = ref[idx];
-                        if (slice.hasJobs() && slice.workConditionMet()) {
-                            service = slice;
-                            revolvingSelector = (idx+1)%ref.length;
-                            break;
-                        }
-                    }
-
-                } else {
-                    long chosenNumber = clamped % weight;
-                    for (var slice : ref) {
-                        chosenNumber -= ((long) slice.weightPerJob) * slice.jobCount.availablePermits();
-                        if (chosenNumber <= 0 && slice.workConditionMet()) {
-                            service = slice;
-                            break;
-                        }
-                    }
-                }
-                /*
-                VarHandle.fullFence();
-                long realTimeStart = System.nanoTime();
-                long cpuTimeStart = THREAD_BEAN.getCurrentThreadCpuTime();
-                VarHandle.fullFence();
-                 */
-
-                //Run the job
-                if (!service.doRun(threadId)) {
-                    //Didnt consume the job, find a new job
-                    continue;
-                }
-                /*
-                VarHandle.fullFence();
-                long cpuTimeEnd = THREAD_BEAN.getCurrentThreadCpuTime();
-                long realTimeEnd = System.nanoTime();
-                VarHandle.fullFence();
-
-                long realTimeDelta = realTimeEnd - realTimeStart;
-                long cpuTimeDelta = cpuTimeEnd - cpuTimeStart;
-
-                //Realtime should always be bigger or equal to cpu time
-                double runtimeRatio = ((double)cpuTimeDelta)/((double)realTimeDelta);
-                rollRuntimeRatio = (rollRuntimeRatio*0.95)+runtimeRatio*0.05;
-                rollCpuTimeDelta = (rollCpuTimeDelta*0.95)+cpuTimeDelta*0.05;
-                //Attempt to self balance cpu load
-                VarHandle.fullFence();
+    private void worker_work(int threadId, long[] seedIO, int[] revolvingSelectorIO, long[] logIO) {
+        final int ATTEMPT_COUNT = 50;
+        int attempts = ATTEMPT_COUNT;
+        while (true) {
+            if (attempts < ATTEMPT_COUNT-2) {
                 try {
-                    if (rollRuntimeRatio > 0.8) {
-                        Thread.sleep(Math.max((long) ((rollRuntimeRatio - 0.5) * (rollCpuTimeDelta / (1000 * 1000))), 1));
-                    }
+                    Thread.sleep(20);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
-                }*/
-
-                //Consumed a job from the service, decrease weight by the amount
-                if (this.totalJobWeight.addAndGet(-service.weightPerJob)<0) {
-                    throw new IllegalStateException("Total job weight is negative");
+                }
+            }
+            if (this.releaseNow) {
+                this.jobCounter.release();
+                try {
+                    Thread.sleep(20);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
                 break;
             }
+            var ref = this.serviceSlices;
+            if (ref.length == 0) {
+                Logger.error("Service worker tried to run but had 0 slices");
+                break;
+            }
+            if (attempts-- == 0) {
+                Logger.warn("Unable to execute service after many attempts, releasing");
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                this.jobCounter.release();//Release the job we acquired
+                break;
+            }
+            long seed = seedIO[0]*1984691871L+1497210975L;
+            seed = (seed ^ (seed >>> 30)) * -4658895280553007687L;
+            seed = (seed ^ (seed >>> 27)) * -7723592293110705685L;
+            seedIO[0] = seed;
+            long clamped = seed&((1L<<63)-1);
+            long weight = this.totalJobWeight.get();
+            if (weight == 0) {
+                this.jobCounter.release();
+                break;
+            }
+
+            ServiceSlice service = null;
+            for (int i = 0; i < ref.length; i++) {
+                var service2 = ref[(int) ((clamped+i) % ref.length)];
+                if (service2.hasJobs() && service2.workConditionMet()) {
+                    service = service2;
+                    break;
+                }
+            }
+            if (service == null) {
+                logIO[0]++;
+                long delta = System.currentTimeMillis()-logIO[1];
+                if (delta>30_000) {
+                    logIO[1] = System.currentTimeMillis();
+                    Logger.warn("No available jobs, sleeping releasing returning: " + (delta/1000) + " attempts " + logIO[0]);
+                    logIO[0] = 0;
+                }
+                try {
+                    Thread.sleep((long) (500*Math.random()+200));
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                this.jobCounter.release();
+                break;
+            }
+
+            //1 in 64 chance just to pick a service that has a task, in a cycling manor, this is to keep at least one service from overloading all services constantly
+            if (((seed>>10)&63) == 0) {
+                int revolvingSelector = revolvingSelectorIO[0];
+                for (int i = 0; i < ref.length; i++) {
+                    int idx = (i+revolvingSelector)%ref.length;
+                    var slice = ref[idx];
+                    if (slice.hasJobs() && slice.workConditionMet()) {
+                        service = slice;
+                        revolvingSelector = (idx+1)%ref.length;
+                        break;
+                    }
+                }
+                revolvingSelectorIO[0] = revolvingSelector;
+            } else {
+                long chosenNumber = clamped % weight;
+                for (var slice : ref) {
+                    chosenNumber -= ((long) slice.weightPerJob) * slice.jobCount.availablePermits();
+                    if (chosenNumber <= 0 && slice.workConditionMet()) {
+                        service = slice;
+                        break;
+                    }
+                }
+            }
+
+            //Run the job
+            if (!service.doRun(threadId)) {
+                //Didnt consume the job, find a new job
+                continue;
+            }
+
+            //Consumed a job from the service, decrease weight by the amount
+            if (this.totalJobWeight.addAndGet(-service.weightPerJob)<0) {
+                throw new IllegalStateException("Total job weight is negative");
+            }
+
+            //Sleep for a bit after running a job, yeild the thread
+            Thread.yield();
+            break;
         }
     }
 

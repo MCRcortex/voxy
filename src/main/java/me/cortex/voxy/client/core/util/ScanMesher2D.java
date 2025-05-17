@@ -6,7 +6,6 @@ public abstract class ScanMesher2D {
 
     private static final int MAX_SIZE = 16;
 
-
     // is much faster if implemented inline into parent
     private final long[] rowData = new long[32];
     private final int[] rowLength = new int[32];//How long down does a row entry go
@@ -28,7 +27,7 @@ public abstract class ScanMesher2D {
             //If the previous data is not zero, that means it was not merge-able, so emit it at the pos
             if (this.currentData!=0) {
                 if ((this.rowBitset&(1<<31))!=0) {
-                    emitQuad(31, ((this.currentIndex-1)>>5)-1, this.rowLength[31], this.rowDepth[31], this.rowData[31]);
+                    this.emitQuad(31, ((this.currentIndex-1)>>5)-1, this.rowLength[31], this.rowDepth[31], this.rowData[31]);
                 }
                 this.rowBitset |= 1<<31;
                 this.rowLength[31] = this.currentSum;
@@ -84,14 +83,14 @@ public abstract class ScanMesher2D {
     private void emitRanged(int msk) {
         {//Emit quads that cover the previous indices
             int rowSet = this.rowBitset&msk;
+            this.rowBitset &= ~msk;
             while (rowSet!=0) {//Need to emit quads that would have skipped, note that this does not include the current index
                 int index = Integer.numberOfTrailingZeros(rowSet);
                 rowSet &= ~Integer.lowestOneBit(rowSet);
 
                 //Emit the quad, dont need to clear the data since it not existing in the bitmask is implicit no data
-                this.emitQuad(index, ((this.currentIndex-1)>>5)-1, this.rowLength[index], this.rowDepth[index], this.rowData[index]);
+                this.emitQuad(index, (this.currentIndex>>5)-1, this.rowLength[index], this.rowDepth[index], this.rowData[index]);
             }
-            this.rowBitset &= ~msk;
         }
     }
 
@@ -107,10 +106,14 @@ public abstract class ScanMesher2D {
         this.currentIndex += count;
          */
         if (count == 0) return;
-        this.putNext(0);
-        if (1<count) {
-            this.emitRanged(((1 << (Math.min(count, 32)-1)) - 1) << (this.currentIndex & 31));
-            this.currentIndex += count - 1;
+        if (this.currentData!=0) {
+            this.putNext(0);
+            count--;
+        }
+        if (0<count) {
+            int msk = (int) ((1L<<Math.min(32, count))-1) << (this.currentIndex & 31);
+            this.emitRanged(msk);
+            this.currentIndex += count;
         }
 
     }
@@ -177,111 +180,6 @@ public abstract class ScanMesher2D {
         int i = 1;
         while (true) {
             mesher.putNext(i++);
-        }
-    }
-
-    public static void main5(String[] args) {
-        var r = new Random(0);
-        long[] data = new long[32*32];
-        float DENSITY = 0.5f;
-        int RANGE = 50;
-        for (int i = 0; i < data.length; i++) {
-            data[i] = r.nextFloat()<DENSITY?(r.nextInt(RANGE)+1):0;
-        }
-
-        int[] qc = new int[2];
-        var mesher = new ScanMesher2D(){
-            @Override
-            protected void emitQuad(int x, int z, int length, int width, long data) {
-                qc[0]++;
-                qc[1]+=length*width;
-            }
-        };
-
-        for (int i = 0; i < 500000; i++) {
-            for (long v : data) {
-                mesher.putNext(v);
-            }
-            mesher.finish();
-        }
-
-        var m2 = new Mesher2D();
-        for (int i = 0; i < 500000; i++) {
-            int j = 0;
-            m2.reset();
-            for (long v : data) {
-                if (v!=0)
-                    m2.put(j&31, j>>5, v);
-                j++;
-            }
-            m2.process();
-        }
-
-        long t = System.nanoTime();
-        for (int i = 0; i < 1000000; i++) {
-            for (long v : data) {
-                mesher.putNext(v);
-            }
-            mesher.finish();
-        }
-        long delta = System.nanoTime()-t;
-        System.out.println(delta*1e-6);
-
-
-        t = System.nanoTime();
-        for (int i = 0; i < 1000000; i++) {
-            int j = 0;
-            m2.reset();
-            for (long v : data) {
-                if (v!=0)
-                    m2.put(j&31, j>>5, v);
-                j++;
-            }
-            m2.process();
-        }
-        delta = System.nanoTime()-t;
-        System.out.println(delta*1e-6);
-
-
-    }
-    public static void main4(String[] args) {
-        var r = new Random(0);
-        int[] qc = new int[2];
-        var mesher = new ScanMesher2D(){
-            @Override
-            protected void emitQuad(int x, int z, int length, int width, long data) {
-                qc[0]++;
-                qc[1]+=length*width;
-            }
-        };
-
-        var mesh2 = new Mesher2D();
-
-        float DENSITY = 0.75f;
-        int RANGE = 25;
-        int total = 0;
-        while (true) {
-            //DENSITY = r.nextFloat();
-            //RANGE = r.nextInt(500)+1;
-            qc[0] = 0; qc[1] = 0;
-            int c = 0;
-            for (int i = 0; i < 32*32; i++) {
-                long val = r.nextFloat()<DENSITY?(r.nextInt(RANGE)+1):0;
-                c += val==0?0:1;
-                mesher.putNext(val);
-                if (val != 0) {
-                    mesh2.put(i&31, i>>5, val);
-                }
-            }
-            mesher.finish();
-            if (c != qc[1]) {
-                System.out.println("ERROR: "+c+", " + qc[1]);
-            }
-            int count = mesh2.process();
-            int delta = count - qc[0];
-            total += delta;
-            //System.out.println(total);
-            //System.out.println(c+", new: " + qc[0] + " old: " + count);
         }
     }
 
