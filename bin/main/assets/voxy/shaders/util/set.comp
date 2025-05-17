@@ -1,0 +1,27 @@
+#version 460 core
+
+layout(local_size_x=128) in;
+
+layout(binding = SETTING_BUFFER_BINDING, std430) restrict writeonly buffer SetDataBuffer {
+    TYPE[] setting;
+};
+
+struct Entry {
+    TYPE value;
+    uint index;
+};
+
+layout(binding = ENTRY_BUFFER_BINDING, std430) restrict readonly buffer EntryBuffer {
+    Entry[] entries;
+};
+
+layout(location=0) uniform uint count;
+
+void main() {
+    uint id = gl_GlobalInvocationID.x;
+    if (count <= id) {
+        return;
+    }
+    Entry entry = entries[id];
+    setting[entry.index] = entry.value;
+}

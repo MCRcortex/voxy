@@ -1,0 +1,28 @@
+#version 450
+
+layout(local_size_x = WIDTH, local_size_y = HEIGHT) in;
+
+layout(binding = 0) uniform sampler2D colourTexIn;
+layout(binding = 1) uniform sampler2D depthTexIn;
+layout(binding = 2) uniform usampler2D stencilTexIn;
+layout(binding = 3, std430) writeonly restrict buffer OutBuffer {
+    uint[] outBuffer;
+};
+
+
+layout(location=4) uniform uint bufferOffset;
+
+
+void main() {
+    ivec2 point = ivec2(gl_GlobalInvocationID.xy);
+    uint writeIndex = ((gl_GlobalInvocationID.x+(gl_GlobalInvocationID.y*WIDTH))*2)+bufferOffset;
+    uvec4 colour = clamp(uvec4(texelFetch(colourTexIn, point, 0)*255), uvec4(0), uvec4(255));//TODO: check that this actually gets to the range of 255
+    colour <<= uvec4(0,8,16,24);//ABGR format!!!
+    outBuffer[writeIndex] = colour.r|colour.g|colour.b|colour.a;
+
+    float depth = clamp(texelFetch(depthTexIn, point, 0).r, 0, 1);//Opengl grumble grumble
+    uint stencil = texelFetch(stencilTexIn, point, 0).r;
+    uint value = uint(depth*((1<<24)-1))<<8;
+    value |= stencil;
+    outBuffer[writeIndex+1] = value;
+}

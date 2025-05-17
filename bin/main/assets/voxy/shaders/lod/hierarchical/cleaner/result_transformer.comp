@@ -1,0 +1,35 @@
+#version 460 core
+layout(local_size_x=OUTPUT_SIZE) in;
+
+layout(binding = MIN_ID_BUFFER_BINDING, std430) restrict readonly buffer VisibilityDataBuffer {
+    uint minVisIds[OUTPUT_SIZE];
+};
+
+layout(binding = NODE_BUFFER_BINDING, std430) restrict readonly buffer NodeData {
+    uvec4[] nodes;
+};
+
+layout(binding = OUTPUT_BUFFER_BINDING, std430) restrict writeonly buffer OutputBuffer {
+    uvec2 outputBuffer[OUTPUT_SIZE];
+};
+
+layout(binding = VISIBILITY_BUFFER_BINDING, std430) restrict buffer VisibilityBuffer {
+    uint[] visibility;
+};
+
+layout(location=0) uniform uint visibilityCounter;
+void main() {
+    uint id = minVisIds[gl_LocalInvocationID.x];
+    uvec4 node = nodes[id];
+    uvec2 res = node.xy;
+    if (all(equal(node, uvec4(-1)))) {//If its a empty node, TODO: DONT THINK THIS IS ACTUALLY CORRECT
+        res = uvec2(-1);
+    }
+    outputBuffer[gl_LocalInvocationID.x] = res;//Move the position of the node id into the output buffer
+
+    //This is an evil hack to not spam the same node 500 times in a row
+    //TODO: maybe instead set this to the current frame index
+//    visibility[id] += 30;
+    visibility[id] = visibilityCounter + 60;
+
+}

@@ -1,0 +1,24 @@
+#version 450
+
+layout(local_size_x = 1) in;
+
+#define DRAW_COUNT_BUFFER_BINDING 1
+#define INDIRECT_SECTION_LOOKUP_BINDING 2
+
+#import <voxy:lod/gl46/bindings.glsl>
+
+void main() {
+    cmdGenDispatchX = ((sectionCount+127)/128);
+    cmdGenDispatchY = 1;
+    cmdGenDispatchZ = 1;
+
+    opaqueDrawCount = 0;
+    translucentDrawCount = 0;
+    temporalOpaqueDrawCount = 0;
+
+    cullDrawIndirectCommand.count = 6*2*3;
+    cullDrawIndirectCommand.instanceCount = sectionCount;
+    cullDrawIndirectCommand.firstIndex = (1<<16)*6*2;
+    cullDrawIndirectCommand.baseVertex = 0;
+    cullDrawIndirectCommand.baseInstance = 0;
+}
