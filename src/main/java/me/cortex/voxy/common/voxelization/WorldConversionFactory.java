@@ -267,14 +267,5 @@ public class WorldConversionFactory {
                         data[J(0, 0, 0)], data[J(1, 0, 0)], data[J(0, 0, 1)], data[J(1, 0, 1)],
                         data[J(0, 1, 0)], data[J(1, 1, 0)], data[J(0, 1, 1)], data[J(1, 1, 1)],
                         mapper);
-
-
-
-
-        //Do some very cheeky stuff for MiB
-        if (false) {
-            int sector = (section.x+512)>>10;
-            section.setPosition(section.x-(sector<<10), section.y+16+(256-32-sector*30), section.z);//Note sector size mult is 30 because the top chunk is replicated (and so is bottom chunk)
-        }
     }
 }

@@ -35,7 +35,7 @@ public class RenderDistanceTracker {
         this.tracker = new RingTracker(this.tracker, renderDistance, ((int)this.posX)>>9, ((int)this.posZ)>>9, true);//Steal from previous tracker
     }
 
-    public void setCenterAndProcess(double x, double z) {
+    public boolean setCenterAndProcess(double x, double z) {
         double dx = this.posX-x;
         double dz = this.posZ-z;
         if (CHECK_DISTANCE_BLOCKS*CHECK_DISTANCE_BLOCKS<dx*dx+dz*dz) {
@@ -43,7 +43,7 @@ public class RenderDistanceTracker {
             this.posZ = z;
             this.tracker.moveCenter(((int)x)>>9, ((int)z)>>9);
         }
-        this.tracker.process(this.processRate, this::add, this::rem);
+        return this.tracker.process(this.processRate, this::add, this::rem)!=0;
     }
 
     private void add(int x, int z) {

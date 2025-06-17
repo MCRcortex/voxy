@@ -53,12 +53,18 @@ public class SectionSavingService {
 
             //Hard limit the save count to prevent OOM
             if (this.getTaskCount() > 5_000) {
-                while (this.getTaskCount() > 5_000) {
-                    try {
-                        Thread.sleep(10);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
+                //wait a bit
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                //If we are still full, process entries in the queue ourselves instead of waiting for the service
+                while (this.getTaskCount() > 5_000 && this.threads.isAlive()) {
+                    if (!this.threads.steal()) {
+                        break;
                     }
+                    this.processJob();
                 }
             }
 
@@ -69,7 +75,7 @@ public class SectionSavingService {
 
     public void shutdown() {
         if (this.threads.getJobCount() != 0) {
-            System.err.println("Voxy section saving still in progress, estimated " + this.threads.getJobCount() + " sections remaining.");
+            Logger.error("Voxy section saving still in progress, estimated " + this.threads.getJobCount() + " sections remaining.");
             while (this.threads.getJobCount() != 0) {
                 Thread.onSpinWait();
             }

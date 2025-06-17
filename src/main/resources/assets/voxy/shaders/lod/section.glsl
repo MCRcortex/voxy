@@ -1,3 +1,14 @@
+struct SectionMeta {
+    uint posA;
+    uint posB;
+    uint AABB;
+    uint ptr;
+    uint cntA;
+    uint cntB;
+    uint cntC;
+    uint cntD;
+};
+
 uint extractDetail(SectionMeta section) {
     return section.posA>>28;
 }
@@ -5,7 +16,7 @@ uint extractDetail(SectionMeta section) {
 ivec3 extractPosition(SectionMeta section) {
     int y = ((int(section.posA)<<4)>>24);
     int x = (int(section.posB)<<4)>>8;
-    int z = int((section.posA&((1<<20)-1))<<4);
+    int z = int((section.posA&((1u<<20)-1))<<4);
     z |= int(section.posB>>28);
     z <<= 8;
     z >>= 8;

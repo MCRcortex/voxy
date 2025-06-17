@@ -4,6 +4,7 @@ import com.mojang.blaze3d.opengl.GlConst;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.TimingStatistics;
+import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
@@ -41,7 +42,13 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.lwjgl.opengl.GL11.GL_ONE;
+import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
+import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
+import static org.lwjgl.opengl.GL11.GL_VIEWPORT;
+import static org.lwjgl.opengl.GL11.glGetIntegerv;
 import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL14.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL30C.GL_DRAW_FRAMEBUFFER_BINDING;
 import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
 import static org.lwjgl.opengl.GL33.glBindSampler;
@@ -54,63 +61,49 @@ public class VoxyRenderSystem {
     public final ChunkBoundRenderer chunkBoundRenderer;
 
     public VoxyRenderSystem(WorldEngine world, ServiceThreadPool threadPool) {
-        //Trigger the shared index buffer loading
-        SharedIndexBuffer.INSTANCE.id();
-        Capabilities.init();//Ensure clinit is called
+        //Keep the world loaded, NOTE: this is done FIRST, to keep and ensure that even if the rest of loading takes more
+        // than timeout, we keep the world acquired
+        world.acquireRef();
+        try {
+            //wait for opengl to be finished, this should hopefully ensure all memory allocations are free
+            glFinish();
+            glFinish();
 
-        this.worldIn = world;
-        this.renderer = new RenderService(world, threadPool);
-        this.postProcessing = new PostProcessing();
+            //Trigger the shared index buffer loading
+            SharedIndexBuffer.INSTANCE.id();
+            Capabilities.init();//Ensure clinit is called
 
-        this.renderDistanceTracker = new RenderDistanceTracker(20,
-                MinecraftClient.getInstance().world.getBottomSectionCoord()>>5,
-                (MinecraftClient.getInstance().world.getTopSectionCoord()-1)>>5,
-                this.renderer::addTopLevelNode,
-                this.renderer::removeTopLevelNode);
+            this.worldIn = world;
+            this.renderer = new RenderService(world, threadPool);
+            this.postProcessing = new PostProcessing();
+            int minSec = MinecraftClient.getInstance().world.getBottomSectionCoord() >> 5;
+            int maxSec = (MinecraftClient.getInstance().world.getTopSectionCoord() - 1) >> 5;
 
-        this.renderDistanceTracker.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
+            //Do some very cheeky stuff for MiB
+            if (false) {
+                minSec = -8;
+                maxSec = 7;
+            }
 
-        this.chunkBoundRenderer = new ChunkBoundRenderer();
+            this.renderDistanceTracker = new RenderDistanceTracker(20,
+                    minSec,
+                    maxSec,
+                    this.renderer::addTopLevelNode,
+                    this.renderer::removeTopLevelNode);
+
+            this.renderDistanceTracker.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
+
+            this.chunkBoundRenderer = new ChunkBoundRenderer();
+        } catch (RuntimeException e) {
+            world.releaseRef();//If something goes wrong, we must release the world first
+            throw e;
+        }
     }
 
     public void setRenderDistance(int renderDistance) {
         this.renderDistanceTracker.setRenderDistance(renderDistance);
     }
 
-
-    //private static final ModelTextureBakery mtb = new ModelTextureBakery(16, 16);
-    //private static final RawDownloadStream downstream = new RawDownloadStream(1<<20);
-    public void renderSetup(Frustum frustum, Camera camera) {
-        TimingStatistics.resetSamplers();
-
-        /*
-        if (false) {
-            int allocation = downstream.download(2 * 4 * 6 * 16 * 16, ptr -> {
-                ColourDepthTextureData[] textureData = new ColourDepthTextureData[6];
-                final int FACE_SIZE = 16 * 16;
-                for (int face = 0; face < 6; face++) {
-                    long faceDataPtr = ptr + (FACE_SIZE * 4) * face * 2;
-                    int[] colour = new int[FACE_SIZE];
-                    int[] depth = new int[FACE_SIZE];
-
-                    //Copy out colour
-                    for (int i = 0; i < FACE_SIZE; i++) {
-                        //De-interpolate results
-                        colour[i] = MemoryUtil.memGetInt(faceDataPtr + (i * 4 * 2));
-                        depth[i] = MemoryUtil.memGetInt(faceDataPtr + (i * 4 * 2) + 4);
-                    }
-
-                    textureData[face] = new ColourDepthTextureData(colour, depth, 16, 16);
-                }
-                if (textureData[0].colour()[0] == 0) {
-                    int a = 0;
-                }
-            });
-            mtb.renderFacesToStream(Blocks.AIR.getDefaultState(), 123456, false, downstream.getBufferId(), allocation);
-            downstream.submit();
-            downstream.tick();
-        }*/
-    }
 
     private void autoBalanceSubDivSize() {
         //only increase quality while there are very few mesh queues, this stops,
@@ -154,49 +147,56 @@ public class VoxyRenderSystem {
         if (IrisUtil.irisShadowActive()) {
             return;
         }
+        TimingStatistics.resetSamplers();
+
+
         //Do some very cheeky stuff for MiB
         if (false) {
             int sector = (((int)Math.floor(cameraX)>>4)+512)>>10;
             cameraX -= sector<<14;//10+4
             cameraY += (16+(256-32-sector*30))*16;
         }
+
         long startTime = System.nanoTime();
         TimingStatistics.all.start();
         TimingStatistics.main.start();
+
+
+
+        int oldFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
+        int boundFB = oldFB;
+
+        //var target = DefaultTerrainRenderPasses.CUTOUT.getTarget();
+        //boundFB = ((net.minecraft.client.texture.GlTexture) target.getColorAttachment()).getOrCreateFramebuffer(((GlBackend) RenderSystem.getDevice()).getFramebufferManager(), target.getDepthAttachment());
+        if (boundFB == 0) {
+            throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
+        }
 
         //this.autoBalanceSubDivSize();
 
         var projection = computeProjectionMat(matrices.projection());//RenderSystem.getProjectionMatrix();
         //var projection = new Matrix4f(matrices.projection());
 
+        int[] dims = new int[4];
+        glGetIntegerv(GL_VIEWPORT, dims);
         var viewport = this.renderer.getViewport();
         viewport
                 .setProjection(projection)
                 .setModelView(new Matrix4f(matrices.modelView()))
                 .setCamera(cameraX, cameraY, cameraZ)
-                .setScreenSize(MinecraftClient.getInstance().getFramebuffer().textureWidth, MinecraftClient.getInstance().getFramebuffer().textureHeight)
+                .setScreenSize(dims[2], dims[3])
                 .update();
         viewport.frameId++;
-
-
-
-        int oldFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
-
-        var target = DefaultTerrainRenderPasses.CUTOUT.getTarget();
-        int boundFB = ((net.minecraft.client.texture.GlTexture) target.getColorAttachment()).getOrCreateFramebuffer(((GlBackend) RenderSystem.getDevice()).getFramebufferManager(), target.getDepthAttachment());
-        if (boundFB == 0) {
-            throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
-        }
 
         TimingStatistics.E.start();
         this.chunkBoundRenderer.render(viewport);
         TimingStatistics.E.stop();
 
         TimingStatistics.F.start();
-        this.postProcessing.setup(target.textureWidth, target.textureHeight, boundFB);
+        this.postProcessing.setup(viewport.width, viewport.height, boundFB);
         TimingStatistics.F.stop();
 
-        this.renderer.renderFarAwayOpaque(viewport, this.chunkBoundRenderer.getDepthBoundTexture(), startTime);
+        this.renderer.renderFarAwayOpaque(viewport, this.chunkBoundRenderer.getDepthBoundTexture());
 
 
         TimingStatistics.F.start();
@@ -224,7 +224,7 @@ public class VoxyRenderSystem {
             //Tick upload stream (this is ok to do here as upload ticking is just memory management)
             UploadStream.INSTANCE.tick();
 
-            this.renderDistanceTracker.setCenterAndProcess(cameraX, cameraZ);
+            while (this.renderDistanceTracker.setCenterAndProcess(cameraX, cameraZ) && VoxyClient.isFrexActive());//While FF is active, run until everything is processed
 
             //Done here as is allows less gl state resetup
             this.renderer.tickModelService(Math.max(3_000_000-(System.nanoTime()-startTime), 500_000));
@@ -270,130 +270,8 @@ public class VoxyRenderSystem {
         try {this.renderer.shutdown();this.chunkBoundRenderer.free();} catch (Exception e) {Logger.error("Error shutting down renderer", e);}
         Logger.info("Shutting down post processor");
         if (this.postProcessing!=null){try {this.postProcessing.shutdown();} catch (Exception e) {Logger.error("Error shutting down post processor", e);}}
-    }
 
-
-
-
-
-
-
-    private void testMeshingPerformance() {
-        var modelService = new ModelBakerySubsystem(this.worldIn.getMapper());
-        var factory = new RenderDataFactory(this.worldIn, modelService.factory, false);
-
-        List<WorldSection> sections = new ArrayList<>();
-
-        System.out.println("Loading sections");
-        for (int x = -17; x <= 17; x++) {
-            for (int z = -17; z <= 17; z++) {
-                for (int y = -1; y <= 4; y++) {
-                    var section = this.worldIn.acquire(0, x, y, z);
-
-                    int nonAir = 0;
-                    for (long state : section.copyData()) {
-                        nonAir += Mapper.isAir(state)?0:1;
-                        modelService.requestBlockBake(Mapper.getBlockId(state));
-                    }
-
-                    if (nonAir > 500 && Math.abs(x) <= 16 && Math.abs(z) <= 16) {
-                        sections.add(section);
-                    } else {
-                        section.release();
-                    }
-                }
-            }
-        }
-
-        System.out.println("Baking models");
-        {
-            //Bake everything
-            while (!modelService.areQueuesEmpty()) {
-                modelService.tick(5_000_000);
-                glFinish();
-            }
-        }
-
-        System.out.println("Ready!");
-
-        {
-            int iteration = 0;
-            while (true) {
-                long start = System.currentTimeMillis();
-                for (var section : sections) {
-                    var mesh = factory.generateMesh(section);
-
-                    mesh.free();
-                }
-                long delta = System.currentTimeMillis() - start;
-                System.out.println("Iteration: " + (iteration++) + " took " + delta + "ms, for an average of " + ((float)delta/sections.size()) + "ms per section");
-                //System.out.println("Quad count: " + factory.quadCount);
-            }
-        }
-    }
-
-    private void testFullMesh() {
-        var modelService = new ModelBakerySubsystem(this.worldIn.getMapper());
-        var completedCounter = new AtomicInteger();
-        var generationService = new RenderGenerationService(this.worldIn, modelService, VoxyCommon.getInstance().getThreadPool(), a-> {completedCounter.incrementAndGet(); a.free();}, false);
-
-
-        var r = new Random(12345);
-        {
-            for (int i = 0; i < 10_000; i++) {
-                int x = (r.nextInt(256*2+2)-256)>>1;//-32
-                int z = (r.nextInt(256*2+2)-256)>>1;//-32
-                int y = r.nextInt(10)-2;
-                int lvl = 0;//r.nextInt(5);
-                long key = WorldEngine.getWorldSectionId(lvl, x>>lvl, y>>lvl, z>>lvl);
-                generationService.enqueueTask(key);
-            }
-            int i = 0;
-            while (true) {
-                modelService.tick(5_000_000);
-                if (i++%5000==0)
-                    System.out.println(completedCounter.get());
-                glFinish();
-                List<String> a = new ArrayList<>();
-                generationService.addDebugData(a);
-                if (a.getFirst().endsWith(" 0")) {
-                    break;
-                }
-            }
-        }
-
-        System.out.println("Running benchmark");
-        while (true)
-        {
-            completedCounter.set(0);
-            long start = System.currentTimeMillis();
-            int C = 200_000;
-            for (int i = 0; i < C; i++) {
-                int x = (r.nextInt(256 * 2 + 2) - 256) >> 1;//-32
-                int z = (r.nextInt(256 * 2 + 2) - 256) >> 1;//-32
-                int y = r.nextInt(10) - 2;
-                int lvl = 0;//r.nextInt(5);
-                long key = WorldEngine.getWorldSectionId(lvl, x >> lvl, y >> lvl, z >> lvl);
-                generationService.enqueueTask(key);
-            }
-            //int i = 0;
-            while (true) {
-                //if (i++%5000==0)
-                //    System.out.println(completedCounter.get());
-                modelService.tick(5_000_000);
-                glFinish();
-                List<String> a = new ArrayList<>();
-                generationService.addDebugData(a);
-                if (a.getFirst().endsWith(" 0")) {
-                    break;
-                }
-            }
-            long delta = (System.currentTimeMillis()-start);
-            System.out.println("Time "+delta+"ms count: " + completedCounter.get() + " avg per mesh: " + ((double)delta/completedCounter.get()) + "ms");
-            if (false)
-                break;
-        }
-        generationService.shutdown();
-        modelService.shutdown();
+        //Release hold on the world
+        this.worldIn.releaseRef();
     }
 }

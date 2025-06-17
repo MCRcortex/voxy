@@ -1,36 +1,40 @@
 package me.cortex.voxy.commonImpl.mixin.minecraft;
 
-import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.commonImpl.IVoxyWorld;
+import me.cortex.voxy.commonImpl.IWorldGetIdentifier;
+import me.cortex.voxy.commonImpl.WorldIdentifier;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.world.MutableWorldProperties;
 import net.minecraft.world.World;
-import net.minecraft.world.block.NeighborUpdater;
+import net.minecraft.world.dimension.DimensionType;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(World.class)
-public class MixinWorld implements IVoxyWorld {
-    @Unique private WorldEngine voxyWorld;
+public class MixinWorld implements IWorldGetIdentifier {
+    @Unique
+    private WorldIdentifier identifier;
 
-    @Override
-    public WorldEngine getWorldEngine() {
-        return this.voxyWorld;
+    @Inject(method = "<init>", at = @At("RETURN"))
+    private void voxy$injectIdentifier(MutableWorldProperties properties,
+                                       RegistryKey<World> key,
+                                       DynamicRegistryManager registryManager,
+                                       RegistryEntry<DimensionType> dimensionEntry,
+                                       boolean isClient,
+                                       boolean debugWorld,
+                                       long seed,
+                                       int maxChainedNeighborUpdates,
+                                       CallbackInfo ci) {
+        this.identifier = new WorldIdentifier(key, seed, dimensionEntry.getKey().orElse(null));
     }
 
     @Override
-    public void setWorldEngine(WorldEngine engine) {
-        if (engine != null && this.voxyWorld != null) {
-            throw new IllegalStateException("WorldEngine not null");
-        }
-        this.voxyWorld = engine;
-    }
-
-    @Override
-    public void shutdownEngine() {
-        if (this.voxyWorld != null && this.voxyWorld.instanceIn != null) {
-            this.voxyWorld.instanceIn.stopWorld(this.voxyWorld);
-            this.setWorldEngine(null);
-        }
+    public WorldIdentifier voxy$getIdentifier() {
+        return this.identifier;
     }
 }

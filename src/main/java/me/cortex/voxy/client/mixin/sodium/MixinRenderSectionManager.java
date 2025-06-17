@@ -5,7 +5,10 @@ import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
+import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionFlags;
@@ -61,16 +64,8 @@ public class MixinRenderSectionManager {
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))
     private void injectIngest(int x, int z, CallbackInfo ci) {
         //TODO: Am not quite sure if this is right
-        var instance = VoxyCommon.getInstance();
-        if (instance != null && VoxyConfig.CONFIG.ingestEnabled) {
-            var chunk = this.level.getChunk(x, z);
-            var world = chunk.getWorld();
-            if (world instanceof ClientWorld cw) {
-                var engine = ((VoxyClientInstance)instance).getOrMakeRenderWorld(cw);
-                if (engine != null) {
-                    instance.getIngestService().enqueueIngest(engine, chunk);
-                }
-            }
+        if (VoxyConfig.CONFIG.ingestEnabled) {
+            VoxelIngestService.tryAutoIngestChunk(this.level.getChunk(x, z));
         }
     }
 
@@ -100,13 +95,4 @@ public class MixinRenderSectionManager {
         }
         return true;
     }
-
-    /*
-    @ModifyReturnValue(method = "getSearchDistance", at = @At("RETURN"))
-    private float voxy$increaseSearchDistanceFix(float searchDistance) {
-        if (((IGetVoxyRenderSystem)(this.level.worldRenderer)).getVoxyRenderSystem() == null) {
-            return searchDistance;
-        }
-        return searchDistance + 32;
-    }*/
 }

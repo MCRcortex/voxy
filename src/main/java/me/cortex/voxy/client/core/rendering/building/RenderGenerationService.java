@@ -43,7 +43,7 @@ public class RenderGenerationService {
             int unique = COUNTER.incrementAndGet();
             int lvl = WorldEngine.MAX_LOD_LAYER-WorldEngine.getLevel(this.position);
             lvl = Math.min(lvl, 3);//Make the 2 highest quality have equal priority
-            this.priority = (((lvl*3L + Math.min(this.attempts, 5))*2 + this.addin) <<32) + Integer.toUnsignedLong(unique);
+            this.priority = (((lvl*3L + Math.min(this.attempts, 3))*2 + this.addin) <<32) + Integer.toUnsignedLong(unique);
             this.addin = 0;
         }
     }
@@ -57,21 +57,20 @@ public class RenderGenerationService {
 
     private final WorldEngine world;
     private final ModelBakerySubsystem modelBakery;
-    private final Consumer<BuiltSection> resultConsumer;
+    private Consumer<BuiltSection> resultConsumer;
     private final boolean emitMeshlets;
 
     private final ServiceSlice threads;
 
 
-    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, Consumer<BuiltSection> consumer, boolean emitMeshlets) {
-        this(world, modelBakery, serviceThreadPool, consumer, emitMeshlets, ()->true);
+    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, boolean emitMeshlets) {
+        this(world, modelBakery, serviceThreadPool, emitMeshlets, ()->true);
     }
 
-    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, Consumer<BuiltSection> consumer, boolean emitMeshlets, BooleanSupplier taskLimiter) {
+    public RenderGenerationService(WorldEngine world, ModelBakerySubsystem modelBakery, ServiceThreadPool serviceThreadPool, boolean emitMeshlets, BooleanSupplier taskLimiter) {
         this.emitMeshlets = emitMeshlets;
         this.world = world;
         this.modelBakery = modelBakery;
-        this.resultConsumer = consumer;
 
         this.threads = serviceThreadPool.createService("Section mesh generation service", 100, ()->{
             //Thread local instance of the factory
@@ -81,6 +80,10 @@ public class RenderGenerationService {
                 this.processJob(factory, seenMissed);
             }, factory::free);
         }, taskLimiter);
+    }
+
+    public void setResultConsumer(Consumer<BuiltSection> consumer) {
+        this.resultConsumer = consumer;
     }
 
     //NOTE: the biomes are always fully populated/kept up to date
@@ -139,7 +142,9 @@ public class RenderGenerationService {
         }
 
         if (section == null) {
-            this.resultConsumer.accept(BuiltSection.empty(task.position));
+            if (this.resultConsumer != null) {
+                this.resultConsumer.accept(BuiltSection.empty(task.position));
+            }
             return;
         }
         section.assertNotFree();
@@ -233,7 +238,7 @@ public class RenderGenerationService {
                         task.hasDoneModelRequestOuter = true;
                     }
 
-                    task.addin = WorldEngine.getLevel(task.position)>2?3:0;//Single time addin which gives the models time to bake before the task executes
+                    task.addin = WorldEngine.getLevel(task.position)>2?1:0;//Single time addin which gives the models time to bake before the task executes
                 }
 
                 //Keep the lock on the section, and attach it to the task, this prevents needing to re-aquire it later
@@ -265,7 +270,11 @@ public class RenderGenerationService {
         }
 
         if (mesh != null) {//If the mesh is null it means it didnt finish, so dont submit
-            this.resultConsumer.accept(mesh);
+            if (this.resultConsumer != null) {
+                this.resultConsumer.accept(mesh);
+            } else {
+                mesh.free();
+            }
         }
     }
 
@@ -336,6 +345,9 @@ public class RenderGenerationService {
                 throw new IllegalStateException();
             }
             this.taskMapLock.unlockWrite(stamp);
+        }
+        if (this.taskQueueCount.get() != 0) {
+            throw new IllegalStateException();
         }
     }
 

@@ -93,10 +93,9 @@ void bubbleSortInital(uint vis, uint id) {
 
 bool shouldSortId(uint id) {
     UnpackedNode node;
-    if (unpackNode(node, gl_GlobalInvocationID.x)==uvec4(-1)) {
+    if (unpackNode(node, id)==uvec4(-1)) {
         return false;//Unallocated node
     }
-
     if (isEmptyMesh(node) || (!hasMesh(node))) {//|| (!hasChildren(node))
         return false;
     }
@@ -105,6 +104,9 @@ bool shouldSortId(uint id) {
         return false;//Cannot remove geometry from top level node
     }
 
+    if (hasRequested(node)) {//If a node has a request its not valid to remove
+        return false;
+    }
 
     /*THIS IS COMPLETLY WRONG, we need to check if all the children of the parent of the child are leaf nodes
     // not this node
@@ -130,7 +132,7 @@ void main() {
     // this means that insertion into the local buffer can be accelerated W.R.T global
     for (uint i = 0; i < OPS_PER_THREAD; i++) {
         //Copy in with warp size batch fetch
-        uint id = gl_LocalInvocationID.x + (i*WORK_SIZE);
+        uint id = (gl_LocalInvocationID.x*OPS_PER_THREAD) + i;
         initalSort[id] = minVisIds[id]|(1u<<31);//Flag the id as being external
     }
     barrier();
@@ -158,7 +160,7 @@ void main() {
     //Work size batching
     for (uint i = 0; i < OPS_PER_THREAD; i++) {
         barrier();//Probably unneeded, was just to keep warp coheriancy
-        uint id = gl_LocalInvocationID.x+(i*WORK_SIZE);
+        uint id = (gl_LocalInvocationID.x*OPS_PER_THREAD)+i;
         uint sid = initalSort[id];
         if ((sid&(1u<<31)) != 0) {
             //The flag being external was set, meaning we should NOT insert this element

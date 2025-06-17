@@ -152,7 +152,8 @@ public class Serialization {
             }
         }
 
-        var builder = new GsonBuilder();
+        var builder = new GsonBuilder()
+                .setPrettyPrinting();
         for (var entry : serializers.entrySet()) {
             builder.registerTypeAdapterFactory(entry.getValue());
         }

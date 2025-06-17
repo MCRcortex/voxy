@@ -41,6 +41,7 @@ public class VoxyCommon implements ModInitializer {
 
     @Override
     public void onInitialize() {
+
     }
 
     public interface IInstanceFactory {VoxyInstance create();}

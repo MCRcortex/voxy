@@ -1,15 +1,11 @@
 package me.cortex.voxy.client.config;
 
 import com.google.common.collect.ImmutableList;
-import com.terraformersmc.modmenu.api.ConfigScreenFactory;
-import com.terraformersmc.modmenu.api.ModMenuApi;
 import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
-import me.cortex.voxy.common.Logger;
-import me.cortex.voxy.commonImpl.IVoxyWorld;
+import me.cortex.voxy.common.util.cpu.CpuLayout;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.caffeinemc.mods.sodium.client.gui.SodiumOptionsGUI;
 import net.caffeinemc.mods.sodium.client.gui.options.*;
 import net.caffeinemc.mods.sodium.client.gui.options.control.SliderControl;
 import net.caffeinemc.mods.sodium.client.gui.options.control.TickBoxControl;
@@ -49,10 +45,6 @@ public abstract class VoxyConfigScreenPages {
                                 if (vrsh != null) {
                                     vrsh.shutdownRenderer();
                                 }
-                                var world = (IVoxyWorld) MinecraftClient.getInstance().world;
-                                if (world != null) {
-                                    world.shutdownEngine();
-                                }
                                 VoxyCommon.shutdownInstance();
                             }
                         }, s -> s.enabled)
@@ -60,7 +52,10 @@ public abstract class VoxyConfigScreenPages {
                 ).add(OptionImpl.createBuilder(int.class, storage)
                         .setName(Text.translatable("voxy.config.general.serviceThreads"))
                         .setTooltip(Text.translatable("voxy.config.general.serviceThreads.tooltip"))
-                        .setControl(opt->new SliderControl(opt, 1, Runtime.getRuntime().availableProcessors(), 1, v->Text.literal(Integer.toString(v))))
+                        .setControl(opt->new SliderControl(opt, 1,
+                                CpuLayout.CORES.length, //Just do core size as max
+                                //Runtime.getRuntime().availableProcessors(),//Note: this is threads not cores, the default value is half the core count, is fine as this should technically be the limit but CpuLayout.CORES.length is more realistic
+                                1, v->Text.literal(Integer.toString(v))))
                         .setBinding((s, v)->{
                             boolean wasEnabled = VoxyCommon.getInstance() != null;
                             var vrsh = (IGetVoxyRenderSystem) MinecraftClient.getInstance().worldRenderer;
@@ -68,11 +63,6 @@ public abstract class VoxyConfigScreenPages {
                                 if (vrsh != null) {
                                     vrsh.shutdownRenderer();
                                 }
-                                var world = (IVoxyWorld) MinecraftClient.getInstance().world;
-                                if (world != null) {
-                                    world.shutdownEngine();
-                                }
-
                                 VoxyCommon.shutdownInstance();
                             }
 

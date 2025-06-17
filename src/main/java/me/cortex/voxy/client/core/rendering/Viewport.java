@@ -1,12 +1,14 @@
 package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import net.minecraft.util.math.MathHelper;
 import org.joml.*;
 
 import java.lang.reflect.Field;
 
 public abstract class Viewport <A extends Viewport<A>> {
+    public final HiZBuffer hiZBuffer = new HiZBuffer();
     private static final Field planesField;
     static {
         try {
@@ -46,7 +48,9 @@ public abstract class Viewport <A extends Viewport<A>> {
         this.delete0();
     }
 
-    protected abstract void delete0();
+    protected void delete0() {
+        this.hiZBuffer.free();
+    }
 
     public A setProjection(Matrix4f projection) {
         this.projection = projection;

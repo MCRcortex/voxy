@@ -2,12 +2,14 @@ package me.cortex.voxy.common.world;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.VolatileHolder;
 import me.cortex.voxy.common.world.other.Mapper;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.invoke.VarHandle;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.StampedLock;
 
@@ -18,6 +20,7 @@ public class ActiveSectionTracker {
 
     //Loaded section world cache, TODO: get rid of VolatileHolder and use something more sane
 
+    private final AtomicInteger loadedSections = new AtomicInteger();
     private final Long2ObjectOpenHashMap<VolatileHolder<WorldSection>>[] loadedSectionCache;
     private final StampedLock[] locks;
     private final SectionLoader loader;
@@ -53,6 +56,7 @@ public class ActiveSectionTracker {
     }
 
     public WorldSection acquire(long key, boolean nullOnEmpty) {
+        if (this.engine != null) this.engine.lastActiveTime = System.currentTimeMillis();
         int index = this.getCacheArrayIndex(key);
         var cache = this.loadedSectionCache[index];
         final var lock = this.locks[index];
@@ -91,6 +95,7 @@ public class ActiveSectionTracker {
         }
 
         if (isLoader) {
+            this.loadedSections.incrementAndGet();
             long stamp = this.lruLock.writeLock();
             section = this.lruSecondaryCache.remove(key);
             this.lruLock.unlockWrite(stamp);
@@ -111,7 +116,7 @@ public class ActiveSectionTracker {
                 if (status < 0) {
                     //TODO: Instead if throwing an exception do something better, like attempting to regen
                     //throw new IllegalStateException("Unable to load section: ");
-                    System.err.println("Unable to load section " + section.key + " setting to air");
+                    Logger.error("Unable to load section " + section.key + " setting to air");
                     status = 1;
                 }
 
@@ -125,9 +130,9 @@ public class ActiveSectionTracker {
             }
 
             section.acquire();
-            VarHandle.fullFence();//Do not reorder setting this object
+            VarHandle.storeStoreFence();//Do not reorder setting this object
             holder.obj = section;
-            VarHandle.fullFence();
+            VarHandle.releaseFence();
             if (nullOnEmpty && status == 1) {//If its air return null as stated, release the section aswell
                 section.release();
                 return null;
@@ -155,6 +160,7 @@ public class ActiveSectionTracker {
     }
 
     void tryUnload(WorldSection section) {
+        if (this.engine != null) this.engine.lastActiveTime = System.currentTimeMillis();
         int index = this.getCacheArrayIndex(section.key);
         final var cache = this.loadedSectionCache[index];
         WorldSection sec = null;
@@ -194,6 +200,10 @@ public class ActiveSectionTracker {
         if (aa != null) {
             aa._releaseArray();
         }
+
+        if (sec != null) {
+            this.loadedSections.decrementAndGet();
+        }
     }
 
     private int getCacheArrayIndex(long pos) {
@@ -207,11 +217,7 @@ public class ActiveSectionTracker {
     }
 
     public int getLoadedCacheCount() {
-        int res = 0;
-        for (var cache : this.loadedSectionCache) {
-            res += cache.size();
-        }
-        return res;
+        return this.loadedSections.get();
     }
 
     public int getSecondaryCacheSize() {

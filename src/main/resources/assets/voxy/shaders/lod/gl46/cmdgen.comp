@@ -11,10 +11,8 @@ layout(local_size_x = 128) in;
 #define POSITION_SCRATCH_BINDING 6
 #define POSITION_SCRATCH_ACCESS writeonly
 
-#import <voxy:lod/quad_format.glsl>
-#import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/section.glsl>
-#line 11
+#import <voxy:lod/gl46/bindings.glsl>
 
 //https://github.com/KhronosGroup/GLSL/blob/master/extensions/ext/GL_EXT_shader_16bit_storage.txt
 // adds support for uint8_t which can use for compact visibility buffer
@@ -35,6 +33,9 @@ layout(binding = STATISTICS_BUFFER_BINDING, std430) restrict buffer statisticsBu
     uint  baseInstance;
     */
 
+layout(binding = TRANSLUCENT_DISTANCE_BUFFER_BINDING, std430) restrict buffer TranslucentCommandCount {
+    uint[] translucentCommandData;
+};
 
 //Note: if i want reverse indexing i need to use the index buffer offset to offset
 void writeCmd(uint idx, uint instance, uint offset, uint quadCount) {
@@ -108,8 +109,13 @@ void main() {
         //Translucency
         count = meta.cntA&0xFFFF;
         if (count != 0) {
-            uint translucentCommandPtr = atomicAdd(translucentDrawCount, 1) + TRANSLUCENT_OFFSET;//FIXME: dont hardcode this offset
-            writeCmd(translucentCommandPtr, drawId, ptr, count);
+            uint tp = atomicAdd(translucentDrawCount, 1)+TRANSLUCENT_WRITE_BASE;
+            translucentCommandData[tp] = drawId;
+            uvec3 absRel = abs(relative);
+            uint distToCamera = (absRel.x+absRel.y+absRel.z)<<detail;
+            //The -1 is because we want 0 to TRANSLUCENT_WRITE_BASE, exclusive of ending, not inclusive (0->1023)
+            distToCamera = (TRANSLUCENT_WRITE_BASE-1)-min(distToCamera, (TRANSLUCENT_WRITE_BASE-1));
+            atomicAdd(translucentCommandData[distToCamera], 1);
             #ifdef HAS_STATISTICS
             totalQuads += count;
             #endif

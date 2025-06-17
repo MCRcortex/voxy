@@ -10,11 +10,9 @@ import me.cortex.voxy.commonImpl.VoxyCommon;
 import org.lwjgl.system.MemoryUtil;
 
 public class SaveLoadSystem3 {
-    private record SerializationCache(long[] blockStateCache, Long2ShortOpenHashMap lutMapCache, MemoryBuffer memoryBuffer) {
+    private record SerializationCache(Long2ShortOpenHashMap lutMapCache, MemoryBuffer memoryBuffer) {
         public SerializationCache() {
-            this(new long[WorldSection.SECTION_VOLUME],
-                    new Long2ShortOpenHashMap(512),
-                    ThreadLocalMemoryBuffer.create(WorldSection.SECTION_VOLUME*2+WorldSection.SECTION_VOLUME*8+1024));
+            this(new Long2ShortOpenHashMap(512), ThreadLocalMemoryBuffer.create(WorldSection.SECTION_VOLUME*2+WorldSection.SECTION_VOLUME*8+1024));
             this.lutMapCache.defaultReturnValue((short) -1);
         }
     }
@@ -39,8 +37,7 @@ public class SaveLoadSystem3 {
     //TODO: Cache like long2short and the short and other data to stop allocs
     public static MemoryBuffer serialize(WorldSection section) {
         var cache = CACHE.get();
-        var data = cache.blockStateCache;
-        section.copyDataTo(data);
+        var data = section.data;
 
         Long2ShortOpenHashMap LUT = cache.lutMapCache; LUT.clear();
 

@@ -33,6 +33,7 @@ public class MultiGson {
             if (map[i] != null) {
                 throw new IllegalArgumentException("Duplicate entry classes");
             }
+            map[i] = obj;
         }
 
         var json = new JsonObject();
@@ -68,5 +69,28 @@ public class MultiGson {
         public MultiGson build() {
             return new MultiGson(new ArrayList<>(this.classes));
         }
+    }
+
+
+    private static final class A {
+        public int a;
+        public int b;
+        public int c;
+        public int d;
+    }
+
+    private static final class B {
+        public int q;
+        public int e;
+        public int g;
+        public int l;
+    }
+
+    public static void main(String[] args) {
+        var gson = new Builder().add(A.class).add(B.class).build();
+        var a = new A();
+        a.c =11;
+        var b = new B();
+        System.out.println(gson.fromJson(gson.toJson(a,b)));
     }
 }

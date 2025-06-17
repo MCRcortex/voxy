@@ -7,24 +7,6 @@ layout(binding = 0, std140) uniform SceneUniform {
     vec3 cameraSubPos;
 };
 
-struct BlockModel {
-    uint faceData[6];
-    uint flagsA;
-    uint colourTint;
-    uint _pad[8];
-};
-
-struct SectionMeta {
-    uint posA;
-    uint posB;
-    uint AABB;
-    uint ptr;
-    uint cntA;
-    uint cntB;
-    uint cntC;
-    uint cntD;
-};
-
 //TODO: see if making the stride 2*4*4 bytes or something cause you get that 16 byte write
 struct DrawCommand {
     uint  count;

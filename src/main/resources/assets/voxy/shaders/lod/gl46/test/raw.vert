@@ -9,8 +9,8 @@
 
 
 #import <voxy:lod/quad_format.glsl>
-#import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/block_model.glsl>
+#import <voxy:lod/gl46/bindings.glsl>
 
 layout(location = 6) out flat uint quadDebug;
 

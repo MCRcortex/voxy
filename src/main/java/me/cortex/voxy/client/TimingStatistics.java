@@ -29,9 +29,7 @@ public class TimingStatistics {
                 throw new IllegalStateException();
             }
             this.running = true;
-            VarHandle.fullFence();
             this.timestamp = System.nanoTime();
-            VarHandle.fullFence();
         }
 
         public void stop() {
@@ -39,9 +37,7 @@ public class TimingStatistics {
                 throw new IllegalStateException();
             }
             this.running = false;
-            VarHandle.fullFence();
             this.runtime += System.nanoTime() - this.timestamp;
-            VarHandle.fullFence();
         }
 
         public void subtract(TimeSampler sampler) {

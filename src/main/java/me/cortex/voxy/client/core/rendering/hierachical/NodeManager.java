@@ -18,6 +18,7 @@ import me.cortex.voxy.common.world.WorldEngine;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 import static me.cortex.voxy.common.world.WorldEngine.MAX_LOD_LAYER;
 import static me.cortex.voxy.common.world.WorldEngine.UPDATE_TYPE_BLOCK_BIT;
@@ -123,7 +124,27 @@ public class NodeManager {
         this.geometryManager = geometryManager;
     }
 
+    private static void assertPosValid(long pos) {
+        int lvl = WorldEngine.getLevel(pos);
+        int x = WorldEngine.getX(pos);
+        int y = WorldEngine.getY(pos);
+        int z = WorldEngine.getZ(pos);
+        if (WorldEngine.getWorldSectionId(lvl, x, y, z) != pos) {
+            throw new IllegalStateException("Reconstructed pos not same as original");
+        }
+        x <<= lvl;
+        y <<= lvl;
+        z <<= lvl;
+        long p2 = WorldEngine.getWorldSectionId(0, x, y, z);
+        if (WorldEngine.getLevel(p2) != 0 || WorldEngine.getX(p2) != x || WorldEngine.getY(p2) != y || WorldEngine.getZ(p2) != z) {
+            throw new IllegalStateException("Position not valid at all levels");
+        }
+    }
+
     public void insertTopLevelNode(long pos) {
+        //Verify that pos is actually valid
+        assertPosValid(pos);
+
         if ((pos&0xF) != 0) {
             throw new IllegalStateException("BAD POS !! YOU DID SOMETHING VERY BAD");
         }
@@ -141,7 +162,7 @@ public class NodeManager {
 
     public void removeTopLevelNode(long pos) {
         if (!this.topLevelNodes.remove(pos)) {
-            throw new IllegalStateException("Position not in top level map");
+            throw new IllegalStateException("Position not in top level map: " + WorldEngine.pprintPos(pos));
         }
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {
@@ -235,9 +256,6 @@ public class NodeManager {
         //Removes geometry possible with downloading to cache
         this.geometryManager.removeSection(id);
     }
-    //TODO: FIXME: add method to clear geometry cache of position, or the geometry is empty etc jkdfgsl
-    // this is for cpu/ram side geometry caching
-    // TODO: IMPLEMENT
 
     private int uploadReplaceSection(int meshId, BuiltSection section) {
         if (section.isEmpty()) {
@@ -399,7 +417,7 @@ public class NodeManager {
             // so add the new nodes to it
             int requestId = this.nodeData.getNodeRequest(nodeId);
             var request = this.childRequests.get(requestId);// TODO: do not assume request is childRequest (it will probably always be)
-            if (request.getPosition() != pos) throw new IllegalStateException("Request is not at pos");
+            if (request.getPosition() != pos) throw new IllegalStateException("Request is not at pos: got " + WorldEngine.pprintPos(pos) + " expected: " + WorldEngine.pprintPos(request.getPosition()));
 
             //Add all new children to the request
             for (int i = 0; i < 8; i++) {
@@ -1195,7 +1213,8 @@ public class NodeManager {
 
         if (!this.nodeData.isNodeGeometryInFlight(nodeId)) {
             if (!this.watcher.watch(pos, WorldEngine.UPDATE_TYPE_BLOCK_BIT)) {
-                Logger.info("Node: " + nodeId + " at pos: " + WorldEngine.pprintPos(pos) + " got update request, but geometry was already being watched");
+                //Logger.info("Node: " + nodeId + " at pos: " + WorldEngine.pprintPos(pos) + " got update request, but geometry was already being watched");
+                this.invalidateNode(nodeId);//Who knows why but just invalidate the data just to keep in sync
             } else {
                 this.nodeData.markNodeGeometryInFlight(nodeId);
             }

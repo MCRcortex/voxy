@@ -13,6 +13,7 @@ public class Capabilities {
 
     public static final Capabilities INSTANCE = new Capabilities();
 
+    public final boolean repFragTest;
     public final boolean meshShaders;
     public final boolean INT64_t;
     public final long ssboMaxSize;
@@ -22,11 +23,14 @@ public class Capabilities {
     public final long totalDynamicMemory;//Bytes, total allocation memory - dedicated memory
     public final boolean compute;
     public final boolean indirectParameters;
+    public final boolean isIntel;
+
     public Capabilities() {
         var cap = GL.getCapabilities();
         this.compute = cap.glDispatchComputeIndirect != 0;
         this.indirectParameters = cap.glMultiDrawElementsIndirectCountARB != 0;
-        this.meshShaders = cap.GL_NV_mesh_shader && cap.GL_NV_representative_fragment_test;
+        this.repFragTest = cap.GL_NV_representative_fragment_test;
+        this.meshShaders = cap.GL_NV_mesh_shader;
         this.canQueryGpuMemory = cap.GL_NVX_gpu_memory_info;
         //this.INT64_t = cap.GL_ARB_gpu_shader_int64 || cap.GL_AMD_gpu_shader_int64;
         //The only reliable way to test for int64 support is to try compile a shader
@@ -42,6 +46,7 @@ public class Capabilities {
         this.ssboMaxSize = glGetInteger64(GL_MAX_SHADER_STORAGE_BLOCK_SIZE);
 
         this.isMesa = glGetString(GL_VERSION).toLowerCase().contains("mesa");
+        this.isIntel = glGetString(GL_VENDOR).toLowerCase().contains("intel");
 
         if (this.canQueryGpuMemory) {
             this.totalDedicatedMemory = glGetInteger64(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX)*1024;//Since its in Kb

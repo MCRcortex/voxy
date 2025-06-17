@@ -47,6 +47,11 @@ public class GlBuffer extends TrackedObject {
         return this;
     }
 
+    public GlBuffer zeroRange(long offset, long size) {
+        nglClearNamedBufferSubData(this.id, GL_R8UI, offset, size, GL_RED_INTEGER, GL_UNSIGNED_BYTE, 0);
+        return this;
+    }
+
     public GlBuffer fill(int data) {
         //Clear unpack values
         //Fixed in mesa commit a5c3c452

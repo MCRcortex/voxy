@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.gl.shader;
 
+import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlDebug;
 import me.cortex.voxy.common.Logger;
@@ -147,6 +148,7 @@ public class Shader extends TrackedObject {
         }
 
         public T compile() {
+            this.defineIf("IS_INTEL", Capabilities.INSTANCE.isIntel);
             return this.constructor.make(this, this.compileToProgram());
         }
 
@@ -173,7 +175,7 @@ public class Shader extends TrackedObject {
             String log = GL20C.glGetShaderInfoLog(shader);
 
             if (!log.isEmpty()) {
-                System.err.println(log);
+                Logger.warn(log);
             }
 
             int result = GL20C.glGetShaderi(shader, GL20C.GL_COMPILE_STATUS);

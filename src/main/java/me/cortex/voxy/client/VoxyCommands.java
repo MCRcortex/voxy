@@ -6,8 +6,9 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
-import me.cortex.voxy.commonImpl.IVoxyWorld;
+import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import me.cortex.voxy.commonImpl.WorldIdentifier;
 import me.cortex.voxy.commonImpl.importers.DHImporter;
 import me.cortex.voxy.commonImpl.importers.WorldImporter;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
@@ -67,8 +68,6 @@ public class VoxyCommands {
         if (wr!=null) {
             ((IGetVoxyRenderSystem)wr).shutdownRenderer();
         }
-        var w = ((IVoxyWorld)MinecraftClient.getInstance().world);
-        if (w != null) w.shutdownEngine();
 
         VoxyCommon.shutdownInstance();
         VoxyCommon.createInstance();
@@ -98,9 +97,10 @@ public class VoxyCommands {
         }
 
         File dbFile_ = dbFile;
-        var engine = instance.getOrMakeRenderWorld(MinecraftClient.getInstance().player.clientWorld);
+        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().player.clientWorld);
+        if (engine==null)return 1;
         return instance.getImportManager().makeAndRunIfNone(engine, ()->
-                new DHImporter(dbFile_, engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.getSavingService()))?0:1;
+                new DHImporter(dbFile_, engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.savingServiceRateLimiter))?0:1;
     }
 
     private static boolean fileBasedImporter(File directory) {
@@ -108,9 +108,11 @@ public class VoxyCommands {
         if (instance == null) {
             return false;
         }
-        var engine = instance.getOrMakeRenderWorld(MinecraftClient.getInstance().player.clientWorld);
+
+        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().player.clientWorld);
+        if (engine==null) return false;
         return instance.getImportManager().makeAndRunIfNone(engine, ()->{
-            var importer = new WorldImporter(engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.getSavingService());
+            var importer = new WorldImporter(engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.savingServiceRateLimiter);
             importer.importRegionDirectoryAsync(directory);
             return importer;
         });
@@ -200,12 +202,15 @@ public class VoxyCommands {
         }
         String finalInnerDir = innerDir;
 
-        var engine = instance.getOrMakeRenderWorld(MinecraftClient.getInstance().player.clientWorld);
-        return instance.getImportManager().makeAndRunIfNone(engine, ()->{
-            var importer = new WorldImporter(engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.getSavingService());
-            importer.importZippedRegionDirectoryAsync(zip, finalInnerDir);
-            return importer;
-        })?0:1;
+        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().player.clientWorld);
+        if (engine != null) {
+            return instance.getImportManager().makeAndRunIfNone(engine, () -> {
+                var importer = new WorldImporter(engine, MinecraftClient.getInstance().player.clientWorld, instance.getThreadPool(), instance.savingServiceRateLimiter);
+                importer.importZippedRegionDirectoryAsync(zip, finalInnerDir);
+                return importer;
+            }) ? 0 : 1;
+        }
+        return 1;
     }
 
     private static int cancelImport(CommandContext<FabricClientCommandSource> fabricClientCommandSourceCommandContext) {
@@ -213,7 +218,10 @@ public class VoxyCommands {
         if (instance == null) {
             return 1;
         }
-        var world = instance.getOrMakeRenderWorld(MinecraftClient.getInstance().player.clientWorld);
-        return instance.getImportManager().cancelImport(world)?0:1;
+        var world = WorldIdentifier.ofEngineNullable(MinecraftClient.getInstance().player.clientWorld);
+        if (world != null) {
+            return instance.getImportManager().cancelImport(world)?0:1;
+        }
+        return 1;
     }
 }

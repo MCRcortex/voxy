@@ -11,6 +11,13 @@ public class WorldUpdater {
 
     //NOTE: THIS RUNS ON THE THREAD IT WAS EXECUTED ON, when this method exits, the calling method may assume that VoxelizedSection is no longer needed
     public static void insertUpdate(WorldEngine into, VoxelizedSection section) {//TODO: add a bitset of levels to update and if it should force update
+
+        //Do some very cheeky stuff for MiB
+        if (false) {
+            int sector = (section.x+512)>>10;
+            section.setPosition(section.x-(sector<<10), section.y+16+(256-32-sector*30), section.z);//Note sector size mult is 30 because the top chunk is replicated (and so is bottom chunk)
+        }
+
         if (!into.isLive) throw new IllegalStateException("World is not live");
         boolean shouldCheckEmptiness = false;
         WorldSection previousSection = null;

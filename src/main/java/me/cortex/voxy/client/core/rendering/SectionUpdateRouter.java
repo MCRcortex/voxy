@@ -22,13 +22,15 @@ public class SectionUpdateRouter implements ISectionWatcher {
         }
     }
 
+    private LongConsumer initialRenderMeshGen;
     private LongConsumer renderMeshGen;
     private IChildUpdate childUpdateCallback;
 
-    public void setCallbacks(LongConsumer renderMeshGen, IChildUpdate childUpdateCallback) {
+    public void setCallbacks(LongConsumer initialRenderMeshGen, LongConsumer renderMeshGen, IChildUpdate childUpdateCallback) {
         if (this.renderMeshGen != null) {
             throw new IllegalStateException();
         }
+        this.initialRenderMeshGen = initialRenderMeshGen;
         this.renderMeshGen = renderMeshGen;
         this.childUpdateCallback = childUpdateCallback;
     }
@@ -69,7 +71,7 @@ public class SectionUpdateRouter implements ISectionWatcher {
         }
         if ((delta&UPDATE_TYPE_BLOCK_BIT)!=0) {
             //If we added it, immediately invoke for an update
-            this.renderMeshGen.accept(position);
+            this.initialRenderMeshGen.accept(position);
         }
         return delta!=0;
     }

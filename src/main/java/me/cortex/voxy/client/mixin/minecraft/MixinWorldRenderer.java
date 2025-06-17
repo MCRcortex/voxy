@@ -6,8 +6,8 @@ import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
-import me.cortex.voxy.commonImpl.IVoxyWorld;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.client.render.*;
 import net.minecraft.client.util.ObjectAllocator;
 import net.minecraft.client.world.ClientWorld;
@@ -26,13 +26,6 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
     @Shadow private @Nullable ClientWorld world;
     @Unique private VoxyRenderSystem renderer;
 
-    @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/render/WorldRenderer;setupTerrain(Lnet/minecraft/client/render/Camera;Lnet/minecraft/client/render/Frustum;ZZ)V", shift = At.Shift.AFTER))
-    private void injectSetup(ObjectAllocator allocator, RenderTickCounter tickCounter, boolean renderBlockOutline, Camera camera, GameRenderer gameRenderer, Matrix4f positionMatrix, Matrix4f projectionMatrix, CallbackInfo ci) {
-        if (this.renderer != null) {
-            this.renderer.renderSetup(this.frustum, camera);
-        }
-    }
-
     @Override
     public VoxyRenderSystem getVoxyRenderSystem() {
         return this.renderer;
@@ -50,10 +43,6 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
     private void voxy$captureSetWorld(ClientWorld world, CallbackInfo ci) {
         if (this.world != world) {
             this.shutdownRenderer();
-
-            if (this.world != null) {
-                ((IVoxyWorld)this.world).shutdownEngine();
-            }
         }
     }
 
@@ -86,7 +75,7 @@ public abstract class MixinWorldRenderer implements IGetVoxyRenderSystem {
             Logger.error("Not creating renderer due to null instance");
             return;
         }
-        WorldEngine world = instance.getOrMakeRenderWorld(this.world);
+        WorldEngine world = WorldIdentifier.ofEngine(this.world);
         if (world == null) {
             Logger.error("Null world selected");
             return;

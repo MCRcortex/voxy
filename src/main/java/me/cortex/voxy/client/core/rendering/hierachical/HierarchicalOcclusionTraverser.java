@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.rendering.building.RenderGenerationService;
 import me.cortex.voxy.client.core.rendering.util.PrintfDebugUtil;
 import me.cortex.voxy.client.core.rendering.util.HiZBuffer;
 import me.cortex.voxy.client.core.rendering.Viewport;
@@ -30,7 +31,7 @@ import static org.lwjgl.opengl.GL45.*;
 public class HierarchicalOcclusionTraverser {
     public static final boolean HIERARCHICAL_SHADER_DEBUG = System.getProperty("voxy.hierarchicalShaderDebug", "false").equals("true");
 
-    public static final int REQUEST_QUEUE_SIZE = 50;
+    public static final int MAX_REQUEST_QUEUE_SIZE = 50;
     public static final int MAX_QUEUE_SIZE = 200_000;
 
 
@@ -39,6 +40,7 @@ public class HierarchicalOcclusionTraverser {
 
     private final AsyncNodeManager nodeManager;
     private final NodeCleaner nodeCleaner;
+    private final RenderGenerationService meshGen;
 
     private final GlBuffer requestBuffer;
 
@@ -67,14 +69,13 @@ public class HierarchicalOcclusionTraverser {
     private static final int RENDER_TRACKER_BINDING = BINDING_COUNTER++;
     private static final int STATISTICS_BUFFER_BINDING = BINDING_COUNTER++;
 
-    private final HiZBuffer hiZBuffer = new HiZBuffer();
     private final int hizSampler = glGenSamplers();
 
     private final AutoBindingShader traversal = Shader.makeAuto(PRINTF_processor)
             .defineIf("DEBUG", HIERARCHICAL_SHADER_DEBUG)
             .define("MAX_ITERATIONS", MAX_ITERATIONS)
             .define("LOCAL_SIZE_BITS", LOCAL_WORK_SIZE_BITS)
-            .define("REQUEST_QUEUE_SIZE", REQUEST_QUEUE_SIZE)
+            .define("MAX_REQUEST_QUEUE_SIZE", MAX_REQUEST_QUEUE_SIZE)
 
             .define("HIZ_BINDING", 0)
 
@@ -97,19 +98,18 @@ public class HierarchicalOcclusionTraverser {
             .compile();
 
 
-    public HierarchicalOcclusionTraverser(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner) {
+    public HierarchicalOcclusionTraverser(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, RenderGenerationService meshGen) {
         this.nodeCleaner = nodeCleaner;
         this.nodeManager = nodeManager;
-        this.requestBuffer = new GlBuffer(REQUEST_QUEUE_SIZE*8L+8).zero();
+        this.meshGen = meshGen;
+        this.requestBuffer = new GlBuffer(MAX_REQUEST_QUEUE_SIZE*8L+8).zero();
         this.nodeBuffer = new GlBuffer(nodeManager.maxNodeCount*16L).fill(-1);
 
 
-        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+        glSamplerParameteri(this.hizSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glSamplerParameteri(this.hizSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glSamplerParameteri(this.hizSampler, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-        glSamplerParameteri(this.hizSampler, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL);
 
         this.traversal
                 .ubo("SCENE_UNIFORM_BINDING", this.uniformBuffer)
@@ -176,38 +176,43 @@ public class HierarchicalOcclusionTraverser {
 
         viewport.section.getToAddress(ptr); ptr += 4*3;
 
-        MemoryUtil.memPutFloat(ptr, viewport.width); ptr += 4;
+        //MemoryUtil.memPutFloat(ptr, viewport.width); ptr += 4;
+        MemoryUtil.memPutInt(ptr, viewport.hiZBuffer.getPackedLevels()); ptr += 4;
 
         viewport.innerTranslation.getToAddress(ptr); ptr += 4*3;
 
-        MemoryUtil.memPutFloat(ptr, viewport.height); ptr += 4;
-
-        setFrustum(viewport, ptr); ptr += 4*4*6;
-
-        MemoryUtil.memPutInt(ptr, (int) (viewport.getRenderList().size()/4-1)); ptr += 4;
-
+        //MemoryUtil.memPutFloat(ptr, viewport.height); ptr += 4;
 
         final float screenspaceAreaDecreasingSize = VoxyConfig.CONFIG.subDivisionSize*VoxyConfig.CONFIG.subDivisionSize;
         //Screen space size for descending
         MemoryUtil.memPutFloat(ptr, (float) (screenspaceAreaDecreasingSize) /(viewport.width*viewport.height)); ptr += 4;
 
+        setFrustum(viewport, ptr); ptr += 4*4*6;
+
+        MemoryUtil.memPutInt(ptr, (int) (viewport.getRenderList().size()/4-1)); ptr += 4;
+
         //VisibilityId
         MemoryUtil.memPutInt(ptr, this.nodeCleaner.visibilityId); ptr += 4;
+
+        {
+            final double TARGET_COUNT = 4000;//TODO: make this configurable, or at least dynamically computed based on throughput rate of mesh gen
+            double iFillness = Math.max(0, (TARGET_COUNT - this.meshGen.getTaskCount()) / TARGET_COUNT);
+            //iFillness = Math.pow(iFillness, 2);
+            final int requestSize = (int) Math.ceil(iFillness * MAX_REQUEST_QUEUE_SIZE);
+            MemoryUtil.memPutInt(ptr, Math.max(0, Math.min(MAX_REQUEST_QUEUE_SIZE, requestSize)));ptr += 4;
+        }
     }
 
     private void bindings(Viewport<?> viewport) {
         glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.queueMetaBuffer.id);
 
         //Bind the hiz buffer
-        glBindTextureUnit(0, this.hiZBuffer.getHizTextureId());
+        glBindTextureUnit(0, viewport.hiZBuffer.getHizTextureId());
         glBindSampler(0, this.hizSampler);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_QUEUE_BINDING, viewport.getRenderList().id);
     }
 
-    public void doTraversal(Viewport<?> viewport, int depthBuffer) {
-        //Compute the mip chain
-        this.hiZBuffer.buildMipChain(depthBuffer, viewport.width, viewport.height);
-
+    public void doTraversal(Viewport<?> viewport) {
         this.uploadUniform(viewport);
         //UploadStream.INSTANCE.commit(); //Done inside traversal
 
@@ -344,7 +349,6 @@ public class HierarchicalOcclusionTraverser {
     public void free() {
         this.traversal.free();
         this.requestBuffer.free();
-        this.hiZBuffer.free();
         this.nodeBuffer.free();
         this.uniformBuffer.free();
         this.statisticsBuffer.free();

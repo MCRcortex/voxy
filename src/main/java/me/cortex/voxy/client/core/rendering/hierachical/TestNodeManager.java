@@ -277,7 +277,7 @@ public class TestNodeManager {
     public static void main(String[] args) {
         Logger.INSERT_CLASS = false;
         int ITER_COUNT = 5_000;
-        int INNER_ITER_COUNT = 100_000;
+        int INNER_ITER_COUNT = 1_000_000;
         boolean GEO_REM = true;
 
         AtomicInteger finished = new AtomicInteger();
@@ -285,7 +285,7 @@ public class TestNodeManager {
 
         Logger.SHUTUP = true;
 
-        if (false) {
+        if (true) {
             for (int q = 0; q < ITER_COUNT; q++) {
                 //Logger.info("Iteration "+ q);
                 if (runTest(INNER_ITER_COUNT, q, seenTraces, GEO_REM)) {
@@ -331,8 +331,9 @@ public class TestNodeManager {
             //Fuzzy bruteforce everything
             for (int x = -R; x<=R; x++) {
                 for (int z = -R; z<=R; z++) {
-                    tops.add(WorldEngine.getWorldSectionId(4, x, 0, z));
-                    tops.add(WorldEngine.getWorldSectionId(4, x, 1, z));
+                    for (int y = -8; y<=7; y++) {
+                        tops.add(WorldEngine.getWorldSectionId(4, x, y, z));
+                    }
                 }
             }
 
@@ -351,7 +352,7 @@ public class TestNodeManager {
                 boolean addRemTLN = r.nextInt(64) == 0;
                 boolean extraBool = r.nextBoolean();
                 if (op == 0 && addRemTLN) {
-                    pos = WorldEngine.getWorldSectionId(4, r.nextInt(5)-2, r.nextInt(5)-2, r.nextInt(5)-2);
+                    pos = WorldEngine.getWorldSectionId(4, r.nextInt(5)-2, r.nextInt(32)-16, r.nextInt(5)-2);
                     boolean cont = tops.contains(pos);
                     if (cont&&extraBool&&tops.size()>1) {
                         extraBool = true;

@@ -207,17 +207,17 @@ public class RenderDataFactory {
         return quadData;
     }
 
-    private int prepareSectionData() {
+    private int prepareSectionData(final long[] rawSectionData) {
         final var sectionData = this.sectionData;
         final var rawModelIds = this.modelMan._unsafeRawAccess();
-        int opaque = 0;
-        int notEmpty = 0;
-        int pureFluid = 0;
-        int partialFluid = 0;
+        long opaque = 0;
+        long notEmpty = 0;
+        long pureFluid = 0;
+        long partialFluid = 0;
 
-        int neighborAcquireMsk = 0;//-+x, -+y, -+Z
+        int neighborAcquireMsk = 0;//-+x, -+z, -+y
         for (int i = 0; i < 32*32*32;) {
-            long block = sectionData[i + 32 * 32 * 32];//Get the block mapping
+            long block = rawSectionData[i];//Get the block mapping
             if (Mapper.isAir(block)) {//If it is air, just emit lighting
                 sectionData[i * 2] = (block&(0xFFL<<56))>>1;
                 sectionData[i * 2 + 1] = 0;
@@ -231,7 +231,7 @@ public class RenderDataFactory {
                 sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
                 sectionData[i * 2 + 1] = modelMetadata;
 
-                int msk = 1 << (i & 31);
+                long msk = 1L << (i & 63);
                 opaque |= ModelQueries.isFullyOpaque(modelMetadata) ? msk : 0;
                 notEmpty |= modelId != 0 ? msk : 0;
                 pureFluid |= ModelQueries.isFluid(modelMetadata) ? msk : 0;
@@ -241,21 +241,28 @@ public class RenderDataFactory {
             //Do increment here
             i++;
 
-            if ((i & 31) == 0 && notEmpty != 0) {
-                this.opaqueMasks[(i >> 5) - 1] = opaque;
-                this.nonOpaqueMasks[(i >> 5) - 1] = (notEmpty^opaque)&~pureFluid;
-                this.fluidMasks[(i >> 5) - 1] = pureFluid|partialFluid;
+            if ((i & 63) == 0 && notEmpty != 0) {
+                long nonOpaque = (notEmpty^opaque)&~pureFluid;
+                long fluid = pureFluid|partialFluid;
+                this.opaqueMasks[(i >> 5) - 2] = (int) opaque;
+                this.opaqueMasks[(i >> 5) - 1] = (int) (opaque>>>32);
+                this.nonOpaqueMasks[(i >> 5) - 2] = (int) nonOpaque;
+                this.nonOpaqueMasks[(i >> 5) - 1] = (int) (nonOpaque>>>32);
+                this.fluidMasks[(i >> 5) - 2] = (int) fluid;
+                this.fluidMasks[(i >> 5) - 1] = (int) (fluid>>>32);
+
+                int packedEmpty = (int) ((notEmpty>>>32)|notEmpty);
 
                 int neighborMsk = 0;
                 //-+x
-                neighborMsk |= notEmpty&1;//-x
-                neighborMsk |= (notEmpty>>>30)&0b10;//+x
+                neighborMsk |= packedEmpty&1;//-x
+                neighborMsk |= (packedEmpty>>>30)&0b10;//+x
 
                 //notEmpty = (notEmpty != 0)?1:0;
-                neighborMsk |= (((i - 1) >> 10) == 0) ? 0b100 : 0;//-y
-                neighborMsk |= (((i - 1) >> 10) == 31) ? 0b1000 : 0;//+y
-                neighborMsk |= ((((i - 1) >> 5) & 0x1F) == 0) ? 0b10000 : 0;//-z
-                neighborMsk |= ((((i - 1) >> 5) & 0x1F) == 31) ? 0b100000 : 0;//+z
+                neighborMsk |= ((((i - 1) >> 10) == 0) ? 0b100 : 0)*(packedEmpty!=0?1:0);//-y
+                neighborMsk |= ((((i - 1) >> 10) == 31) ? 0b1000 : 0)*(packedEmpty!=0?1:0);//+y
+                neighborMsk |= (((((i - 33) >> 5) & 0x1F) == 0) ? 0b10000 : 0)*(((int)notEmpty)!=0?1:0);//-z
+                neighborMsk |= (((((i - 1) >> 5) & 0x1F) == 31) ? 0b100000 : 0)*((notEmpty>>>32)!=0?1:0);//+z
 
                 neighborAcquireMsk |= neighborMsk;
 
@@ -1542,7 +1549,7 @@ public class RenderDataFactory {
         //THE EXCEPTION THAT THIS THROWS CAUSES MAJOR ISSUES
 
         //Copy section data to end of array so that can mutate array while reading safely
-        section.copyDataTo(this.sectionData, 32*32*32);
+        //section.copyDataTo(this.sectionData, 32*32*32);
 
         //We must reset _everything_ that could have changed as we dont exactly know the state due to how the model id exception
         // throwing system works
@@ -1578,7 +1585,7 @@ public class RenderDataFactory {
         Arrays.fill(this.fluidMasks, 0);
 
         //Prepare everything
-        int neighborMsk = this.prepareSectionData();
+        int neighborMsk = this.prepareSectionData(section._unsafeGetRawDataArray());
         if (neighborMsk>>31!=0) {//We failed to get everything so throw exception
             throw new IdNotYetComputedException(neighborMsk&(~(1<<31)), true);
         }

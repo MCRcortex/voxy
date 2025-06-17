@@ -2,7 +2,9 @@ package me.cortex.voxy.commonImpl.mixin.chunky;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.server.world.OptionalChunk;
 import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.chunk.ChunkStatus;
@@ -19,18 +21,13 @@ public class MixinFabricWorld {
     @WrapOperation(method = "getChunkAtAsync", at = @At(value = "INVOKE", target = "Lorg/popcraft/chunky/mixin/ServerChunkCacheMixin;invokeGetChunkFutureMainThread(IILnet/minecraft/world/chunk/ChunkStatus;Z)Ljava/util/concurrent/CompletableFuture;"))
     private CompletableFuture<OptionalChunk<Chunk>> captureGeneratedChunk(ServerChunkCacheMixin instance, int i, int j, ChunkStatus chunkStatus, boolean b, Operation<CompletableFuture<OptionalChunk<Chunk>>> original) {
         var future = original.call(instance, i, j, chunkStatus, b);
-        if (true) {//TODO: ADD SERVER CONFIG THING
+        if (false) {//TODO: ADD SERVER CONFIG THING
             return future;
         } else {
-            return future.thenApplyAsync(res -> {
+            return future.thenApply(res -> {
                 res.ifPresent(chunk -> {
-                    var voxyInstance = VoxyCommon.getInstance();
-                    if (voxyInstance != null) {
-                        try {
-                            voxyInstance.getIngestService().enqueueIngest((WorldChunk) chunk, true);
-                        } catch (Exception e) {
-
-                        }
+                    if (chunk instanceof WorldChunk worldChunk) {
+                        VoxelIngestService.tryAutoIngestChunk(worldChunk);
                     }
                 });
                 return res;

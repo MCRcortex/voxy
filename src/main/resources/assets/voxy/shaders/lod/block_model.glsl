@@ -1,3 +1,10 @@
+struct BlockModel {
+    uint faceData[6];
+    uint flagsA;
+    uint colourTint;
+    uint _pad[8];
+};
+
 //TODO: FIXME: this isnt actually correct cause depending on the face (i think) it could be 1/64 th of a position off
 // but im going to assume that since we are dealing with huge render distances, this shouldent matter that much
 float extractFaceIndentation(uint faceData) {
@@ -18,13 +25,13 @@ uint faceHasAlphaCuttoutOverride(uint faceData) {
 }
 
 bool modelHasBiomeLUT(BlockModel model) {
-    return ((model.flagsA)&2) != 0;
+    return ((model.flagsA)&2u) != 0;
 }
 
 bool modelIsTranslucent(BlockModel model) {
-    return ((model.flagsA)&4) != 0;
+    return ((model.flagsA)&4u) != 0;
 }
 
 bool modelHasMipmaps(BlockModel model) {
-    return ((model.flagsA)&8) != 0;
+    return ((model.flagsA)&8u) != 0;
 }

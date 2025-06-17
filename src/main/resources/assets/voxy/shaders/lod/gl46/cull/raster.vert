@@ -6,8 +6,8 @@
 #define VISIBILITY_BUFFER_BINDING 2
 #define INDIRECT_SECTION_LOOKUP_BINDING 3
 
-#import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/section.glsl>
+#import <voxy:lod/gl46/bindings.glsl>
 
 flat out uint id;
 flat out uint value;

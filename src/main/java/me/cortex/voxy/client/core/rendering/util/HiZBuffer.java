@@ -69,12 +69,12 @@ public class HiZBuffer {
     }
 
     public void buildMipChain(int srcDepthTex, int width, int height) {
-        if (this.width != width || this.height != height) {
+        if (this.width != Integer.highestOneBit(width) || this.height != Integer.highestOneBit(height)) {
             if (this.texture != null) {
                 this.texture.free();
                 this.texture = null;
             }
-            this.alloc(width, height);
+            this.alloc(Integer.highestOneBit(width), Integer.highestOneBit(height));
         }
         glBindVertexArray(RenderService.STATIC_VAO);
         int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
@@ -86,26 +86,22 @@ public class HiZBuffer {
         glEnable(GL_DEPTH_TEST);
 
 
-        //System.err.println("SRC: " + GlTexture.getRawTextureType(srcDepthTex) + " DST: " + this.texture.id);
-        glCopyImageSubData(srcDepthTex, GL_TEXTURE_2D, 0,0,0,0,
-                this.texture.id, GL_TEXTURE_2D, 0,0,0,0,
-                width, height, 1);
-
-
-        glBindTextureUnit(0, this.texture.id);
+        glBindTextureUnit(0, srcDepthTex);
         glBindSampler(0, this.sampler);
         glUniform1i(0, 0);
         int cw = this.width;
         int ch = this.height;
-        glViewport(0, 0, cw, ch);
-        for (int i = 0; i < this.levels-1; i++) {
-            glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, i);
-            glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, i);
-            this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, i+1);
-            cw = Math.max(cw/2, 1); ch = Math.max(ch/2, 1); glViewport(0, 0, cw, ch);
+        for (int i = 0; i < this.levels; i++) {
+            this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, i);
+            glViewport(0, 0, cw, ch); cw = Math.max(cw/2, 1); ch = Math.max(ch/2, 1);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
             glTextureBarrier();
             glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+            glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, i);
+            glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, i);
+            if (i==0) {
+                glBindTextureUnit(0, this.texture.id);
+            }
         }
         glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, 0);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, 1000);//TODO: CHECK IF ITS -1 or -0
@@ -129,5 +125,9 @@ public class HiZBuffer {
 
     public int getHizTextureId() {
         return this.texture.id;
+    }
+
+    public int getPackedLevels() {
+        return ((Integer.numberOfTrailingZeros(this.width))<<16)|(Integer.numberOfTrailingZeros(this.height));//+1
     }
 }

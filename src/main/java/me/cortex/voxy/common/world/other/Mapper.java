@@ -1,6 +1,7 @@
 package me.cortex.voxy.common.world.other;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.IMappingStorage;
 import me.cortex.voxy.common.config.section.SectionStorage;
 import net.minecraft.block.Block;
@@ -99,7 +100,7 @@ public class Mapper {
             if (entryType == BLOCK_STATE_TYPE) {
                 var sentry = StateEntry.deserialize(id, entry.getValue());
                 if (sentry.state.isAir()) {
-                    System.err.println("Deserialization was air, removed block");
+                    Logger.error("Deserialization was air, removed block");
                     sentryErrors.add(new Pair<>(entry.getValue(), id));
                     continue;
                 }

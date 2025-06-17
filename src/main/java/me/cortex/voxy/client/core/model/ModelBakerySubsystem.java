@@ -74,8 +74,6 @@ public class ModelBakerySubsystem {
             }
         }*/
         //TimingStatistics.modelProcess.start();
-        long start = System.nanoTime();
-        VarHandle.fullFence();
         if (this.blockIdCount.get() != 0) {
             long budget = Math.min(totalBudget-150_000, totalBudget-(this.factory.resultJobs.size()*10_000L))-150_000;
 
@@ -100,7 +98,7 @@ public class ModelBakerySubsystem {
 
         this.factory.tick();
 
-        start = System.nanoTime();
+        long start = System.nanoTime();
         while (!this.factory.resultJobs.isEmpty()) {
             this.factory.resultJobs.poll().run();
             if (totalBudget<(System.nanoTime()-start))

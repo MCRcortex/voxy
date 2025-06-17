@@ -3,6 +3,7 @@ package me.cortex.voxy.common.thread;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.util.ThreadUtils;
+import me.cortex.voxy.common.util.cpu.CpuLayout;
 
 import java.lang.invoke.VarHandle;
 import java.lang.management.ManagementFactory;
@@ -32,14 +33,32 @@ public class ServiceThreadPool {
     }
 
     public ServiceThreadPool(int threadCount, int priority) {
+        if (CpuLayout.CORES.length-2 < threadCount) {
+            Logger.warn("The thread count over core count -2, performance degradation possible");
+        }
+
         this.threadGroup = new ThreadGroup("Service job workers");
         this.workers = new Thread[threadCount];
         for (int i = 0; i < threadCount; i++) {
             int threadId = i;
-            var worker = new Thread(this.threadGroup, ()->this.worker(threadId));
+            var worker = new Thread(this.threadGroup, ()->{
+                if (CpuLayout.CORES.length>3) {
+                    //Set worker affinity if possible
+                    CpuLayout.setThreadAffinity(CpuLayout.CORES[2 + (threadId % (CpuLayout.CORES.length - 2))]);
+                }
+                if (threadId != 0) {
+                    ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_PRIORITY_LOWEST);
+                    //ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_MODE_BACKGROUND_BEGIN);
+                }
+                this.worker(threadId);
+            });
             worker.setDaemon(false);
             worker.setName("Service worker #" + i);
-            worker.setPriority(priority);
+            if (i == 0) {//Give the first thread normal priority, this helps if the system is under huge load for voxy to get some work done
+                worker.setPriority(Thread.NORM_PRIORITY);
+            } else {
+                worker.setPriority(priority);
+            }
             worker.start();
             worker.setUncaughtExceptionHandler(this::handleUncaughtException);
             this.workers[i]  = worker;
@@ -133,9 +152,6 @@ public class ServiceThreadPool {
     }
 
     private void worker(int threadId) {
-        ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_PRIORITY_LOWEST);
-        //ThreadUtils.SetSelfThreadPriorityWin32(ThreadUtils.WIN32_THREAD_MODE_BACKGROUND_BEGIN);
-
         long[] seed = new long[]{1234342^(threadId*124987198651981L+215987981111L)};
         int[] revolvingSelector = new int[1];
         long[] logIO = new long[] {0, System.currentTimeMillis()};
@@ -262,8 +278,7 @@ public class ServiceThreadPool {
     }
 
     private void handleUncaughtException(Thread thread, Throwable throwable) {
-        System.err.println("Service worker thread has exploded unexpectedly! this is really not good very very bad.");
-        throwable.printStackTrace();
+        Logger.error("Service worker thread has exploded unexpectedly! this is really not good very very bad.", throwable);
     }
 
     public void shutdown() {

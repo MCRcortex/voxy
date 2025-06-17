@@ -263,8 +263,6 @@ public final class NodeStore {
         if (!this.nodeExists(nodeId)) {
             MemoryUtil.memPutLong(ptr, -1);
             MemoryUtil.memPutLong(ptr + 8, -1);
-            MemoryUtil.memPutLong(ptr + 16, -1);
-            MemoryUtil.memPutLong(ptr + 24, -1);
             return;
         }
         long pos = this.nodePosition(nodeId);

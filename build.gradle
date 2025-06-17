@@ -3,6 +3,8 @@ plugins {
     id 'maven-publish'
 }
 
+def isInGHA = System.getenv("GITHUB_ACTIONS") == "true"
+
 version = project.mod_version
 group = project.maven_group
 
@@ -61,22 +63,31 @@ loom {
     accessWidenerPath = file("src/main/resources/voxy.accesswidener")
 }
 
+def modRuntimeOnlyMsk = {arg->}
+if (!isInGHA) {
+    modRuntimeOnlyMsk = { arg ->
+        dependencies {
+            modRuntimeOnly(arg)
+        }
+    }
+}
+
 dependencies {
     // To change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
-    
-    modRuntimeOnly(fabricApi.module("fabric-api-base", project.fabric_version))
-    modRuntimeOnly(fabricApi.module("fabric-rendering-fluids-v1", project.fabric_version))
-    modRuntimeOnly(fabricApi.module("fabric-resource-loader-v0", project.fabric_version))
-    modRuntimeOnly(fabricApi.module("fabric-command-api-v2", project.fabric_version))
+
+    modRuntimeOnlyMsk(fabricApi.module("fabric-api-base", project.fabric_version))
+    modRuntimeOnlyMsk(fabricApi.module("fabric-rendering-fluids-v1", project.fabric_version))
+    modRuntimeOnlyMsk(fabricApi.module("fabric-resource-loader-v0", project.fabric_version))
+    modRuntimeOnlyMsk(fabricApi.module("fabric-command-api-v2", project.fabric_version))
 
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
 
     //TODO: this is to eventually not need sodium installed as atm its just used for parsing shaders
-    modRuntimeOnly "maven.modrinth:sodium:mc1.21.5-0.6.13-fabric"
+    modRuntimeOnlyMsk "maven.modrinth:sodium:mc1.21.5-0.6.13-fabric"
     modCompileOnly "maven.modrinth:sodium:mc1.21.5-0.6.13-fabric"
 
     modImplementation("maven.modrinth:lithium:mc1.21.5-0.16.0-fabric")
@@ -85,20 +96,21 @@ dependencies {
     modCompileOnly "maven.modrinth:nvidium:0.3.1"
 
     modCompileOnly("maven.modrinth:modmenu:14.0.0-rc.2")
-    modRuntimeOnly("maven.modrinth:modmenu:14.0.0-rc.2")
+    modRuntimeOnlyMsk("maven.modrinth:modmenu:14.0.0-rc.2")
 
-    modCompileOnly("maven.modrinth:iris:1.8.5+1.21.4-fabric")
+    modCompileOnly("maven.modrinth:iris:1.8.11+1.21.5-fabric")
+    modRuntimeOnlyMsk("maven.modrinth:iris:1.8.11+1.21.5-fabric")
 
     //modCompileOnly("maven.modrinth:starlight:1.1.3+1.20.4")
 
     //modCompileOnly("maven.modrinth:immersiveportals:v5.1.7-mc1.20.4")
 
 
-    modCompileOnly("maven.modrinth:chunky:1.4.27-fabric")
-    //modRuntimeOnly("maven.modrinth:chunky:1.4.27-fabric")
+    modCompileOnly("maven.modrinth:chunky:1.4.36-fabric")
+    modRuntimeOnlyMsk("maven.modrinth:chunky:1.4.36-fabric")
 
-    modRuntimeOnly("maven.modrinth:spark:1.10.121-fabric")
-    modRuntimeOnly("maven.modrinth:fabric-permissions-api:0.3.3")
+    modRuntimeOnlyMsk("maven.modrinth:spark:1.10.121-fabric")
+    modRuntimeOnlyMsk("maven.modrinth:fabric-permissions-api:0.3.3")
     //modRuntimeOnly("maven.modrinth:nsight-loader:1.2.0")
 
     //modImplementation('io.github.douira:glsl-transformer:2.0.1')
@@ -176,7 +188,9 @@ processIncludeJars {
 }
 
 remapJar {
-    delete getDestinationDirectory().get()
+    doFirst {
+        delete fileTree(getDestinationDirectory().get())
+    }
 
     def hash = gitCommitHash();
     if (!hash.equals("<UnknownCommit>")) {
@@ -206,13 +220,15 @@ dependencies {
     include(runtimeOnly "org.lwjgl:lwjgl-zstd:$lwjglVersion:natives-linux")
 
     include(implementation 'redis.clients:jedis:5.1.0')
-    include(implementation('org.rocksdb:rocksdbjni:8.10.0'))
+    include(implementation('org.rocksdb:rocksdbjni:10.2.1'))
     include(implementation 'org.apache.commons:commons-pool2:2.12.0')
     include(implementation 'org.lz4:lz4-java:1.8.0')
     include(implementation('org.tukaani:xz:1.10'))
 
     if (true) {
-        minecraftRuntimeLibraries('org.xerial:sqlite-jdbc:3.49.1.0')
+        if (!isInGHA) {
+            minecraftRuntimeLibraries('org.xerial:sqlite-jdbc:3.49.1.0')
+        }
     } else {
         include(implementation('org.xerial:sqlite-jdbc:3.49.1.0'))
     }
@@ -220,14 +236,16 @@ dependencies {
     //implementation 'redis.clients:jedis:5.1.0'
 }
 
-repositories {
-    maven {
-        url = "https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1"
+if (!isInGHA) {
+    repositories {
+        maven {
+            url = "https://pkgs.dev.azure.com/djtheredstoner/DevAuth/_packaging/public/maven/v1"
+        }
     }
-}
 
-dependencies {
-    modRuntimeOnly('me.djtheredstoner:DevAuth-fabric:1.1.0') {
-        exclude group: 'net.fabricmc', module: 'fabric-loader'
+    dependencies {
+        modRuntimeOnly('me.djtheredstoner:DevAuth-fabric:1.1.0') {
+            exclude group: 'net.fabricmc', module: 'fabric-loader'
+        }
     }
 }

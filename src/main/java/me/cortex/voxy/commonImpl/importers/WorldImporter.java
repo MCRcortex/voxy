@@ -55,9 +55,6 @@ public class WorldImporter implements IDataImporter {
     private final ServiceSlice threadPool;
 
     private volatile boolean isRunning;
-    public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, SectionSavingService savingService) {
-        this(worldEngine, mcWorld, servicePool, ()->savingService.getTaskCount() < 4000);
-    }
 
     public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, BooleanSupplier runChecker) {
         this.world = worldEngine;
@@ -120,10 +117,15 @@ public class WorldImporter implements IDataImporter {
 
     @Override
     public void runImport(IUpdateCallback updateCallback, ICompletionCallback completionCallback) {
-        if (this.isRunning || this.worker == null) {
+        if (this.isRunning) {
             throw new IllegalStateException();
         }
+        if (this.worker == null) {//Can happen if no files
+            completionCallback.onCompletion(0);
+            return;
+        }
         this.isRunning = true;
+        this.world.acquireRef();
         this.updateCallback = updateCallback;
         this.completionCallback = completionCallback;
         this.worker.start();
@@ -144,6 +146,7 @@ public class WorldImporter implements IDataImporter {
             }
         }
         if (!this.threadPool.isFreed()) {
+            this.world.releaseRef();
             this.threadPool.shutdown();
         }
     }
@@ -256,6 +259,7 @@ public class WorldImporter implements IDataImporter {
                 }
             }
             this.worker = null;
+            this.world.releaseRef();
             this.threadPool.shutdown();
             this.completionCallback.onCompletion(this.totalChunks.get());
         });
@@ -323,7 +327,7 @@ public class WorldImporter implements IDataImporter {
 
             //TODO: create memory copy for each section
             if (regionFile.size < ((sectorCount-1) + sectorStart) * 4096L) {
-                System.err.println("Cannot access chunk sector as it goes out of bounds. start bytes: " + (sectorStart*4096) + " sector count: " + sectorCount + " fileSize: " + regionFile.size);
+                Logger.warn("Cannot access chunk sector as it goes out of bounds. start bytes: " + (sectorStart*4096) + " sector count: " + sectorCount + " fileSize: " + regionFile.size);
                 continue;
             }
 
@@ -337,7 +341,7 @@ public class WorldImporter implements IDataImporter {
                 } else {
                     int n = m - 1;
                     if (regionFile.size < (n + sectorStart*4096L)) {
-                        System.err.println("Chunk stream to small");
+                        Logger.warn("Chunk stream to small");
                     } else if ((b & 128) != 0) {
                         if (n != 0) {
                             Logger.error("Chunk has both internal and external streams");

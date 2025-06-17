@@ -10,13 +10,13 @@ layout(local_size_x=LOCAL_SIZE) in;//, local_size_y=1
 layout(binding = SCENE_UNIFORM_BINDING, std140) uniform SceneUniform {
     mat4 VP;
     ivec3 camSecPos;
-    float screenW;
+    int packedHizSize;
     vec3 camSubSecPos;
-    float screenH;
+    float minSSS;
     Frustum frustum;
     uint renderQueueMaxSize;
-    float minSSS;
     uint frameId;
+    uint requestQueueSize;
 };
 
 #import <voxy:lod/hierarchical/queue.glsl>
@@ -49,9 +49,9 @@ layout(binding = STATISTICS_BUFFER_BINDING, std430) restrict buffer statisticsBu
 void addRequest(inout UnpackedNode node) {
     //printf("Put node decend request");
     if (!hasRequested(node)) {
-        if (requestQueueIndex.x < REQUEST_QUEUE_SIZE) {
+        if (requestQueueIndex.x < requestQueueSize) {//Soft limit
             uint atomRes = atomicAdd(requestQueueIndex.x, 1);
-            if (atomRes < REQUEST_QUEUE_SIZE) {
+            if (atomRes < MAX_REQUEST_QUEUE_SIZE) {//Hard limit
                 //Mark node as having a request submitted to prevent duplicate submissions
                 requestQueue[atomRes] = getRawPos(node);
                 markRequested(node);

@@ -39,6 +39,7 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
 
 public class DHImporter implements IDataImporter {
     private final Connection db;
@@ -68,7 +69,7 @@ public class DHImporter implements IDataImporter {
         }
     }
 
-    public DHImporter(File file, WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, SectionSavingService savingService) {
+    public DHImporter(File file, WorldEngine worldEngine, World mcWorld, ServiceThreadPool servicePool, BooleanSupplier rateLimiter) {
         this.engine = worldEngine;
         this.world = mcWorld;
         this.biomeRegistry = mcWorld.getRegistryManager().getOrThrow(RegistryKeys.BIOME);
@@ -101,13 +102,14 @@ public class DHImporter implements IDataImporter {
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
-        }, ()->savingService.getTaskCount() < 500);
+        }, rateLimiter);
     }
 
     public void runImport(IUpdateCallback updateCallback, ICompletionCallback completionCallback) {
         if (this.isRunning()) {
             throw new IllegalStateException();
         }
+        this.engine.acquireRef();
         this.updateCallback = updateCallback;
         this.runner = new Thread(()-> {
             Queue<Task> taskQ = new PriorityQueue<>(Comparator.comparingLong(Task::distanceFromZero));
@@ -356,6 +358,7 @@ public class DHImporter implements IDataImporter {
             throw new RuntimeException(e);
         }
         this.threadPool.shutdown();
+        this.engine.releaseRef();
         try {
             this.db.close();
         } catch (SQLException e) {

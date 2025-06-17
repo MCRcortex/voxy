@@ -2,7 +2,6 @@
 #extension GL_ARB_gpu_shader_int64 : enable
 
 #define QUAD_BUFFER_BINDING 1
-#define SECTION_METADATA_BUFFER_BINDING 2
 #define MODEL_BUFFER_BINDING 3
 #define MODEL_COLOUR_BUFFER_BINDING 4
 #define POSITION_SCRATCH_BINDING 5
@@ -10,8 +9,8 @@
 
 
 #import <voxy:lod/quad_format.glsl>
-#import <voxy:lod/gl46/bindings.glsl>
 #import <voxy:lod/block_model.glsl>
+#import <voxy:lod/gl46/bindings.glsl>
 
 //#define DEBUG_RENDER
 
@@ -21,9 +20,10 @@ layout(location = 2) out flat vec4 tinting;
 layout(location = 3) out flat vec4 addin;
 layout(location = 4) out flat uint flags;
 layout(location = 5) out flat vec4 conditionalTinting;
+layout(location = 6) out flat vec2 size;
 
 #ifdef DEBUG_RENDER
-layout(location = 6) out flat uint quadDebug;
+layout(location = 7) out flat uint quadDebug;
 #endif
 
 /*
@@ -42,16 +42,16 @@ vec4 uint2vec4RGBA(uint colour) {
 }
 
 vec4 getFaceSize(uint faceData) {
-    float EPSILON = 0.0005f;
+    float EPSILON = 0.00005f;
 
     vec4 faceOffsetsSizes = extractFaceSizes(faceData);
+
+    //Make the end relative to the start
+    faceOffsetsSizes.yw -= faceOffsetsSizes.xz;
 
     //Expand the quads by a very small amount
     faceOffsetsSizes.xz -= vec2(EPSILON);
     faceOffsetsSizes.yw += vec2(EPSILON);
-
-    //Make the end relative to the start
-    faceOffsetsSizes.yw -= faceOffsetsSizes.xz;
 
     return faceOffsetsSizes;
 }
@@ -104,13 +104,16 @@ void main() {
     uvec2 encPos = positionBuffer[gl_BaseInstance];
     uint lodLevel = extractDetail(encPos);
 
-
-    vec2 modelUV = vec2(modelId&0xFFu, (modelId>>8)&0xFFu)*(1.0/(256.0));
-    baseUV = modelUV + (vec2(face>>1, face&1u) * (1.0/(vec2(3.0, 2.0)*256.0)));
-
     ivec2 quadSize = extractSize(quad);
 
-    { //Generate tinting and flag data
+    if (cornerIdx == 1) //Only if we are the provoking vertex
+    {
+        size = vec2(quadSize-1);
+
+        vec2 modelUV = vec2(modelId&0xFFu, (modelId>>8)&0xFFu)*(1.0/(256.0));
+        baseUV = modelUV + (vec2(face>>1, face&1u) * (1.0/(vec2(3.0, 2.0)*256.0)));
+
+        //Generate tinting and flag data
         flags = faceHasAlphaCuttout(faceData);
 
         //We need to have a conditional override based on if the model size is < a full face + quadSize > 1

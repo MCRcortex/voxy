@@ -87,7 +87,7 @@ public final class ReuseVertexConsumer implements VertexConsumer {
         if ((long) (this.count + 5) * VERTEX_FORMAT_SIZE < this.buffer.size) {
             return;
         }
-        long offset = this.buffer.address-this.ptr;
+        long offset = this.ptr-this.buffer.address;
         //1.5x the size
         var newBuffer = new MemoryBuffer((((int)(this.buffer.size*2)+VERTEX_FORMAT_SIZE-1)/VERTEX_FORMAT_SIZE)*VERTEX_FORMAT_SIZE);
         this.buffer.cpyTo(newBuffer.address);
@@ -104,6 +104,8 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     public void free() {
+        this.ptr = 0;
+        this.count = 0;
         this.buffer.free();
         this.buffer = null;
     }

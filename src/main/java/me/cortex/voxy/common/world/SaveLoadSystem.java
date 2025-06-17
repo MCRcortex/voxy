@@ -1,6 +1,7 @@
 package me.cortex.voxy.common.world;
 
 import it.unimi.dsi.fastutil.longs.Long2ShortOpenHashMap;
+import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import me.cortex.voxy.common.world.other.Mapper;
@@ -120,7 +121,7 @@ public class SaveLoadSystem {
 
         if (section.key != key) {
             //throw new IllegalStateException("Decompressed section not the same as requested. got: " + key + " expected: " + section.key);
-            System.err.println("Decompressed section not the same as requested. got: " + key + " expected: " + section.key);
+            Logger.error("Decompressed section not the same as requested. got: " + key + " expected: " + section.key);
             return false;
         }
 
@@ -145,7 +146,7 @@ public class SaveLoadSystem {
             long expectedHash = MemoryUtil.memGetLong(ptr); ptr += 8; if (VERIFY_MEMORY_ACCESS && data.size<(ptr-data.address)) throw new IllegalStateException("Memory access OOB");
             if (expectedHash != hash) {
                 //throw new IllegalStateException("Hash mismatch got: " + hash + " expected: " + expectedHash);
-                System.err.println("Hash mismatch got: " + hash + " expected: " + expectedHash + " removing region");
+                Logger.error("Hash mismatch got: " + hash + " expected: " + expectedHash + " removing region");
                 return false;
             }
         }

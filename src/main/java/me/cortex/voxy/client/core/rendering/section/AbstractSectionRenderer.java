@@ -19,7 +19,7 @@ public abstract class AbstractSectionRenderer <T extends Viewport<T>, J extends 
 
     public abstract void renderOpaque(T viewport, GlTexture depthBoundTexture);
     public abstract void buildDrawCalls(T viewport);
-    public abstract void renderTemporal(GlTexture depthBoundTexture);
+    public abstract void renderTemporal(T viewport, GlTexture depthBoundTexture);
     public abstract void renderTranslucent(T viewport, GlTexture depthBoundTexture);
     public abstract T createViewport();
     public abstract void free();

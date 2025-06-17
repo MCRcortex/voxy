@@ -16,7 +16,7 @@ import static me.cortex.voxy.client.core.rendering.section.geometry.BasicSection
 //Is basicly the manager for an "undefined" data store, the underlying store is irrelevant
 // this manager serves as an overlay, that is, it allows an implementation to do "async management" of the data store
 public class BasicAsyncGeometryManager implements IGeometryManager {
-    private static final int GEOMETRY_ELEMENT_SIZE = 8;
+    private static final long GEOMETRY_ELEMENT_SIZE = 8;
     private final HierarchicalBitSet allocationSet;
     private final AllocationArena allocationHeap = new AllocationArena();
     private final ObjectArrayList<SectionMeta> sectionMetadata = new ObjectArrayList<>(1<<15);
@@ -63,12 +63,20 @@ public class BasicAsyncGeometryManager implements IGeometryManager {
             throw new IllegalStateException("Size exceeds limits: " + newId + ", " + this.sectionMetadata.size() + ", " + this.allocationSet.getCount());
         }
 
+        if (newId < this.sectionMetadata.size()) {
+            if (this.sectionMetadata.get(newId) != null) {
+                throw new IllegalStateException();
+            }
+        }
+
         var newMeta = this.createMeta(section);
 
         if (newId == this.sectionMetadata.size()) {
             this.sectionMetadata.add(newMeta);
         } else {
-            this.sectionMetadata.set(newId, newMeta);
+            if (this.sectionMetadata.set(newId, newMeta) != null) {
+                throw new IllegalStateException();
+            }
         }
 
         //Invalidate the section id
@@ -101,10 +109,13 @@ public class BasicAsyncGeometryManager implements IGeometryManager {
         int size = (int) (section.geometryBuffer.size/GEOMETRY_ELEMENT_SIZE);
         //Address
         int addr = (int)this.allocationHeap.alloc(size);
+        if (addr == -1) {
+            throw new IllegalStateException("Geometry OOM");
+        }
         this.usedCapacity += size;
         //Create upload
         if (this.heapUploads.put(addr, section.geometryBuffer) != null) {
-            throw new IllegalStateException();
+            throw new IllegalStateException("Addr: " + addr);
         }
         this.heapRemoveUploads.remove(addr);
         //Create Meta
