@@ -1,0 +1,30 @@
+{
+  "voxy.config.title": "Voxy",
+
+  "voxy.config.general.enabled": "启用Voxy",
+  "voxy.config.general.enabled.tooltip": "完全启用或禁用Voxy",
+
+  "voxy.config.general.serviceThreads": "服务线程数",
+  "voxy.config.general.serviceThreads.tooltip": "ServiceThreadPool可以使用的线程数",
+
+  "voxy.config.general.ingest": "区块摄取",
+  "voxy.config.general.ingest.tooltip": "启用或禁用Voxy将新区块转换为细节层次（LoD）的能力",
+
+  "voxy.config.general.rendering": "Voxy渲染",
+  "voxy.config.general.rendering.tooltip": "启用或禁用Voxy渲染",
+
+  "voxy.config.general.subDivisionSize": "细分尺寸的像素^2",
+  "voxy.config.general.subDivisionSize.tooltip": "在细分至更小细节层次（LoD，尺寸越小质量越高）之前，屏幕空间轴向包围盒（AABB）的最大像素尺寸（平方值）",
+
+  "voxy.config.general.renderDistance": "渲染距离",
+  "voxy.config.general.renderDistance.tooltip": "渲染Voxy的距离，以区块为单位",
+
+  "voxy.config.general.environmental_fog": "启用环境迷雾",
+  "voxy.config.general.environmental_fog.tooltip": "启用或禁用Voxy渲染环境迷雾",
+
+  "voxy.config.general.vanilla_fog": "启用原版迷雾",
+  "voxy.config.general.vanilla_fog.tooltip": "启用或禁用原版迷雾效果",
+
+  "voxy.config.general.render_statistics": "启用渲染统计信息",
+  "voxy.config.general.render_statistics.tooltip": "在F3菜单中启用渲染统计信息，有助于调试"
+}
