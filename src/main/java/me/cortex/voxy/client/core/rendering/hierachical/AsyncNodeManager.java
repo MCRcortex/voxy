@@ -263,9 +263,13 @@ public class AsyncNodeManager {
             long ptr = job.address;
             int count = MemoryUtil.memGetInt(ptr);
             ptr += 8;//Its 8 to keep alignment
-            if (job.size < count * 8L + 8) {
-                throw new IllegalStateException();
+
+            if (count < 0 || count > 50000 || job.size < count * 8L + 8) {
+                Logger.warn("Skipping request batch with invalid count: " + count);
+                job.free();
+                continue;
             }
+
             for (int i = 0; i < count; i++) {
                 long pos = ((long) MemoryUtil.memGetInt(ptr)) << 32; ptr += 4;
                 pos |= Integer.toUnsignedLong(MemoryUtil.memGetInt(ptr)); ptr += 4;
@@ -273,7 +277,6 @@ public class AsyncNodeManager {
             }
             job.free();
         }
-
 
         do {
             var job = this.removeBatchQueue.poll();
