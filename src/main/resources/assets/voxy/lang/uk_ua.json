@@ -28,5 +28,5 @@
   "voxy.config.general.render_statistics": "Увімкнути статистику промальовування",
   "voxy.config.general.render_statistics.tooltip": "Умикає статистику промальовування в меню налагодження, корисно для цього.",
 
-  "modmenu.descriptionTranslation.voxy": "Мод для промальовування на далекій відстані з використанням зони РД"
+  "modmenu.descriptionTranslation.voxy": "Мод для промальовування на далекій відстані з використанням зони РД."
 }
