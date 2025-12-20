@@ -149,6 +149,14 @@ bool isCulledByHiz() {
     for (int x = mnbb.x; x<=mxbb.x; x++) {
         for (int y = mnbb.y; y<=mxbb.y; y++) {
             float sp = texelFetch(hizDepthSampler, ivec2(x, y), ml).r;
+
+            // AMD Fix V9: Read-Side Filter
+            // If the sampled depth is exactly 0.0 (or very close), it's the Buggy Sky.
+            // We treat it as 1.0 (Far Plane) so it doesn't occlude anything.
+            if (sp <= 0.0001f) {
+                sp = 1.0f;
+            }
+
             //pointSample2 = max(sp, pointSample2);
             //sp = mix(sp, pointSample, 0.9999999f<=sp);
             pointSample = max(sp, pointSample);
