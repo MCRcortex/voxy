@@ -1,10 +1,19 @@
 package me.cortex.voxy.client.core.gl;
 
 import me.cortex.voxy.common.util.TrackedObject;
+import org.lwjgl.opengl.GL;
 
 import java.util.Arrays;
 
+import static org.lwjgl.opengl.GL11.GL_FLOAT;
+import static org.lwjgl.opengl.GL15C.GL_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15C.glBindBuffer;
+import static org.lwjgl.opengl.GL20C.glEnableVertexAttribArray;
+import static org.lwjgl.opengl.GL20C.glVertexAttribPointer;
 import static org.lwjgl.opengl.GL30.glGenVertexArrays;
+import static org.lwjgl.opengl.GL30C.glBindVertexArray;
+import static org.lwjgl.opengl.GL30C.glDeleteVertexArrays;
+import static org.lwjgl.opengl.GL30C.glVertexAttribIPointer;
 import static org.lwjgl.opengl.GL45C.*;
 
 public class GlVertexArray extends TrackedObject {
@@ -14,7 +23,12 @@ public class GlVertexArray extends TrackedObject {
     private int[] indices = new int[0];
     private int stride;
     public GlVertexArray() {
-        this.id = glCreateVertexArrays();
+        boolean hasDSA = GL.getCapabilities().GL_ARB_direct_state_access || GL.getCapabilities().OpenGL45;
+        if (hasDSA) {
+            this.id = glCreateVertexArrays();
+        } else {
+            this.id = glGenVertexArrays();
+        }
     }
 
     @Override
@@ -28,15 +42,27 @@ public class GlVertexArray extends TrackedObject {
     }
 
     public GlVertexArray bindBuffer(int buffer) {
-        //TODO: optimization, use glVertexArrayVertexBuffers
-        for (int index : this.indices) {
-            glVertexArrayVertexBuffer(this.id, index, buffer, 0, this.stride);
+        boolean hasDSA = GL.getCapabilities().GL_ARB_direct_state_access || GL.getCapabilities().OpenGL45;
+        if (hasDSA) {
+            //TODO: optimization, use glVertexArrayVertexBuffers
+            for (int index : this.indices) {
+                glVertexArrayVertexBuffer(this.id, index, buffer, 0, this.stride);
+            }
+        } else {
+            glBindVertexArray(this.id);
+            glBindBuffer(GL_ARRAY_BUFFER, buffer);
         }
         return this;
     }
 
     public GlVertexArray bindElementBuffer(int buffer) {
-        glVertexArrayElementBuffer(this.id, buffer);
+        boolean hasDSA = GL.getCapabilities().GL_ARB_direct_state_access || GL.getCapabilities().OpenGL45;
+        if (hasDSA) {
+            glVertexArrayElementBuffer(this.id, buffer);
+        } else {
+            glBindVertexArray(this.id);
+            glBindBuffer(org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER, buffer);
+        }
         return this;
     }
 
@@ -47,8 +73,16 @@ public class GlVertexArray extends TrackedObject {
 
     public GlVertexArray setI(int index, int type, int count, int offset) {
         this.addIndex(index);
-        glEnableVertexArrayAttrib(this.id, index);
-        glVertexArrayAttribIFormat(this.id, index, count, type, offset);
+        boolean hasDSA = GL.getCapabilities().GL_ARB_direct_state_access || GL.getCapabilities().OpenGL45;
+        if (hasDSA) {
+            glEnableVertexArrayAttrib(this.id, index);
+            glVertexArrayAttribIFormat(this.id, index, count, type, offset);
+        } else {
+            glBindVertexArray(this.id);
+            glEnableVertexAttribArray(index);
+            // Integer attribute pointer uses glVertexAttribIPointer
+            glVertexAttribIPointer(index, count, type, this.stride, offset);
+        }
         return this;
     }
 
@@ -58,8 +92,16 @@ public class GlVertexArray extends TrackedObject {
 
     public GlVertexArray setF(int index, int type, int count, boolean normalize, int offset) {
         this.addIndex(index);
-        glEnableVertexArrayAttrib(this.id, index);
-        glVertexArrayAttribFormat(this.id, index, count, type, normalize, offset);
+        boolean hasDSA = GL.getCapabilities().GL_ARB_direct_state_access || GL.getCapabilities().OpenGL45;
+        if (hasDSA) {
+            glEnableVertexArrayAttrib(this.id, index);
+            glVertexArrayAttribFormat(this.id, index, count, type, normalize, offset);
+        } else {
+            glBindVertexArray(this.id);
+            glEnableVertexAttribArray(index);
+            int glType = type == GL_FLOAT ? GL_FLOAT : type;
+            glVertexAttribPointer(index, count, glType, normalize, this.stride, offset);
+        }
         return this;
     }
 

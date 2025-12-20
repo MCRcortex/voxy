@@ -1,4 +1,4 @@
-#version 460 core
+#version 430 core
 #define VISIBILITY_BUFFER_BINDING 2
 layout(binding = VISIBILITY_BUFFER_BINDING, std430) restrict buffer VisibilityBuffer {
     uint visibilityData[];

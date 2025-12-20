@@ -1,4 +1,4 @@
-#version 450
+#version 430
 
 layout(local_size_x = WIDTH, local_size_y = HEIGHT) in;
 

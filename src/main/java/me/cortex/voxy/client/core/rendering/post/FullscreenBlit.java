@@ -10,10 +10,10 @@ import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL15C.GL_ELEMENT_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15C.glBindBuffer;
 import static org.lwjgl.opengl.GL30C.glBindVertexArray;
-import static org.lwjgl.opengl.GL45C.glCreateVertexArrays;
+import static org.lwjgl.opengl.GL30C.glGenVertexArrays;
 
 public class FullscreenBlit {
-    private static final int EMPTY_VAO = glCreateVertexArrays();
+    private static final int EMPTY_VAO = glGenVertexArrays();
 
     private final Shader shader;
     public FullscreenBlit(String fragId) {

@@ -21,11 +21,29 @@ import static me.cortex.voxy.client.core.rendering.util.PrintfDebugUtil.PRINTF_p
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.GL_UNPACK_IMAGE_HEIGHT;
 import static org.lwjgl.opengl.GL12.GL_UNPACK_SKIP_IMAGES;
-import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
+import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
-import static org.lwjgl.opengl.GL42.glMemoryBarrier;
-import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BARRIER_BIT;
-import static org.lwjgl.opengl.GL45.*;
+import static org.lwjgl.opengl.GL30C.glBindBufferBase;
+import static org.lwjgl.opengl.GL31C.GL_COPY_READ_BUFFER;
+import static org.lwjgl.opengl.GL31C.glBindBuffer;
+import static org.lwjgl.opengl.GL33C.glBindSampler;
+import static org.lwjgl.opengl.GL33C.glDeleteSamplers;
+import static org.lwjgl.opengl.GL33C.glGenSamplers;
+import static org.lwjgl.opengl.GL33C.glSamplerParameteri;
+import static org.lwjgl.opengl.GL30C.glUniform1ui;
+import static org.lwjgl.opengl.GL42C.GL_BUFFER_UPDATE_BARRIER_BIT;
+import static org.lwjgl.opengl.GL42C.GL_FRAMEBUFFER_BARRIER_BIT;
+import static org.lwjgl.opengl.GL42C.GL_TEXTURE_FETCH_BARRIER_BIT;
+import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
+import static org.lwjgl.opengl.GL43C.GL_COMMAND_BARRIER_BIT;
+import static org.lwjgl.opengl.GL43C.GL_DISPATCH_INDIRECT_BUFFER;
+import static org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BARRIER_BIT;
+import static org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER;
+import static org.lwjgl.opengl.GL43C.glDispatchCompute;
+import static org.lwjgl.opengl.GL43C.glDispatchComputeIndirect;
+import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
 
 // TODO: swap to persistent gpu threads instead of dispatching MAX_ITERATIONS of compute layers
 public class HierarchicalOcclusionTraverser {
@@ -129,10 +147,11 @@ public class HierarchicalOcclusionTraverser {
             throw new IllegalStateException("Top level node count greater than capacity");
         }
 
-        //Use clear buffer, yes know is a bad idea, TODO: replace
         //Add the new top level node to the queue
         MemoryUtil.memPutInt(SCRATCH, id);
-        nglClearNamedBufferSubData(this.topNodeIds.id, GL_R32UI, aid * 4L, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, SCRATCH);
+        glBindBuffer(GL_COPY_READ_BUFFER, this.topNodeIds.id);
+        org.lwjgl.opengl.GL15C.nglBufferSubData(GL_COPY_READ_BUFFER, aid * 4L, 4, SCRATCH);
+        glBindBuffer(GL_COPY_READ_BUFFER, 0);
 
         if (this.topNode2idxMapping.put(id, aid) != -1) {
             throw new IllegalStateException();
@@ -163,7 +182,9 @@ public class HierarchicalOcclusionTraverser {
 
         //Move it server side, from end to new idx
         MemoryUtil.memPutInt(SCRATCH, endTLNId);
-        nglClearNamedBufferSubData(this.topNodeIds.id, GL_R32UI, idx*4L, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, SCRATCH);
+        glBindBuffer(GL_COPY_READ_BUFFER, this.topNodeIds.id);
+        org.lwjgl.opengl.GL15C.nglBufferSubData(GL_COPY_READ_BUFFER, idx*4L, 4, SCRATCH);
+        glBindBuffer(GL_COPY_READ_BUFFER, 0);
     }
 
     private static void setFrustum(Viewport<?> viewport, long ptr) {
@@ -211,7 +232,7 @@ public class HierarchicalOcclusionTraverser {
         glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, this.queueMetaBuffer.id);
 
         //Bind the hiz buffer
-        glBindTextureUnit(0, viewport.hiZBuffer.getHizTextureId());
+        bindTextureUnit(0, viewport.hiZBuffer.getHizTextureId());
         glBindSampler(0, this.hizSampler);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, RENDER_QUEUE_BINDING, viewport.getRenderList().id);
     }
@@ -229,7 +250,9 @@ public class HierarchicalOcclusionTraverser {
         }
 
         //Clear the render output counter
-        nglClearNamedBufferSubData(viewport.getRenderList().id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+        glBindBuffer(GL_COPY_READ_BUFFER, viewport.getRenderList().id);
+        org.lwjgl.opengl.GL15C.nglBufferSubData(GL_COPY_READ_BUFFER, 0, 4, 0);
+        glBindBuffer(GL_COPY_READ_BUFFER, 0);
 
         //Traverse
         this.traverseInternal();
@@ -250,7 +273,7 @@ public class HierarchicalOcclusionTraverser {
 
         //Bind the hiz buffer
         glBindSampler(0, 0);
-        glBindTextureUnit(0, 0);
+        bindTextureUnit(0, 0);
     }
 
     private void traverseInternal() {
@@ -319,7 +342,9 @@ public class HierarchicalOcclusionTraverser {
     private void downloadResetRequestQueue() {
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
         DownloadStream.INSTANCE.download(this.requestBuffer, this::forwardDownloadResult);
-        nglClearNamedBufferSubData(this.requestBuffer.id, GL_R32UI, 0, 4, GL_RED_INTEGER, GL_UNSIGNED_INT, 0);
+        glBindBuffer(GL_COPY_READ_BUFFER, this.requestBuffer.id);
+        org.lwjgl.opengl.GL15C.nglBufferSubData(GL_COPY_READ_BUFFER, 0, 4, 0);
+        glBindBuffer(GL_COPY_READ_BUFFER, 0);
     }
 
     private void forwardDownloadResult(long ptr, long size) {

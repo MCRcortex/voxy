@@ -19,9 +19,12 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 
 import static org.lwjgl.opengl.GL11.GL_DEPTH_BUFFER_BIT;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
 import static org.lwjgl.opengl.GL30C.*;
 import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
-import static org.lwjgl.opengl.GL45C.*;
+import static me.cortex.voxy.client.core.gl.GLCompat.blitFramebuffer;
+import static me.cortex.voxy.client.core.gl.GLCompat.framebufferDrawBuffers;
+import static me.cortex.voxy.client.core.gl.GLCompat.framebufferTexture;
 
 public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
     private final IrisVoxyRenderPipelineData data;
@@ -43,17 +46,17 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         int[] binding = new int[oDT.length];
         for (int i = 0; i < oDT.length; i++) {
             binding[i] = GL30.GL_COLOR_ATTACHMENT0+i;
-            glNamedFramebufferTexture(this.fb.framebuffer.id, GL30.GL_COLOR_ATTACHMENT0+i, oDT[i], 0);
+            framebufferTexture(this.fb.framebuffer.id, GL30.GL_COLOR_ATTACHMENT0+i, oDT[i], 0, GL_TEXTURE_2D);
         }
-        glNamedFramebufferDrawBuffers(this.fb.framebuffer.id, binding);
+        framebufferDrawBuffers(this.fb.framebuffer.id, binding);
 
         var tDT = this.data.translucentDrawTargets;
         binding = new int[tDT.length];
         for (int i = 0; i < tDT.length; i++) {
             binding[i] = GL30.GL_COLOR_ATTACHMENT0+i;
-            glNamedFramebufferTexture(this.fbTranslucent.framebuffer.id, GL30.GL_COLOR_ATTACHMENT0+i, tDT[i], 0);
+            framebufferTexture(this.fbTranslucent.framebuffer.id, GL30.GL_COLOR_ATTACHMENT0+i, tDT[i], 0, GL_TEXTURE_2D);
         }
-        glNamedFramebufferDrawBuffers(this.fbTranslucent.framebuffer.id, binding);
+        framebufferDrawBuffers(this.fbTranslucent.framebuffer.id, binding);
 
         this.fb.framebuffer.verify();
         this.fbTranslucent.framebuffer.verify();
@@ -131,7 +134,7 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
         } else {
             msk |= GL_COLOR_BUFFER_BIT;
         }
-        glBlitNamedFramebuffer(this.fb.framebuffer.id, this.fbTranslucent.framebuffer.id, 0,0, viewport.width, viewport.height, 0,0, viewport.width, viewport.height, msk, GL_NEAREST);
+        blitFramebuffer(this.fb.framebuffer.id, this.fbTranslucent.framebuffer.id, 0,0, viewport.width, viewport.height, 0,0, viewport.width, viewport.height, msk, GL_NEAREST);
     }
 
     @Override

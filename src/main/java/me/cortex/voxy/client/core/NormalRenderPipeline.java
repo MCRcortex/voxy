@@ -24,14 +24,16 @@ import static org.lwjgl.opengl.GL11.GL_ONE;
 import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
 import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
 import static org.lwjgl.opengl.GL11.glEnable;
+import static org.lwjgl.opengl.GL11C.GL_DEPTH_COMPONENT;
 import static org.lwjgl.opengl.GL11C.GL_NEAREST;
 import static org.lwjgl.opengl.GL11C.GL_RGBA8;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
 import static org.lwjgl.opengl.GL14.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL15.GL_READ_WRITE;
 import static org.lwjgl.opengl.GL30C.*;
 import static org.lwjgl.opengl.GL43.GL_DEPTH_STENCIL_TEXTURE_MODE;
-import static org.lwjgl.opengl.GL45C.glBindTextureUnit;
-import static org.lwjgl.opengl.GL45C.glTextureParameterf;
+import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
+import static me.cortex.voxy.client.core.gl.GLCompat.textureParameterf;
 
 public class NormalRenderPipeline extends AbstractRenderPipeline {
     private GlTexture colourTex;
@@ -68,11 +70,11 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             this.fbSSAO.bind(this.fb.getDepthAttachmentType(), this.fb.getDepthTex()).bind(GL_COLOR_ATTACHMENT0, this.colourSSAOTex).verify();
 
 
-            glTextureParameterf(this.colourTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTextureParameterf(this.colourTex.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTextureParameterf(this.colourSSAOTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTextureParameterf(this.colourSSAOTex.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTextureParameterf(this.fb.getDepthTex().id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+            textureParameterf(this.colourTex.id, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            textureParameterf(this.colourTex.id, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            textureParameterf(this.colourSSAOTex.id, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            textureParameterf(this.colourSSAOTex.id, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            textureParameterf(this.fb.getDepthTex().id, GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
         }
 
         this.initDepthStencil(sourceFB, this.fb.framebuffer.id, viewport.width, viewport.height, viewport.width, viewport.height);
@@ -93,8 +95,8 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
 
 
         glBindImageTexture(0, this.colourSSAOTex.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
-        glBindTextureUnit(1, this.fb.getDepthTex().id);
-        glBindTextureUnit(2, this.colourTex.id);
+        bindTextureUnit(1, GL_TEXTURE_2D, this.fb.getDepthTex().id);
+        bindTextureUnit(2, GL_TEXTURE_2D, this.colourTex.id);
 
         glDispatchCompute((viewport.width+31)/32, (viewport.height+31)/32, 1);
 
@@ -120,7 +122,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             }
         }
 
-        glBindTextureUnit(3, this.colourSSAOTex.id);
+        bindTextureUnit(3, GL_TEXTURE_2D, this.colourSSAOTex.id);
 
         //Do alpha blending
 

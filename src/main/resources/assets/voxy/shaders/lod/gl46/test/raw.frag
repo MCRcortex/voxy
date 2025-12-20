@@ -1,4 +1,4 @@
-#version 460 core
+#version 430 core
 
 layout(location = 6) in flat uint quadDebug;
 layout(location = 0) out vec4 outColour;

@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static org.lwjgl.opengl.ARBDirectStateAccess.glBindTextureUnit;
+import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
 import static org.lwjgl.opengl.GL30.glBindBufferBase;
 import static org.lwjgl.opengl.GL30.glBindBufferRange;
 import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
@@ -134,7 +134,7 @@ public class AutoBindingShader extends Shader {
             for (var binding : this.textureBindings) {
                 if (binding.texture != null) {
                     binding.texture.assertNotFreed();
-                    glBindTextureUnit(binding.unit, binding.texture.id);
+                    bindTextureUnit(binding.unit, binding.texture.id);
                 }
                 if (binding.sampler != -1) {
                     glBindSampler(binding.unit, binding.sampler);

@@ -27,7 +27,10 @@ import org.lwjgl.opengl.GL14;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL30.*;
-import static org.lwjgl.opengl.GL45.glTextureBarrier;
+import static org.lwjgl.opengl.GL42C.GL_FRAMEBUFFER_BARRIER_BIT;
+import static org.lwjgl.opengl.GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
+import static org.lwjgl.opengl.GL42C.GL_TEXTURE_FETCH_BARRIER_BIT;
+import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 
@@ -323,7 +326,7 @@ public class ModelTextureBakery {
         glDisable(GL_BLEND);
 
         //Finish and download
-        glTextureBarrier();
+        glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT|GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         this.capture.emitToStream(streamBuffer, streamOffset);
 
         glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);

@@ -36,18 +36,18 @@ public class GlViewCapture {
         this.depthTex = new GlTexture().store(GL_DEPTH24_STENCIL8, 1, width*3, height*2).name("ModelBakeryDepth");
         //TODO: FIXME: Mesa is broken when trying to read from a sampler of GL_STENCIL_INDEX
         // it seems to just ignore the value set in GL_DEPTH_STENCIL_TEXTURE_MODE
-        glTextureParameteri(this.depthTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.depthTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
         this.stencilTex = this.depthTex.createView();
-        glTextureParameteri(this.depthTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.depthTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
 
         this.framebuffer = new GlFramebuffer().bind(GL_COLOR_ATTACHMENT0, this.colourTex).bind(GL_COLOR_ATTACHMENT1, this.metaTex).setDrawBuffers(GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1).bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthTex).verify().name("ModelFramebuffer");
 
-        glTextureParameteri(this.stencilTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
-        glTextureParameteri(this.stencilTex.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTextureParameteri(this.stencilTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.stencilTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.stencilTex.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.stencilTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-        glTextureParameteri(this.metaTex.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTextureParameteri(this.metaTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.metaTex.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.metaTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
         this.copyOutShader = Shader.makeAuto()
                 .define("WIDTH", width)

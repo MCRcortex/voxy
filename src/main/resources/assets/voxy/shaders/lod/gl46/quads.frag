@@ -1,4 +1,4 @@
-#version 460 core
+#version 430 core
 //Use quad shuffling to compute fragment mip
 //#extension GL_KHR_shader_subgroup_quad: enable
 #ifdef USE_SINGLE_TRI

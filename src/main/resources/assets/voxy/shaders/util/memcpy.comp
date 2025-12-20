@@ -1,4 +1,4 @@
-#version 460 core
+#version 430 core
 #define WORK_SIZE 256
 layout(local_size_x=WORK_SIZE) in;
 

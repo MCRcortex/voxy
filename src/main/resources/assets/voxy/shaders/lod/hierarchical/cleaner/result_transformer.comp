@@ -1,4 +1,4 @@
-#version 460 core
+#version 430 core
 layout(local_size_x=OUTPUT_SIZE) in;
 
 layout(binding = MIN_ID_BUFFER_BINDING, std430) restrict readonly buffer VisibilityDataBuffer {

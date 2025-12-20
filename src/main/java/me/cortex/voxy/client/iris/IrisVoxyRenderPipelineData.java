@@ -32,7 +32,7 @@ import java.util.*;
 import java.util.function.*;
 import java.util.stream.Collectors;
 
-import static org.lwjgl.opengl.ARBDirectStateAccess.glBindTextureUnit;
+import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
 import static org.lwjgl.opengl.ARBUniformBufferObject.glBindBufferBase;
 import static org.lwjgl.opengl.GL33C.glBindSampler;
 import static org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER;
@@ -510,7 +510,7 @@ public class IrisVoxyRenderPipelineData {
             for (int j = 0; j < samplers.length; j++) {
                 int unit = j+base;
                 var ts = samplers[j];
-                glBindTextureUnit(unit, ts.texture.getAsInt());
+                bindTextureUnit(unit, ts.texture.getAsInt());
                 int sampler = ts.sampler.getAsInt();
                 if (sampler != -1) {
                     glBindSampler(unit, sampler);

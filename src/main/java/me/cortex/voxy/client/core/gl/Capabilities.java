@@ -5,6 +5,8 @@ import me.cortex.voxy.common.Logger;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL20C;
+import org.lwjgl.opengl.GL15C;
+import org.lwjgl.opengl.GL30C;
 import org.lwjgl.opengl.GL30;
 import org.lwjgl.system.MemoryUtil;
 
@@ -14,17 +16,19 @@ import static org.lwjgl.opengl.GL11.GL_NEAREST;
 import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
 import static org.lwjgl.opengl.GL11.GL_TEXTURE_MAG_FILTER;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
-import static org.lwjgl.opengl.GL15.glDeleteBuffers;
+import static org.lwjgl.opengl.GL15C.*;
 import static org.lwjgl.opengl.GL30.GL_DEPTH_STENCIL;
-import static org.lwjgl.opengl.GL30C.GL_MAP_READ_BIT;
+import static org.lwjgl.opengl.GL30C.*;
 import static org.lwjgl.opengl.GL32.glGetInteger64;
 import static org.lwjgl.opengl.GL43C.GL_MAX_SHADER_STORAGE_BLOCK_SIZE;
+import static org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER;
+import static org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER_BINDING;
 import static org.lwjgl.opengl.GL44.GL_DYNAMIC_STORAGE_BIT;
 import static org.lwjgl.opengl.GL44.GL_MAP_COHERENT_BIT;
-import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfi;
+import static org.lwjgl.opengl.GL44C.GL_MAP_PERSISTENT_BIT;
 import static org.lwjgl.opengl.GL45C.*;
-import static org.lwjgl.opengl.GL45C.glCreateFramebuffers;
 import static org.lwjgl.opengl.NVXGPUMemoryInfo.*;
+import static me.cortex.voxy.client.core.gl.GLCompat.*;
 
 public class Capabilities {
 
@@ -40,6 +44,7 @@ public class Capabilities {
     public final long totalDynamicMemory;//Bytes, total allocation memory - dedicated memory
     public final boolean compute;
     public final boolean indirectParameters;
+    public final boolean indirectCount;
     public final boolean isIntel;
     public final boolean subgroup;
     public final boolean sparseBuffer;
@@ -52,7 +57,8 @@ public class Capabilities {
         var cap = GL.getCapabilities();
         this.sparseBuffer = cap.GL_ARB_sparse_buffer;
         this.compute = cap.glDispatchComputeIndirect != 0;
-        this.indirectParameters = cap.glMultiDrawElementsIndirectCountARB != 0;
+        this.indirectCount = cap.glMultiDrawElementsIndirectCountARB != 0;
+        this.indirectParameters = cap.glMultiDrawElementsIndirect != 0 || this.indirectCount;
         this.repFragTest = cap.GL_NV_representative_fragment_test;
         this.meshShaders = cap.GL_NV_mesh_shader;
         this.canQueryGpuMemory = cap.GL_NVX_gpu_memory_info;
@@ -139,37 +145,55 @@ public class Capabilities {
             glDeleteShader(shader);
         }
 
-        int buffer = glCreateBuffers();
-        glNamedBufferStorage(buffer, 4096, GL_DYNAMIC_STORAGE_BIT|GL_MAP_READ_BIT);
+        int buffer = glGenBuffers();
+        int prevSSBO = glGetInteger(GL_SHADER_STORAGE_BUFFER_BINDING);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
+        glBufferData(GL_SHADER_STORAGE_BUFFER, 4096, GL_DYNAMIC_READ);
 
-        int tex = glCreateTextures(GL_TEXTURE_2D);
-        glTextureStorage2D(tex, 1, GL_DEPTH24_STENCIL8, 64, 64);
-        glTextureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTextureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        int tex = GLCompat.createTexture(GL_TEXTURE_2D);
+        GLCompat.textureStorage2D(tex, GL_TEXTURE_2D, 1, GL_DEPTH24_STENCIL8, 64, 64);
+        GLCompat.textureParameteri(tex, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        GLCompat.textureParameteri(tex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-        int fb = glCreateFramebuffers();
-        glNamedFramebufferTexture(fb, GL_DEPTH_STENCIL_ATTACHMENT, tex, 0);
+        int fb = GLCompat.createFramebuffer();
+        GLCompat.framebufferTexture(fb, GL_DEPTH_STENCIL_ATTACHMENT, tex, 0, GL_TEXTURE_2D);
 
         boolean isCorrect = true;
         for (int i = 0; i <= 10; i++) {
             float value = (float) (i/10.0);
 
-            nglClearNamedBufferSubData(buffer, GL_R32F, 0, 4096, GL_RED, GL_FLOAT, 0);//Zero the buffer
-            glClearNamedFramebufferfi(fb, GL_DEPTH_STENCIL, 0, value, 1);//Set the depth texture
+            if (GL.getCapabilities().GL_ARB_direct_state_access || GL.getCapabilities().OpenGL45) {
+                nglClearNamedBufferSubData(buffer, GL_R32F, 0, 4096, GL_RED, GL_FLOAT, 0);//Zero the buffer
+            } else {
+                glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer);
+                var zero = MemoryUtil.memCalloc(4096);
+                glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, zero);
+                MemoryUtil.memFree(zero);
+            }
+            GLCompat.clearDepthStencilFramebuffer(fb, value, 1);//Set the depth texture
 
             glUseProgram(program);
-            glBindTextureUnit(0, tex);
+            bindTextureUnit(0, tex);
             GL30.glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, buffer);
 
             glDispatchCompute(1,1,1);
             glFinish();
 
-            long ptr = nglMapNamedBuffer(buffer, GL_READ_ONLY);
+            long ptr;
+            if (GL.getCapabilities().GL_ARB_direct_state_access || GL.getCapabilities().OpenGL45) {
+                ptr = nglMapNamedBuffer(buffer, GL_READ_ONLY);
+            } else {
+                ptr = GL30C.nglMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, 4096, GL_MAP_READ_BIT);
+            }
             float gottenValue = MemoryUtil.memGetFloat(ptr);
-            glUnmapNamedBuffer(buffer);
+            if (GL.getCapabilities().GL_ARB_direct_state_access || GL.getCapabilities().OpenGL45) {
+                glUnmapNamedBuffer(buffer);
+            } else {
+                GL15C.glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+            }
 
             glUseProgram(0);
-            glBindTextureUnit(0,0);
+            bindTextureUnit(0,0);
             glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
             boolean localCorrect = Math.abs(value - gottenValue)<0.0000001f;
@@ -179,8 +203,9 @@ public class Capabilities {
             isCorrect &= localCorrect;
         }
 
-        glDeleteFramebuffers(fb);
-        glDeleteTextures(tex);
+        GLCompat.deleteFramebuffer(fb);
+        GLCompat.deleteTexture(tex);
+        glBindBuffer(GL_SHADER_STORAGE_BUFFER, prevSSBO);
         glDeleteBuffers(buffer);
         glDeleteProgram(program);
         return !isCorrect;

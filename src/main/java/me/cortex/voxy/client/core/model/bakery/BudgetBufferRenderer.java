@@ -86,7 +86,7 @@ public class BudgetBufferRenderer {
         VA.bind();
         glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
         glBindSampler(0, 0);
-        glBindTextureUnit(0, texId);
+        me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit(0, texId);
     }
 
     public static void render(Matrix4f matrix) {

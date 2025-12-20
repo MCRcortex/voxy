@@ -1,4 +1,4 @@
-#version 450
+#version 430
 #extension GL_ARB_shader_draw_parameters : require
 
 layout(binding = 0, std140) uniform SceneUniform {

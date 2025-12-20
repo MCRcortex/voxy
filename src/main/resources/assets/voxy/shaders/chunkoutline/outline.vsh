@@ -1,4 +1,4 @@
-#version 460
+#version 430
 
 layout(binding = 0, std140) uniform SceneUniform {
     mat4 MVP;

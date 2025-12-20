@@ -1,4 +1,4 @@
-#version 460 core
+#version 430 core
 //Uses intrinsics and other operations to perform very fast sorting
 // we dont need a propper sort, only a fuzzy sort, as in we only need to top 128 entries, but those can be unsorted
 

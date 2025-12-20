@@ -1,4 +1,4 @@
-#version 450 core
+#version 430 core
 
 layout(binding = 0) uniform sampler2D depthTex;
 layout(location = 1) uniform mat4 invProjMat;

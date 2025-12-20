@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.rendering.util;
 
+import me.cortex.voxy.client.core.gl.GLCompat;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.GlVertexArray;
@@ -7,7 +8,6 @@ import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import org.lwjgl.opengl.GL11;
 
-import static org.lwjgl.opengl.ARBDirectStateAccess.*;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_TEXTURE_FETCH_BARRIER_BIT;
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL30C.*;
@@ -17,7 +17,8 @@ import static org.lwjgl.opengl.GL33C.glDeleteSamplers;
 import static org.lwjgl.opengl.GL33C.glSamplerParameteri;
 import static org.lwjgl.opengl.GL42C.*;
 import static org.lwjgl.opengl.GL43C.glDispatchCompute;
-import static org.lwjgl.opengl.GL45C.glTextureBarrier;
+import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
+import static me.cortex.voxy.client.core.gl.GLCompat.textureParameteri;
 
 public class HiZBuffer2 {
     private final Shader hizMip = Shader.make()
@@ -40,7 +41,7 @@ public class HiZBuffer2 {
         this(GL_R32F);
     }
     public HiZBuffer2(int type) {
-        glNamedFramebufferDrawBuffer(this.fb.id, GL_COLOR_ATTACHMENT0);
+        GLCompat.framebufferDrawBuffers(this.fb.id, GL_COLOR_ATTACHMENT0);
         this.type = type;
     }
 
@@ -52,11 +53,11 @@ public class HiZBuffer2 {
 
         //GL_DEPTH_COMPONENT32F //Cant use this as it does not match the depth format of the provided depth buffer
         this.texture = new GlTexture().store(this.type, this.levels, width, height).name("HiZ");
-        glTextureParameteri(this.texture.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-        glTextureParameteri(this.texture.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTextureParameteri(this.texture.id, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        glTextureParameteri(this.texture.id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTextureParameteri(this.texture.id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         glSamplerParameteri(this.sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
         glSamplerParameteri(this.sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -90,7 +91,7 @@ public class HiZBuffer2 {
             glDisable(GL_DEPTH_TEST);
 
 
-            glBindTextureUnit(0, srcDepthTex);
+            bindTextureUnit(0, GL_TEXTURE_2D, srcDepthTex);
             glBindSampler(0, this.sampler);
             glUniform1i(0, 0);
 
@@ -98,8 +99,7 @@ public class HiZBuffer2 {
 
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
 
-            glTextureBarrier();
-            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT|GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
             glBindFramebuffer(GL_FRAMEBUFFER, boundFB);
             glViewport(0, 0, width, height);
@@ -110,7 +110,7 @@ public class HiZBuffer2 {
             this.hizMip.bind();
 
             glUniform2f(0, 1f/this.width, 1f/this.height);
-            glBindTextureUnit(0, this.texture.id);
+            bindTextureUnit(0, GL_TEXTURE_2D, this.texture.id);
             glBindSampler(0, this.sampler);
             for (int i = 1; i < 7; i++) {
                 glBindImageTexture(i, this.texture.id, i, false, 0, GL_WRITE_ONLY, GL_R32F);
@@ -120,7 +120,7 @@ public class HiZBuffer2 {
 
             glBindSampler(0, 0);
             for (int i =0;i<7;i++)
-                glBindTextureUnit(i, 0);
+                bindTextureUnit(i, GL_TEXTURE_2D, 0);
 
         }
 

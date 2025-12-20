@@ -29,16 +29,20 @@ import java.util.List;
 import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
 import static org.lwjgl.opengl.ARBIndirectParameters.glMultiDrawElementsIndirectCountARB;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
-import static org.lwjgl.opengl.GL15.glBindBuffer;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL15C.GL_ELEMENT_ARRAY_BUFFER;
+import static org.lwjgl.opengl.GL15C.glBindBuffer;
+import static org.lwjgl.opengl.GL15C.glGetBufferSubData;
 import static org.lwjgl.opengl.GL30.glBindBufferBase;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
+import static org.lwjgl.opengl.GL31C.GL_COPY_READ_BUFFER;
 import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
 import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER;
 import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL43.*;
-import static org.lwjgl.opengl.GL45.glBindTextureUnit;
+import static org.lwjgl.opengl.GL43.glMultiDrawElementsIndirect;
+import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
 import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FRAGMENT_TEST_NV;
 
 //Uses MDIC to render the sections
@@ -157,7 +161,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.modelStore.bind(3, 4, 0);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.positionScratchBuffer.id);
         LightMapHelper.bind(1);
-        glBindTextureUnit(2, viewport.depthBoundingBuffer.getDepthTex().id);
+        bindTextureUnit(2, GL_TEXTURE_2D, viewport.depthBoundingBuffer.getDepthTex().id);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, viewport.drawCallBuffer.id);
@@ -181,7 +185,12 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         if (VoxyClient.getOcclusionDebugState()==3) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
         }
-        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, indirectOffset, drawCountOffset, maxDrawCount, 0);
+        if (Capabilities.INSTANCE.indirectCount) {
+            glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, indirectOffset, drawCountOffset, maxDrawCount, 0);
+        } else {
+            int drawCount = Math.min(readDrawCount(viewport.drawCountCallBuffer.id, drawCountOffset), maxDrawCount);
+            glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, indirectOffset, drawCount, 0);
+        }
         if (VoxyClient.getOcclusionDebugState()==3) {
             glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         }
@@ -189,9 +198,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glEnable(GL_CULL_FACE);
         glBindVertexArray(0);
         glBindSampler(0, 0);
-        glBindTextureUnit(0, 0);
+        bindTextureUnit(0, GL_TEXTURE_2D, 0);
         glBindSampler(1, 0);
-        glBindTextureUnit(1, 0);
+        bindTextureUnit(1, GL_TEXTURE_2D, 0);
 
         //RenderLayer.getCutoutMipped().endDrawing();
     }
@@ -221,14 +230,20 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);//Barrier everything is needed
         glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
-        glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, Math.min(this.geometryManager.getSectionCount(), 100_000), 0);
+        int translucentMax = Math.min(this.geometryManager.getSectionCount(), 100_000);
+        if (Capabilities.INSTANCE.indirectCount) {
+            glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, translucentMax, 0);
+        } else {
+            int drawCount = Math.min(readDrawCount(viewport.drawCountCallBuffer.id, 4*4L), translucentMax);
+            glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, drawCount, 0);
+        }
 
         glEnable(GL_CULL_FACE);
         glBindVertexArray(0);
         glBindSampler(0, 0);
-        glBindTextureUnit(0, 0);
+        bindTextureUnit(0, GL_TEXTURE_2D, 0);
         glBindSampler(1, 0);
-        glBindTextureUnit(1, 0);
+        bindTextureUnit(1, GL_TEXTURE_2D, 0);
 
         glDisable(GL_BLEND);
     }
@@ -341,6 +356,16 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         if (this.geometryManager.getSectionCount() == 0) return;
         //Render temporal
         this.renderTerrain(viewport, TEMPORAL_OFFSET*5*4, 4*5, Math.min(this.geometryManager.getSectionCount(), 100_000));
+    }
+
+    private int readDrawCount(int bufferId, long offsetBytes) {
+        var tmp = MemoryUtil.memAllocInt(1);
+        glBindBuffer(GL_COPY_READ_BUFFER, bufferId);
+        glGetBufferSubData(GL_COPY_READ_BUFFER, offsetBytes, tmp);
+        glBindBuffer(GL_COPY_READ_BUFFER, 0);
+        int count = tmp.get(0);
+        MemoryUtil.memFree(tmp);
+        return Math.max(count, 0);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core.rendering.util;
 
+import me.cortex.voxy.client.core.gl.GLCompat;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.GlVertexArray;
@@ -7,7 +8,6 @@ import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import org.lwjgl.opengl.GL11;
 
-import static org.lwjgl.opengl.ARBDirectStateAccess.*;
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_TEXTURE_FETCH_BARRIER_BIT;
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL30C.*;
@@ -16,8 +16,11 @@ import static org.lwjgl.opengl.GL33.glGenSamplers;
 import static org.lwjgl.opengl.GL33C.glDeleteSamplers;
 import static org.lwjgl.opengl.GL33C.glSamplerParameteri;
 import static org.lwjgl.opengl.GL42C.GL_FRAMEBUFFER_BARRIER_BIT;
+import static org.lwjgl.opengl.GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
 import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
-import static org.lwjgl.opengl.GL45C.glTextureBarrier;
+import static me.cortex.voxy.client.core.gl.GLCompat.textureParameteri;
+import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
+import static me.cortex.voxy.client.core.gl.GLCompat.textureParameteri;
 
 public class HiZBuffer {
     private final Shader hiz = Shader.make()
@@ -37,7 +40,7 @@ public class HiZBuffer {
         this(GL_DEPTH24_STENCIL8);
     }
     public HiZBuffer(int type) {
-        glNamedFramebufferDrawBuffer(this.fb.id, GL_NONE);
+        GLCompat.framebufferDrawBuffers(this.fb.id, GL_NONE);
         this.type = type;
     }
 
@@ -49,11 +52,11 @@ public class HiZBuffer {
 
         //GL_DEPTH_COMPONENT32F //Cant use this as it does not match the depth format of the provided depth buffer
         this.texture = new GlTexture().store(this.type, this.levels, width, height).name("HiZ");
-        glTextureParameteri(this.texture.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-        glTextureParameteri(this.texture.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTextureParameteri(this.texture.id, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        glTextureParameteri(this.texture.id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTextureParameteri(this.texture.id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         glSamplerParameteri(this.sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
         glSamplerParameteri(this.sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -85,7 +88,7 @@ public class HiZBuffer {
         glEnable(GL_DEPTH_TEST);
 
 
-        glBindTextureUnit(0, srcDepthTex);
+        bindTextureUnit(0, GL_TEXTURE_2D, srcDepthTex);
         glBindSampler(0, this.sampler);
         glUniform1i(0, 0);
         int cw = this.width;
@@ -94,16 +97,15 @@ public class HiZBuffer {
             this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, i);
             glViewport(0, 0, cw, ch); cw = Math.max(cw/2, 1); ch = Math.max(ch/2, 1);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-            glTextureBarrier();
-            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
-            glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, i);
-            glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, i);
+            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT|GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, i);
+            textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, i);
             if (i==0) {
-                glBindTextureUnit(0, this.texture.id);
+                bindTextureUnit(0, GL_TEXTURE_2D, this.texture.id);
             }
         }
-        glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, 0);
-        glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, 1000);//TODO: CHECK IF ITS -1 or -0
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 1000);//TODO: CHECK IF ITS -1 or -0
 
         glDepthFunc(GL_LEQUAL);
         glDisable(GL_DEPTH_TEST);

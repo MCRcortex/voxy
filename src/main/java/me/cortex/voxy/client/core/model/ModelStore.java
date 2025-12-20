@@ -15,7 +15,7 @@ import static org.lwjgl.opengl.GL30.glBindBufferBase;
 import static org.lwjgl.opengl.GL33.*;
 import static org.lwjgl.opengl.GL33C.glSamplerParameteri;
 import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
-import static org.lwjgl.opengl.GL45.glBindTextureUnit;
+import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
 
 public class ModelStore {
     public static final int MODEL_SIZE = 64;
@@ -53,7 +53,7 @@ public class ModelStore {
     public void bind(int modelBindingIndex, int colourBindingIndex, int textureBindingIndex) {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, modelBindingIndex, this.modelBuffer.id);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, colourBindingIndex, this.modelColourBuffer.id);
-        glBindTextureUnit(textureBindingIndex, this.textures.id);
+        bindTextureUnit(textureBindingIndex, this.textures.id);
         glBindSampler(textureBindingIndex, this.blockSampler);
     }
 }

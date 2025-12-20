@@ -1,4 +1,4 @@
-#version 460 core
+#version 430 core
 
 //TODO: increase local size
 #define LOCAL_SIZE_MSK ((1<<LOCAL_SIZE_BITS)-1)

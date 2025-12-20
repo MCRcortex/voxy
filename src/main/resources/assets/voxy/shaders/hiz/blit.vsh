@@ -1,4 +1,4 @@
-#version 450
+#version 430
 
 layout(location = 0) out vec2 uv;
 void main() {

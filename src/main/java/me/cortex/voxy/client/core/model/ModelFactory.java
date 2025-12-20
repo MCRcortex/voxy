@@ -46,7 +46,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.locks.ReentrantLock;
 
 import static me.cortex.voxy.client.core.model.ModelStore.MODEL_SIZE;
-import static org.lwjgl.opengl.ARBDirectStateAccess.nglTextureSubImage2D;
+import static me.cortex.voxy.client.core.gl.GLCompat.textureSubImage2D;
 import static org.lwjgl.opengl.GL11.*;
 
 //Manages the storage and updating of model states, textures and colours
@@ -325,7 +325,7 @@ public class ModelFactory {
 
             long cAddr = this.texture.address;
             for (int lvl = 0; lvl < LAYERS; lvl++) {
-                nglTextureSubImage2D(atlas.id, lvl, X >> lvl, Y >> lvl, (MODEL_TEXTURE_SIZE*3) >> lvl, (MODEL_TEXTURE_SIZE*2) >> lvl, GL_RGBA, GL_UNSIGNED_BYTE, cAddr);
+                textureSubImage2D(atlas.id, GL_TEXTURE_2D, lvl, X >> lvl, Y >> lvl, (MODEL_TEXTURE_SIZE*3) >> lvl, (MODEL_TEXTURE_SIZE*2) >> lvl, GL_RGBA, GL_UNSIGNED_BYTE, cAddr);
                 cAddr += (MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*3*2*4)>>(lvl<<1);
             }
 

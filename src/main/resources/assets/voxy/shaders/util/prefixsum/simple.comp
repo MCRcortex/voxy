@@ -1,4 +1,4 @@
-#version 460
+#version 430
 #define WORK_SIZE 256
 
 //Does inital parralel prefix sum on batches of WORK_SIZE

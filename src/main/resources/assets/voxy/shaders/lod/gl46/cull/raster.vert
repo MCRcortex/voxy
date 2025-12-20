@@ -1,4 +1,4 @@
-#version 460 core
+#version 430 core
 #extension GL_ARB_gpu_shader_int64 : enable
 #define VISIBILITY_ACCESS
 

@@ -41,7 +41,7 @@ import static org.lwjgl.opengl.GL42.glDepthFunc;
 import static org.lwjgl.opengl.GL42.*;
 import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfi;
 import static org.lwjgl.opengl.GL45.glGetNamedFramebufferAttachmentParameteri;
-import static org.lwjgl.opengl.GL45C.glBindTextureUnit;
+import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
 
 public abstract class AbstractRenderPipeline extends TrackedObject {
     private final BooleanSupplier frexStillHasWork;
@@ -126,7 +126,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
         this.depthCopy.bind();
         int depthTexture = glGetNamedFramebufferAttachmentParameteri(sourceFrameBuffer, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
-        glBindTextureUnit(0, depthTexture);
+        bindTextureUnit(0, depthTexture);
         glBindSampler(0, DEPTH_SAMPLER);
         glUniform2f(1,((float)width)/srcWidth, ((float)height)/srcHeight);
         glColorMask(false,false,false,false);
@@ -174,7 +174,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         glBindFramebuffer(GL30.GL_FRAMEBUFFER, dstFB);
 
         blitShader.bind();
-        glBindTextureUnit(0, srcDepthTex);
+        bindTextureUnit(0, srcDepthTex);
         new Matrix4f(viewport.MVP).invert().getToAddress(SCRATCH);
         nglUniformMatrix4fv(1, 1, false, SCRATCH);//inverse fromProjection
         targetTransform.getToAddress(SCRATCH);//new Matrix4f(tooProjection).mul(vp.modelView).get(data);

@@ -1,11 +1,18 @@
 package me.cortex.voxy.client.core.gl;
 
 import me.cortex.voxy.common.util.TrackedObject;
+import org.lwjgl.opengl.GL11C;
+import org.lwjgl.opengl.GL30C;
+import org.lwjgl.opengl.GL45C;
 
 import static org.lwjgl.opengl.GL11.GL_RGBA8;
-import static org.lwjgl.opengl.GL11C.*;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL14C.GL_DEPTH_COMPONENT24;
+import static org.lwjgl.opengl.GL14C.GL_DEPTH_COMPONENT32;
 import static org.lwjgl.opengl.GL30.GL_DEPTH24_STENCIL8;
-import static org.lwjgl.opengl.GL45C.*;
+import static org.lwjgl.opengl.GL30C.GL_DEPTH_COMPONENT32F;
+import static org.lwjgl.opengl.GL30C.GL_R32F;
+import static org.lwjgl.opengl.GL30C.GL_R32UI;
 
 public class GlTexture extends TrackedObject {
     public final int id;
@@ -24,16 +31,16 @@ public class GlTexture extends TrackedObject {
     }
 
     public GlTexture(int type) {
-        this.id = glCreateTextures(type);
+        this.id = GLCompat.createTexture(type);
         this.type = type;
         COUNT++;
     }
 
     private GlTexture(int type, boolean useGenTypes) {
         if (useGenTypes) {
-            this.id = glGenTextures();
+            this.id = GL11C.glGenTextures();
         } else {
-            this.id = glCreateTextures(type);
+            this.id = GLCompat.createTexture(type);
         }
         this.type = type;
         COUNT++;
@@ -47,7 +54,7 @@ public class GlTexture extends TrackedObject {
 
         this.format = format;
         if (this.type == GL_TEXTURE_2D) {
-            glTextureStorage2D(this.id, levels, format, width, height);
+            GLCompat.textureStorage2D(this.id, this.type, levels, format, width, height);
             this.width = width;
             this.height = height;
             this.levels = levels;
@@ -61,7 +68,7 @@ public class GlTexture extends TrackedObject {
     public GlTexture createView() {
         this.assertAllocated();
         var view = new GlTexture(this.type, true);
-        glTextureView(view.id, this.type, this.id, this.format, 0, 1, 0, 1);
+        GL45C.glTextureView(view.id, this.type, this.id, this.format, 0, 1, 0, 1);
         return view;
     }
 
@@ -73,7 +80,7 @@ public class GlTexture extends TrackedObject {
         COUNT--;
         this.hasAllocated = false;
         super.free0();
-        glDeleteTextures(this.id);
+        GLCompat.deleteTexture(this.id);
     }
 
     public GlTexture name(String name) {
@@ -99,6 +106,10 @@ public class GlTexture extends TrackedObject {
     public int getFormat() {
         this.assertAllocated();
         return this.format;
+    }
+
+    public int getType() {
+        return this.type;
     }
 
     private long getEstimatedSize() {

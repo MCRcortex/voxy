@@ -1,13 +1,16 @@
 package me.cortex.voxy.client.core.rendering.util;
 
+import me.cortex.voxy.client.core.gl.GLCompat;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
-import org.lwjgl.system.MemoryStack;
+import org.lwjgl.opengl.GL30C;
 
-import static org.lwjgl.opengl.ARBDirectStateAccess.nglClearNamedFramebufferfv;
-import static org.lwjgl.opengl.GL11C.GL_DEPTH;
 import static org.lwjgl.opengl.GL14.GL_DEPTH_COMPONENT24;
-import static org.lwjgl.opengl.GL30C.*;
+import static org.lwjgl.opengl.GL30C.GL_DEPTH24_STENCIL8;
+import static org.lwjgl.opengl.GL30C.GL_DEPTH_ATTACHMENT;
+import static org.lwjgl.opengl.GL30C.GL_DEPTH_STENCIL_ATTACHMENT;
+import static org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER;
+import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
 
 public class DepthFramebuffer {
     private final int depthType;
@@ -43,9 +46,7 @@ public class DepthFramebuffer {
     }
 
     public void clear(float depth) {
-        try (var stack = MemoryStack.stackPush()) {
-            nglClearNamedFramebufferfv(this.framebuffer.id, GL_DEPTH, 0, stack.nfloat(depth));
-        }
+        GLCompat.clearDepthFramebuffer(this.framebuffer.id, depth);
     }
 
     public GlTexture getDepthTex() {
