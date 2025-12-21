@@ -36,18 +36,23 @@ public class HiZBuffer {
     public HiZBuffer() {
         this(GL_DEPTH24_STENCIL8);
     }
+
     public HiZBuffer(int type) {
         glNamedFramebufferDrawBuffer(this.fb.id, GL_NONE);
         this.type = type;
     }
 
     private void alloc(int width, int height) {
-        this.levels = (int)Math.ceil(Math.log(Math.max(width, height))/Math.log(2));
-        //We dont care about e.g. 1x1 size texture since you dont get meshlets that big to cover such a large area
-        //this.levels -= 1;//Arbitrary size, shinks the max level by alot and saves a significant amount of processing time
-        // (could probably increase it to be defined by a max meshlet coverage computation thing)
+        this.levels = (int) Math.ceil(Math.log(Math.max(width, height)) / Math.log(2));
+        // We dont care about e.g. 1x1 size texture since you dont get meshlets that big
+        // to cover such a large area
+        // this.levels -= 1;//Arbitrary size, shinks the max level by alot and saves a
+        // significant amount of processing time
+        // (could probably increase it to be defined by a max meshlet coverage
+        // computation thing)
 
-        //GL_DEPTH_COMPONENT32F //Cant use this as it does not match the depth format of the provided depth buffer
+        // GL_DEPTH_COMPONENT32F //Cant use this as it does not match the depth format
+        // of the provided depth buffer
         this.texture = new GlTexture().store(this.type, this.levels, width, height).name("HiZ");
         glTextureParameteri(this.texture.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
         glTextureParameteri(this.texture.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -61,7 +66,7 @@ public class HiZBuffer {
         glSamplerParameteri(this.sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glSamplerParameteri(this.sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        this.width  = width;
+        this.width = width;
         this.height = height;
 
         this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, 0).verify();
@@ -84,26 +89,34 @@ public class HiZBuffer {
         glDepthMask(true);
         glEnable(GL_DEPTH_TEST);
 
-
         glBindTextureUnit(0, srcDepthTex);
+        // FORCE PARAMETERS: Ensure the depth texture is treated as a plain texture, not
+        // a shadow map
+        // This is crucial for RDNA1 cards which might default to Comparison Mode
+        glTextureParameteri(srcDepthTex, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        // We use Nearest because we want raw values
+        glTextureParameteri(srcDepthTex, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTextureParameteri(srcDepthTex, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glBindSampler(0, this.sampler);
         glUniform1i(0, 0);
         int cw = this.width;
         int ch = this.height;
         for (int i = 0; i < this.levels; i++) {
             this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, i);
-            glViewport(0, 0, cw, ch); cw = Math.max(cw/2, 1); ch = Math.max(ch/2, 1);
+            glViewport(0, 0, cw, ch);
+            cw = Math.max(cw / 2, 1);
+            ch = Math.max(ch / 2, 1);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
             glTextureBarrier();
-            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT);
+            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
             glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, i);
             glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, i);
-            if (i==0) {
+            if (i == 0) {
                 glBindTextureUnit(0, this.texture.id);
             }
         }
         glTextureParameteri(this.texture.id, GL_TEXTURE_BASE_LEVEL, 0);
-        glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, 1000);//TODO: CHECK IF ITS -1 or -0
+        glTextureParameteri(this.texture.id, GL_TEXTURE_MAX_LEVEL, 1000);// TODO: CHECK IF ITS -1 or -0
 
         glDepthFunc(GL_LEQUAL);
         glDisable(GL_DEPTH_TEST);
@@ -127,6 +140,6 @@ public class HiZBuffer {
     }
 
     public int getPackedLevels() {
-        return (this.width<<16)|this.height;//+1
+        return (this.width << 16) | this.height;// +1
     }
 }
