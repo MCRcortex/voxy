@@ -11,6 +11,7 @@ import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.core.SectionPos;
+import net.minecraft.client.Minecraft;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -129,13 +130,19 @@ public class VoxelIngestService {
             }
         }
 
+        var isSingleplayer = Minecraft.getInstance().isSingleplayer();
+        var player = Minecraft.getInstance().player;
+
+        if(!isSingleplayer) {
+            gotLighting = true;
+        }
+
         if (!gotLighting) {
             return false;
         }
 
         var blp = lightingProvider.getLayerListener(LightLayer.BLOCK);
         var slp = lightingProvider.getLayerListener(LightLayer.SKY);
-
 
         i = chunk.getMinSectionY() - 1;
         for (var section : chunk.getSections()) {
@@ -147,6 +154,12 @@ public class VoxelIngestService {
             var bl = blp.getDataLayerData(pos);
             if (bl != null) {
                 bl = bl.copy();
+            }
+
+            //Use skylight of player chunk as a workaround to being unable to handle far chunk updates on server worlds
+            //FIXME: this will gather the same skylight for all chunks, so they will appear with that repeating light pattern
+            if(!isSingleplayer && player != null) {
+                pos = SectionPos.of(player.chunkPosition(), i);
             }
 
             var sl = slp.getDataLayerData(pos);

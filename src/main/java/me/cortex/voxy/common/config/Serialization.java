@@ -116,6 +116,9 @@ public class Serialization {
             if (clzName.endsWith("VoxyConfig")) {
                 continue;//Special case to prevent recursive loading pain
             }
+            if (clzName.contains("VoxyConfigMenu") || clzName.contains("SodiumConfigBuilder")) {
+                continue;//And definitely dont want to crash our server
+            }
 
             if (clzName.equals(Serialization.class.getName())) {
                 continue;//Dont want to load ourselves
