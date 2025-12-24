@@ -1,0 +1,37 @@
+{
+  "voxy.config.title": "Voxy",
+
+  "voxy.config.general": "Algemeen",
+  "voxy.config.rendering": "Rendering",
+
+  "voxy.config.general.enabled": "Voxy inschakelen",
+  "voxy.config.general.enabled.tooltip": "Schakelt voxy volledig in of uit",
+
+  "voxy.config.general.serviceThreads": "Service threads",
+  "voxy.config.general.serviceThreads.tooltip": "Aantal threads dat de ServiceThreadPool kan gebruiken",
+
+  "voxy.config.general.useSodiumBuilder": "Sodium threads gebruiken",
+  "voxy.config.general.useSodiumBuilder.tooltip": "Gebruikt sodium builder threads als onderdeel van voxy's thread pool, kan stotteren en lag verminderen bij snel bewegen op hoge renderafstand",
+
+  "voxy.config.general.ingest": "Chunk verwerking",
+  "voxy.config.general.ingest.tooltip": "Schakelt voxy's mogelijkheid om nieuwe chunks naar LoDs te converteren in of uit",
+
+  "voxy.config.general.rendering": "Voxy Rendering",
+  "voxy.config.general.rendering.tooltip": "Schakelt voxy rendering in of uit",
+
+  "voxy.config.general.subDivisionSize": "Pixels^2 van onderverdelingsgrootte",
+  "voxy.config.general.subDivisionSize.tooltip": "Maximale grootte in pixels (gekwadrateerd) van schermruimte AABB voordat wordt onderverdeeld naar kleinere LoDs (kleiner is hogere kwaliteit)",
+
+  "voxy.config.general.renderDistance": "Renderafstand",
+  "voxy.config.general.renderDistance.tooltip": "Renderafstand van voxy in chunks",
+
+  "voxy.config.general.environmental_fog": "Omgevingsmist inschakelen",
+  "voxy.config.general.environmental_fog.tooltip": "Schakelt voxy omgevingsmist rendering in of uit",
+
+  "voxy.config.general.render_fog": "Render mist inschakelen",
+  "voxy.config.general.render_fog.tooltip": "Schakelt render mist effect in of uit",
+
+  "voxy.config.general.render_statistics": "Render statistieken inschakelen",
+  "voxy.config.general.render_statistics.tooltip": "Schakel render statistieken in het F3 menu in, handig voor het opsporen van problemen"
+}
+
