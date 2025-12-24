@@ -18,8 +18,11 @@ ivec3 extractLoDPosition(uvec2 encPos) {
     return ivec3(x,y,z);
 }
 
-vec4 getFaceSize(uint faceData) {
+vec4 getFaceSize(uint faceData, bool isTranslucent) {
     float EPSILON = 0.00005f;
+    if (isTranslucent) {
+        EPSILON = 0.0f;
+    }
 
     vec4 faceOffsetsSizes = extractFaceSizes(faceData);
 
@@ -143,7 +146,7 @@ void setupQuad(out QuadData quad, const in Quad rawQuad, uvec2 sPos, bool genera
         quad.attributeData.yzw = makeRemainingAttributes(model, rawQuad, lodLevel, face);
     }
 
-    vec4 faceSize = getFaceSize(faceData);
+    vec4 faceSize = getFaceSize(faceData, modelIsTranslucent(model));
     #ifdef USE_SINGLE_TRI
     faceSize *= 2;
     #endif
