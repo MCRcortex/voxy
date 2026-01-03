@@ -28,7 +28,7 @@ public class DepthFramebuffer {
                 this.depthBuffer.free();
             }
             this.depthBuffer = new GlTexture().store(this.depthType, 1, width, height);
-            this.framebuffer.bind(this.getDepthAttachmentType(), this.depthBuffer).verify();
+            this.framebuffer.bind(this.getDepthAttachmentType(), this.depthBuffer);
             return true;
         }
         return false;
