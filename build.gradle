@@ -129,7 +129,7 @@ dependencies {
     modImplementation("maven.modrinth:lithium:mc1.21.11-0.21.0-fabric")
 
     //modRuntimeOnlyMsk "drouarb:nvidium:0.4.1-beta4:1.21.6@jar"
-    modCompileOnly "drouarb:nvidium:0.4.1-beta4:1.21.6@jar"
+    modCompileOnly "drouarb:nvidium:0.4.3-beta1:1.21.11@jar"
 
     modCompileOnly("maven.modrinth:modmenu:17.0.0-alpha.1")
     modRuntimeOnlyMsk("maven.modrinth:modmenu:17.0.0-alpha.1")
