@@ -64,8 +64,11 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             this.colourTex = new GlTexture().store(GL_RGBA8, 1, viewport.width, viewport.height);
             this.colourSSAOTex = new GlTexture().store(GL_RGBA8, 1, viewport.width, viewport.height);
 
-            this.fb.framebuffer.bind(GL_COLOR_ATTACHMENT0, this.colourTex).verify();
-            this.fbSSAO.bind(this.fb.getDepthAttachmentType(), this.fb.getDepthTex()).bind(GL_COLOR_ATTACHMENT0, this.colourSSAOTex).verify();
+            this.fb.framebuffer.bind(GL_COLOR_ATTACHMENT0, this.colourTex);
+            this.fbSSAO.bind(this.fb.getDepthAttachmentType(), this.fb.getDepthTex()).bind(GL_COLOR_ATTACHMENT0, this.colourSSAOTex);
+
+            this.fb.framebuffer.verify();
+            this.fbSSAO.verify();
 
 
             glTextureParameterf(this.colourTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
