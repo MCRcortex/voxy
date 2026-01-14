@@ -2,10 +2,10 @@
 package me.cortex.voxy.client.core.model.bakery;
 
 import me.cortex.voxy.common.Logger;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.SubmitNodeStorage;
-import net.minecraft.core.BlockPos;
+import net.minecraft.util.Math.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -34,7 +34,7 @@ public class BakedBlockEntityModel {
                 if (textureId == null) {
                     Logger.error("ERROR: Empty texture id for layer: " + layer);
                 } else {
-                    texId = ((com.mojang.blaze3d.opengl.GlTexture)Minecraft.getInstance().getTextureManager().getTexture(textureId).getTexture()).glId();
+                    texId = ((com.mojang.blaze3d.opengl.GlTexture)MinecraftClient.getInstance().getTextureManager().getTexture(textureId).getTexture()).glId();
                 }
             }
             if (texId == 0) continue;
@@ -68,8 +68,8 @@ public class BakedBlockEntityModel {
         if (entity == null) {
             return null;
         }
-        var renderer = Minecraft.getInstance().getBlockEntityRenderDispatcher().getRenderer(entity);
-        entity.setLevel(Minecraft.getInstance().level);
+        var renderer = MinecraftClient.getInstance().getBlockEntityRenderDispatcher().getRenderer(entity);
+        entity.setLevel(MinecraftClient.getInstance().level);
         if (renderer != null) {
             try {
                 var rt = renderer.createRenderState();

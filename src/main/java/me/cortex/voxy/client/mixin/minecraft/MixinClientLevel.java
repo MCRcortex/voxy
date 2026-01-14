@@ -7,14 +7,14 @@ import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.core.BlockPos;
+import net.minecraft.util.Math.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.SectionPos;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.Level;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.world.World;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.dimension.DimensionType;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -37,7 +37,7 @@ public abstract class MixinClientLevel {
     private void voxy$getBottom(
             ClientPacketListener networkHandler,
             ClientLevel.ClientLevelData properties,
-            ResourceKey<Level> registryRef,
+            RegistryKey<World> registryRef,
             Holder<DimensionType> dimensionType,
             int loadDistance,
             int simulationDistance,
@@ -46,7 +46,7 @@ public abstract class MixinClientLevel {
             long seed,
             int seaLevel,
             CallbackInfo cir) {
-        this.bottomSectionY = ((Level)(Object)this).getMinY()>>4;
+        this.bottomSectionY = ((World)(Object)this).getMinY()>>4;
     }
 
     @Inject(method = "setBlocksDirty", at = @At("TAIL"))
@@ -59,7 +59,7 @@ public abstract class MixinClientLevel {
 
         if (!VoxyConfig.CONFIG.ingestEnabled) return;//Only ingest if setting enabled
 
-        var self = (Level)(Object)this;
+        var self = (World)(Object)this;
         var wi = WorldIdentifier.of(self);
         if (wi == null) {
             return;

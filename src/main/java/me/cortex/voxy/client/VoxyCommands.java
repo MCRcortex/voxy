@@ -6,21 +6,16 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
-import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import me.cortex.voxy.commonImpl.importers.DHImporter;
 import me.cortex.voxy.commonImpl.importers.WorldImporter;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
-import net.minecraft.client.Minecraft;
-import net.minecraft.commands.SharedSuggestionProvider;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.command.CommandSource;
+import net.minecraft.text.Text;
+import net.minecraft.world.dimension.DimensionType;
 
 import java.io.File;
 import java.io.IOException;
@@ -69,10 +64,10 @@ public class VoxyCommands {
     private static int reloadInstance(CommandContext<FabricClientCommandSource> ctx) {
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
-        var wr = Minecraft.getInstance().levelRenderer;
+        var wr = MinecraftClient.getInstance().worldRenderer;
         if (wr!=null) {
             ((IGetVoxyRenderSystem)wr).shutdownRenderer();
         }
@@ -81,8 +76,8 @@ public class VoxyCommands {
         System.gc();
         VoxyCommon.createInstance();
 
-        var r = Minecraft.getInstance().levelRenderer;
-        if (r != null) r.allChanged();
+        var r = MinecraftClient.getInstance().worldRenderer;
+        if (r != null) r.reload();
         return 0;
     }
 
@@ -92,7 +87,7 @@ public class VoxyCommands {
     private static int importDistantHorizons(CommandContext<FabricClientCommandSource> ctx) {
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
         var dbFile = new File(ctx.getArgument("sqlDbPath", String.class));
@@ -107,10 +102,10 @@ public class VoxyCommands {
         }
 
         File dbFile_ = dbFile;
-        var engine = WorldIdentifier.ofEngine(Minecraft.getInstance().level);
+        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().world);
         if (engine==null)return 1;
         return instance.getImportManager().makeAndRunIfNone(engine, ()->
-                new DHImporter(dbFile_, engine, Minecraft.getInstance().level, instance.getServiceManager(), instance.savingServiceRateLimiter))?0:1;
+                new DHImporter(dbFile_, engine, MinecraftClient.getInstance().world, instance.getServiceManager(), instance.savingServiceRateLimiter))?0:1;
     }
 
     private static boolean fileBasedImporter(File directory) {
@@ -119,10 +114,10 @@ public class VoxyCommands {
             return false;
         }
 
-        var engine = WorldIdentifier.ofEngine(Minecraft.getInstance().level);
+        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().world);
         if (engine==null) return false;
         return instance.getImportManager().makeAndRunIfNone(engine, ()->{
-            var importer = new WorldImporter(engine, Minecraft.getInstance().level, instance.getServiceManager(), instance.savingServiceRateLimiter);
+            var importer = new WorldImporter(engine, MinecraftClient.getInstance().world, instance.getServiceManager(), instance.savingServiceRateLimiter);
             importer.importRegionDirectoryAsync(directory);
             return importer;
         });
@@ -130,7 +125,7 @@ public class VoxyCommands {
 
     private static int importRaw(CommandContext<FabricClientCommandSource> ctx) {
         if (VoxyCommon.getInstance() == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
 
@@ -139,7 +134,7 @@ public class VoxyCommands {
 
     private static int importBobby(CommandContext<FabricClientCommandSource> ctx) {
         if (VoxyCommon.getInstance() == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
 
@@ -148,10 +143,10 @@ public class VoxyCommands {
     }
 
     private static CompletableFuture<Suggestions> importWorldSuggester(CommandContext<FabricClientCommandSource> ctx, SuggestionsBuilder sb) {
-        return fileDirectorySuggester(Minecraft.getInstance().gameDirectory.toPath().resolve("saves"), sb);
+        return fileDirectorySuggester(MinecraftClient.getInstance().runDirectory.toPath().resolve("saves"), sb);
     }
     private static CompletableFuture<Suggestions> importBobbySuggester(CommandContext<FabricClientCommandSource> ctx, SuggestionsBuilder sb) {
-        return fileDirectorySuggester(Minecraft.getInstance().gameDirectory.toPath().resolve(".bobby"), sb);
+        return fileDirectorySuggester(MinecraftClient.getInstance().runDirectory.toPath().resolve(".bobby"), sb);
     }
 
     private static CompletableFuture<Suggestions> fileDirectorySuggester(Path dir, SuggestionsBuilder sb) {
@@ -186,7 +181,7 @@ public class VoxyCommands {
                 if (wn.equals(remaining)) {
                     continue;
                 }
-                if (SharedSuggestionProvider.matchesSubStr(remaining, wn) || SharedSuggestionProvider.matchesSubStr(remaining, '"'+wn)) {
+                if (CommandSource.shouldSuggest(remaining, wn) || CommandSource.shouldSuggest(remaining, '"'+wn)) {
                     wn = str+wn + "/";
                     sb.suggest(StringArgumentType.escapeIfRequired(wn));
                 }
@@ -198,7 +193,7 @@ public class VoxyCommands {
 
     private static int importWorld(CommandContext<FabricClientCommandSource> ctx) {
         if (VoxyCommon.getInstance() == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
 
@@ -209,7 +204,7 @@ public class VoxyCommands {
             name = name.substring(0, name.length()-1);
         }
         if (file.resolve("level.dat").toFile().exists()) {
-            var dimFile = DimensionType.getStorageFolder(Minecraft.getInstance().level.dimension(), file)
+            var dimFile = DimensionType.getSaveDirectory(MinecraftClient.getInstance().world.getRegistryKey(), file)
                     .resolve("region")
                     .toFile();
             if (!dimFile.isDirectory()) return 1;
@@ -217,7 +212,7 @@ public class VoxyCommands {
             //We are in a world directory, so import the current dimension we are in
             /*
             for (var dim : new String[]{"overworld", "the_nether", "the_end"}) {//This is so annoying that you cant loop through all the dimensions
-                var id = ResourceKey.create(Registries.DIMENSION, Identifier.withDefaultNamespace(dim));
+                var id = ResourceKey.create(RegistryKeys.DIMENSION, Identifier.withDefaultNamespace(dim));
                 var dimPath = DimensionType.getStorageFolder(id, file);
                 dimPath = dimPath.resolve("region");
                 var dimFile = dimPath.toFile();
@@ -244,15 +239,15 @@ public class VoxyCommands {
 
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
         String finalInnerDir = innerDir;
 
-        var engine = WorldIdentifier.ofEngine(Minecraft.getInstance().level);
+        var engine = WorldIdentifier.ofEngine(MinecraftClient.getInstance().world);
         if (engine != null) {
             return instance.getImportManager().makeAndRunIfNone(engine, () -> {
-                var importer = new WorldImporter(engine, Minecraft.getInstance().level, instance.getServiceManager(), instance.savingServiceRateLimiter);
+                var importer = new WorldImporter(engine, MinecraftClient.getInstance().world, instance.getServiceManager(), instance.savingServiceRateLimiter);
                 importer.importZippedRegionDirectoryAsync(zip, finalInnerDir);
                 return importer;
             }) ? 0 : 1;
@@ -263,10 +258,10 @@ public class VoxyCommands {
     private static int cancelImport(CommandContext<FabricClientCommandSource> ctx) {
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Text.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
-        var world = WorldIdentifier.ofEngineNullable(Minecraft.getInstance().level);
+        var world = WorldIdentifier.ofEngineNullable(MinecraftClient.getInstance().world);
         if (world != null) {
             return instance.getImportManager().cancelImport(world)?0:1;
         }

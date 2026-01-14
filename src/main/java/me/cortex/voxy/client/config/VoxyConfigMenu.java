@@ -13,8 +13,8 @@ import net.caffeinemc.mods.sodium.api.config.option.OptionFlag;
 import net.caffeinemc.mods.sodium.api.config.option.OptionImpact;
 import net.caffeinemc.mods.sodium.api.config.option.Range;
 import net.caffeinemc.mods.sodium.api.config.structure.ConfigBuilder;
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.text;
 import net.minecraft.resources.Identifier;
 
 public class VoxyConfigMenu implements ConfigEntryPoint {
@@ -51,7 +51,7 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                         })
                                         .setPostChangeRunner(c->{
                                             if (!c) {
-                                                var vrsh = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
+                                                var vrsh = (IGetVoxyRenderSystem) MinecraftClient.getInstance().levelRenderer;
                                                 if (vrsh != null) {
                                                     vrsh.shutdownRenderer();
                                                 }
@@ -84,7 +84,7 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                         Component.translatable("voxy.config.general.rendering"),
                                         ()->CFG.enableRendering, v->CFG.enableRendering=v)
                                         .setPostChangeRunner(c->{
-                                            var vrsh = (IGetVoxyRenderSystem)Minecraft.getInstance().levelRenderer;
+                                            var vrsh = (IGetVoxyRenderSystem)MinecraftClient.getInstance().levelRenderer;
                                             if (vrsh != null) {
                                                 if (c) {
                                                     vrsh.createRenderer();
@@ -109,7 +109,7 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                         new Range(2, 64, 1))
                                         .setFormatter(v->Component.literal(Integer.toString(v*32)))//Top level rd == 32 chunks
                                         .setPostChangeRunner(c->{
-                                            var vrsh = (IGetVoxyRenderSystem)Minecraft.getInstance().levelRenderer;
+                                            var vrsh = (IGetVoxyRenderSystem)MinecraftClient.getInstance().levelRenderer;
                                             if (vrsh != null) {
                                                 var vrs = vrsh.getVoxyRenderSystem();
                                                 if (vrs != null) {

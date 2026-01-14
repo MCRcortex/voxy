@@ -4,9 +4,9 @@ import me.cortex.voxy.commonImpl.IWorldGetIdentifier;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.core.Holder;
 import net.minecraft.core.RegistryAccess;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.world.World;
+import net.minecraft.world.dimension.DimensionType;
 import net.minecraft.world.level.storage.WritableLevelData;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -14,14 +14,14 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(Level.class)
+@Mixin(World.class)
 public class MixinWorld implements IWorldGetIdentifier {
     @Unique
     private WorldIdentifier identifier;
 
     @Inject(method = "<init>", at = @At("RETURN"))
     private void voxy$injectIdentifier(WritableLevelData properties,
-                                       ResourceKey<Level> key,
+                                       RegistryKey<World> key,
                                        RegistryAccess registryManager,
                                        Holder<DimensionType> dimensionEntry,
                                        boolean isClient,

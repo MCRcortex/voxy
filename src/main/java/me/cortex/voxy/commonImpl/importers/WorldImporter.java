@@ -12,12 +12,12 @@ import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldUpdater;
 import net.minecraft.core.Holder;
-import net.minecraft.core.registries.Registries;
+import net.minecraft.core.registries.RegistryKeys;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.World;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.state.BlockState;
@@ -62,11 +62,11 @@ public class WorldImporter implements IDataImporter {
 
     private volatile boolean isRunning;
 
-    public WorldImporter(WorldEngine worldEngine, Level mcWorld, ServiceManager sm, BooleanSupplier runChecker) {
+    public WorldImporter(WorldEngine worldEngine, World mcWorld, ServiceManager sm, BooleanSupplier runChecker) {
         this.world = worldEngine;
         this.service = sm.createService(()->new Pair<>(()->this.jobQueue.poll().run(), ()->{}), 3, "World importer", runChecker);
 
-        var biomeRegistry = mcWorld.registryAccess().lookupOrThrow(Registries.BIOME);
+        var biomeRegistry = mcWorld.registryAccess().lookupOrThrow(RegistryKeys.BIOME);
         var defaultBiome = biomeRegistry.getOrThrow(Biomes.PLAINS);
         this.defaultBiomeProvider = new PalettedContainerRO<>() {
             @Override

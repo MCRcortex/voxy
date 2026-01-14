@@ -15,28 +15,24 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.Pair;
 import me.cortex.voxy.common.world.other.Mapper;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.color.block.BlockColor;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.ColorResolver;
-import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.Biomes;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.LeavesBlock;
-import net.minecraft.world.level.block.LiquidBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.lighting.LevelLightEngine;
-import net.minecraft.world.level.material.FluidState;
+import net.minecraft.block.*;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.color.block.BlockColorProvider;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.chunk.ChunkBuilder;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.BlockRenderView;
+import net.minecraft.world.biome.ColorResolver;
+import net.minecraft.world.LightType;
+import net.minecraft.world.biome.Biome;
+import net.minecraft.world.biome.BiomeKeys;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.world.chunk.light.LightingProvider;
+import net.minecraft.fluid.FluidState;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
@@ -73,7 +69,7 @@ public class ModelFactory {
         }
     }
 
-    private final Biome DEFAULT_BIOME = Minecraft.getInstance().level.registryAccess().lookupOrThrow(Registries.BIOME).getValue(Biomes.PLAINS);
+    private final Biome DEFAULT_BIOME = MinecraftClient.getInstance().world.getRegistryManager().get(RegistryKeys.BIOME).get(BiomeKeys.PLAINS);
 
     public final ModelTextureBakery bakery;
 
@@ -203,10 +199,10 @@ public class ModelFactory {
 
         //Before we enqueue the baking of this blockstate, we must check if it has a fluid state associated with it
         // if it does, we must ensure that it is (effectivly) baked BEFORE we bake this blockstate
-        boolean isFluid = blockState.getBlock() instanceof LiquidBlock;
+        boolean isFluid = blockState.getBlock() instanceof FluidBlock;
         if ((!isFluid) && (!blockState.getFluidState().isEmpty())) {
             //Insert into the fluid LUT
-            var fluidState = blockState.getFluidState().createLegacyBlock();
+            var fluidState = blockState.getFluidState().getBlockState();
 
             int fluidStateId = this.mapper.getIdForBlockState(fluidState);
 
@@ -264,7 +260,7 @@ public class ModelFactory {
     public void processAllThings() {
         var biomeEntry = this.biomeQueue.poll();
         while (biomeEntry != null) {
-            var biomeRegistry = Minecraft.getInstance().level.registryAccess().lookupOrThrow(Registries.BIOME);
+            var biomeRegistry = MinecraftClient.getInstance().level.registryAccess().lookupOrThrow(RegistryKeys.BIOME);
             var res = this.addBiome0(biomeEntry.id, biomeRegistry.getValue(Identifier.parse(biomeEntry.biome)));
             if (res != null) {
                 this.uploadResults.add(res);
@@ -730,14 +726,14 @@ public class ModelFactory {
         return result;
     }
 
-    private static BlockColor getColourProvider(Block block) {
-        return Minecraft.getInstance().getBlockColors().blockColors.byId(BuiltInRegistries.BLOCK.getId(block));
+    private static BlockColorProvider getColourProvider(Block block) {
+        return MinecraftClient.getInstance().getBlockColorProviders().blockColors.byId(BuiltInRegistries.BLOCK.getId(block));
     }
 
     //TODO: add a method to detect biome dependent colours (can do by detecting if getColor is ever called)
     // if it is, need to add it to a list and mark it as biome colour dependent or something then the shader
     // will either use the uint as an index or a direct colour multiplier
-    private static int captureColourConstant(BlockColor colorProvider, BlockState state, Biome biome) {
+    private static int captureColourConstant(BlockColorProvider colorProvider, BlockState state, Biome biome) {
         var getter = new BlockAndTintGetter() {
             @Override
             public float getShade(Direction direction, boolean shaded) {
@@ -791,7 +787,7 @@ public class ModelFactory {
         return colorProvider.getColor(state, getter, BlockPos.ZERO, 1);
     }
 
-    private static boolean isBiomeDependentColour(BlockColor colorProvider, BlockState state) {
+    private static boolean isBiomeDependentColour(BlockColorProvider colorProvider, BlockState state) {
         boolean[] biomeDependent = new boolean[1];
         var getter = new BlockAndTintGetter() {
             @Override

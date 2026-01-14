@@ -2,14 +2,16 @@ package me.cortex.voxy.client.core.model.bakery;
 
 
 import me.cortex.voxy.common.util.MemoryBuffer;
-import net.minecraft.client.model.geom.builders.UVPair;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.texture.MipmapStrategy;
+import net.minecraft.client.texture.SpriteContents;
+import net.minecraft.client.util.math.Vector2f;
+import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.texture.MipmapHelper;
 import org.lwjgl.system.MemoryUtil;
 
 import static me.cortex.voxy.client.core.model.bakery.BudgetBufferRenderer.VERTEX_FORMAT_SIZE;
 
-import com.mojang.blaze3d.vertex.VertexConsumer;
+import net.minecraft.client.render.VertexConsumer;
 
 public final class ReuseVertexConsumer implements VertexConsumer {
     private MemoryBuffer buffer = new MemoryBuffer(8192);
@@ -30,13 +32,13 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     @Override
-    public ReuseVertexConsumer addVertex(float x, float y, float z) {
+    public ReuseVertexConsumer vertex(double x, double y, double z) {
         this.ensureCanPut();
         this.ptr += VERTEX_FORMAT_SIZE; this.count++; //Goto next vertex
         this.meta(this.defaultMeta);
-        MemoryUtil.memPutFloat(this.ptr, x);
-        MemoryUtil.memPutFloat(this.ptr + 4, y);
-        MemoryUtil.memPutFloat(this.ptr + 8, z);
+        MemoryUtil.memPutDouble(this.ptr, x);
+        MemoryUtil.memPutDouble(this.ptr + 4, y);
+        MemoryUtil.memPutDouble(this.ptr + 8, z);
         return this;
     }
 
@@ -45,53 +47,71 @@ public final class ReuseVertexConsumer implements VertexConsumer {
         return this;
     }
 
+
     @Override
-    public ReuseVertexConsumer setColor(int red, int green, int blue, int alpha) {
+    public ReuseVertexConsumer color(int red, int green, int blue, int alpha) {
+        return this;
+    }
+
+
+
+    @Override
+    public void next() {
+
+    }
+
+    @Override
+    public void fixedColor(int red, int green, int blue, int alpha) {
+
+    }
+
+    @Override
+    public void unfixColor() {
+
+    }
+
+    @Override
+    public VertexConsumer color(int i) {
         return this;
     }
 
     @Override
-    public VertexConsumer setColor(int i) {
-        return this;
-    }
-
-    @Override
-    public ReuseVertexConsumer setUv(float u, float v) {
+    public ReuseVertexConsumer texture(float u, float v) {
         MemoryUtil.memPutFloat(this.ptr + 16, u);
         MemoryUtil.memPutFloat(this.ptr + 20, v);
         return this;
     }
 
     @Override
-    public ReuseVertexConsumer setUv1(int u, int v) {
+    public ReuseVertexConsumer overlay(int u, int v) {
         return this;
     }
 
     @Override
-    public ReuseVertexConsumer setUv2(int u, int v) {
+    public ReuseVertexConsumer light(int u, int v) {
         return this;
     }
 
     @Override
-    public ReuseVertexConsumer setNormal(float x, float y, float z) {
+    public ReuseVertexConsumer normal(float x, float y, float z) {
         return this;
-    }
-
-    @Override
-    public VertexConsumer setLineWidth(float f) {
-        return null;
     }
 
     public ReuseVertexConsumer quad(BakedQuad quad, int metadata) {
-        this.anyShaded |= quad.shade();
-        this.anyDarkendTex |= quad.sprite().contents().mipmapStrategy == MipmapStrategy.DARK_CUTOUT;
+        this.anyShaded |= quad.hasShade();
+        SpriteContents contents = quad.getSprite().getContents();
+//        this.anyDarkendTex |= ;
         this.ensureCanPut();
+        int[] vertexData = quad.getVertexData();
         for (int i = 0; i < 4; i++) {
-            var pos = quad.position(i);
-            this.addVertex(pos.x(), pos.y(), pos.z());
-            long puv = quad.packedUV(i);
-            this.setUv(UVPair.unpackU(puv),UVPair.unpackV(puv));
-
+            int offset = i * 8;
+            float x = Float.intBitsToFloat(vertexData[offset]);
+            float y = Float.intBitsToFloat(vertexData[offset + 1]);
+            float z = Float.intBitsToFloat(vertexData[offset + 2]);
+            this.vertex(x, y, z);
+            float u = Float.intBitsToFloat(vertexData[offset + 4]);
+            float v = Float.intBitsToFloat(vertexData[offset + 5]);
+            this.texture(u, v);
             this.meta(metadata);
         }
         return this;

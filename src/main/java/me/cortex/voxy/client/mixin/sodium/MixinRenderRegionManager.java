@@ -7,7 +7,7 @@ import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegionManager;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -19,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinRenderRegionManager {
     @Redirect(method = "uploadResults(Lnet/caffeinemc/mods/sodium/client/gl/device/CommandList;Lnet/caffeinemc/mods/sodium/client/render/chunk/region/RenderRegion;Ljava/util/Collection;)V", at = @At(value = "INVOKE", target = "Ljava/lang/Math;toIntExact(J)I"), remap = false)
     private int voxy$cancelFade(long time) {
-        var vrs = ((IGetVoxyRenderSystem)(Minecraft.getInstance().levelRenderer)).getVoxyRenderSystem();
+        var vrs = ((IGetVoxyRenderSystem)(MinecraftClient.getInstance().levelRenderer)).getVoxyRenderSystem();
         if (vrs!=null) {
             return -2;
         } else {

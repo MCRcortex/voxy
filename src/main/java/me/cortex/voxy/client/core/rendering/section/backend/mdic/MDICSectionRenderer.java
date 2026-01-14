@@ -19,8 +19,8 @@ import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.WorldEngine;
-import net.minecraft.client.Minecraft;
-import net.minecraft.core.Direction;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.util.math.Direction;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
@@ -114,7 +114,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                 .addSource(ShaderType.VERTEX, vertex);
 
         //Apply per face tinting
-        addDirectionalFaceTint(builder, Minecraft.getInstance().level);
+        addDirectionalFaceTint(builder, MinecraftClient.getInstance().world);
 
         String frag = ShaderLoader.parse("voxy:lod/gl46/quads.frag");
 

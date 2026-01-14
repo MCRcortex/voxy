@@ -6,28 +6,25 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.IMappingStorage;
 import me.cortex.voxy.common.util.Pair;
 import net.minecraft.SharedConstants;
-import net.minecraft.core.Holder;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtTagSizeTracker;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.util.datafix.DataFixers;
-import net.minecraft.util.datafix.fixes.References;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.LeavesBlock;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.datafixer.Schemas;
+import net.minecraft.datafixer.TypeReferences;
+import net.minecraft.world.biome.Biome;
+import net.minecraft.block.Block;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.LeavesBlock;
+import net.minecraft.block.BlockState;
 import org.lwjgl.system.MemoryUtil;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -57,7 +54,7 @@ public class Mapper {
     public Mapper(IMappingStorage storage) {
         this.storage = storage;
         //Insert air since its a special entry (index 0)
-        var airEntry = new StateEntry(0, Blocks.AIR.defaultBlockState());
+        var airEntry = new StateEntry(0, Blocks.AIR.getDefaultState());
         this.block2stateEntry.put(airEntry.state, airEntry);
         this.blockId2stateEntry.add(airEntry);
 
@@ -141,12 +138,12 @@ public class Mapper {
         }
 
         if (!sentryErrors.isEmpty()) {
-            forceResave[0] |= true;
+            forceResave[0] = true;
             //Insert garbage types into the mapping for those blocks, TODO:FIXME: Need to upgrade the type or have a solution to error blocks
             var rand = new Random();
             for (var error : sentryErrors) {
                 while (true) {
-                    var state = new StateEntry(error.right(), Block.BLOCK_STATE_REGISTRY.byId(rand.nextInt(Block.BLOCK_STATE_REGISTRY.size() - 1)));
+                    var state = new StateEntry(error.right(), Objects.requireNonNull(Block.STATE_IDS.get(rand.nextInt(Block.STATE_IDS.size() - 1))));
                     if (this.block2stateEntry.put(state.state, state) == null) {
                         sentries.add(state);
                         break;
@@ -229,7 +226,7 @@ public class Mapper {
 
 
     //TODO:FIXME: IS VERY SLOW NEED TO MAKE IT LOCK FREE, or at minimum use a concurrent map
-    public long getBaseId(byte light, BlockState state, Holder<Biome> biome) {
+    public long getBaseId(byte light, BlockState state, RegistryEntry<Biome> biome) {
         if (state.isAir()) return Byte.toUnsignedLong(light) <<56;//Special case and fast return for air, dont care about the biome
         return composeMappingId(light, this.getIdForBlockState(state), this.getIdForBiome(biome));
     }
@@ -257,8 +254,8 @@ public class Mapper {
         return this.blockId2stateEntry.get(blockId).opacity;
     }
 
-    public int getIdForBiome(Holder<Biome> biome) {
-        String biomeId = biome.unwrapKey().get().identifier().toString();
+    public int getIdForBiome(RegistryEntry<Biome> biome) {
+        String biomeId = biome.getKey().toString();
         var entry = this.biome2biomeEntry.get(biomeId);
         if (entry == null) {
             entry = this.registerNewBiome(biomeId);
@@ -357,7 +354,7 @@ public class Mapper {
             if (state.getBlock() instanceof LeavesBlock) {
                 this.opacity = 15;
             } else {
-                this.opacity = state.getLightBlock();
+                this.opacity = state.getOpacity();
             }
         }
 

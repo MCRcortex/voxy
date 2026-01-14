@@ -17,7 +17,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -49,7 +49,7 @@ public abstract class MixinDefaultChunkRenderer extends ShaderChunkRenderer {
     @Unique
     private void doRender(ChunkRenderMatrices matrices, TerrainRenderPass renderPass, CameraTransform camera, FogParameters fogParameters) {
         if (renderPass == DefaultTerrainRenderPasses.CUTOUT) {
-            var renderer = ((IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer).getVoxyRenderSystem();
+            var renderer = ((IGetVoxyRenderSystem) MinecraftClient.getInstance().levelRenderer).getVoxyRenderSystem();
             if (renderer != null) {
                 Viewport<?> viewport = null;
                 if (IrisUtil.irisShaderPackEnabled()) {

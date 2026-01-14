@@ -11,12 +11,12 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.gui.components.debug.DebugScreenEntry;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.World;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.jspecify.annotations.Nullable;
 
@@ -55,7 +55,7 @@ public class VoxyClient implements ClientModInitializer {
     public void onInitializeClient() {
         DebugScreenEntries.register(Identifier.fromNamespaceAndPath("voxy", "version"), new DebugScreenEntry() {
             @Override
-            public void display(DebugScreenDisplayer lines, @Nullable Level level, @Nullable LevelChunk levelChunk, @Nullable LevelChunk levelChunk2) {
+            public void display(DebugScreenDisplayer lines, @Nullable World level, @Nullable LevelChunk levelChunk, @Nullable LevelChunk levelChunk2) {
                 if (!VoxyCommon.isAvailable()) {
                     lines.addLine(ChatFormatting.RED + "voxy-"+VoxyCommon.MOD_VERSION);//Voxy installed, not avalible
                     return;
@@ -66,7 +66,7 @@ public class VoxyClient implements ClientModInitializer {
                     return;
                 }
                 VoxyRenderSystem vrs = null;
-                var wr = Minecraft.getInstance().levelRenderer;
+                var wr = MinecraftClient.getInstance().levelRenderer;
                 if (wr != null) vrs = ((IGetVoxyRenderSystem) wr).getVoxyRenderSystem();
 
                 //Voxy instance active

@@ -9,11 +9,12 @@ import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.config.storage.StorageBackend;
 import me.cortex.voxy.common.config.storage.StorageConfig;
 import me.cortex.voxy.common.util.MemoryBuffer;
-import net.minecraft.world.level.levelgen.RandomSupport;
+import net.minecraft.util.math.random.RandomSeed;
 import org.apache.commons.lang3.stream.Streams;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.function.LongConsumer;
 
 //TODO: replace synchronize with StampedLock
@@ -26,7 +27,7 @@ public class MemoryStorageBackend extends StorageBackend {
     }
 
     private Long2ObjectMap<MemoryBuffer> getMap(long key) {
-        return this.maps[(int) (RandomSupport.mixStafford13(RandomSupport.mixStafford13(key)^key)&(this.maps.length-1))];
+        return this.maps[(int) (RandomSeed.mixStafford13(RandomSeed.mixStafford13(key)^key)&(this.maps.length-1))];
     }
 
     @Override
@@ -115,7 +116,7 @@ public class MemoryStorageBackend extends StorageBackend {
 
     @Override
     public void close() {
-        Streams.of(this.maps).map(Long2ObjectMap::values).flatMap(ObjectCollection::stream).forEach(MemoryBuffer::free);
+        Arrays.stream(this.maps).map(Long2ObjectMap::values).flatMap(ObjectCollection::stream).forEach(MemoryBuffer::free);
         this.idMappings.values().forEach(MemoryUtil::memFree);
     }
 

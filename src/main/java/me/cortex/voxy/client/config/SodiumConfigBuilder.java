@@ -5,7 +5,7 @@ import net.caffeinemc.mods.sodium.api.config.ConfigState;
 import net.caffeinemc.mods.sodium.api.config.StorageEventHandler;
 import net.caffeinemc.mods.sodium.api.config.option.*;
 import net.caffeinemc.mods.sodium.api.config.structure.*;
-import net.minecraft.network.chat.Component;
+import net.minecraft.text.text;
 import net.minecraft.network.chat.contents.TranslatableContents;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;

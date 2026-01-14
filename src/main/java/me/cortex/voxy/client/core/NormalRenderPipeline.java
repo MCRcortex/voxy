@@ -11,7 +11,7 @@ import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTra
 import me.cortex.voxy.client.core.rendering.hierachical.NodeCleaner;
 import me.cortex.voxy.client.core.rendering.post.FullscreenBlit;
 import me.cortex.voxy.client.core.rendering.util.DepthFramebuffer;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
 
@@ -109,7 +109,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             float end = viewport.fogParameters.environmentalEnd();
             if (Math.abs(end-start)>1) {
                 float invEndFogDelta = 1f / (end - start);
-                float endDistance = Math.max(Minecraft.getInstance().gameRenderer.getRenderDistance(), 20*16);//TODO: make this constant a config option
+                float endDistance = Math.max(MinecraftClient.getInstance().gameRenderer.getRenderDistance(), 20*16);//TODO: make this constant a config option
                 endDistance *= (float)Math.sqrt(3);
                 float startDelta = -start * invEndFogDelta;
                 glUniform4f(4, invEndFogDelta, startDelta, Math.clamp(endDistance*invEndFogDelta+startDelta, 0, 1),0);//

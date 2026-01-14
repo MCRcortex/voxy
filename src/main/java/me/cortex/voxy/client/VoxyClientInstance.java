@@ -1,6 +1,6 @@
 package me.cortex.voxy.client;
 
-import me.cortex.voxy.client.compat.FlashbackCompat;
+//import me.cortex.voxy.client.compat.FlashbackCompat;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.mixin.sodium.AccessorSodiumWorldRenderer;
 import me.cortex.voxy.common.Logger;
@@ -16,9 +16,9 @@ import me.cortex.voxy.common.config.storage.rocksdb.RocksDBStorageBackend;
 import me.cortex.voxy.commonImpl.ImportManager;
 import me.cortex.voxy.commonImpl.VoxyInstance;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
-import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
-import net.minecraft.client.Minecraft;
-import net.minecraft.world.level.storage.LevelResource;
+import me.jellysquid.mods.sodium.client.render.SodiumWorldRenderer;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.util.WorldSavePath;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -30,7 +30,8 @@ public class VoxyClientInstance extends VoxyInstance {
     private final boolean noIngestOverride;
     public VoxyClientInstance() {
         super();
-        var path = FlashbackCompat.getReplayStoragePath();
+//        var path = FlashbackCompat.getReplayStoragePath();
+        var path = getBasePath();
         this.noIngestOverride = path != null;
         if (path == null) {
             path = getBasePath();
@@ -92,26 +93,28 @@ public class VoxyClientInstance extends VoxyInstance {
     }
 
     private static Path getBasePath() {
-        Path basePath = Minecraft.getInstance().gameDirectory.toPath().resolve(".voxy").resolve("saves");
-        var iserver = Minecraft.getInstance().getSingleplayerServer();
+        Path basePath = MinecraftClient.getInstance().runDirectory.toPath().resolve(".voxy").resolve("saves");
+        var iserver = MinecraftClient.getInstance().getServer();
         if (iserver != null) {
-            basePath = iserver.getWorldPath(LevelResource.ROOT).resolve("voxy");
+            basePath = iserver.getSavePath(WorldSavePath.ROOT).resolve("voxy");
         } else {
-            var netHandle = Minecraft.getInstance().gameMode;
+            var netHandle = MinecraftClient.getInstance().getNetworkHandler();
             if (netHandle == null) {
                 Logger.error("Network handle null");
                 basePath = basePath.resolve("UNKNOWN");
             } else {
-                var info = netHandle.connection.getServerData();
+                var info = netHandle.getConnection();
                 if (info == null) {
                     Logger.error("Server info null");
                     basePath = basePath.resolve("UNKNOWN");
                 } else {
-                    if (info.isRealm()) {
-                        basePath = basePath.resolve("realms");
-                    } else {
-                        basePath = basePath.resolve(info.ip.replace(":", "_"));
-                    }
+                    basePath = basePath.resolve(info.getAddress().toString().replace(":", "_"));
+
+//                    if (info.isRealm()) {
+//                        basePath = basePath.resolve("realms");
+//                    } else {
+//                        basePath = basePath.resolve(info.ip.replace(":", "_"));
+//                    }
                 }
             }
         }

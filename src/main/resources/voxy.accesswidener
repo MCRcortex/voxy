@@ -17,6 +17,14 @@ accessible field net/minecraft/world/level/chunk/PalettedContainer$Data storage 
 accessible field net/minecraft/client/renderer/texture/SpriteContents mipmapStrategy Lnet/minecraft/client/renderer/texture/MipmapStrategy;
 
 accessible method net/minecraft/client/renderer/GameRenderer getFov (Lnet/minecraft/client/Camera;FZ)F
+accessible method net/minecraft/client/render/GameRenderer getFov (Lnet/minecraft/client/render/Camera;FZ)D
 
 accessible method net/minecraft/client/multiplayer/ClientChunkCache$Storage getChunk (I)Lnet/minecraft/world/level/chunk/LevelChunk;
 accessible method net/minecraft/client/multiplayer/ClientChunkCache$Storage getIndex (II)I
+
+accessible  class  net/minecraft/client/render/BackgroundRenderer$FogData
+accessible field net/minecraft/client/render/BackgroundRenderer$FogData fogStart F
+accessible field net/minecraft/client/render/BackgroundRenderer$FogData fogEnd F
+accessible field net/minecraft/client/render/BackgroundRenderer$FogData fogShape Lnet/minecraft/client/render/FogShape;
+
+accessible method me/jellysquid/mods/sodium/client/util/color/ColorSRGB linearToSrgb (F)I

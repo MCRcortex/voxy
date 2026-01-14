@@ -3,20 +3,25 @@ package me.cortex.voxy.common.voxelization;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.other.Mipper;
-import net.caffeinemc.mods.lithium.common.world.chunk.LithiumHashPalette;
+//import net.caffeinemc.mods.lithium.common.world.chunk.LithiumHashPalette;
+import me.jellysquid.mods.lithium.common.world.chunk.LithiumHashPalette;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.core.Holder;
-import net.minecraft.util.SimpleBitStorage;
-import net.minecraft.util.ZeroBitStorage;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.chunk.GlobalPalette;
-import net.minecraft.world.level.chunk.HashMapPalette;
-import net.minecraft.world.level.chunk.LinearPalette;
-import net.minecraft.world.level.chunk.Palette;
-import net.minecraft.world.level.chunk.PalettedContainer;
-import net.minecraft.world.level.chunk.PalettedContainerRO;
-import net.minecraft.world.level.chunk.SingleValuePalette;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.entry.RegistryEntryList;
+import net.minecraft.util.collection.PackedIntegerArray;
+import net.minecraft.util.collection.EmptyPaletteStorage;
+import net.minecraft.world.biome.Biome;
+import net.minecraft.block.BlockState;
+import net.minecraft.world.chunk.IdListPalette;
+import net.minecraft.world.chunk.BiMapPalette;
+import net.minecraft.world.chunk.ArrayPalette;
+import net.minecraft.world.chunk.Palette;
+import net.minecraft.world.chunk.PalettedContainer;
+import net.minecraft.world.chunk.ReadableContainer;
+import net.minecraft.world.chunk.SingularPalette;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.gen.Accessor;
+
 import java.util.WeakHashMap;
 
 public class WorldConversionFactory {
@@ -45,7 +50,7 @@ public class WorldConversionFactory {
             for (int i = 0; i < vp.getSize(); i++) {
                 BlockState state = null;
                 int blockId = -1;
-                try { state = vp.valueFor(i); } catch (Exception e) {}
+                try { state = vp.get(i); } catch (Exception e) {}
                 if (state != null) {
                     blockId = blockCache.getOrDefault(state, -1);
                     if (blockId == -1) {
@@ -61,9 +66,9 @@ public class WorldConversionFactory {
     }
     private static int setupLocalPalette(Palette<BlockState> vp, Reference2IntOpenHashMap<BlockState> blockCache, Mapper mapper, int[] pc) {
         int c = vp.getSize();
-        if (vp instanceof LinearPalette<BlockState>) {
+        if (vp instanceof ArrayPalette<BlockState>) {
             for (int i = 0; i < vp.getSize(); i++) {
-                var state = vp.valueFor(i);
+                var state = vp.get(i);
                 int blockId = -1;
                 if (state != null) {
                     blockId = blockCache.getOrDefault(state, -1);
@@ -74,14 +79,14 @@ public class WorldConversionFactory {
                 }
                 pc[i] = blockId;
             }
-        } else if (vp instanceof HashMapPalette<BlockState> pal) {
+        } else if (vp instanceof BiMapPalette<BlockState> pal) {
             //var map = pal.map;
             //TODO: heavily optimize this by reading the map directly
 
             for (int i = 0; i < vp.getSize(); i++) {
                 BlockState state = null;
                 int blockId = -1;
-                try { state = vp.valueFor(i); } catch (Exception e) {}
+                try { state = vp.get(i); } catch (Exception e) {}
                 if (state != null) {
                     blockId = blockCache.getOrDefault(state, -1);
                     if (blockId == -1) {
@@ -92,9 +97,9 @@ public class WorldConversionFactory {
                 pc[i] = blockId;
             }
 
-        } else if (vp instanceof SingleValuePalette<BlockState>) {
+        } else if (vp instanceof SingularPalette<BlockState>) {
             int blockId = -1;
-            var state = vp.valueFor(0);
+            var state = vp.get(0);
             if (state != null) {
                 blockId = blockCache.getOrDefault(state, -1);
                 if (blockId == -1) {
@@ -111,10 +116,11 @@ public class WorldConversionFactory {
         return c;
     }
 
-    public static VoxelizedSection convert(VoxelizedSection section,
+
+      public static VoxelizedSection convert(VoxelizedSection section,
                                            Mapper stateMapper,
                                            PalettedContainer<BlockState> blockContainer,
-                                           PalettedContainerRO<Holder<Biome>> biomeContainer,
+                                           ReadableContainer<RegistryEntry<Biome>> biomeContainer,
                                            ILightingSupplier lightSupplier) {
 
         //Cheat by creating a local pallet then read the data directly
@@ -128,10 +134,10 @@ public class WorldConversionFactory {
 
         var vp = blockContainer.data.palette;
         var pc = cache.getPaletteCache(vp.getSize());
-        GlobalPalette<BlockState> bps = null;
+        IdListPalette<BlockState> bps = null;
 
         int pcc = 0;
-        if (blockContainer.data.palette instanceof GlobalPalette<BlockState> _bps) {
+        if (blockContainer.data.palette instanceof IdListPalette<BlockState> _bps) {
             bps = _bps;
             pcc = bps.getSize();
         } else {
@@ -152,12 +158,12 @@ public class WorldConversionFactory {
 
 
         int nonZeroCnt = 0;
-        if (blockContainer.data.storage instanceof SimpleBitStorage bStor) {
-            var bDat = bStor.getRaw();
-            int iterPerLong = (64 / bStor.getBits()) - 1;
+        if (blockContainer.data.storage instanceof PackedIntegerArray bStor) {
+            var bDat = bStor.getData();
+            int iterPerLong = (64 / bStor.getElementBits()) - 1;
 
-            int MSK = (1 << bStor.getBits()) - 1;
-            int eBits = bStor.getBits();
+            int MSK = (1 << bStor.getElementBits()) - 1;
+            int eBits = bStor.getElementBits();
 
             long sample = 0;
             int c = 0;
@@ -171,7 +177,7 @@ public class WorldConversionFactory {
                 if (bps == null) {
                     bId = pc[Math.min((int) (sample & MSK), pcc)];
                 } else {
-                    bId = stateMapper.getIdForBlockState(bps.valueFor((int) (sample&MSK)));
+                    bId = stateMapper.getIdForBlockState(bps.get((int) (sample&MSK)));
                 }
                 sample >>>= eBits;
 
@@ -180,7 +186,7 @@ public class WorldConversionFactory {
                 data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
             }
         } else {
-            if (!(blockContainer.data.storage instanceof ZeroBitStorage)) {
+            if (!(blockContainer.data.storage instanceof EmptyPaletteStorage)) {
                 throw new IllegalStateException();
             }
             int bId = pc[0];

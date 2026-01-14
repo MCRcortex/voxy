@@ -7,7 +7,7 @@ import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
-import net.minecraft.util.Mth;
+import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL15;
@@ -38,9 +38,9 @@ public class DebugRenderer {
 
     private void uploadUniform(Viewport<?> viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 1024);
-        int sx = Mth.floor(viewport.cameraX)>>5;
-        int sy = Mth.floor(viewport.cameraY)>>5;
-        int sz = Mth.floor(viewport.cameraZ)>>5;
+        int sx = MathHelper.floor(viewport.cameraX)>>5;
+        int sy = MathHelper.floor(viewport.cameraY)>>5;
+        int sz = MathHelper.floor(viewport.cameraZ)>>5;
 
         new Matrix4f(viewport.projection).mul(viewport.modelView).getToAddress(ptr); ptr += 4*4*4;
 

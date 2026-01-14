@@ -5,7 +5,7 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import me.cortex.voxy.common.world.other.Mapper;
-import net.minecraft.util.Mth;
+import net.minecraft.util.math.MathHelper;
 import org.lwjgl.system.MemoryUtil;
 
 import java.util.Arrays;
@@ -170,7 +170,7 @@ public class SaveLoadSystem2 {
         //TODO: see if tight bitpacking is better or if bitpacking with pow2 pack size is better
 
         {//Store blocks
-            final int SIZE = Mth.smallestEncompassingPowerOfTwo(Mth.log2(Mth.smallestEncompassingPowerOfTwo(blockMapping.size())));
+            final int SIZE = MathHelper.smallestEncompassingPowerOfTwo(MathHelper.floorLog2(MathHelper.smallestEncompassingPowerOfTwo(blockMapping.size())));
 
             int rem = 32;
             int batch = 0;
@@ -195,7 +195,7 @@ public class SaveLoadSystem2 {
             if (biomeMapping.size() == 1) {
                 //If its only a single mapping, dont put anything
             } else {
-                final int SIZE = Mth.smallestEncompassingPowerOfTwo(Mth.log2(Mth.smallestEncompassingPowerOfTwo(biomeMapping.size())));
+                final int SIZE = MathHelper.smallestEncompassingPowerOfTwo(MathHelper.floorLog2(MathHelper.smallestEncompassingPowerOfTwo(biomeMapping.size())));
 
                 int rem = 32;
                 int batch = 0;
@@ -295,7 +295,7 @@ public class SaveLoadSystem2 {
         short[] blocks = new short[32*32*32];
         short[] biomes = new short[32*32*32];
         {//Block
-            final int SIZE = Mth.smallestEncompassingPowerOfTwo(Mth.log2(Mth.smallestEncompassingPowerOfTwo(blockMapSize)));
+            final int SIZE = MathHelper.smallestEncompassingPowerOfTwo(MathHelper.floorLog2(MathHelper.smallestEncompassingPowerOfTwo(blockMapSize)));
             int rem = 32;
             int batch = MemoryUtil.memGetInt(ptr); ptr += 4;
             int msk = (1<<SIZE)-1;
@@ -315,7 +315,7 @@ public class SaveLoadSystem2 {
             if (biomeMapSize == 1) {
                 Arrays.fill(biomes, (short) 0);
             } else {
-                final int SIZE = Mth.smallestEncompassingPowerOfTwo(Mth.log2(Mth.smallestEncompassingPowerOfTwo(biomeMapSize)));
+                final int SIZE = MathHelper.smallestEncompassingPowerOfTwo(MathHelper.floorLog2(MathHelper.smallestEncompassingPowerOfTwo(biomeMapSize)));
                 int rem = 32;
                 int batch = MemoryUtil.memGetInt(ptr); ptr += 4;
                 int msk = (1<<SIZE)-1;

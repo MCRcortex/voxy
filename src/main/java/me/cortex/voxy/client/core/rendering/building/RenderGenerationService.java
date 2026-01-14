@@ -122,7 +122,7 @@ public class RenderGenerationService {
     }
 
     private static boolean putTaskFirst(long pos) {
-        //Level 3 or 4
+        //World 3 or 4
         return WorldEngine.getLevel(pos) > 2;
     }
 

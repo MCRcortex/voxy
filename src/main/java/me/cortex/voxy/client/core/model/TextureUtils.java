@@ -1,8 +1,8 @@
 package me.cortex.voxy.client.core.model;
 
-import net.caffeinemc.mods.sodium.client.util.color.ColorSRGB;
-import net.minecraft.client.renderer.texture.MipmapGenerator;
-import net.minecraft.util.ARGB;
+import me.jellysquid.mods.sodium.client.util.color.ColorSRGB;
+import net.minecraft.client.texture.MipmapHelper;
+import net.minecraft.util.math.ColorHelper.Argb;
 
 //Texturing utils to manipulate data from the model bakery
 public class TextureUtils {
@@ -232,7 +232,35 @@ public class TextureUtils {
                 r / 4,
                 g / 4,
                 b / 4,
-                darkend ? ((int) a) / 4 : ARGB.linearToSrgbChannel(a / 4)
+                darkend ? ((int) a) / 4 : ColorSRGB.linearToSrgb(a / 4)
         );
+
+    }
+
+    // Private in this sodium api version, so reimplementing here
+    private static final int[] TO_SRGB8_TABLE = new int[]{7536653, 7995405, 8388621, 8847373, 9240589, 9699341, 10092557, 10551309, 10944538, 11796506, 12648474, 13500442, 14286874, 15138842, 15990810, 16842778, 17694771, 19398707, 21037107, 22741043, 24444979, 26148915, 27787315, 29491251, 31195239, 34537575, 37945447, 41287783, 44695655, 48037991, 51445863, 54788199, 58196174, 64946382, 71696590, 78446798, 85197006, 91947205, 98369724, 104530101, 110559576, 121766210, 132317488, 142278944, 151716114, 160694534, 169279740, 177537266, 185532875, 200540590, 214630805, 227869056, 240517486, 252510558, 263979344, 274923843, 285672036, 305660478, 324469277, 342229505, 359006697, 374997459, 390332864, 405012911, 419300145, 446038782, 471139026, 494797485, 517210765, 538575472, 559022678, 578617920, 597623875, 633340926, 666829764, 698418066, 728367975, 756876097, 784204575, 810353408, 835782064, 883426645, 928122119, 970261701, 1010238603, 1048314968, 1084752938, 1119683585, 1153566616, 1217267486, 1276905142, 1333134941, 1386546704, 1437337036, 1485964687, 1532560729, 1577847331, 1662781824, 1742407926, 1817512063, 1888749592, 1956644797, 2021459820, 2083718947};
+
+    private static final float MIN_BOUND = Float.intBitsToFloat(956301312);
+    private static final float MAX_BOUND = Float.intBitsToFloat(1065353215);
+
+    private static int linearToSrgb(float c) {
+        int inputBits = Float.floatToRawIntBits(clampLinearInput(c));
+        int entry = TO_SRGB8_TABLE[inputBits - 956301312 >> 20];
+        int bias = entry >>> 16 << 9;
+        int scale = entry & '\uffff';
+        int t = inputBits >>> 12 & 255;
+        return bias + scale * t >>> 16;
+    }
+
+    private static float clampLinearInput(float input) {
+        if (!(input > MIN_BOUND)) {
+            input = MIN_BOUND;
+        }
+
+        if (input > MAX_BOUND) {
+            input = MAX_BOUND;
+        }
+
+        return input;
     }
 }

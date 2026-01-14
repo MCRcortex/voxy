@@ -1,11 +1,12 @@
 package me.cortex.voxy.commonImpl;
 
 import me.cortex.voxy.common.world.WorldEngine;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.World;
+import net.minecraft.world.World;
+import net.minecraft.world.dimension.DimensionType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -14,15 +15,15 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 public class WorldIdentifier {
-    private static final ResourceKey<DimensionType> NULL_DIM_KEY = ResourceKey.create(Registries.DIMENSION_TYPE, Identifier.parse("voxy:null_dimension_id"));
+    private static final RegistryKey<DimensionType> NULL_DIM_KEY = RegistryKey.of(RegistryKeys.DIMENSION_TYPE, Identifier.of("voxy", "null_dimension_id"));
 
-    public final ResourceKey<Level> key;
+    public final RegistryKey<World> key;
     public final long biomeSeed;
-    public final ResourceKey<DimensionType> dimension;//Maybe?
+    public final RegistryKey<DimensionType> dimension;//Maybe?
     private final transient long hashCode;
     @Nullable transient WeakReference<WorldEngine> cachedEngineObject;
 
-    public WorldIdentifier(@NotNull ResourceKey<Level> key, long biomeSeed, @Nullable ResourceKey<DimensionType> dimension) {
+    public WorldIdentifier(@NotNull RegistryKey<World> key, long biomeSeed, @Nullable RegistryKey<DimensionType> dimension) {
         if (key == null) {
             throw new IllegalStateException("Key cannot be null");
         }
@@ -50,10 +51,10 @@ public class WorldIdentifier {
         return false;
     }
 
-    private static <T> boolean equal(ResourceKey<T> a, ResourceKey<T> b) {
+    private static <T> boolean equal(RegistryKey<T> a, RegistryKey<T> b) {
         if (a == b) return true;
         if (a == null || b == null) return false;
-        return a.registry().equals(b.registry()) && a.identifier().equals(b.identifier());
+        return a.getRegistry().equals(b.getRegistry()) && a.getValue().equals(b.getValue());
     }
 
     //Quick access utility method to get or create a world object in the current instance
@@ -79,7 +80,7 @@ public class WorldIdentifier {
         return instance.getNullable(this);
     }
 
-    public static WorldIdentifier of(Level level) {
+    public static WorldIdentifier of(World level) {
         //Gets or makes an identifier for world
         if (level == null) {
             return null;
@@ -88,7 +89,7 @@ public class WorldIdentifier {
     }
 
     //Common utility function to get or create a world engine
-    public static WorldEngine ofEngine(Level level) {
+    public static WorldEngine ofEngine(World level) {
         var id = of(level);
         if (id == null) {
             return null;
@@ -96,7 +97,7 @@ public class WorldIdentifier {
         return id.getOrCreateEngine();
     }
 
-    public static WorldEngine ofEngineNullable(Level level) {
+    public static WorldEngine ofEngineNullable(World level) {
         var id = of(level);
         if (id == null) {
             return null;
@@ -115,9 +116,9 @@ public class WorldIdentifier {
         return this.hashCode;
     }
 
-    private static long registryKeyHashCode(ResourceKey<?> key) {
-        var A = key.registry();
-        var B = key.identifier();
+    private static long registryKeyHashCode(RegistryKey<?> key) {
+        var A = key.getRegistry();
+        var B = key.getValue();
         int a = A==null?0:A.hashCode();
         int b = B==null?0:B.hashCode();
         return (Integer.toUnsignedLong(a)<<32)|Integer.toUnsignedLong(b);

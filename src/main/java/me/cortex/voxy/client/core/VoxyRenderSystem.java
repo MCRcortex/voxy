@@ -1,7 +1,7 @@
 package me.cortex.voxy.client.core;
 
-import com.mojang.blaze3d.opengl.GlConst;
-import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.platform.GlConst;
+import com.mojang.blaze3d.platform.GlStateManager;
 import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.config.VoxyConfig;
@@ -32,9 +32,9 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.ServiceManager;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
-import net.caffeinemc.mods.sodium.client.util.FogParameters;
-import net.minecraft.client.Minecraft;
+import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderMatrices;// Replace the Sodium import
+import net.minecraft.client.render.BackgroundRenderer;
+import net.minecraft.client.MinecraftClient;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL11;
@@ -80,11 +80,12 @@ public class VoxyRenderSystem {
         world.acquireRef();
         System.gc();
 
-        if (Minecraft.getInstance().options.getEffectiveRenderDistance()<3) {
+        if (MinecraftClient.getInstance().options.getClampedViewDistance()<3) {
             Logger.warn("Having a vanilla render distance of 2 can cause rare culling near the edge of your screen issues, please use 3 or more");
         }
 
         //Fking HATE EVERYTHING AAAAAAAAAAAAAAAA
+        /* Nice comment btw - mathiol */
         int[] oldBufferBindings = new int[10];
         for (int i = 0; i < oldBufferBindings.length; i++) {
             oldBufferBindings[i] = glGetIntegeri(GL_SHADER_STORAGE_BUFFER_BINDING, i);
@@ -125,8 +126,8 @@ public class VoxyRenderSystem {
             this.viewportSelector = new ViewportSelector<>(sectionRenderer::createViewport);
 
             {
-                int minSec = Minecraft.getInstance().level.getMinSectionY() >> 5;
-                int maxSec = (Minecraft.getInstance().level.getMaxSectionY() - 1) >> 5;
+                int minSec = MinecraftClient.getInstance().world.getBottomY() >> 5;
+                int maxSec = (MinecraftClient.getInstance().world.getBottomY() - 1) >> 5;
 
                 //Do some very cheeky stuff for MiB
                 if (VoxyCommon.IS_MINE_IN_ABYSS) {//TODO: make this somehow configurable
@@ -163,7 +164,7 @@ public class VoxyRenderSystem {
     }
 
 
-    public Viewport<?> setupViewport(ChunkRenderMatrices matrices, FogParameters fogParameters, double cameraX, double cameraY, double cameraZ) {
+    public Viewport<?> setupViewport(ChunkRenderMatrices matrices, BackgroundRenderer.FogData fogParameters, double cameraX, double cameraY, double cameraZ) {
         var viewport = this.getViewport();
         if (viewport == null) {
             return null;
@@ -353,12 +354,12 @@ public class VoxyRenderSystem {
         float INCREASE_PER_SECOND = 60;
         float DECREASE_PER_SECOND = 30;
         //Auto fps targeting
-        if (Minecraft.getInstance().getFps() < MIN_FPS) {
-            VoxyConfig.CONFIG.subDivisionSize = Math.min(VoxyConfig.CONFIG.subDivisionSize + INCREASE_PER_SECOND / Math.max(1f, Minecraft.getInstance().getFps()), 256);
+        if (MinecraftClient.getInstance().getCurrentFps() < MIN_FPS) {
+            VoxyConfig.CONFIG.subDivisionSize = Math.min(VoxyConfig.CONFIG.subDivisionSize + INCREASE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 256);
         }
 
-        if (MAX_FPS < Minecraft.getInstance().getFps() && canDecreaseSize) {
-            VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - DECREASE_PER_SECOND / Math.max(1f, Minecraft.getInstance().getFps()), 28);
+        if (MAX_FPS < MinecraftClient.getInstance().getCurrentFps() && canDecreaseSize) {
+            VoxyConfig.CONFIG.subDivisionSize = Math.max(VoxyConfig.CONFIG.subDivisionSize - DECREASE_PER_SECOND / Math.max(1f, MinecraftClient.getInstance().getCurrentFps()), 28);
         }
     }
 
@@ -366,10 +367,10 @@ public class VoxyRenderSystem {
         //TODO: use the existing projection matrix use mulLocal by the inverse of the projection and then mulLocal our projection
 
         var projection = new Matrix4f();
-        var client = Minecraft.getInstance();
+        var client = MinecraftClient.getInstance();
         var gameRenderer = client.gameRenderer;//tickCounter.getTickDelta(true);
 
-        float fov = gameRenderer.getFov(gameRenderer.getMainCamera(), client.getDeltaTracker().getGameTimeDeltaPartialTick(true), true);
+        float fov = gameRenderer.getFov(gameRenderer.getCamera(), client.getTickDelta(), true);
 
         projection.setPerspective(fov * 0.01745329238474369f,
                 (float) client.getWindow().getWidth() / (float)client.getWindow().getHeight(),
@@ -383,11 +384,11 @@ public class VoxyRenderSystem {
         // at short render distances the vanilla terrain doesnt end up covering the 16f near plane voxy uses
         // meaning that it explodes (due to near plane clipping).. _badly_ with the rastered culling being wrong in rare cases for the immediate
         // sections rendered after the vanilla render distance
-        float nearVoxy = Minecraft.getInstance().gameRenderer.getRenderDistance()<=32.0f?8f:16f;
+        float nearVoxy = MinecraftClient.getInstance().gameRenderer.getViewDistance()<=32.0f?8f:16f;
         nearVoxy = VoxyClient.disableSodiumChunkRender()?0.1f:nearVoxy;
 
         return base.mulLocal(
-                makeProjectionMatrix(0.05f, Minecraft.getInstance().gameRenderer.getDepthFar()).invert(),
+                makeProjectionMatrix(0.05f, MinecraftClient.getInstance().gameRenderer.getFarPlaneDistance()).invert(),
                 new Matrix4f()
         ).mulLocal(makeProjectionMatrix(nearVoxy, 16*3000));
     }

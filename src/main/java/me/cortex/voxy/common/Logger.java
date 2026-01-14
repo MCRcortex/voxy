@@ -1,8 +1,8 @@
 package me.cortex.voxy.common;
 
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.text.Text;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
@@ -58,11 +58,11 @@ public class Logger {
     }
 
     private static void error0(String error) {
-        var instance = Minecraft.getInstance();
+        var instance = MinecraftClient.getInstance();
         if (instance != null) {
-            instance.executeIfPossible(() -> {
-                var player = Minecraft.getInstance().player;
-                if (player != null) player.displayClientMessage(Component.literal(error), true);
+            instance.executeSync(() -> {
+                var player = MinecraftClient.getInstance().player;
+                if (player != null) player.sendMessage(Text.literal(error), true);
             });
         }
     }

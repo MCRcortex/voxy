@@ -12,9 +12,9 @@ import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
-import net.minecraft.core.registries.Registries;
+import net.minecraft.core.registries.RegistryKeys;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.World;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
@@ -49,7 +49,7 @@ public class DHImporter implements IDataImporter {
     private final Connection db;
     private final WorldEngine engine;
     private final Service service;
-    private final Level world;
+    private final World world;
     private final int bottomOfWorld;
     private final int worldHeightSections;
     private final Holder.Reference<Biome> defaultBiome;
@@ -96,12 +96,12 @@ public class DHImporter implements IDataImporter {
         }
     }
 
-    public DHImporter(File file, WorldEngine worldEngine, Level mcWorld, ServiceManager servicePool, BooleanSupplier rateLimiter) {
+    public DHImporter(File file, WorldEngine worldEngine, World mcWorld, ServiceManager servicePool, BooleanSupplier rateLimiter) {
         this.engine = worldEngine;
         this.world = mcWorld;
-        this.biomeRegistry = mcWorld.registryAccess().lookupOrThrow(Registries.BIOME);
+        this.biomeRegistry = mcWorld.registryAccess().lookupOrThrow(RegistryKeys.BIOME);
         this.defaultBiome = this.biomeRegistry.getOrThrow(Biomes.PLAINS);
-        this.blockRegistry = mcWorld.registryAccess().lookupOrThrow(Registries.BLOCK);
+        this.blockRegistry = mcWorld.registryAccess().lookupOrThrow(RegistryKeys.BLOCK);
 
         this.bottomOfWorld = mcWorld.getMinY();
         int worldHeight = mcWorld.getHeight();
