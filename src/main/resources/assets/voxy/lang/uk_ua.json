@@ -1,11 +1,17 @@
 {
   "voxy.config.title": "Voxy",
 
+  "voxy.config.general": "Загальні",
+  "voxy.config.rendering": "Промальовування",
+  
   "voxy.config.general.enabled": "Увімкнути Voxy",
   "voxy.config.general.enabled.tooltip": "Повністю вмикає або вимикає Voxy.",
 
   "voxy.config.general.serviceThreads": "Потоки служби",
   "voxy.config.general.serviceThreads.tooltip": "Кількість потоків, які може використовувати ServiceThreadPool.",
+
+  "voxy.config.general.useSodiumBuilder": "Використовувати потоки Sodium",
+  "voxy.config.general.useSodiumBuilder.tooltip": "Використовує потоки Sodium для створення як частину пулу потоків Voxy, може зменшити фрізи та відставання під час швидкого переміщення за великої дальности промальвоування.",
 
   "voxy.config.general.ingest": "Передача блока",
   "voxy.config.general.ingest.tooltip": "Умикає або вимикає здатність Voxy перетворювати нові чанки в зони РД.",
@@ -22,8 +28,8 @@
   "voxy.config.general.environmental_fog": "Увімкнути навколишній туман",
   "voxy.config.general.environmental_fog.tooltip": "Умикає або вимикає промальовування навколишнього туману Voxy.",
 
-  "voxy.config.general.vanilla_fog": "Увімкнути туман усталеної гри",
-  "voxy.config.general.vanilla_fog.tooltip": "Умикає або вимикає ефект туману усталеної гри.",
+  "voxy.config.general.render_fog": "Увімкнути промальовування туману",
+  "voxy.config.general.render_fog.tooltip": "Умикає або вимикає промальовування ефекту туману.",
 
   "voxy.config.general.render_statistics": "Увімкнути статистику промальовування",
   "voxy.config.general.render_statistics.tooltip": "Умикає статистику промальовування в меню налагодження, корисно для цього.",
