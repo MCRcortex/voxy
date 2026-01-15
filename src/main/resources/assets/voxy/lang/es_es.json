@@ -1,0 +1,36 @@
+{
+  "voxy.config.title": "Voxy",
+
+  "voxy.config.general": "General",
+  "voxy.config.rendering": "Renderizado",
+
+  "voxy.config.general.enabled": "Activar Voxy",
+  "voxy.config.general.enabled.tooltip": "Activa o desactiva todas las funciones de Voxy",
+
+  "voxy.config.general.serviceThreads": "Service threads",
+  "voxy.config.general.serviceThreads.tooltip": "Número de hilos que ServiceThreadPool puede usar",
+
+  "voxy.config.general.useSodiumBuilder": "Usar sodium threads",
+  "voxy.config.general.useSodiumBuilder.tooltip": "Incluye hilos de sodium builder como parte del pool de hilos de Voxy, puede reducir el stuttering y el lag al moverse rápido con una distancia de renderizado alta",
+
+  "voxy.config.general.ingest": "Chunk Ingest",
+  "voxy.config.general.ingest.tooltip": "Activa o desactiva la capacidad de Voxy de convertir nuevos chunks en LoDs",
+
+  "voxy.config.general.rendering": "Voxy Rendering",
+  "voxy.config.general.rendering.tooltip": "Activa o desactiva el renderizado de Voxy",
+
+  "voxy.config.general.subDivisionSize": "Tamaño de subdivisión de píxeles^2",
+  "voxy.config.general.subDivisionSize.tooltip": "Tamaño máximo en píxeles (al cuadrado) de espacio de pantalla AABB antes de subdividir en LoDs más pequeños (y de mayor calidad)",
+
+  "voxy.config.general.renderDistance": "Distancia de renderizado",
+  "voxy.config.general.renderDistance.tooltip": "Distancia de renderizado de Voxy en chunks",
+
+  "voxy.config.general.environmental_fog": "Habilitar niebla ambiental",
+  "voxy.config.general.environmental_fog.tooltip": "Activa o desactiva el renderizado de niebla ambiental de Voxy",
+
+  "voxy.config.general.render_fog": "Habilitar niebla de renderizado",
+  "voxy.config.general.render_fog.tooltip": "Activa o desactiva el efecto de niebla de renderizado",
+
+  "voxy.config.general.render_statistics": "Habilitar estadísticas de renderizado",
+  "voxy.config.general.render_statistics.tooltip": "Activa las estadísticas de renderizado en el menú F3, útil para debugear"
+}
