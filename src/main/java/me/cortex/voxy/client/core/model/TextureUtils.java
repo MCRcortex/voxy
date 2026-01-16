@@ -2,7 +2,6 @@ package me.cortex.voxy.client.core.model;
 
 import net.caffeinemc.mods.sodium.client.util.color.ColorSRGB;
 import net.minecraft.client.renderer.texture.MipmapGenerator;
-import net.minecraft.util.ARGB;
 
 //Texturing utils to manipulate data from the model bakery
 public class TextureUtils {
@@ -197,42 +196,63 @@ public class TextureUtils {
     }
 
 
-    public static int mipColours(boolean darkend, int C00, int C01, int C10, int C11) {
-        darkend = !darkend;//Invert to make it easier
-        float r = 0.0f;
-        float g = 0.0f;
-        float b = 0.0f;
-        float a = 0.0f;
-        if (darkend || (C00 >>> 24) != 0) {
-            r += ColorSRGB.srgbToLinear((C00 >> 0) & 0xFF);
-            g += ColorSRGB.srgbToLinear((C00 >> 8) & 0xFF);
-            b += ColorSRGB.srgbToLinear((C00 >> 16) & 0xFF);
-            a += darkend ? (C00 >>> 24) : ColorSRGB.srgbToLinear(C00 >>> 24);
+
+
+
+
+
+
+
+
+
+
+
+
+    public static int mipColours(boolean darkened, int one, int two, int three, int four) {
+        if (true) {
+            return MipmapGenerator.alphaBlend(one, two, three, four, darkened);
+        } else {
+            return weightedAverageColor(weightedAverageColor(one, two), weightedAverageColor(three, four));
         }
-        if (darkend || (C01 >>> 24) != 0) {
-            r += ColorSRGB.srgbToLinear((C01 >> 0) & 0xFF);
-            g += ColorSRGB.srgbToLinear((C01 >> 8) & 0xFF);
-            b += ColorSRGB.srgbToLinear((C01 >> 16) & 0xFF);
-            a += darkend ? (C01 >>> 24) : ColorSRGB.srgbToLinear(C01 >>> 24);
+    }
+
+    //TODO: FIXME!!! ITS READING IT AS ABGR??? isnt the format RGBA??
+    private static int weightedAverageColor(int a, int b) {
+        //We specifically want the entire other component if the alpha is zero
+        // this prevents black mips from generating due to A) non filled colours, and B) when the sampler samples everything it doesnt detonate
+        if ((a&0xFF000000) == 0) {
+            return b;
         }
-        if (darkend || (C10 >>> 24) != 0) {
-            r += ColorSRGB.srgbToLinear((C10 >> 0) & 0xFF);
-            g += ColorSRGB.srgbToLinear((C10 >> 8) & 0xFF);
-            b += ColorSRGB.srgbToLinear((C10 >> 16) & 0xFF);
-            a += darkend ? (C10 >>> 24) : ColorSRGB.srgbToLinear(C10 >>> 24);
-        }
-        if (darkend || (C11 >>> 24) != 0) {
-            r += ColorSRGB.srgbToLinear((C11 >> 0) & 0xFF);
-            g += ColorSRGB.srgbToLinear((C11 >> 8) & 0xFF);
-            b += ColorSRGB.srgbToLinear((C11 >> 16) & 0xFF);
-            a += darkend ? (C11 >>> 24) : ColorSRGB.srgbToLinear(C11 >>> 24);
+        if ((b&0xFF000000) == 0) {
+            return a;
         }
 
-        return ColorSRGB.linearToSrgb(
-                r / 4,
-                g / 4,
-                b / 4,
-                darkend ? ((int) a) / 4 : ARGB.linearToSrgbChannel(a / 4)
-        );
+        if (((a^b)&0xFF000000)==0) {
+            return ColorSRGB.linearToSrgb(
+                    addHalfLinear(0, a,b),
+                    addHalfLinear(8, a,b),
+                    addHalfLinear(16, a,b),
+                    a>>>24);
+        }
+
+        {
+            int A = (a>>>24);
+            int B = (a>>>24);
+            float mul = 1.0F / (float)(A+B);
+            float wA = A * mul;
+            float wB = B * mul;
+            return ColorSRGB.linearToSrgb(
+                    addMulLinear(0, a,b,wA,wB),
+                    addMulLinear(8, a,b,wA,wB),
+                    addMulLinear(16, a,b,wA,wB)
+                    , (A + B)/2);
+        }
+    }
+
+    private static float addHalfLinear(int shift, int a, int b) {
+        return addMulLinear(shift, a, b, 0.5f, 0.5f);
+    }
+    private static float addMulLinear(int shift, int a, int b, float mulA, float mulB) {
+        return Math.fma(ColorSRGB.srgbToLinear((a>>shift)&0xFF),mulA, ColorSRGB.srgbToLinear((b>>shift)&0xFF)*mulB);
     }
 }

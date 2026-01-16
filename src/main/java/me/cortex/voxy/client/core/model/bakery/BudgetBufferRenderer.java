@@ -1,7 +1,6 @@
 package me.cortex.voxy.client.core.model.bakery;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import me.cortex.voxy.client.core.gl.GlBuffer;
@@ -9,11 +8,19 @@ import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
+import net.minecraft.client.renderer.texture.AbstractTexture;
+
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
 
+import static org.lwjgl.opengl.GL11.GL_FLOAT;
+import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
+import static org.lwjgl.opengl.GL11.GL_UNSIGNED_SHORT;
+import static org.lwjgl.opengl.GL11.glDrawElements;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
 import static org.lwjgl.opengl.GL33.glBindSampler;
+import static org.lwjgl.opengl.GL42.GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT;
+import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL45.*;
 
 public class BudgetBufferRenderer {
@@ -29,7 +36,8 @@ public class BudgetBufferRenderer {
     private static final GlBuffer indexBuffer;
     static {
         var i = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
-        int id = ((com.mojang.blaze3d.opengl.GlBuffer) i.getBuffer(4096*3*2)).handle;
+        i.bind(4096*3*2);
+        int id = i.name;
         if (i.type() != VertexFormat.IndexType.SHORT) {
             throw new IllegalStateException();
         }
@@ -46,7 +54,7 @@ public class BudgetBufferRenderer {
 
     private static GlBuffer immediateBuffer;
     private static int quadCount;
-    public static void drawFast(MeshData buffer, GpuTexture tex, Matrix4f matrix) {
+    public static void drawFast(MeshData buffer, AbstractTexture tex, Matrix4f matrix) {
         if (buffer.drawState().mode() != VertexFormat.Mode.QUADS) {
             throw new IllegalStateException("Fast only supports quads");
         }
@@ -57,7 +65,7 @@ public class BudgetBufferRenderer {
         size /= STRIDE;
         if (size%4 != 0) throw new IllegalStateException();
         size /= 4;
-        setup(MemoryUtil.memAddress(buff), size, ((com.mojang.blaze3d.opengl.GlTexture)tex).glId());
+        setup(MemoryUtil.memAddress(buff), size, tex.getId());
         buffer.close();
 
         render(matrix);

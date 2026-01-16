@@ -10,16 +10,8 @@ import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
-import net.minecraft.client.gui.components.debug.DebugScreenEntries;
-import net.minecraft.client.gui.components.debug.DebugScreenEntry;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.chunk.LevelChunk;
-import org.jspecify.annotations.Nullable;
-
+// import net.minecraft.client.gui.components.debug.DebugScreenEntries;
+import net.minecraft.resources.ResourceLocation;
 import java.util.HashSet;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -30,11 +22,7 @@ public class VoxyClient implements ClientModInitializer {
     public static void initVoxyClient() {
         Capabilities.init();//Ensure clinit is called
 
-        if (Capabilities.INSTANCE.hasBrokenDepthSampler) {
-            Logger.error("AMD broken depth sampler detected, voxy does not work correctly and has been disabled, this will hopefully be fixed in the future");
-        }
-
-        boolean systemSupported = Capabilities.INSTANCE.compute && Capabilities.INSTANCE.indirectParameters && !Capabilities.INSTANCE.hasBrokenDepthSampler;
+        boolean systemSupported = Capabilities.INSTANCE.compute && Capabilities.INSTANCE.indirectParameters;
         if (systemSupported) {
 
             SharedIndexBuffer.INSTANCE.id();
@@ -53,28 +41,7 @@ public class VoxyClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        DebugScreenEntries.register(Identifier.fromNamespaceAndPath("voxy", "version"), new DebugScreenEntry() {
-            @Override
-            public void display(DebugScreenDisplayer lines, @Nullable Level level, @Nullable LevelChunk levelChunk, @Nullable LevelChunk levelChunk2) {
-                if (!VoxyCommon.isAvailable()) {
-                    lines.addLine(ChatFormatting.RED + "voxy-"+VoxyCommon.MOD_VERSION);//Voxy installed, not avalible
-                    return;
-                }
-                var instance = VoxyCommon.getInstance();
-                if (instance == null) {
-                    lines.addLine(ChatFormatting.YELLOW + "voxy-" + VoxyCommon.MOD_VERSION);//Voxy avalible, no instance active
-                    return;
-                }
-                VoxyRenderSystem vrs = null;
-                var wr = Minecraft.getInstance().levelRenderer;
-                if (wr != null) vrs = ((IGetVoxyRenderSystem) wr).getVoxyRenderSystem();
-
-                //Voxy instance active
-                lines.addLine((vrs==null?ChatFormatting.DARK_GREEN:ChatFormatting.GREEN)+"voxy-"+VoxyCommon.MOD_VERSION);
-            }
-        });
-
-        DebugScreenEntries.register(Identifier.fromNamespaceAndPath("voxy","debug"), new VoxyDebugScreenEntry());
+        // DebugScreenEntries.register(ResourceLocation.fromNamespaceAndPath("voxy","debug"), new VoxyDebugScreenEntry());
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             if (VoxyCommon.isAvailable()) {
                 dispatcher.register(VoxyCommands.register());
@@ -99,6 +66,6 @@ public class VoxyClient implements ClientModInitializer {
     }
 
     public static boolean disableSodiumChunkRender() {
-        return false;// getOcclusionDebugState() != 0;
+        return getOcclusionDebugState() != 0;
     }
 }

@@ -8,6 +8,6 @@ import net.minecraft.client.Minecraft;
 public class LightMapHelper {
     public static void bind(int lightingIndex) {
         glBindSampler(lightingIndex, 0);
-        glBindTextureUnit(lightingIndex, ((com.mojang.blaze3d.opengl.GlTexture)(Minecraft.getInstance().gameRenderer.lightTexture().getTextureView().texture())).glId());
+        glBindTextureUnit(lightingIndex, Minecraft.getInstance().gameRenderer.lightTexture().lightTexture.getId());
     }
 }
