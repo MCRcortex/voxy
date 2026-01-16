@@ -22,13 +22,11 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
-import org.lwjgl.opengl.ARBDrawBuffersBlend;
 import org.lwjgl.opengl.GL14;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL14C.glBlendFuncSeparate;
 import static org.lwjgl.opengl.GL30.*;
-import static org.lwjgl.opengl.GL40.glBlendFuncSeparatei;
 import static org.lwjgl.opengl.GL45.glTextureBarrier;
 
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -50,15 +48,16 @@ public class ModelTextureBakery {
 
     public static int getMetaFromLayer(RenderType layer) {
         boolean hasDiscard = layer == RenderType.cutout() ||
-                layer == RenderType.translucent()||
+                layer == RenderType.cutoutMipped() ||
                 layer == RenderType.tripwire();
 
-        boolean isMipped = layer == RenderType.solid() ||
+        boolean isMipped = layer == RenderType.cutoutMipped() ||
+                layer == RenderType.solid() ||
                 layer == RenderType.translucent() ||
                 layer == RenderType.tripwire();
 
         int meta = hasDiscard?1:0;
-        meta |= true?2:0;
+        meta |= isMipped?2:0;
         return meta;
     }
 
@@ -186,9 +185,9 @@ public class ModelTextureBakery {
         }
 
         //TODO: support block model entities
-        //BakedBlockEntityModel bbem = null;
+        BakedBlockEntityModel bbem = null;
         if (state.hasBlockEntity()) {
-            //bbem = BakedBlockEntityModel.bake(state);
+            bbem = BakedBlockEntityModel.bake(state);
         }
 
         //Setup GL state
@@ -200,9 +199,8 @@ public class ModelTextureBakery {
             glEnable(GL_DEPTH_TEST);
             glEnable(GL_CULL_FACE);
             if (layer == RenderType.translucent()) {
-                glEnablei(GL_BLEND, 0);
-                glDisablei(GL_BLEND, 1);
-                ARBDrawBuffersBlend.glBlendFuncSeparateiARB(0, GL_ONE_MINUS_DST_ALPHA, GL_DST_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+                glEnable(GL_BLEND);
+                glBlendFuncSeparate(GL_ONE_MINUS_DST_ALPHA, GL_DST_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
             } else {
                 glDisable(GL_BLEND);//FUCK YOU INTEL (screams), for _some reason_ discard or something... JUST DOESNT WORK??
                 //glBlendFuncSeparate(GL_ONE, GL_ZERO, GL_ONE, GL_ONE);
@@ -283,7 +281,6 @@ public class ModelTextureBakery {
         }
 
         //Render block model entity data if it exists
-        /*
         if (bbem != null) {
             //Rerender everything again ;-; but is ok (is not)
 
@@ -309,7 +306,7 @@ public class ModelTextureBakery {
             glBindVertexArray(0);
 
             bbem.release();
-        }*/
+        }
 
 
 
