@@ -31,6 +31,7 @@
     "sodium.MixinChunkJobQueue",
     "sodium.MixinDefaultChunkRenderer",
     "sodium.MixinRenderSectionManager",
+    "sodium.MixinSodiumOptionsGUI",
     "sodium.MixinSodiumWorldRenderer",
     "minecraft.MixinLayerLightSectionStorage"
   ],
