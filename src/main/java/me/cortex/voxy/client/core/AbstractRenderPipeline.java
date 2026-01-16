@@ -10,9 +10,7 @@ import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTra
 import me.cortex.voxy.client.core.rendering.hierachical.NodeCleaner;
 import me.cortex.voxy.client.core.rendering.post.FullscreenBlit;
 import me.cortex.voxy.client.core.rendering.section.backend.AbstractSectionRenderer;
-import me.cortex.voxy.client.core.rendering.util.DepthFramebuffer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
-import me.cortex.voxy.client.core.util.GPUTiming;
 import me.cortex.voxy.common.util.TrackedObject;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL30;
@@ -33,7 +31,6 @@ import static org.lwjgl.opengl.GL11C.glEnable;
 import static org.lwjgl.opengl.GL11C.glStencilFunc;
 import static org.lwjgl.opengl.GL11C.glStencilMask;
 import static org.lwjgl.opengl.GL11C.glStencilOp;
-import static org.lwjgl.opengl.GL30C.GL_DEPTH24_STENCIL8;
 import static org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER;
 import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
 import static org.lwjgl.opengl.GL42.GL_LEQUAL;
@@ -56,23 +53,17 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     private final FullscreenBlit depthMaskBlit = new FullscreenBlit("voxy:post/fullscreen2.vert", "voxy:post/noop.frag");
     private final FullscreenBlit depthSetBlit = new FullscreenBlit("voxy:post/fullscreen2.vert", "voxy:post/depth0.frag");
     private final FullscreenBlit depthCopy = new FullscreenBlit("voxy:post/fullscreen2.vert", "voxy:post/depth_copy.frag");
-
-    public final DepthFramebuffer fb = new DepthFramebuffer(GL_DEPTH24_STENCIL8);
-
-    protected final boolean deferTranslucency;
-
     private static final int DEPTH_SAMPLER = glGenSamplers();
     static {
         glSamplerParameteri(DEPTH_SAMPLER, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glSamplerParameteri(DEPTH_SAMPLER, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     }
 
-    protected AbstractRenderPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier, boolean deferTranslucency) {
+    protected AbstractRenderPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
         this.frexStillHasWork = frexSupplier;
         this.nodeManager = nodeManager;
         this.nodeCleaner = nodeCleaner;
         this.traversal = traversal;
-        this.deferTranslucency = deferTranslucency;
     }
 
     //Allows pipelines to configure model baking system
@@ -102,23 +93,16 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         rs.renderOpaque(viewport);
         var occlusionDebug = VoxyClient.getOcclusionDebugState();
         if (occlusionDebug==0) {
-            GPUTiming.INSTANCE.marker("I");
             this.innerPrimaryWork(viewport, depthTexture);
-            GPUTiming.INSTANCE.marker();
         }
-
         if (occlusionDebug<=1) {
             rs.buildDrawCalls(viewport);
         }
-
-        GPUTiming.INSTANCE.marker("TP");
         rs.renderTemporal(viewport);
 
         this.postOpaquePreTranslucent(viewport);
 
-        if (!this.deferTranslucency) {
-            rs.renderTranslucent(viewport);
-        }
+        rs.renderTranslucent(viewport);
 
         this.finish(viewport, sourceFrameBuffer, srcWidth, srcHeight);
         glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);
@@ -224,7 +208,6 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
     @Override
     protected void free0() {
-        this.fb.free();
         this.sectionRenderer.free();
         this.depthMaskBlit.delete();
         this.depthSetBlit.delete();

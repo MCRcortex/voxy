@@ -2,6 +2,8 @@ package me.cortex.voxy.client.core.rendering;
 
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import me.cortex.voxy.client.VoxyClient;
+import me.cortex.voxy.client.compat.SodiumExtra;
 import me.cortex.voxy.client.core.AbstractRenderPipeline;
 import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlVertexArray;
@@ -54,6 +56,7 @@ public class ChunkBoundRenderer {
         this.rasterShader = Shader.makeAuto()
                 .addSource(ShaderType.VERTEX, vert)
                 .defineIf("TAA", taa != null)
+                .defineIf("USE_SODIUM_EXTRA_CULLING", SodiumExtra.useSodiumExtraCulling())
                 .add(ShaderType.FRAGMENT, "voxy:chunkoutline/outline.fsh")
                 .compile()
                 .ubo(0, this.uniformBuffer)

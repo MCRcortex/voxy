@@ -38,8 +38,8 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
     private GlTexture colourTex;
     private GlTexture colourSSAOTex;
     private final GlFramebuffer fbSSAO = new GlFramebuffer();
+    private final DepthFramebuffer fb = new DepthFramebuffer(GL_DEPTH24_STENCIL8);
 
-    private final boolean useEnvFog;
     private final FullscreenBlit finalBlit;
 
     private final Shader ssaoCompute = Shader.make()
@@ -47,10 +47,9 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             .compile();
 
     protected NormalRenderPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
-        super(nodeManager, nodeCleaner, traversal, frexSupplier, false);
-        this.useEnvFog = VoxyConfig.CONFIG.useEnvironmentalFog;
+        super(nodeManager, nodeCleaner, traversal, frexSupplier);
         this.finalBlit = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag",
-                a->a.defineIf("USE_ENV_FOG", this.useEnvFog).define("EMIT_COLOUR"));
+                a->a.define("EMIT_COLOUR"));
     }
 
     @Override
@@ -66,7 +65,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             this.colourSSAOTex = new GlTexture().store(GL_RGBA8, 1, viewport.width, viewport.height);
 
             this.fb.framebuffer.bind(GL_COLOR_ATTACHMENT0, this.colourTex).verify();
-            this.fbSSAO.bind(this.fb.getDepthAttachmentType(), this.fb.getDepthTex()).bind(GL_COLOR_ATTACHMENT0, this.colourSSAOTex).verify();
+            this.fbSSAO.bind(GL_DEPTH_STENCIL_ATTACHMENT, this.fb.getDepthTex()).bind(GL_COLOR_ATTACHMENT0, this.colourSSAOTex).verify();
 
 
             glTextureParameterf(this.colourTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -133,6 +132,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
     public void free() {
         this.finalBlit.delete();
         this.ssaoCompute.free();
+        this.fb.free();
         this.fbSSAO.free();
         if (this.colourTex != null) {
             this.colourTex.free();

@@ -1,12 +1,12 @@
-/*
 package me.cortex.voxy.client.core.model.bakery;
 
 import me.cortex.voxy.common.Logger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.Model;
-import net.minecraft.client.renderer.SubmitNodeStorage;
+import net.minecraft.client.renderer.RenderType;
+// import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 
 public class BakedBlockEntityModel {
-
     private record LayerConsumer(RenderType layer, ReuseVertexConsumer consumer) {}
     private final List<LayerConsumer> layers;
     private BakedBlockEntityModel(List<LayerConsumer> layers) {
@@ -30,11 +29,11 @@ public class BakedBlockEntityModel {
         for (var layer : this.layers) {
             if (layer.consumer.isEmpty()) continue;
             if (layer.layer instanceof RenderType.CompositeRenderType mp) {
-                Identifier textureId = mp.state.textureState.cutoutTexture().orElse(null);
+                ResourceLocation textureId = mp.state.textureState.cutoutTexture().orElse(null);
                 if (textureId == null) {
                     Logger.error("ERROR: Empty texture id for layer: " + layer);
                 } else {
-                    texId = ((com.mojang.blaze3d.opengl.GlTexture)Minecraft.getInstance().getTextureManager().getTexture(textureId).getTexture()).glId();
+                    texId = Minecraft.getInstance().getTextureManager().getTexture(textureId).getId();
                 }
             }
             if (texId == 0) continue;
@@ -72,6 +71,7 @@ public class BakedBlockEntityModel {
         entity.setLevel(Minecraft.getInstance().level);
         if (renderer != null) {
             try {
+                /*
                 var rt = renderer.createRenderState();
                 renderer.extractRenderState(entity, rt, 0.0f, new Vec3d(0,0,0), null);
 
@@ -81,6 +81,7 @@ public class BakedBlockEntityModel {
                 renderer.submit(rt, new MatrixStack(), queue, cstate);
                 var qq = queue.order(0);
                 qq.
+                */
                 //renderer.render(entity, 0.0f, new MatrixStack(), layer->map.computeIfAbsent(layer, rl -> new LayerConsumer(rl, new ReuseVertexConsumer().setDefaultMeta(getMetaFromLayer(rl)))).consumer, 0, 0, new Vec3d(0,0,0));
             } catch (Exception e) {
                 Logger.error("Unable to bake block entity: " + entity, e);
@@ -102,4 +103,3 @@ public class BakedBlockEntityModel {
         return new BakedBlockEntityModel(new ArrayList<>(map.values()));
     }
 }
-*/
