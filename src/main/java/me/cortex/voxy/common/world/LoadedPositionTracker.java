@@ -211,22 +211,37 @@ public final class LoadedPositionTracker {
 
     private void shiftKeys(int pos) {
         // Shift entries with the same hash.
+        // This is a standard open-addressing deletion with linear probing.
         int last;
         long curr;
         final long[] key = this.key;
         final Object[] value = this.value;
         final int msk = this.mask;
+
         while (true) {
-            pos = ((last = pos) + 1) & msk;
+            last = pos;
+            pos = (pos + 1) & msk;
+
             while (true) {
-                if ((curr = key[pos]) == 0) {
+                curr = key[pos];
+                if (curr == 0) {
                     key[last] = 0;
                     value[last] = null;
                     return;
                 }
-                int slot = (int)curr & msk;
-                //TODO: optimize all this to make this only 1 branch-less loop
-                if (last <= pos ? last >= slot || slot > pos : last >= slot && slot > pos) break;
+
+                int slot = (int) curr & msk;
+
+                // Branchless check: does 'slot' lie outside the range (last, pos] cyclically?
+                // This is equivalent to: slot should be moved to 'last'
+                // The condition is true when slot is NOT in the range (last, pos] (cyclically)
+                // Using: ((slot - last - 1) & msk) >= ((pos - last) & msk) but avoiding branches
+                int slotDist = (slot - last - 1) & msk;
+                int posDist = (pos - last) & msk;
+
+                // If slotDist >= posDist, we should break and move this entry
+                if (slotDist >= posDist) break;
+
                 pos = (pos + 1) & msk;
             }
             key[last] = curr;

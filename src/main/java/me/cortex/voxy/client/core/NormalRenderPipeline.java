@@ -90,6 +90,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             viewport.MVP.invert(new Matrix4f()).getToAddress(ptr);
             nglUniformMatrix4fv(4, 1, false, ptr);//invMVP
         }
+        glUniform2i(5, viewport.width, viewport.height);
 
 
         glBindImageTexture(0, this.colourSSAOTex.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);

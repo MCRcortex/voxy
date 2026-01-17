@@ -90,6 +90,26 @@ public class Mapper {
         return (id&(~(0xFFL<<56)))|(Integer.toUnsignedLong(light&0xFF)<<56);
     }
 
+    // Mixed flag: bit 0 indicates this block was mipped from a region containing both air and solid blocks.
+    // When set, faces adjacent to this block should not be culled, as the original region may have had air.
+    public static final long MIXED_FLAG = 1L;
+
+    public static boolean isMixed(long id) {
+        return (id & MIXED_FLAG) != 0;
+    }
+
+    public static long withMixedFlag(long id, boolean mixed) {
+        return mixed ? (id | MIXED_FLAG) : (id & ~MIXED_FLAG);
+    }
+
+    public static long setMixed(long id) {
+        return id | MIXED_FLAG;
+    }
+
+    public static long clearMixed(long id) {
+        return id & ~MIXED_FLAG;
+    }
+
     public static long withBlockBiome(long id, int block, int biome) {
         return (id&(0xFFL<<56))|(Integer.toUnsignedLong(block)<<27)|(Integer.toUnsignedLong(biome)<<47);
     }

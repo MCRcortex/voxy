@@ -44,6 +44,23 @@ public class RenderDataFactory {
     private final int[] nonOpaqueMasks = new int[32*32];
     private final int[] fluidMasks = new int[32*32];//Used to separately mesh fluids, allowing for fluid + blockstate
 
+    private final int[] mixedMasks = new int[32*32];//Tracks blocks that were mipped from mixed air+solid regions
+
+    // Vanilla boundary mask: 6 bits indicating which directions face vanilla-rendered chunks
+    // Bit layout: 0=-x, 1=+x, 2=-y, 3=+y, 4=-z, 5=+z
+    // When a bit is set, outer faces in that direction should never be culled (treated like vanilla boundary)
+    private int vanillaBoundaryMask = 0;
+
+    /**
+     * Sets the vanilla boundary mask for the next mesh generation.
+     * This indicates which directions of the section face vanilla-rendered chunks.
+     * Faces toward vanilla chunks should never be culled to prevent gaps at the LOD/vanilla boundary.
+     * @param mask 6-bit mask: bit 0=-x, 1=+x, 2=-y, 3=+y, 4=-z, 5=+z
+     */
+    public void setVanillaBoundaryMask(int mask) {
+        this.vanillaBoundaryMask = mask & 0b111111;
+    }
+
 
     //TODO: emit directly to memory buffer instead of long arrays
 
@@ -221,6 +238,7 @@ public class RenderDataFactory {
         long notEmpty = 0;
         long pureFluid = 0;
         long partialFluid = 0;
+        long mixed = 0;  // Track blocks with the mixed flag (mipped from air+solid regions)
 
         int neighborAcquireMskAndFlags = 0;//-+x, -+z, -+y
         for (int i = 0; i < 32*32*32;) {
@@ -243,6 +261,7 @@ public class RenderDataFactory {
                 notEmpty |= modelId != 0 ? msk : 0;
                 pureFluid |= ModelQueries.isFluid(modelMetadata) ? msk : 0;
                 partialFluid |= ModelQueries.containsFluid(modelMetadata) ? msk : 0;
+                mixed |= Mapper.isMixed(block) ? msk : 0;  // Track mixed flag from raw block data
             }
 
             //Do increment here
@@ -257,6 +276,8 @@ public class RenderDataFactory {
                 this.nonOpaqueMasks[(i >> 5) - 1] = (int) (nonOpaque>>>32);
                 this.fluidMasks[(i >> 5) - 2] = (int) fluid;
                 this.fluidMasks[(i >> 5) - 1] = (int) (fluid>>>32);
+                this.mixedMasks[(i >> 5) - 2] = (int) mixed;
+                this.mixedMasks[(i >> 5) - 1] = (int) (mixed>>>32);
 
                 int packedEmpty = (int) ((notEmpty>>>32)|notEmpty);
 
@@ -278,6 +299,7 @@ public class RenderDataFactory {
                 notEmpty = 0;
                 pureFluid = 0;
                 partialFluid = 0;
+                mixed = 0;
             }
         }
         return neighborAcquireMskAndFlags;
@@ -437,6 +459,12 @@ public class RenderDataFactory {
             int layer = side == 0 ? 0 : 31;
             this.blockMesher.auxiliaryPosition = layer;
             int cSkips = 0;
+
+            // Check if this direction faces vanilla-rendered chunks (never cull if so)
+            // For Y axis (axis=1): -y is bit 2, +y is bit 3
+            // For Z axis (axis=2): -z is bit 4, +z is bit 5
+            boolean facesVanilla = (this.vanillaBoundaryMask & (1 << (axis * 2 + side))) != 0;
+
             for (int other = 0; other < 32; other++) {
                 int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
                 int msk = this.opaqueMasks[pidx];
@@ -464,8 +492,15 @@ public class RenderDataFactory {
                         long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
                         long A = this.sectionData[idx * 2];
 
+                        // Check if current block has mixed flag (it's a boundary surface - never cull its faces)
+                        boolean selfIsMixed = (this.mixedMasks[pidx] & (1 << index)) != 0;
+
                         int nib = Mapper.getBlockId(neighborId);
-                        if (nib != 0) {//Not air
+                        // Don't cull if neighbor is marked as mixed (was mipped from air+solid region)
+                        // Also don't cull if SELF is mixed (this block is a boundary surface)
+                        // Also don't cull if this direction faces vanilla-rendered chunks
+                        boolean neighborIsMixed = Mapper.isMixed(neighborId);
+                        if (nib != 0 && !neighborIsMixed && !selfIsMixed && !facesVanilla) {//Not air and not mixed (neither self nor neighbor) and not facing vanilla
                             int cid = this.modelMan.getModelId(nib);
                             long meta = this.modelMan.getModelMetadataFromClientId(cid);
                             if (ModelQueries.isFullyOpaque(meta)) {//Dont mesh this face
@@ -592,6 +627,12 @@ public class RenderDataFactory {
             int layer = side == 0 ? 0 : 31;
             this.blockMesher.auxiliaryPosition = layer;
             int cSkips = 0;
+
+            // Check if this direction faces vanilla-rendered chunks (never cull if so)
+            // For Y axis (axis=1): -y is bit 2, +y is bit 3
+            // For Z axis (axis=2): -z is bit 4, +z is bit 5
+            boolean facesVanilla = (this.vanillaBoundaryMask & (1 << (axis * 2 + side))) != 0;
+
             for (int other = 0; other < 32; other++) {
                 int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
                 int msk = this.fluidMasks[pidx];
@@ -633,7 +674,13 @@ public class RenderDataFactory {
                         }
 
                         //Check and test if can cull W.R.T neighbor
-                        if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                        // Check if current block has mixed flag (it's a boundary surface - never cull its faces)
+                        boolean selfIsMixed = (this.mixedMasks[pidx] & (1 << index)) != 0;
+                        // Don't cull if neighbor is marked as mixed (was mipped from air+solid region)
+                        // Also don't cull if SELF is mixed (this block is a boundary surface)
+                        // Also don't cull if this direction faces vanilla-rendered chunks
+                        boolean neighborIsMixed = Mapper.isMixed(neighborId);
+                        if (Mapper.getBlockId(neighborId) != 0 && !neighborIsMixed && !selfIsMixed && !facesVanilla) {//Not air and not mixed (neither self nor neighbor) and not facing vanilla
                             int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
                             long meta = this.modelMan.getModelMetadataFromClientId(modelId);
                             if (ModelQueries.containsFluid(meta)) {
@@ -731,6 +778,12 @@ public class RenderDataFactory {
             this.blockMesher.auxiliaryPosition = layer;
             this.seondaryblockMesher.auxiliaryPosition = layer;
             int cSkips = 0;
+
+            // Check if this direction faces vanilla-rendered chunks (never cull if so)
+            // For Y axis (axis=1): -y is bit 2, +y is bit 3
+            // For Z axis (axis=2): -z is bit 4, +z is bit 5
+            boolean facesVanilla = (this.vanillaBoundaryMask & (1 << (axis * 2 + side))) != 0;
+
             for (int other = 0; other < 32; other++) {
                 int pidx = axis == 0 ? (layer * 32 + other) : (other * 32 + layer);
                 int msk = this.nonOpaqueMasks[pidx];
@@ -764,9 +817,16 @@ public class RenderDataFactory {
                         long A = this.sectionData[idx * 2];
                         long B = this.sectionData[idx * 2 + 1];
 
+                        // Check if current block has mixed flag (it's a boundary surface - never cull its faces)
+                        boolean selfIsMixed = (this.mixedMasks[pidx] & (1 << index)) != 0;
+
                         boolean fail = false;
                         //Check and test if can cull W.R.T neighbor
-                        if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                        // Don't cull if neighbor is marked as mixed (was mipped from air+solid region)
+                        // Also don't cull if SELF is mixed (this block is a boundary surface)
+                        // Also don't cull if this direction faces vanilla-rendered chunks
+                        boolean neighborIsMixed = Mapper.isMixed(neighborId);
+                        if (Mapper.getBlockId(neighborId) != 0 && !neighborIsMixed && !selfIsMixed && !facesVanilla) {//Not air and not mixed (neither self nor neighbor) and not facing vanilla
                             int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
 
 
@@ -1004,6 +1064,10 @@ public class RenderDataFactory {
         ma.doAuxiliaryFaceOffset = false;
         mb.doAuxiliaryFaceOffset = false;
 
+        // Check if -x or +x direction faces vanilla-rendered chunks (never cull if so)
+        boolean facesVanillaNegX = (this.vanillaBoundaryMask & (1 << 0)) != 0;  // bit 0 = -x
+        boolean facesVanillaPosX = (this.vanillaBoundaryMask & (1 << 1)) != 0;  // bit 1 = +x
+
         for (int y = 0; y < 32; y++) {
             int skipA = 0;
             int skipB = 0;
@@ -1013,7 +1077,13 @@ public class RenderDataFactory {
                 if ((msk & 1) != 0) {//-x
                     long neighborId = this.neighboringFaces[i];
                     boolean oki = true;
-                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                    // Check if current block has mixed flag (it's a boundary surface - never cull its faces)
+                    boolean selfIsMixed = (this.mixedMasks[i] & 1) != 0;
+                    // Don't cull if neighbor is marked as mixed (was mipped from air+solid region)
+                    // Also don't cull if SELF is mixed (this block is a boundary surface)
+                    // Also don't cull if this direction faces vanilla-rendered chunks
+                    boolean neighborIsMixed = Mapper.isMixed(neighborId);
+                    if (Mapper.getBlockId(neighborId) != 0 && !neighborIsMixed && !selfIsMixed && !facesVanillaNegX) {//Not air and not mixed (neither self nor neighbor) and not facing vanilla
                         long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
                         if (ModelQueries.isFullyOpaque(meta)) {
                             oki = false;
@@ -1035,7 +1105,13 @@ public class RenderDataFactory {
                 if ((msk & (1<<31)) != 0) {//+x
                     long neighborId = this.neighboringFaces[i+32*32];
                     boolean oki = true;
-                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                    // Check if current block has mixed flag (it's a boundary surface - never cull its faces)
+                    boolean selfIsMixed31 = (this.mixedMasks[i] & (1<<31)) != 0;
+                    // Don't cull if neighbor is marked as mixed (was mipped from air+solid region)
+                    // Also don't cull if SELF is mixed (this block is a boundary surface)
+                    // Also don't cull if this direction faces vanilla-rendered chunks
+                    boolean neighborIsMixed = Mapper.isMixed(neighborId);
+                    if (Mapper.getBlockId(neighborId) != 0 && !neighborIsMixed && !selfIsMixed31 && !facesVanillaPosX) {//Not air and not mixed (neither self nor neighbor) and not facing vanilla
                         long meta = this.modelMan.getModelMetadataFromClientId(this.modelMan.getModelId(Mapper.getBlockId(neighborId)));
                         if (ModelQueries.isFullyOpaque(meta)) {
                             oki = false;
@@ -1215,6 +1291,10 @@ public class RenderDataFactory {
         ma.doAuxiliaryFaceOffset = false;
         mb.doAuxiliaryFaceOffset = false;
 
+        // Check if -x or +x direction faces vanilla-rendered chunks (never cull if so)
+        boolean facesVanillaNegX = (this.vanillaBoundaryMask & (1 << 0)) != 0;  // bit 0 = -x
+        boolean facesVanillaPosX = (this.vanillaBoundaryMask & (1 << 1)) != 0;  // bit 1 = +x
+
         for (int y = 0; y < 32; y++) {
             int skipA = 0;
             int skipB = 0;
@@ -1241,7 +1321,13 @@ public class RenderDataFactory {
                     }
 
 
-                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                    // Check if current block has mixed flag (it's a boundary surface - never cull its faces)
+                    boolean selfIsMixed = (this.mixedMasks[i] & 1) != 0;
+                    // Don't cull if neighbor is marked as mixed (was mipped from air+solid region)
+                    // Also don't cull if SELF is mixed (this block is a boundary surface)
+                    // Also don't cull if this direction faces vanilla-rendered chunks
+                    boolean neighborIsMixed = Mapper.isMixed(neighborId);
+                    if (Mapper.getBlockId(neighborId) != 0 && !neighborIsMixed && !selfIsMixed && !facesVanillaNegX) {//Not air and not mixed (neither self nor neighbor) and not facing vanilla
 
                         int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
                         long meta = this.modelMan.getModelMetadataFromClientId(modelId);
@@ -1303,7 +1389,13 @@ public class RenderDataFactory {
 
 
 
-                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                    // Check if current block has mixed flag (it's a boundary surface - never cull its faces)
+                    boolean selfIsMixed = (this.mixedMasks[i] & (1<<31)) != 0;
+                    // Don't cull if neighbor is marked as mixed (was mipped from air+solid region)
+                    // Also don't cull if SELF is mixed (this block is a boundary surface)
+                    // Also don't cull if this direction faces vanilla-rendered chunks
+                    boolean neighborIsMixed = Mapper.isMixed(neighborId);
+                    if (Mapper.getBlockId(neighborId) != 0 && !neighborIsMixed && !selfIsMixed && !facesVanillaPosX) {//Not air and not mixed (neither self nor neighbor) and not facing vanilla
                         int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
                         long meta = this.modelMan.getModelMetadataFromClientId(modelId);
                         if (ModelQueries.isFullyOpaque(meta)) {
@@ -1489,6 +1581,10 @@ public class RenderDataFactory {
         var ppx = this.xAxisMeshers[31]; ppx.finish();
         var pnx = this.secondaryXAxisMeshers[31]; pnx.finish();
 
+        // Check if -x or +x direction faces vanilla-rendered chunks (never cull if so)
+        boolean facesVanillaNegX = (this.vanillaBoundaryMask & (1 << 0)) != 0;  // bit 0 = -x
+        boolean facesVanillaPosX = (this.vanillaBoundaryMask & (1 << 1)) != 0;  // bit 1 = +x
+
         for (int y = 0; y < 32; y++) {
             int skipA = 0;
             int skipB = 0;
@@ -1505,7 +1601,12 @@ public class RenderDataFactory {
 
                     int modelId = 0;
                     long nM = 0;
-                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                    // Check if current block has mixed flag (boundary surface - never cull its faces)
+                    boolean selfIsMixed = (this.mixedMasks[i] & 1) != 0;
+                    // If neighbor is mixed, treat it as air for culling purposes (don't cull faces)
+                    // Also don't cull if this direction faces vanilla-rendered chunks
+                    boolean neighborIsMixed = Mapper.isMixed(neighborId);
+                    if (Mapper.getBlockId(neighborId) != 0 && !neighborIsMixed && !selfIsMixed && !facesVanillaNegX) {//Not air and not mixed and not facing vanilla
                         modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
                         nM = this.modelMan.getModelMetadataFromClientId(modelId);
                     }
@@ -1527,7 +1628,12 @@ public class RenderDataFactory {
 
                     int modelId = 0;
                     long nM = 0;
-                    if (Mapper.getBlockId(neighborId) != 0) {//Not air
+                    // Check if current block has mixed flag (boundary surface - never cull its faces)
+                    boolean selfIsMixed = (this.mixedMasks[i] & (1<<31)) != 0;
+                    // If neighbor is mixed, treat it as air for culling purposes (don't cull faces)
+                    // Also don't cull if this direction faces vanilla-rendered chunks
+                    boolean neighborIsMixed = Mapper.isMixed(neighborId);
+                    if (Mapper.getBlockId(neighborId) != 0 && !neighborIsMixed && !selfIsMixed && !facesVanillaPosX) {//Not air and not mixed and not facing vanilla
                         modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
                         nM = this.modelMan.getModelMetadataFromClientId(modelId);
                     }

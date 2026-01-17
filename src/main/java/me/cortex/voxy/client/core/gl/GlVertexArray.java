@@ -1,6 +1,8 @@
 package me.cortex.voxy.client.core.gl;
 
 import me.cortex.voxy.common.util.TrackedObject;
+import org.lwjgl.PointerBuffer;
+import org.lwjgl.system.MemoryStack;
 
 import java.util.Arrays;
 
@@ -28,9 +30,22 @@ public class GlVertexArray extends TrackedObject {
     }
 
     public GlVertexArray bindBuffer(int buffer) {
-        //TODO: optimization, use glVertexArrayVertexBuffers
-        for (int index : this.indices) {
-            glVertexArrayVertexBuffer(this.id, index, buffer, 0, this.stride);
+        // Optimized: use glVertexArrayVertexBuffers to bind all indices in one call
+        if (this.indices.length == 0) return this;
+
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            int count = this.indices.length;
+            int[] buffers = new int[count];
+            PointerBuffer offsets = stack.mallocPointer(count);
+            int[] strides = new int[count];
+
+            for (int i = 0; i < count; i++) {
+                buffers[i] = buffer;
+                offsets.put(i, 0L);
+                strides[i] = this.stride;
+            }
+
+            glVertexArrayVertexBuffers(this.id, this.indices[0], buffers, offsets, strides);
         }
         return this;
     }

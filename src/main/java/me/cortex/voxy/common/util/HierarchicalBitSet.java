@@ -140,12 +140,46 @@ public class HierarchicalBitSet {
                 continue;
             }
 
-            //TODO: optimize this laziness
-            // (can  do it by first setting/updating the lower D index and propagating, then the upper D index (if it has/needs one))
-            for (int j = 0; j < count; j++) {
-                this.set(j + i);
+            // Optimized consecutive bit setting
+            // Set bits in the D array directly, handling the case where bits span two longs
+            int startIdx = i;
+            int dIdx = i >> 6;
+            int bitOffset = i & 63;
+
+            if (bitOffset + count <= 64) {
+                // All bits fit in one long
+                this.D[dIdx] |= chkMsk << bitOffset;
+            } else {
+                // Bits span two longs
+                int bitsInFirst = 64 - bitOffset;
+                this.D[dIdx] |= chkMsk << bitOffset;  // Lower bits (auto-truncated)
+                this.D[dIdx + 1] |= chkMsk >>> bitsInFirst;  // Upper bits
             }
-            return i;
+
+            // Update count and endId
+            this.cnt += count;
+            if (startIdx + count - 1 > this.endId) {
+                this.endId = startIdx + count - 1;
+            }
+
+            // Propagate to parent levels if any D entry becomes full
+            for (int j = 0; j < count; j++) {
+                int idx = startIdx + j;
+                if (this.D[idx >> 6] == -1) {
+                    int cIdx = idx >> 6;
+                    this.C[cIdx >> 6] |= 1L << (cIdx & 0x3f);
+                    if (this.C[cIdx >> 6] == -1) {
+                        int bIdx = cIdx >> 6;
+                        this.B[bIdx >> 6] |= 1L << (bIdx & 0x3f);
+                        if (this.B[bIdx >> 6] == -1) {
+                            int aIdx = bIdx >> 6;
+                            this.A |= 1L << (aIdx & 0x3f);
+                        }
+                    }
+                }
+            }
+
+            return startIdx;
         }
     }
 

@@ -157,10 +157,13 @@ void main() {
     }
 
     //Check the minimum bounding texture and ensure we are greater than it
-    if (gl_FragCoord.z < texelFetch(depthTex, ivec2(gl_FragCoord.xy), 0).r) {
-        discard;
-        return;
-    }
+    //DISABLED: This AABB-based culling causes gaps at the vanilla/LOD boundary
+        //because the AABB covers the full chunk area but vanilla geometry (especially water)
+        //doesn't fill the edges. Relying on actual depth buffer instead.
+        //if (gl_FragCoord.z < texelFetch(depthTex, ivec2(gl_FragCoord.xy), 0).r - 0.0001) {
+        //    discard;
+        //    return;
+        //}
 
 
     //Also, small quad is really fking over the mipping level somehow

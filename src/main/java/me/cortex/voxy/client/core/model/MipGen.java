@@ -105,15 +105,22 @@ public class MipGen {
             int width = (MODEL_TEXTURE_SIZE*3)>>(i+1);
             int sWidth = (MODEL_TEXTURE_SIZE*3)>>i;
             int height = (MODEL_TEXTURE_SIZE*2)>>(i+1);
-            //TODO: OPTIMZIE THIS
-            for (int px = 0; px < width; px++) {
-                for (int py = 0; py < height; py++) {
-                    long bp = sAddr + (px*2 + py*2*sWidth)*4;
+            // Optimized: iterate by rows for better cache locality
+            // Pre-compute stride values outside inner loop
+            long sRowStride = sWidth * 4L;
+            long dRowStride = width * 4L;
+
+            for (int py = 0; py < height; py++) {
+                long srcRowBase = sAddr + (py * 2) * sRowStride;
+                long dstRowBase = dAddr + py * dRowStride;
+
+                for (int px = 0; px < width; px++) {
+                    long bp = srcRowBase + (px * 2) * 4L;
                     int C00 = MemoryUtil.memGetInt(bp);
-                    int C01 = MemoryUtil.memGetInt(bp+sWidth*4);
-                    int C10 = MemoryUtil.memGetInt(bp+4);
-                    int C11 = MemoryUtil.memGetInt(bp+sWidth*4+4);
-                    MemoryUtil.memPutInt(dAddr + (px+py*width) * 4L, TextureUtils.mipColours(darkened, C00, C01, C10, C11));
+                    int C10 = MemoryUtil.memGetInt(bp + 4);
+                    int C01 = MemoryUtil.memGetInt(bp + sRowStride);
+                    int C11 = MemoryUtil.memGetInt(bp + sRowStride + 4);
+                    MemoryUtil.memPutInt(dstRowBase + px * 4L, TextureUtils.mipColours(darkened, C00, C01, C10, C11));
                 }
             }
         }

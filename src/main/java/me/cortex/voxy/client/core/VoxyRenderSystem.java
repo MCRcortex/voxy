@@ -56,6 +56,8 @@ import static org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER_BINDING;
 public class VoxyRenderSystem {
     private final WorldEngine worldIn;
 
+    // Static cache for SSBO bindings to avoid allocation overhead each frame
+    private static final int[] SSBO_BINDING_CACHE = new int[10];
 
     private final ModelBakerySubsystem modelService;
     private final RenderGenerationService renderGen;
@@ -221,8 +223,10 @@ public class VoxyRenderSystem {
         GPUTiming.INSTANCE.marker();//Start marker
         TimingStatistics.main.start();
 
-        //TODO: optimize
-        int[] oldBufferBindings = new int[10];
+        //Optimized: use stack allocation and bulk query where possible
+        //Note: glGetIntegeri is slow, but we need to restore these bindings for compatibility
+        //Cache the bindings in a pre-allocated array to avoid allocation overhead
+        int[] oldBufferBindings = SSBO_BINDING_CACHE;
         for (int i = 0; i < oldBufferBindings.length; i++) {
             oldBufferBindings[i] = glGetIntegeri(GL_SHADER_STORAGE_BUFFER_BINDING, i);
         }

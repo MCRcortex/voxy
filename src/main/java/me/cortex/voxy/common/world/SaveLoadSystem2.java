@@ -335,21 +335,47 @@ public class SaveLoadSystem2 {
 
         //Reconstruct everything
         long hash = 12345;
+
+        // Pre-extract all light values for better cache efficiency
+        // Light data is stored as nibbles (4 bits per value), 2 values per byte
+        byte[] blockLightValues = null;
+        byte[] skyLightValues = null;
+
+        if (!allSameBlockLight) {
+            blockLightValues = new byte[32*32*32];
+            for (int i = 0; i < 32*32*32; i += 2) {
+                int byteVal = Byte.toUnsignedInt(MemoryUtil.memGetByte(blockLight + (i >> 1)));
+                blockLightValues[i] = (byte) ((byteVal & 0xF) << 4);
+                if (i + 1 < 32*32*32) {
+                    blockLightValues[i + 1] = (byte) (byteVal & 0xF0);
+                }
+            }
+        }
+
+        if (!allSameSkyLight) {
+            skyLightValues = new byte[32*32*32];
+            for (int i = 0; i < 32*32*32; i += 2) {
+                int byteVal = Byte.toUnsignedInt(MemoryUtil.memGetByte(skyLight + (i >> 1)));
+                skyLightValues[i] = (byte) (byteVal & 0xF);
+                if (i + 1 < 32*32*32) {
+                    skyLightValues[i + 1] = (byte) ((byteVal >> 4) & 0xF);
+                }
+            }
+        }
+
+        byte constBlockLight = allSameBlockLight ? (byte) (blockLight & 0xF0) : 0;
+        byte constSkyLight = allSameSkyLight ? (byte) (skyLight & 0xF) : 0;
+
         for (int i = 0; i < 32*32*32; i++) {
-            byte light = 0;
-            {
-                if (allSameBlockLight) {
-                    light |= (byte) (blockLight&0xF0);
-                } else {
-                    //Todo clean and optimize this (it can be optimized alot)
-                    light |= (byte) (((Byte.toUnsignedInt(MemoryUtil.memGetByte(blockLight+(i>>1)))>>((i&1)*4))&0xF)<<4);
-                }
-                if (allSameSkyLight) {
-                    light |= (byte) (skyLight&0xF);
-                } else {
-                    //Todo clean and optimize this (it can be optimized alot)
-                    light |= (byte) ((Byte.toUnsignedInt(MemoryUtil.memGetByte(skyLight+(i>>1)))>>((i&1)*4))&0xF);
-                }
+            byte light;
+            if (allSameBlockLight && allSameSkyLight) {
+                light = (byte) (constBlockLight | constSkyLight);
+            } else if (allSameBlockLight) {
+                light = (byte) (constBlockLight | skyLightValues[i]);
+            } else if (allSameSkyLight) {
+                light = (byte) (blockLightValues[i] | constSkyLight);
+            } else {
+                light = (byte) (blockLightValues[i] | skyLightValues[i]);
             }
 
             int block = blockLut[blocks[i]];

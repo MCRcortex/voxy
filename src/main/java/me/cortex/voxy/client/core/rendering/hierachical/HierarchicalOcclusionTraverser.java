@@ -35,7 +35,10 @@ public class HierarchicalOcclusionTraverser {
     public static final int MAX_QUEUE_SIZE = 200_000;
 
 
-    private static final int MAX_ITERATIONS = WorldEngine.MAX_LOD_LAYER+1;
+    // Decoupled from MAX_LOD_LAYER to allow more traversal iterations for extreme render distances
+    // with low subdivision settings. Extra iterations have minimal overhead when queues are empty.
+    // uhh yeah
+    private static final int MAX_ITERATIONS = 8;
     private static final int LOCAL_WORK_SIZE_BITS = 5;
 
     private final AsyncNodeManager nodeManager;
@@ -238,11 +241,13 @@ public class HierarchicalOcclusionTraverser {
 
         if (RenderStatistics.enabled) {
             DownloadStream.INSTANCE.download(this.statisticsBuffer, down->{
-                for (int i = 0; i < MAX_ITERATIONS; i++) {
+                // Stats are indexed by LOD level (0 to MAX_LOD_LAYER), not by iteration
+                int statsCount = RenderStatistics.hierarchicalTraversalCounts.length;
+                for (int i = 0; i < statsCount; i++) {
                     RenderStatistics.hierarchicalTraversalCounts[i] = MemoryUtil.memGetInt(down.address+i*4L);
                 }
 
-                for (int i = 0; i < MAX_ITERATIONS; i++) {
+                for (int i = 0; i < statsCount; i++) {
                     RenderStatistics.hierarchicalRenderSections[i] = MemoryUtil.memGetInt(down.address+MAX_ITERATIONS*4L+i*4L);
                 }
             });
