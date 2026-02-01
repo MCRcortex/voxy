@@ -35,64 +35,9 @@ public class WorldUpdater {
                 previousSection = null;
             }
 
-
-            int msk = (1<<(lvl+1))-1;
-            int bx = (section.x&msk)<<(4-lvl);
-            int by = (section.y&msk)<<(4-lvl);
-            int bz = (section.z&msk)<<(4-lvl);
-
-            int airCount = 0;
-            boolean didStateChange = false;
-
-
-            //TODO: remove the nonAirCountDelta stuff if level != 0
-
-            {//Do a bunch of funny math
-                var secD = worldSection.data;
-                int baseSec = bx | (bz << 5) | (by << 10);
-                if (lvl == 0) {
-                    final int secMsk = 0b1100|(0xf << 5) | (0xf << 10);
-                    final int iSecMsk1 = (~secMsk) + 1;
-
-                    int secIdx = 0;
-
-                    //TODO rotate the loop parralelization
-                    // i.e. instead of doing 4 consecutive blocks, which would all be in the same cache line
-                    // do 4 seperate rows so they are in different cache lines, should allow
-                    // more instruction pipelining (in theory)
-                    for (int i = 0; i <= 0xFFF; i+=4) {
-                        int cSecIdx = secIdx + baseSec;
-                        secIdx = (secIdx + iSecMsk1) & secMsk;
-
-                        long oldId0 = secD[cSecIdx+0]; secD[cSecIdx+0] = vdat[i+0];
-                        long oldId1 = secD[cSecIdx+1]; secD[cSecIdx+1] = vdat[i+1];
-                        long oldId2 = secD[cSecIdx+2]; secD[cSecIdx+2] = vdat[i+2];
-                        long oldId3 = secD[cSecIdx+3]; secD[cSecIdx+3] = vdat[i+3];
-
-                        airCount += Mapper.isAir(oldId0)?1:0; didStateChange |= vdat[i+0] != oldId0;
-                        airCount += Mapper.isAir(oldId1)?1:0; didStateChange |= vdat[i+1] != oldId1;
-                        airCount += Mapper.isAir(oldId2)?1:0; didStateChange |= vdat[i+2] != oldId2;
-                        airCount += Mapper.isAir(oldId3)?1:0; didStateChange |= vdat[i+3] != oldId3;
-                    }
-                } else {
-                    int baseVIdx = VoxelizedSection.getBaseIndexForLevel(lvl);
-
-                    int secMsk = 0xF >> lvl;
-                    secMsk |= (secMsk << 5) | (secMsk << 10);
-                    int iSecMsk1 = (~secMsk) + 1;
-
-                    int secIdx = 0;
-                    //TODO: manually unroll and do e.g. 4 iterations per loop
-                    for (int i = baseVIdx; i <= (0xFFF >> (lvl * 3)) + baseVIdx; i++) {
-                        int cSecIdx = secIdx + baseSec;
-                        secIdx = (secIdx + iSecMsk1) & secMsk;
-                        long newId = vdat[i];
-                        long oldId = secD[cSecIdx];
-                        didStateChange |= newId != oldId;
-                        secD[cSecIdx] = newId;
-                    }
-                }
-            }
+            long status = insertSectionLvlIntoWorld(section, worldSection);
+            boolean didStateChange = (status&1)==1;
+            int airCount = (int) ((status>>1)&0x1FFF);
 
             if (lvl == 0) {
                 int nonAirCountDelta = section.lvl0NonAirCount-(4096-airCount);
@@ -145,15 +90,79 @@ public class WorldUpdater {
         }
     }
 
-    public static void main(String[] args) {
-        int MSK = 0b110110010100;
-        int iMSK = ~MSK;
-        int iMSK1 = iMSK+1;
-        int i = 0;
-        do  {
-            System.err.println(Integer.toBinaryString(i));
-            if (i==MSK) break;
-            i = (i+iMSK1)&MSK;
-        } while (true);
+    private static long insertSectionLvlIntoWorld(VoxelizedSection section, WorldSection worldSection) {
+        final long[] vdat = section.section;
+        final int lvl = worldSection.lvl;
+
+        int msk = (1 << (lvl + 1)) - 1;
+        int bx = (section.x & msk) << (4 - lvl);
+        int by = (section.y & msk) << (4 - lvl);
+        int bz = (section.z & msk) << (4 - lvl);
+
+        int airCount = 0;
+        boolean didStateChange = false;
+
+
+        //TODO: remove the nonAirCountDelta stuff if level != 0
+
+        {//Do a bunch of funny math
+            var secD = worldSection.data;
+            int baseSec = bx | (bz << 5) | (by << 10);
+            if (lvl == 0) {
+                final int secMsk = 0b1100 | (0xf << 5) | (0xf << 10);
+                final int iSecMsk1 = (~secMsk) + 1;
+
+                int secIdx = 0;
+
+                //TODO rotate the loop parralelization
+                // i.e. instead of doing 4 consecutive blocks, which would all be in the same cache line
+                // do 4 seperate rows so they are in different cache lines, should allow
+                // more instruction pipelining (in theory)
+                for (int i = 0; i <= 0xFFF; i += 4) {
+                    int cSecIdx = secIdx + baseSec;
+                    secIdx = (secIdx + iSecMsk1) & secMsk;
+
+                    long oldId0 = secD[cSecIdx + 0];
+                    secD[cSecIdx + 0] = vdat[i + 0];
+                    long oldId1 = secD[cSecIdx + 1];
+                    secD[cSecIdx + 1] = vdat[i + 1];
+                    long oldId2 = secD[cSecIdx + 2];
+                    secD[cSecIdx + 2] = vdat[i + 2];
+                    long oldId3 = secD[cSecIdx + 3];
+                    secD[cSecIdx + 3] = vdat[i + 3];
+
+                    airCount += Mapper.isAir(oldId0) ? 1 : 0;
+                    didStateChange |= vdat[i + 0] != oldId0;
+                    airCount += Mapper.isAir(oldId1) ? 1 : 0;
+                    didStateChange |= vdat[i + 1] != oldId1;
+                    airCount += Mapper.isAir(oldId2) ? 1 : 0;
+                    didStateChange |= vdat[i + 2] != oldId2;
+                    airCount += Mapper.isAir(oldId3) ? 1 : 0;
+                    didStateChange |= vdat[i + 3] != oldId3;
+                }
+            } else {
+                int baseVIdx = VoxelizedSection.getBaseIndexForLevel(lvl);
+
+                int secMsk = 0xF >> lvl;
+                secMsk |= (secMsk << 5) | (secMsk << 10);
+                int iSecMsk1 = (~secMsk) + 1;
+
+                int secIdx = 0;
+                //TODO: manually unroll and do e.g. 4 iterations per loop
+                for (int i = baseVIdx; i <= (0xFFF >> (lvl * 3)) + baseVIdx; i++) {
+                    int cSecIdx = secIdx + baseSec;
+                    secIdx = (secIdx + iSecMsk1) & secMsk;
+                    long newId = vdat[i];
+                    long oldId = secD[cSecIdx];
+                    didStateChange |= newId != oldId;
+                    secD[cSecIdx] = newId;
+                }
+            }
+        }
+
+        long status = 0;
+        status |= didStateChange?1:0;
+        status |= Integer.toUnsignedLong(airCount)<<1;//VERY VERY VERY IMPORTANT NOTE: IS 13 BITS BIG NOT 12 BITS (since it can be 4096 which is 6 bits large)
+        return status;
     }
 }

@@ -169,8 +169,10 @@ public class DownloadStream {
         this.tick();
         var fence = new GlFence();
         glFinish();
-        while (!fence.signaled())
+        while (!fence.signaled()) {
+            glFinish();
             Thread.onSpinWait();
+        }
         fence.free();
         this.tick();
         if (!this.frames.isEmpty()) {

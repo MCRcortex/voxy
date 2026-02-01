@@ -1407,7 +1407,7 @@ public class NodeManager {
                 (WorldEngine.getZ(basePos)<<1)|((addin>>1)&1));
     }
 
-    private long makeParentPos(long pos) {
+    private static long makeParentPos(long pos) {
         int lvl = WorldEngine.getLevel(pos);
         if (lvl == MAX_LOD_LAYER) {
             throw new IllegalArgumentException("Cannot create a parent higher than LoD " + (MAX_LOD_LAYER));

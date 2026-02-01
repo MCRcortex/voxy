@@ -157,7 +157,6 @@ public class RocksDBStorageBackend extends StorageBackend {
         }
     }
 
-    //TODO: FIXME, use the ByteBuffer variant
     @Override
     public void setSectionData(long key, MemoryBuffer data) {
         try (var stack = MemoryStack.stackPush()) {

@@ -124,7 +124,7 @@ public class WorldEngine {
         if (this.dirtyCallback != null) {
             this.dirtyCallback.accept(section, changeState, neighborMsk);
         }
-        if ((!section.inSaveQueue)&&(changeState&UPDATE_TYPE_DONT_SAVE)==0) {
+        if ((changeState&UPDATE_TYPE_DONT_SAVE)==0) {
             section.markDirty();
         }
     }

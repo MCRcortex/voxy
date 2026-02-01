@@ -25,6 +25,8 @@ public class SectionSavingService {
         var section = task.section;
         section.assertNotFree();
         try {
+            //Unmark it dirty here (if it wasnt or w/e) so that it doesnt pointlessly resave (in theory this should be safe to do)
+            section.setNotDirty();
             if (section.exchangeIsInSaveQueue(false)) {
                 task.engine.storage.saveSection(section);
             }
