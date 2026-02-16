@@ -110,7 +110,8 @@ public class VoxyClientInstance extends VoxyInstance {
                     if (info.isRealm()) {
                         basePath = basePath.resolve("realms");
                     } else {
-                        basePath = basePath.resolve(info.ip.replace(":", "_"));
+                        String userSuffix = Minecraft.getInstance().getUser().getProfileId().toString();
+                        basePath = basePath.resolve(info.ip.replace(":", "_")).resolve(userSuffix);
                     }
                 }
             }
