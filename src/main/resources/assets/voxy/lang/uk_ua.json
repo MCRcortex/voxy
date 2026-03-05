@@ -11,7 +11,7 @@
   "voxy.config.general.serviceThreads.tooltip": "Кількість потоків, які може використовувати ServiceThreadPool.",
 
   "voxy.config.general.useSodiumBuilder": "Використовувати потоки Sodium",
-  "voxy.config.general.useSodiumBuilder.tooltip": "Використовує потоки Sodium для створення як частину пулу потоків Voxy, може зменшити фрізи та відставання під час швидкого переміщення за великої дальности промальвоування.",
+  "voxy.config.general.useSodiumBuilder.tooltip": "Використовує потоки Sodium для створення як частину пулу потоків Voxy, може зменшити фрізи та відставання під час швидкого переміщення за великої дальности промальовування.",
 
   "voxy.config.general.ingest": "Передача блока",
   "voxy.config.general.ingest.tooltip": "Умикає або вимикає здатність Voxy перетворювати нові чанки в зони РД.",
