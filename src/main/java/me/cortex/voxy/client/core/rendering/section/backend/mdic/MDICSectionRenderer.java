@@ -5,8 +5,9 @@ import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.core.AbstractRenderPipeline;
 import me.cortex.voxy.client.core.gl.Capabilities;
-import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlVertexArray;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderLoader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
@@ -90,13 +91,13 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
             .compile();
 
-    private final GlBuffer uniform = new GlBuffer(1024).zero();//TODO move to viewport?
+    private final IGpuBuffer uniform = RenderBackendFactory.get().createBuffer(1024).zero();//TODO move to viewport?
 
     //TODO: needs to be in the viewport, since it contains the compute indirect call/values
-    private final GlBuffer distanceCountBuffer = new GlBuffer(1024*4+100_000*4).zero();//TODO move to viewport?
+    private final IGpuBuffer distanceCountBuffer = RenderBackendFactory.get().createBuffer(1024*4+100_000*4).zero();//TODO move to viewport?
 
     //Statistics
-    private final GlBuffer statisticsBuffer = new GlBuffer(1024).zero();
+    private final IGpuBuffer statisticsBuffer = RenderBackendFactory.get().createBuffer(1024).zero();
 
     private final AbstractRenderPipeline pipeline;
     public MDICSectionRenderer(AbstractRenderPipeline pipeline, ModelStore modelStore, BasicSectionGeometryData geometryData) {
@@ -155,17 +156,17 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
 
     private void bindRenderingBuffers(MDICViewport viewport) {
-        glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getGeometryBuffer().id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.geometryManager.getMetadataBuffer().id);
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getGeometryBuffer().id());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.geometryManager.getMetadataBuffer().id());
         this.modelStore.bind(3, 4, 0);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.positionScratchBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.positionScratchBuffer.id());
         LightMapHelper.bind(1);
         bindTextureUnit(2, GL_TEXTURE_2D, viewport.depthBoundingBuffer.getDepthTex().id);
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
-        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, viewport.drawCallBuffer.id);
-        glBindBuffer(GL_PARAMETER_BUFFER_ARB, viewport.drawCountCallBuffer.id);
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, viewport.drawCallBuffer.id());
+        glBindBuffer(GL_PARAMETER_BUFFER_ARB, viewport.drawCountCallBuffer.id());
     }
 
     private void renderTerrain(MDICViewport viewport, long indirectOffset, long drawCountOffset, int maxDrawCount) {
@@ -188,7 +189,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         if (Capabilities.INSTANCE.indirectCount) {
             glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, indirectOffset, drawCountOffset, maxDrawCount, 0);
         } else {
-            int drawCount = Math.min(readDrawCount(viewport.drawCountCallBuffer.id, drawCountOffset), maxDrawCount);
+            int drawCount = Math.min(readDrawCount(viewport.drawCountCallBuffer.id(), drawCountOffset), maxDrawCount);
             glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, indirectOffset, drawCount, 0);
         }
         if (VoxyClient.getOcclusionDebugState()==3) {
@@ -234,7 +235,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         if (Capabilities.INSTANCE.indirectCount) {
             glMultiDrawElementsIndirectCountARB(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, 4*4, translucentMax, 0);
         } else {
-            int drawCount = Math.min(readDrawCount(viewport.drawCountCallBuffer.id, 4*4L), translucentMax);
+            int drawCount = Math.min(readDrawCount(viewport.drawCountCallBuffer.id(), 4*4L), translucentMax);
             glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_SHORT, TRANSLUCENT_OFFSET*5*4, drawCount, 0);
         }
 
@@ -258,9 +259,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         {//Dispatch prep
             this.prepShader.bind();
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCountCallBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.getRenderList().id);
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCountCallBuffer.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.getRenderList().id());
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
             glDispatchCompute(1,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
@@ -272,11 +273,11 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                 glEnable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
             }
             glBindVertexArray(GlVertexArray.STATIC_VAO);
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getMetadataBuffer().id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.visibilityBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, viewport.indirectLookupBuffer.id);
-            glBindBuffer(GL_DRAW_INDIRECT_BUFFER, viewport.drawCountCallBuffer.id);
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getMetadataBuffer().id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.visibilityBuffer.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, viewport.indirectLookupBuffer.id());
+            glBindBuffer(GL_DRAW_INDIRECT_BUFFER, viewport.drawCountCallBuffer.id());
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
             glEnable(GL_DEPTH_TEST);
             glColorMask(false, false, false, false);
@@ -295,21 +296,21 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         {//Generate the commands
             this.distanceCountBuffer.zeroRange(0, 1024*4);
             this.commandGenShader.bind();
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCallBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.drawCountCallBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBuffer().id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.visibilityBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.indirectLookupBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, viewport.positionScratchBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.distanceCountBuffer.id);
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCallBuffer.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.drawCountCallBuffer.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBuffer().id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.visibilityBuffer.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.indirectLookupBuffer.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, viewport.positionScratchBuffer.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.distanceCountBuffer.id());
 
             if (RenderStatistics.enabled) {
                 this.statisticsBuffer.zero();
-                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, STATISTICS_BUFFER_BINDING, this.statisticsBuffer.id);
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, STATISTICS_BUFFER_BINDING, this.statisticsBuffer.id());
             }
 
-            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, viewport.drawCountCallBuffer.id);
+            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, viewport.drawCountCallBuffer.id());
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
             glDispatchComputeIndirect(0);
             glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
@@ -330,20 +331,20 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         {//Do translucency sorting
             this.prefixSumShader.bind();
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.distanceCountBuffer.id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.distanceCountBuffer.id());
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);//Am unsure if is needed
             glDispatchCompute(1,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
             this.translucentGenShader.bind();
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCallBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.drawCountCallBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBuffer().id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.indirectLookupBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.distanceCountBuffer.id);
+            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCallBuffer.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.drawCountCallBuffer.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBuffer().id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.indirectLookupBuffer.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.distanceCountBuffer.id());
 
-            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, viewport.drawCountCallBuffer.id);//This isnt great but its a nice trick to bound it, even if its inefficent ;-;
+            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, viewport.drawCountCallBuffer.id());//This isnt great but its a nice trick to bound it, even if its inefficent ;-;
             glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT|GL_UNIFORM_BARRIER_BIT);
             glDispatchComputeIndirect(0);
             glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);

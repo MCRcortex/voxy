@@ -6,8 +6,8 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import me.cortex.voxy.client.core.gl.Capabilities;
-import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.model.bakery.ModelTextureBakery;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
@@ -311,7 +311,7 @@ public class ModelFactory {
             this.upload(store.modelBuffer, store.modelColourBuffer, store.textures);
         }
 
-        public void upload(GlBuffer modelBuffer, GlBuffer colourBuffer, GlTexture atlas) {//Uploads and resets for reuse
+        public void upload(IGpuBuffer modelBuffer, IGpuBuffer colourBuffer, GlTexture atlas) {//Uploads and resets for reuse
             this.model.cpyTo(UploadStream.INSTANCE.upload(modelBuffer, (long) this.modelId * MODEL_SIZE, MODEL_SIZE));
             if (this.biomeUploadIndex != -1) {
                 this.biomeUpload.cpyTo(UploadStream.INSTANCE.upload(colourBuffer, this.biomeUploadIndex * 4L, this.biomeUpload.size));
@@ -669,7 +669,7 @@ public class ModelFactory {
             this.upload(store.modelBuffer, store.modelColourBuffer);
         }
 
-        public void upload(GlBuffer modelBuffer, GlBuffer modelColourBuffer) {
+        public void upload(IGpuBuffer modelBuffer, IGpuBuffer modelColourBuffer) {
             this.biomeColourBuffer.cpyTo(UploadStream.INSTANCE.upload(modelColourBuffer, 0, this.biomeColourBuffer.size));
 
             //TODO: optimize this to like a compute scatter update or something

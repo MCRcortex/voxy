@@ -1,7 +1,8 @@
 package me.cortex.voxy.client.core.model;
 
-import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.resources.Identifier;
@@ -19,14 +20,14 @@ import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
 
 public class ModelStore {
     public static final int MODEL_SIZE = 64;
-    final GlBuffer modelBuffer;
-    final GlBuffer modelColourBuffer;
+    final IGpuBuffer modelBuffer;
+    final IGpuBuffer modelColourBuffer;
     final GlTexture textures;
     public final int blockSampler = glGenSamplers();
 
     public ModelStore() {
-        this.modelBuffer = new GlBuffer(MODEL_SIZE * (1<<16)).name("ModelData");
-        this.modelColourBuffer = new GlBuffer(4 * (1<<16)).name("ModelColour");
+        this.modelBuffer = RenderBackendFactory.get().createBuffer(MODEL_SIZE * (1<<16));
+        this.modelColourBuffer = RenderBackendFactory.get().createBuffer(4 * (1<<16));
         this.textures = new GlTexture().store(GL_RGBA8, Integer.numberOfTrailingZeros(ModelFactory.MODEL_TEXTURE_SIZE), ModelFactory.MODEL_TEXTURE_SIZE*3*256,ModelFactory.MODEL_TEXTURE_SIZE*2*256).name("ModelTextures");
 
 
@@ -51,8 +52,8 @@ public class ModelStore {
 
 
     public void bind(int modelBindingIndex, int colourBindingIndex, int textureBindingIndex) {
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, modelBindingIndex, this.modelBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, colourBindingIndex, this.modelColourBuffer.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, modelBindingIndex, this.modelBuffer.id());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, colourBindingIndex, this.modelColourBuffer.id());
         bindTextureUnit(textureBindingIndex, this.textures.id);
         glBindSampler(textureBindingIndex, this.blockSampler);
     }

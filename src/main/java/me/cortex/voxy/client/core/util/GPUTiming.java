@@ -3,7 +3,7 @@ package me.cortex.voxy.client.core.util;
 import it.unimi.dsi.fastutil.ints.IntArrayFIFOQueue;
 import it.unimi.dsi.fastutil.objects.ObjectArrayFIFOQueue;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.rendering.util.DownloadStream;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.Pair;

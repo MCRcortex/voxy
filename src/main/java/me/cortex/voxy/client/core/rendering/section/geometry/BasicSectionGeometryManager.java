@@ -2,7 +2,8 @@ package me.cortex.voxy.client.core.rendering.section.geometry;
 
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.rendering.building.BuiltSection;
 import me.cortex.voxy.client.core.rendering.util.BufferArena;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
@@ -13,7 +14,7 @@ import java.util.function.Consumer;
 
 public class BasicSectionGeometryManager extends AbstractSectionGeometryManager {
     public static final int SECTION_METADATA_SIZE = 32;
-    private final GlBuffer sectionMetadataBuffer;
+    private final IGpuBuffer sectionMetadataBuffer;
     private final BufferArena geometry;
     private final HierarchicalBitSet allocationSet;
     private final ObjectArrayList<SectionMeta> sectionMetadata = new ObjectArrayList<>(1<<15);
@@ -24,7 +25,7 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
     public BasicSectionGeometryManager(int maxSectionCount, long geometryCapacity) {
         super(maxSectionCount, geometryCapacity);
         this.allocationSet = new HierarchicalBitSet(maxSectionCount);
-        this.sectionMetadataBuffer = new GlBuffer((long) maxSectionCount * SECTION_METADATA_SIZE);
+        this.sectionMetadataBuffer = RenderBackendFactory.get().createBuffer((long) maxSectionCount * SECTION_METADATA_SIZE);
         this.geometry = new BufferArena(geometryCapacity, 8);//8 Cause a quad is 8 bytes
     }
 
@@ -155,7 +156,7 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
     }
 
     int getMetadataBufferId() {
-        return this.sectionMetadataBuffer.id;
+        return this.sectionMetadataBuffer.id();
     }
 
     @Override

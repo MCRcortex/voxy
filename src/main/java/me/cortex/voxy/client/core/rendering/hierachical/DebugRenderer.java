@@ -1,7 +1,8 @@
 package me.cortex.voxy.client.core.rendering.hierachical;
 
-import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlVertexArray;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.Viewport;
@@ -33,8 +34,8 @@ public class DebugRenderer {
             .add(ShaderType.COMPUTE, "voxy:lod/hierarchical/debug/setup.comp")
             .compile();
 
-    private final GlBuffer uniformBuffer = new GlBuffer(1024).zero();
-    private final GlBuffer drawBuffer = new GlBuffer(1024).zero();
+    private final IGpuBuffer uniformBuffer = RenderBackendFactory.get().createBuffer(1024).zero();
+    private final IGpuBuffer drawBuffer = RenderBackendFactory.get().createBuffer(1024).zero();
 
     private void uploadUniform(Viewport<?> viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 1024);
@@ -55,24 +56,24 @@ public class DebugRenderer {
         MemoryUtil.memPutInt(ptr, viewport.height); ptr += 4;
     }
 
-    public void render(Viewport<?> viewport, GlBuffer nodeData, GlBuffer nodeList) {
+    public void render(Viewport<?> viewport, IGpuBuffer nodeData, IGpuBuffer nodeList) {
         this.uploadUniform(viewport);
         UploadStream.INSTANCE.commit();
 
         this.setupShader.bind();
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.drawBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, nodeList.id);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.drawBuffer.id());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, nodeList.id());
         glDispatchCompute(1,1,1);
         glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT|GL_COMMAND_BARRIER_BIT);
 
         glEnable(GL_DEPTH_TEST);
         this.debugShader.bind();
         glBindVertexArray(GlVertexArray.STATIC_VAO);
-        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawBuffer.id);
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawBuffer.id());
         GL15.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BYTE.id());
-        glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, nodeData.id);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, nodeList.id);
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, nodeData.id());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, nodeList.id());
         glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_BYTE, 0);
     }
 

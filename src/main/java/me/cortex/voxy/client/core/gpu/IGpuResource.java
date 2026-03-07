@@ -5,4 +5,6 @@ package me.cortex.voxy.client.core.gpu;
  */
 public interface IGpuResource {
     void free();
+    void assertNotFreed();
+    boolean isFreed();
 }

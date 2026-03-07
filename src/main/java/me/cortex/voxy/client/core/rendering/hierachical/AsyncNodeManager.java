@@ -5,7 +5,7 @@ import it.unimi.dsi.fastutil.ints.IntConsumer;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxy.client.TimingStatistics;
-import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.rendering.GeometryCache;
@@ -490,7 +490,7 @@ public class AsyncNodeManager {
 
     private IntConsumer tlnAddCallback; private IntConsumer tlnRemoveCallback;
     //Render thread synchronization
-    public void tick(GlBuffer nodeBuffer, NodeCleaner cleaner) {//TODO: dont pass nodeBuffer here??, do something else thats better
+    public void tick(IGpuBuffer nodeBuffer, NodeCleaner cleaner) {//TODO: dont pass nodeBuffer here??, do something else thats better
         var results = (SyncResults)RESULT_HANDLE.getAndSet(this, null);//Acquire the results
         if (results == null) {//There are no new results to process, return
             return;
@@ -530,7 +530,7 @@ public class AsyncNodeManager {
                 this.multiMemcpy.bind();
                 glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, UploadStream.INSTANCE.getRawBufferId(), ptr, copies*16L);
                 glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 1, UploadStream.INSTANCE.getRawBufferId(), ptr+copies*16L, scratchSize);
-                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ((BasicSectionGeometryData) this.geometryData).getGeometryBuffer().id);
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ((BasicSectionGeometryData) this.geometryData).getGeometryBuffer().id());
 
                 if (copies > 500) {
                     Logger.warn("Large amount of copies, lag will probably happen: " + copies);
@@ -556,8 +556,8 @@ public class AsyncNodeManager {
 
             this.scatterWrite.bind();
             glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, UploadStream.INSTANCE.getRawBufferId(), ptr, streamSize);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, nodeBuffer.id);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ((BasicSectionGeometryData) this.geometryData).getMetadataBuffer().id);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, nodeBuffer.id());
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, ((BasicSectionGeometryData) this.geometryData).getMetadataBuffer().id());
             glUniform1ui(0, count);
             glMemoryBarrier(GL_UNIFORM_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
             glDispatchCompute((count+127)/128, 1, 1);

@@ -1,6 +1,7 @@
 package me.cortex.voxy.client.core.rendering.util;
 
-import me.cortex.voxy.client.core.gl.GlBuffer;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import org.lwjgl.system.MemoryUtil;
 
@@ -12,10 +13,10 @@ public class SharedIndexBuffer {
     public static final SharedIndexBuffer INSTANCE_BYTE = new SharedIndexBuffer(true);
     public static final SharedIndexBuffer INSTANCE_BB_BYTE = new SharedIndexBuffer(true, true);
 
-    private final GlBuffer indexBuffer;
+    private final IGpuBuffer indexBuffer;
 
     public SharedIndexBuffer() {
-        this.indexBuffer = new GlBuffer((1<<16)*6*2 + 6*2*3);
+        this.indexBuffer = RenderBackendFactory.get().createBuffer((1<<16)*6*2 + 6*2*3);
         var quadIndexBuff = generateQuadIndicesShort(16380);
         var cubeBuff = generateCubeIndexBuffer();
 
@@ -29,7 +30,7 @@ public class SharedIndexBuffer {
     }
 
     private SharedIndexBuffer(boolean type2) {
-        this.indexBuffer = new GlBuffer((1<<8)*6 + 6*2*3);
+        this.indexBuffer = RenderBackendFactory.get().createBuffer((1<<8)*6 + 6*2*3);
         var quadIndexBuff = generateQuadIndicesByte(63);
         var cubeBuff = generateCubeIndexBuffer();
 
@@ -42,7 +43,7 @@ public class SharedIndexBuffer {
     }
 
     private SharedIndexBuffer(boolean type2, boolean type3) {
-        this.indexBuffer = new GlBuffer(6*2*3*(256/8));
+        this.indexBuffer = RenderBackendFactory.get().createBuffer(6*2*3*(256/8));
         var cubeBuff = generateByteCubesIndexBuffer(256/8);
 
         cubeBuff.cpyTo(UploadStream.INSTANCE.upload(this.indexBuffer, 0, this.indexBuffer.size()));
@@ -221,6 +222,6 @@ public class SharedIndexBuffer {
     }
 
     public int id() {
-        return this.indexBuffer.id;
+        return this.indexBuffer.id();
     }
 }

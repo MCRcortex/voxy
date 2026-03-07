@@ -1,9 +1,10 @@
 package me.cortex.voxy.client.core.rendering.util;
 
 import it.unimi.dsi.fastutil.longs.LongArrayList;
-import me.cortex.voxy.client.core.gl.GlBuffer;
-import me.cortex.voxy.client.core.gl.GlFence;
-import me.cortex.voxy.client.core.gl.GlPersistentMappedBuffer;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.IGpuFence;
+import me.cortex.voxy.client.core.gpu.IGpuPersistentBuffer;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.AllocationArena;
 import me.cortex.voxy.common.util.MemoryBuffer;
@@ -27,7 +28,7 @@ public class DownloadStream {
     }
 
     private final AllocationArena allocationArena = new AllocationArena();
-    private final GlPersistentMappedBuffer downloadBuffer;
+    private final IGpuPersistentBuffer downloadBuffer;
 
     private final Deque<DownloadFrame> frames = new ArrayDeque<>();
     private final LongArrayList thisFrameAllocations = new LongArrayList();
@@ -35,7 +36,7 @@ public class DownloadStream {
     private final ArrayList<DownloadData> thisFrameDownloadList = new ArrayList<>();
 
     public DownloadStream(long size) {
-        this.downloadBuffer = new GlPersistentMappedBuffer(size, GL_MAP_READ_BIT);//|GL_MAP_COHERENT_BIT
+        this.downloadBuffer = RenderBackendFactory.get().createPersistentBuffer(size, GL_MAP_READ_BIT);//|GL_MAP_COHERENT_BIT
         this.allocationArena.setLimit(size);
     }
 
@@ -43,21 +44,21 @@ public class DownloadStream {
     private long offset = 0;
 
     //Pulls the entire buffer from the gpu
-    public void download(GlBuffer buffer, DownloadResultConsumer resultConsumer) {
+    public void download(IGpuBuffer buffer, DownloadResultConsumer resultConsumer) {
         this.download(buffer, 0, buffer.size(), resultConsumer);
     }
 
-    public void download(GlBuffer buffer, Consumer<MemoryBuffer> resultConsumer) {
+    public void download(IGpuBuffer buffer, Consumer<MemoryBuffer> resultConsumer) {
         this.download(buffer, 0, buffer.size(), resultConsumer);
     }
 
-    public void download(GlBuffer buffer, long downloadOffset, long size, Consumer<MemoryBuffer> consumer) {
+    public void download(IGpuBuffer buffer, long downloadOffset, long size, Consumer<MemoryBuffer> consumer) {
         this.download(buffer, downloadOffset, size, (ptr,size2)-> {
             consumer.accept(MemoryBuffer.createUntrackedUnfreeableRawFrom(ptr, size));
         });
     }
 
-    public void download(GlBuffer buffer, long downloadOffset, long size, DownloadResultConsumer resultConsumer) {
+    public void download(IGpuBuffer buffer, long downloadOffset, long size, DownloadResultConsumer resultConsumer) {
         if (size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException();
         }
@@ -110,7 +111,7 @@ public class DownloadStream {
         glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
         //Copies all the data from target buffers into the download stream
         for (var entry : this.downloadList) {
-            glCopyNamedBufferSubData(entry.target.id, this.downloadBuffer.id, entry.targetOffset, entry.downloadStreamOffset, entry.size);
+            glCopyNamedBufferSubData(entry.target.id(), this.downloadBuffer.id(), entry.targetOffset, entry.downloadStreamOffset, entry.size);
         }
         glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
         this.thisFrameDownloadList.addAll(this.downloadList);
@@ -123,7 +124,7 @@ public class DownloadStream {
     public void tick() {
         this.commit();
         if (!this.thisFrameAllocations.isEmpty()) {
-            this.frames.add(new DownloadFrame(new GlFence(), new LongArrayList(this.thisFrameAllocations), new ArrayList<>(this.thisFrameDownloadList)));
+            this.frames.add(new DownloadFrame(RenderBackendFactory.get().createFence(), new LongArrayList(this.thisFrameAllocations), new ArrayList<>(this.thisFrameDownloadList)));
             this.thisFrameAllocations.clear();
             this.thisFrameDownloadList.clear();
         }
@@ -151,7 +152,7 @@ public class DownloadStream {
     //Synchonize force flushes everything
     public void waitDiscard() {
         glFinish();
-        var fence = new GlFence();
+        var fence = RenderBackendFactory.get().createFence();
         glFinish();
         while (!fence.signaled())
             Thread.onSpinWait();
@@ -167,7 +168,7 @@ public class DownloadStream {
     public void flushWaitClear() {
         glFinish();
         this.tick();
-        var fence = new GlFence();
+        var fence = RenderBackendFactory.get().createFence();
         glFinish();
         while (!fence.signaled())
             Thread.onSpinWait();
@@ -178,8 +179,8 @@ public class DownloadStream {
         }
     }
 
-    private record DownloadFrame(GlFence fence, LongArrayList allocations, ArrayList<DownloadData> data) {}
-    private record DownloadData(GlBuffer target, long downloadStreamOffset, long targetOffset, long size, DownloadResultConsumer resultConsumer) {}
+    private record DownloadFrame(IGpuFence fence, LongArrayList allocations, ArrayList<DownloadData> data) {}
+    private record DownloadData(IGpuBuffer target, long downloadStreamOffset, long targetOffset, long size, DownloadResultConsumer resultConsumer) {}
 
 
     // Global download stream

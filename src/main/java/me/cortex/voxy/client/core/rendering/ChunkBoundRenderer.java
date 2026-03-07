@@ -3,8 +3,9 @@ package me.cortex.voxy.client.core.rendering;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxy.client.core.AbstractRenderPipeline;
-import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlVertexArray;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderLoader;
@@ -32,8 +33,8 @@ import static org.lwjgl.opengl.GL42.glDrawElementsInstancedBaseInstance;
 // it renders an AABB around loaded chunks, thats it
 public class ChunkBoundRenderer {
     private static final int INIT_MAX_CHUNK_COUNT = 1<<12;
-    private GlBuffer chunkPosBuffer = new GlBuffer(INIT_MAX_CHUNK_COUNT*8);//Stored as ivec2
-    private final GlBuffer uniformBuffer = new GlBuffer(128);
+    private IGpuBuffer chunkPosBuffer = RenderBackendFactory.get().createBuffer(INIT_MAX_CHUNK_COUNT*8);//Stored as ivec2
+    private final IGpuBuffer uniformBuffer = RenderBackendFactory.get().createBuffer(128);
     private final Long2IntOpenHashMap chunk2idx = new Long2IntOpenHashMap(INIT_MAX_CHUNK_COUNT);
     private long[] idx2chunk = new long[INIT_MAX_CHUNK_COUNT];
     private final Shader rasterShader;
@@ -203,8 +204,8 @@ public class ChunkBoundRenderer {
         Logger.info("Resizing chunk position buffer to: " + size);
         //Need to resize
         var old = this.chunkPosBuffer;
-        this.chunkPosBuffer = new GlBuffer(size * 8L);
-        glCopyNamedBufferSubData(old.id, this.chunkPosBuffer.id, 0, 0, old.size());
+        this.chunkPosBuffer = RenderBackendFactory.get().createBuffer(size * 8L);
+        glCopyNamedBufferSubData(old.id(), this.chunkPosBuffer.id(), 0, 0, old.size());
         old.free();
         var old2 = this.idx2chunk;
         this.idx2chunk = new long[size];
