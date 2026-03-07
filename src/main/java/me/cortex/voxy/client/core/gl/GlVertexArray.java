@@ -16,12 +16,16 @@ import static org.lwjgl.opengl.GL30C.glDeleteVertexArrays;
 import static org.lwjgl.opengl.GL30C.glVertexAttribIPointer;
 import static org.lwjgl.opengl.GL45C.*;
 
-public class GlVertexArray extends TrackedObject {
+public class GlVertexArray extends TrackedObject implements me.cortex.voxy.client.core.gpu.IGpuVertexArray {
     public static final int STATIC_VAO = glGenVertexArrays();
 
     public final int id;
     private int[] indices = new int[0];
     private int stride;
+
+    @Override
+    public int id() { return this.id; }
+
     public GlVertexArray() {
         boolean hasDSA = GL.getCapabilities().GL_ARB_direct_state_access || GL.getCapabilities().OpenGL45;
         if (hasDSA) {

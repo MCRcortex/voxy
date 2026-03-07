@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 import static org.lwjgl.opengl.GL20.glDeleteProgram;
 import static org.lwjgl.opengl.GL20.glUseProgram;
 
-public class Shader extends TrackedObject {
+public class Shader extends TrackedObject implements me.cortex.voxy.client.core.gpu.IGpuShader {
     private final int id;
     Shader(int program) {
         id = program;

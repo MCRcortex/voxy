@@ -17,10 +17,14 @@ import static org.lwjgl.opengl.GL44C.GL_CLIENT_STORAGE_BIT;
 import static org.lwjgl.opengl.GL44C.GL_MAP_COHERENT_BIT;
 import static org.lwjgl.opengl.GL44C.GL_MAP_PERSISTENT_BIT;
 
-public class GlPersistentMappedBuffer extends TrackedObject {
+public class GlPersistentMappedBuffer extends TrackedObject implements me.cortex.voxy.client.core.gpu.IGpuPersistentBuffer {
     public final int id;
     private final long size;
     private final long addr;
+
+    @Override
+    public int id() { return this.id; }
+
     public GlPersistentMappedBuffer(long size, int flags) {
         boolean hasDSA = GL.getCapabilities().GL_ARB_direct_state_access || GL.getCapabilities().OpenGL45;
         boolean hasBufferStorage = GL.getCapabilities().GL_ARB_buffer_storage;

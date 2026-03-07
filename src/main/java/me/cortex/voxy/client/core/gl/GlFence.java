@@ -5,7 +5,7 @@ import org.lwjgl.system.MemoryUtil;
 
 import static org.lwjgl.opengl.GL32.*;
 
-public class GlFence extends TrackedObject {
+public class GlFence extends TrackedObject implements me.cortex.voxy.client.core.gpu.IGpuFence {
     private final long fence;
     private boolean signaled;
 

@@ -14,7 +14,7 @@ import static org.lwjgl.opengl.GL30C.GL_DEPTH_COMPONENT32F;
 import static org.lwjgl.opengl.GL30C.GL_R32F;
 import static org.lwjgl.opengl.GL30C.GL_R32UI;
 
-public class GlTexture extends TrackedObject {
+public class GlTexture extends TrackedObject implements me.cortex.voxy.client.core.gpu.IGpuTexture {
     public final int id;
     private final int type;
     private int format;
@@ -22,6 +22,9 @@ public class GlTexture extends TrackedObject {
     private int height;
     private int levels;
     private boolean hasAllocated;
+
+    @Override
+    public int id() { return this.id; }
 
     private static int COUNT;
     private static long ESTIMATED_TOTAL_SIZE;

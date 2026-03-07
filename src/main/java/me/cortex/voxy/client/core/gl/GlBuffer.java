@@ -21,10 +21,13 @@ import static org.lwjgl.opengl.GL30C.GL_R32UI;
 import static org.lwjgl.opengl.GL30C.GL_R8UI;
 import static org.lwjgl.opengl.GL30C.GL_RED_INTEGER;
 
-public class GlBuffer extends TrackedObject {
+public class GlBuffer extends TrackedObject implements me.cortex.voxy.client.core.gpu.IGpuBuffer {
     public final int id;
     private final long size;
     private final int flags;
+
+    @Override
+    public int id() { return this.id; }
 
     private static int COUNT;
     private static long TOTAL_SIZE;

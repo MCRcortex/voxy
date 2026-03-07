@@ -5,8 +5,11 @@ import me.cortex.voxy.common.util.TrackedObject;
 import static me.cortex.voxy.client.core.gl.GLCompat.createRenderbuffer;
 import static me.cortex.voxy.client.core.gl.GLCompat.renderbufferStorage;
 
-public class GlRenderBuffer extends TrackedObject {
+public class GlRenderBuffer extends TrackedObject implements me.cortex.voxy.client.core.gpu.IGpuRenderBuffer {
     public final int id;
+
+    @Override
+    public int id() { return this.id; }
 
     public GlRenderBuffer(int format, int width, int height) {
         this.id = GLCompat.createRenderbuffer();
