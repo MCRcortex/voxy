@@ -20,7 +20,8 @@ public class MixinClientChunkCache implements ICheekyClientChunkCache {
     @Unique
     private static final boolean BOBBY_INSTALLED = FabricLoader.getInstance().isModLoaded("bobby");
 
-    @Shadow volatile ClientChunkCache.Storage storage;
+    @Shadow
+    private volatile ClientChunkCache.Storage storage;
 
     @Override
     public @Nullable LevelChunk voxy$cheekyGetChunk(int x, int z) {
@@ -30,7 +31,7 @@ public class MixinClientChunkCache implements ICheekyClientChunkCache {
             return null;
         }
         //Verify that the position of the chunk is the same as the requested position
-        if (chunk.getPos().x == x && chunk.getPos().z == z) {
+        if (chunk.getPos().x() == x && chunk.getPos().z() == z) {
             return chunk;//The chunk is at the requested position
         }
         //Otherwise return null
@@ -40,7 +41,7 @@ public class MixinClientChunkCache implements ICheekyClientChunkCache {
     @Inject(method = "drop", at = @At("HEAD"))
     public void voxy$captureChunkBeforeUnload(ChunkPos pos, CallbackInfo ci) {
         if (VoxyConfig.CONFIG.ingestEnabled && BOBBY_INSTALLED) {
-            var chunk = this.voxy$cheekyGetChunk(pos.x, pos.z);
+            var chunk = this.voxy$cheekyGetChunk(pos.x(), pos.z());
             if (chunk != null) {
                 VoxelIngestService.tryAutoIngestChunk(chunk);
             }

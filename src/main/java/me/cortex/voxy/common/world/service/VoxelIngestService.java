@@ -105,7 +105,7 @@ public class VoxelIngestService {
         boolean allEmpty = true;
         for (var section : chunk.getSections()) {
             i++;
-            if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
+            if (section == null || !shouldIngestSection(section, chunk.getPos().x(), i, chunk.getPos().z())) continue;
             allEmpty&=section.hasOnlyAir();
             //if (section.isEmpty()) continue;
             var pos = SectionPos.of(chunk.getPos(), i);
@@ -119,9 +119,9 @@ public class VoxelIngestService {
             i = chunk.getMinSectionY() - 1;
             for (var section : chunk.getSections()) {
                 i++;
-                if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
+                if (section == null || !shouldIngestSection(section, chunk.getPos().x(), i, chunk.getPos().z())) continue;
                 engine.markActive();
-                this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, null, null));
+                this.ingestQueue.add(new IngestSection(chunk.getPos().x(), i, chunk.getPos().z(), engine, section, null, null));
                 try {
                     this.service.execute();
                 } catch (Exception e) {
@@ -142,7 +142,7 @@ public class VoxelIngestService {
         i = chunk.getMinSectionY() - 1;
         for (var section : chunk.getSections()) {
             i++;
-            if (section == null || !shouldIngestSection(section, chunk.getPos().x, i, chunk.getPos().z)) continue;
+            if (section == null || !shouldIngestSection(section, chunk.getPos().x(), i, chunk.getPos().z())) continue;
             //if (section.isEmpty()) continue;
             var pos = SectionPos.of(chunk.getPos(), i);
 
@@ -161,7 +161,7 @@ public class VoxelIngestService {
             //    continue;
             //}
             engine.markActive();
-            this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));//TODO: fixme, this is technically not safe todo on the chunk load ingest, we need to copy the section data so it cant be modified while being read
+            this.ingestQueue.add(new IngestSection(chunk.getPos().x(), i, chunk.getPos().z(), engine, section, bl, sl));//TODO: fixme, this is technically not safe todo on the chunk load ingest, we need to copy the section data so it cant be modified while being read
             try {
                 this.service.execute();
             } catch (Exception e) {

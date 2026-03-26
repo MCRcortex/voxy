@@ -108,14 +108,14 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
     protected void finish(Viewport<?> viewport, int sourceFrameBuffer, int srcWidth, int srcHeight) {
         this.finalBlit.bind();
 
-        boolean fogCoversAllRendering = viewport.fogParameters.environmentalEnd()<Minecraft.getInstance().gameRenderer.getRenderDistance();
+        boolean fogCoversAllRendering = viewport.fogParameters.environmentalEnd()<VoxyRenderSystem.getRenderDistance();
 
         if (this.useEnvFog) {
             float start = viewport.fogParameters.environmentalStart();
             float end = viewport.fogParameters.environmentalEnd();
             if (Math.abs(end-start)>1) {
                 float invEndFogDelta = 1f / (end - start);
-                float endDistance = Math.max(Minecraft.getInstance().gameRenderer.getRenderDistance(), 20*16);//TODO: make this constant a config option
+                float endDistance = Math.max(VoxyRenderSystem.getRenderDistance(), 20*16);//TODO: make this constant a config option
                 endDistance *= (float)Math.sqrt(3);
                 float startDelta = -start * invEndFogDelta;
                 glUniform4f(4, invEndFogDelta, startDelta, Math.clamp(endDistance*invEndFogDelta+startDelta, 0, 1),0);//

@@ -19,6 +19,7 @@ public abstract class MixinDebugScreenEntryList {
     @Shadow @Final private List<Identifier> currentlyEnabled;
     @Shadow public abstract boolean isOverlayVisible();
 
+    @Final
     @Shadow
     private Map<Identifier, DebugScreenEntryStatus> allStatuses;
 

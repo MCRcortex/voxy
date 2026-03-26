@@ -20,6 +20,7 @@ public class FlashbackCompat {
     }
 
     private static Path getReplayStoragePath0() {
+        /*
         ReplayServer replayServer = Flashback.getReplayServer();
         if (replayServer != null) {
             FlashbackMeta meta = replayServer.getMetadata();
@@ -35,7 +36,7 @@ public class FlashbackCompat {
                     }
                 }
             }
-        }
+        }*/
         return null;
     }
 }

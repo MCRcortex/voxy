@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version "1.14-SNAPSHOT"
+    id 'net.fabricmc.fabric-loom' version "1.15-SNAPSHOT"
     id 'maven-publish'
 }
 def INCLUDE_OTHER_ARCHS = "true".equalsIgnoreCase(project.findProperty("includeOtherArchs"))
@@ -98,11 +98,11 @@ loom {
     accessWidenerPath = file("src/main/resources/voxy.accesswidener")
 }
 
-def modRuntimeOnlyMsk = {arg->}
+def runtimeOnlyMsk = {arg->}
 if (!isInGHA) {
-    modRuntimeOnlyMsk = { arg ->
+    runtimeOnlyMsk = { arg ->
         dependencies {
-            modRuntimeOnly(arg)
+            runtimeOnly(arg)
         }
     }
 }
@@ -110,50 +110,50 @@ if (!isInGHA) {
 dependencies {
     // To change the versions see the gradle.properties file
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings loom.officialMojangMappings()
-    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    //mappings loom.officialMojangMappings()
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
 
 
-    modRuntimeOnlyMsk(fabricApi.module("fabric-api-base", project.fabric_version))
-    modRuntimeOnlyMsk(fabricApi.module("fabric-rendering-fluids-v1", project.fabric_version))
-    modRuntimeOnlyMsk(fabricApi.module("fabric-resource-loader-v0", project.fabric_version))
-    modRuntimeOnlyMsk(fabricApi.module("fabric-command-api-v2", project.fabric_version))
+    runtimeOnlyMsk(fabricApi.module("fabric-api-base", project.fabric_api_version))
+    runtimeOnlyMsk(fabricApi.module("fabric-rendering-fluids-v1", project.fabric_api_version))
+    runtimeOnlyMsk(fabricApi.module("fabric-resource-loader-v0", project.fabric_api_version))
+    runtimeOnlyMsk(fabricApi.module("fabric-command-api-v2", project.fabric_api_version))
 
-    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
     if (true) {
-        modImplementation "maven.modrinth:sodium:mc1.21.11-0.8.7-fabric"
+        implementation "maven.modrinth:sodium:mc26.1-0.8.7-fabric"
     } else {
-        modImplementation "net.caffeinemc:sodium-fabric:0.8.4-SNAPSHOT+mc1.21.11+"
+        implementation "net.caffeinemc:sodium-fabric:0.8.4-SNAPSHOT+mc1.21.11+"
     }
 
-    modImplementation("maven.modrinth:lithium:mc1.21.11-0.21.0-fabric")
+    implementation("maven.modrinth:lithium:mc26.1-0.22.0-fabric")
 
     //modRuntimeOnlyMsk "drouarb:nvidium:0.4.1-beta4:1.21.6@jar"
-    modCompileOnly "drouarb:nvidium:0.4.1-beta4:1.21.6@jar"
+    compileOnly("drouarb:nvidium:0.4.1-beta4:1.21.6@jar")
 
-    modCompileOnly("maven.modrinth:modmenu:17.0.0-alpha.1")
-    modRuntimeOnlyMsk("maven.modrinth:modmenu:17.0.0-alpha.1")
+    compileOnly("maven.modrinth:modmenu:18.0.0-alpha.8")
+    runtimeOnlyMsk("maven.modrinth:modmenu:18.0.0-alpha.8")
 
-    modCompileOnly("maven.modrinth:iris:1.10.7+1.21.11-fabric")
-    modRuntimeOnlyMsk("maven.modrinth:iris:1.10.7+1.21.11-fabric")
+    compileOnly("maven.modrinth:iris:1.10.8+26.1-fabric")
+    runtimeOnlyMsk("maven.modrinth:iris:1.10.8+26.1-fabric")
 
     //modCompileOnly("maven.modrinth:starlight:1.1.3+1.20.4")
 
     //modCompileOnly("maven.modrinth:immersiveportals:v5.1.7-mc1.20.4")
 
-    modCompileOnly("maven.modrinth:chunky:1.4.54-fabric")
+    compileOnly("maven.modrinth:chunky:1.4.54-fabric")
     //modRuntimeOnlyMsk("maven.modrinth:chunky:1.4.40-fabric")
 
-    modRuntimeOnlyMsk("maven.modrinth:spark:1.10.152-fabric")
-    modRuntimeOnlyMsk("maven.modrinth:fabric-permissions-api:0.3.3")
+    //modRuntimeOnlyMsk("maven.modrinth:spark:1.10.152-fabric")
+    //modRuntimeOnlyMsk("maven.modrinth:fabric-permissions-api:0.3.3")
     //modRuntimeOnly("maven.modrinth:nsight-loader:1.2.0")
 
     //modImplementation('io.github.douira:glsl-transformer:2.0.1')
 
-    modCompileOnly("maven.modrinth:vivecraft:1.21.9-1.3.2-fabric")
+    compileOnly("maven.modrinth:vivecraft:1.21.9-1.3.2-fabric")
 
-    modCompileOnly("maven.modrinth:flashback:rNCr1Rbs")
+    compileOnly("maven.modrinth:flashback:rNCr1Rbs")
 }
 
 
@@ -224,7 +224,7 @@ processIncludeJars {
     }
 }
 
-remapJar {
+jar {
     doFirst {
         delete fileTree(getDestinationDirectory().get())
     }
@@ -280,6 +280,7 @@ dependencies {
     //implementation 'redis.clients:jedis:5.1.0'
 }
 
+/*
 if (!isInGHA) {
     repositories {
         maven {
@@ -292,4 +293,4 @@ if (!isInGHA) {
             exclude group: 'net.fabricmc', module: 'fabric-loader'
         }
     }
-}
+}*/

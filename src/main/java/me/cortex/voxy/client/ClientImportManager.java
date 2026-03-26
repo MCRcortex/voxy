@@ -44,7 +44,7 @@ public class ClientImportManager extends ImportManager {
                 long delta = Math.max(System.currentTimeMillis() - this.startTime, 1);
 
                 String msg = "Voxy world import finished in " + (delta/1000) + " seconds, averaging " + (int)(total/(delta/1000f)) + " chunks per second";
-                Minecraft.getInstance().gui.getChat().addMessage(Component.literal(msg));
+                Minecraft.getInstance().gui.getChat().addClientSystemMessage(Component.literal(msg));
                 Logger.info(msg);
             });
         }

@@ -1,11 +1,10 @@
-accessWidener v1 named
+accessWidener v1 official
 
 accessible class net/minecraft/client/multiplayer/ClientChunkCache$Storage
 accessible class com/mojang/blaze3d/opengl/GlDebug$LogEntry
 
 accessible field net/minecraft/client/multiplayer/ClientLevel levelRenderer Lnet/minecraft/client/renderer/LevelRenderer;
 accessible field com/mojang/blaze3d/opengl/GlBuffer handle I
-accessible field net/minecraft/client/color/block/BlockColors blockColors Lnet/minecraft/core/IdMapper;
 accessible field net/minecraft/client/renderer/texture/TextureAtlas maxMipLevel I
 accessible field net/minecraft/client/gui/components/BossHealthOverlay events Ljava/util/Map;
 accessible field net/minecraft/client/multiplayer/MultiPlayerGameMode connection Lnet/minecraft/client/multiplayer/ClientPacketListener;
@@ -15,8 +14,6 @@ accessible field net/minecraft/world/level/chunk/PalettedContainer$Data palette 
 accessible field net/minecraft/world/level/chunk/PalettedContainer$Data storage Lnet/minecraft/util/BitStorage;
 
 accessible field net/minecraft/client/renderer/texture/SpriteContents mipmapStrategy Lnet/minecraft/client/renderer/texture/MipmapStrategy;
-
-accessible method net/minecraft/client/renderer/GameRenderer getFov (Lnet/minecraft/client/Camera;FZ)F
 
 accessible method net/minecraft/client/multiplayer/ClientChunkCache$Storage getChunk (I)Lnet/minecraft/world/level/chunk/LevelChunk;
 accessible method net/minecraft/client/multiplayer/ClientChunkCache$Storage getIndex (II)I

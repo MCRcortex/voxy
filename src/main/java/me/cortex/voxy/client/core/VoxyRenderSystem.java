@@ -374,7 +374,7 @@ public class VoxyRenderSystem {
     private static float getGameFoV() {
         var client = Minecraft.getInstance();
         var gameRenderer = client.gameRenderer;
-        return gameRenderer.getFov(gameRenderer.getMainCamera(), client.getDeltaTracker().getGameTimeDeltaPartialTick(true), true);
+        return gameRenderer.getMainCamera().getFov();
     }
 
     private static Matrix4f makeProjectionMatrix(float near, float far) {
@@ -388,17 +388,21 @@ public class VoxyRenderSystem {
         return projection;
     }
 
+    public static float getRenderDistance() {
+        return Minecraft.getInstance().options.getEffectiveRenderDistance()*16;
+    }
+
     //TODO: Make a reverse z buffer
     private static Matrix4f computeProjectionMat(Matrix4fc base) {
         //THis is a wild and insane problem to have
         // at short render distances the vanilla terrain doesnt end up covering the 16f near plane voxy uses
         // meaning that it explodes (due to near plane clipping).. _badly_ with the rastered culling being wrong in rare cases for the immediate
         // sections rendered after the vanilla render distance
-        float nearVoxy = Minecraft.getInstance().gameRenderer.getRenderDistance()<=32.0f?8f:16f;
+        float nearVoxy = getRenderDistance()<=32.0f?8f:16f;
         nearVoxy = VoxyClient.disableSodiumChunkRender()?0.1f:nearVoxy;
 
         return base.mulLocal(
-                Minecraft.getInstance().gameRenderer.getProjectionMatrix(getGameFoV()).invert(),
+                Minecraft.getInstance().gameRenderer.getGameRenderState().levelRenderState.cameraRenderState.projectionMatrix.invert(new Matrix4f()),
                 new Matrix4f()
         ).mulLocal(makeProjectionMatrix(nearVoxy, 16*3000));
     }

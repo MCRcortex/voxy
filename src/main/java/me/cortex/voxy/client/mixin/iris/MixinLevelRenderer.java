@@ -10,7 +10,10 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 import org.joml.Vector4f;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -27,25 +30,15 @@ public class MixinLevelRenderer {
 
     @Inject(method = "renderLevel", at = @At("HEAD"), order = 100)
     private void voxy$injectIrisCompat(
-            GraphicsResourceAllocator allocator,
-            DeltaTracker tickCounter,
-            boolean renderBlockOutline,
-            Camera camera,
-            Matrix4f positionMatrix,
-            Matrix4f projectionMatrix,
-            Matrix4f basicProjectionMatrix,
-            GpuBufferSlice fogBuffer,
-            Vector4f fogColor,
-            boolean renderSky,
-            CallbackInfo ci) {
+            GraphicsResourceAllocator resourceAllocator, DeltaTracker deltaTracker, boolean renderOutline, CameraRenderState cameraState, Matrix4fc modelViewMatrix, GpuBufferSlice terrainFog, Vector4f fogColor, boolean shouldRenderSky, ChunkSectionsToRender chunkSectionsToRender, CallbackInfo ci) {
         if (IrisUtil.irisShaderPackEnabled()) {
             var renderer = ((IGetVoxyRenderSystem) this).getVoxyRenderSystem();
             if (renderer != null) {
                 //Fixthe fucking viewport dims, fuck iris
                 glViewport(0,0,Minecraft.getInstance().getMainRenderTarget().width, Minecraft.getInstance().getMainRenderTarget().height);
 
-                var pos = camera.position();
-                IrisUtil.CAPTURED_VIEWPORT_PARAMETERS = new IrisUtil.CapturedViewportParameters(new ChunkRenderMatrices(projectionMatrix, positionMatrix), ((FogStorage) this.minecraft.gameRenderer).sodium$getFogParameters(), pos.x, pos.y, pos.z);
+                var pos = cameraState.pos;
+                IrisUtil.CAPTURED_VIEWPORT_PARAMETERS = new IrisUtil.CapturedViewportParameters(new ChunkRenderMatrices(cameraState.projectionMatrix, cameraState.viewRotationMatrix), ((FogStorage) this.minecraft.gameRenderer).sodium$getFogParameters(), pos.x, pos.y, pos.z);
             }
         }
     }

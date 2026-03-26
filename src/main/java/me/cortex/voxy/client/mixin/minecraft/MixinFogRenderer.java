@@ -20,16 +20,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = FogRenderer.class,remap = true)
 public class MixinFogRenderer {
-    @Inject(method = "setupFog", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;getDevice()Lcom/mojang/blaze3d/systems/GpuDevice;", remap = false))
-    private void voxy$modifyFog(Camera camera, int rdInt, DeltaTracker tracker, float pTick, ClientLevel lvl, CallbackInfoReturnable<Vector4f> cir, @Local(type=FogData.class) FogData data) {
+    @Inject(method = "setupFog", at = @At("RETURN"))
+    private void voxy$modifyFog(Camera camera, int renderDistanceInChunks, DeltaTracker deltaTracker, float darkenWorldAmount, ClientLevel level, CallbackInfoReturnable<FogData> cir) {
         if (!VoxyConfig.CONFIG.isRenderingEnabled()) return;
 
         var vrs = IGetVoxyRenderSystem.getNullable();
         if (vrs == null) return;
-
-        /*
-        if (!VoxyConfig.CONFIG.useRenderFog) {
-        }*/
+        var data = cir.getReturnValue();
         boolean fogIsDamnClose = data.environmentalEnd<10;
         if (!VoxyConfig.CONFIG.useEnvironmentalFog && !fogIsDamnClose) {
             data.environmentalStart = 99999999;

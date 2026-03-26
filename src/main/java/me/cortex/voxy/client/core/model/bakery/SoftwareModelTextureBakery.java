@@ -9,12 +9,16 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.block.BlockAndTintGetter;
+import net.minecraft.client.renderer.block.FluidRenderer;
+import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.CardinalLighting;
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Blocks;
@@ -34,6 +38,8 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.lwjgl.opengl.GL11.glFinish;
@@ -42,10 +48,13 @@ public class SoftwareModelTextureBakery {
     //Note: the first bit of metadata is if alpha discard is enabled
     private static final Matrix4f[] VIEWS = new Matrix4f[6];
 
-    private final ReuseVertexConsumer vc = new ReuseVertexConsumer();
+    private final ReuseVertexConsumer opaqueVC = new ReuseVertexConsumer();
+    private final ReuseVertexConsumer translucentVC = new ReuseVertexConsumer(1/*has discard*/);
     private final SoftwareRasterizer rasterizer = new SoftwareRasterizer();
 
+    private final FluidRenderer fr;
     public SoftwareModelTextureBakery() {
+        this.fr = new FluidRenderer(Minecraft.getInstance().getModelManager().getFluidStateModelSet());
     }
 
     public void setupTexture() {
@@ -87,56 +96,34 @@ public class SoftwareModelTextureBakery {
         }
     }
 
-    public static int getMetaFromLayer(ChunkSectionLayer layer) {
-        boolean hasDiscard = layer == ChunkSectionLayer.CUTOUT ||
-                layer == ChunkSectionLayer.TRANSLUCENT||
-                layer == ChunkSectionLayer.TRIPWIRE;
-
-        int meta = hasDiscard?1:0;
-        meta |= true?2:0;
-        return meta;
-    }
-
-    private void bakeBlockModel(BlockState state, ChunkSectionLayer layer) {
+    private void bakeBlockModel(BlockState state) {
         if (state.getRenderShape() == RenderShape.INVISIBLE) {
             return;//Dont bake if invisible
         }
         var model = Minecraft.getInstance()
                 .getModelManager()
-                .getBlockModelShaper()
-                .getBlockModel(state);
+                .getBlockStateModelSet()
+                .get(state);
 
-        int meta = getMetaFromLayer(layer);
-
-        for (var part : model.collectParts(new SingleThreadedRandomSource(42L))) {
+        List<BlockStateModelPart> out = new ArrayList<>();
+        model.collectParts(new SingleThreadedRandomSource(42L), out);
+        for (var part : out) {
             for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null}) {
                 var quads = part.getQuads(direction);
                 for (var quad : quads) {
-                    this.vc.quad(quad, meta|(quad.isTinted()?4:0));
+                    (quad.materialInfo().layer()==ChunkSectionLayer.TRANSLUCENT?this.translucentVC:this.opaqueVC)
+                            .quad(quad, state.is(BlockTags.LEAVES));
                 }
             }
         }
     }
 
 
-    private void bakeFluidState(BlockState state, ChunkSectionLayer layer, int face) {
-        {
-            //TODO: somehow set the tint flag per quad or something?
-            int metadata = getMetaFromLayer(layer);
-            //Just assume all fluids are tinted, if they arnt it should be implicitly culled in the model baking phase
-            // since it wont have the colour provider
-            metadata |= 4;//Has tint
-            this.vc.setDefaultMeta(metadata);//Set the meta while baking
-        }
-        Minecraft.getInstance().getBlockRenderer().renderLiquid(BlockPos.ZERO, new BlockAndTintGetter() {
-            @Override
-            public float getShade(Direction direction, boolean shaded) {
-                return 0;
-            }
-
+    private void bakeFluidState(BlockState state, int face) {
+        this.fr.tesselate(new BlockAndTintGetter() {
             @Override
             public LevelLightEngine getLightEngine() {
-                return null;
+                return LevelLightEngine.EMPTY;
             }
 
             @Override
@@ -145,8 +132,18 @@ public class SoftwareModelTextureBakery {
             }
 
             @Override
+            public CardinalLighting cardinalLighting() {
+                return CardinalLighting.DEFAULT;
+            }
+
+            @Override
             public int getBlockTint(BlockPos pos, ColorResolver colorResolver) {
-                return 0;
+                //This is such a stupid and bad hack, we can inject tinting state here since this is called
+                // before the quad is added
+                //TODO: need to make a quad once tinting thing
+                translucentVC.setDefaultMeta(translucentVC.getDefaultMeta()|4);//Tinting
+                opaqueVC.setDefaultMeta(opaqueVC.getDefaultMeta()|4);//Tinting
+                return -1;
             }
 
             @Nullable
@@ -191,8 +188,17 @@ public class SoftwareModelTextureBakery {
             public int getMinY() {
                 return 0;
             }
-        }, this.vc, state, state.getFluidState());
-        this.vc.setDefaultMeta(0);//Reset default meta
+        }, BlockPos.ZERO, layer->{
+            if (layer == ChunkSectionLayer.TRANSLUCENT) return this.translucentVC;
+            if (layer == ChunkSectionLayer.CUTOUT) {
+                this.opaqueVC.setDefaultMeta(this.opaqueVC.getDefaultMeta()|1);//set discard
+            } else {
+                this.opaqueVC.setDefaultMeta(this.opaqueVC.getDefaultMeta()&~1);//remove discard
+            }
+            return this.opaqueVC;
+        }, state, state.getFluidState());
+        this.translucentVC.setDefaultMeta(0);//Reset default meta
+        this.opaqueVC.setDefaultMeta(0);//Reset default meta
     }
 
     private static boolean shouldReturnAirForFluid(BlockPos pos, int face) {
@@ -202,7 +208,8 @@ public class SoftwareModelTextureBakery {
     }
 
     public void free() {
-        this.vc.free();
+        this.opaqueVC.free();
+        this.translucentVC.free();
     }
 
     private static final long SINGLE_FACE_OUTPUT_SIZE = (ModelFactory.MODEL_TEXTURE_SIZE * ModelFactory.MODEL_TEXTURE_SIZE)*8;
@@ -214,16 +221,8 @@ public class SoftwareModelTextureBakery {
 
 
         boolean isBlock = true;
-        ChunkSectionLayer layer;
         if (state.getBlock() instanceof LiquidBlock) {
-            layer = ItemBlockRenderTypes.getRenderLayer(state.getFluidState());
             isBlock = false;
-        } else {
-            if (state.getBlock() instanceof LeavesBlock) {
-                layer = ChunkSectionLayer.SOLID;
-            } else {
-                layer = ItemBlockRenderTypes.getChunkRenderType(state);
-            }
         }
 
         //TODO: support block model entities
@@ -232,25 +231,26 @@ public class SoftwareModelTextureBakery {
             //bbem = BakedBlockEntityModel.bake(state);
         }
 
-        {
-            this.rasterizer.setBlending(layer == ChunkSectionLayer.TRANSLUCENT);
-
-            //var tex = Minecraft.getInstance().getTextureManager().getTexture(Identifier.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png")).getTexture();
-            //blockTextureId = ((com.mojang.blaze3d.opengl.GlTexture)tex).glId();
-        }
-
         boolean isAnyShaded = false;
         boolean isAnyDarkend = false;
+        boolean anyTranslucent = false;
+        boolean anyDiscard = false;
         if (isBlock) {
-            this.vc.reset();
-            this.bakeBlockModel(state, layer);
-            isAnyShaded |= this.vc.anyShaded;
-            isAnyDarkend |= this.vc.anyDarkendTex;
-            if (!this.vc.isEmpty()) {//only render if there... is shit to render
+            this.opaqueVC.reset();
+            this.translucentVC.reset();
+            this.bakeBlockModel(state);
+            isAnyShaded |= this.opaqueVC.anyShaded|this.translucentVC.anyShaded;
+            isAnyDarkend |= this.opaqueVC.anyDarkendTex|this.translucentVC.anyDarkendTex;
+            anyTranslucent |= !this.translucentVC.isEmpty();
+            anyDiscard |= this.opaqueVC.anyDiscard;
+            if (!(this.opaqueVC.isEmpty()&&this.translucentVC.isEmpty())) {//only render if there... is shit to render
                 for (int i = 0; i < VIEWS.length; i++) {
                     this.rasterizer.setFaceCull(i==1||i==2||i==4);
-
-                    this.rasterizer.raster(VIEWS[i], this.vc);
+                    this.rasterizer.clear();
+                    this.rasterizer.setBlending(false);
+                    this.rasterizer.raster(VIEWS[i], this.opaqueVC);
+                    this.rasterizer.setBlending(true);
+                    this.rasterizer.raster(VIEWS[i], this.translucentVC);
                     UnsafeUtil.memcpy(this.rasterizer.getRawFramebuffer(), outputBuffer+(SINGLE_FACE_OUTPUT_SIZE*i));
                 }
             }
@@ -258,22 +258,28 @@ public class SoftwareModelTextureBakery {
 
             if (!(state.getBlock() instanceof LiquidBlock)) throw new IllegalStateException();
             for (int i = 0; i < VIEWS.length; i++) {
-                this.vc.reset();
-                this.bakeFluidState(state, layer, i);
-                if (this.vc.isEmpty()) continue;
-                isAnyShaded |= this.vc.anyShaded;
-                isAnyDarkend |= this.vc.anyDarkendTex;
+                this.opaqueVC.reset();
+                this.translucentVC.reset();
+                this.bakeFluidState(state, i);
+                if (this.opaqueVC.isEmpty()&&this.translucentVC.isEmpty()) continue;
+                isAnyShaded |= this.opaqueVC.anyShaded|this.translucentVC.anyShaded;
+                isAnyDarkend |= this.opaqueVC.anyDarkendTex|this.translucentVC.anyDarkendTex;
+                anyTranslucent |= !this.translucentVC.isEmpty();
+                anyDiscard |= this.opaqueVC.anyDiscard;
 
                 this.rasterizer.setFaceCull(i==1||i==2||i==4);
 
                 //The projection matrix
-                this.rasterizer.raster(VIEWS[i], this.vc);
+                this.rasterizer.clear();
+                this.rasterizer.setBlending(false);
+                this.rasterizer.raster(VIEWS[i], this.opaqueVC);
+                this.rasterizer.setBlending(true);
+                this.rasterizer.raster(VIEWS[i], this.translucentVC);
                 UnsafeUtil.memcpy(this.rasterizer.getRawFramebuffer(), outputBuffer+(SINGLE_FACE_OUTPUT_SIZE*i));
             }
         }
 
-
-        return (isAnyShaded?1:0)|(isAnyDarkend?2:0);
+        return (isAnyShaded?1:0)|(isAnyDarkend?2:0)|(anyTranslucent?4:0)|(anyDiscard?8:0);
     }
 
 

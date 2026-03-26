@@ -4,6 +4,7 @@ import com.mojang.blaze3d.platform.DisplayData;
 import com.mojang.blaze3d.platform.ScreenManager;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.platform.WindowEventHandler;
+import com.mojang.blaze3d.systems.GpuBackend;
 import me.cortex.voxy.client.GPUSelectorWindows2;
 import me.cortex.voxy.common.util.ThreadUtils;
 import org.spongepowered.asm.mixin.Mixin;
@@ -14,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(Window.class)
 public class MixinWindow {
     @Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/platform/Window;setBootErrorCallback()V"))
-    private void injectInitWindow(WindowEventHandler eventHandler, ScreenManager monitorTracker, DisplayData settings, String fullscreenVideoMode, String title, CallbackInfo ci) {
+    private void injectInitWindow(WindowEventHandler eventHandler, DisplayData displayData, String fullscreenVideoModeString, String title, GpuBackend backend, CallbackInfo ci) {
         //System.load("C:\\Program Files\\RenderDoc\\renderdoc.dll");
         var prop = System.getProperty("voxy.forceGpuSelectionIndex", "NO");
         if (!prop.equals("NO")) {
