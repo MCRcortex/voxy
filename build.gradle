@@ -157,7 +157,7 @@ dependencies {
 }
 
 
-def targetJavaVersion = 21
+def targetJavaVersion = 25
 tasks.withType(JavaCompile).configureEach {
     it.options.encoding = "UTF-8"
     it.options.release = targetJavaVersion
