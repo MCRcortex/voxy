@@ -18,7 +18,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-@Mixin(value = FogRenderer.class,remap = true)
+@Mixin(value = FogRenderer.class, priority = 900)//We must execute before sodium
 public class MixinFogRenderer {
     @Inject(method = "setupFog", at = @At("RETURN"))
     private void voxy$modifyFog(Camera camera, int renderDistanceInChunks, DeltaTracker deltaTracker, float darkenWorldAmount, ClientLevel level, CallbackInfoReturnable<FogData> cir) {
