@@ -63,7 +63,7 @@ public class RenderDataFactory {
 
     private int quadCount = 0;
 
-    private final OccupancySet occupancy = new OccupancySet();
+    private final OccupancySet occupancy;
 
     //Wont work for double sided quads
     private final class Mesher extends ScanMesher2D {
@@ -186,8 +186,16 @@ public class RenderDataFactory {
     private final Mesher seondaryblockMesher = new Mesher();//Used for dual non-opaque geometry
 
     public RenderDataFactory(WorldEngine world, ModelFactory modelManager, boolean emitMeshlets) {
+        this(world, modelManager, emitMeshlets, false);
+    }
+    public RenderDataFactory(WorldEngine world, ModelFactory modelManager, boolean emitMeshlets, boolean generateOccupancy) {
         this.world = world;
         this.modelMan = modelManager;
+        if (generateOccupancy && BUILD_OCCUPANCY_SET) {
+            this.occupancy = new OccupancySet();
+        } else {
+            this.occupancy = null;
+        }
     }
 
     private static long getQuadTyping(long metadata) {//2 bits
@@ -1624,8 +1632,9 @@ public class RenderDataFactory {
                 }
             }
         }
-
-        this.occupancy.reset();
+        if (this.occupancy != null) {
+            this.occupancy.reset();
+        }
 
         this.minX = Integer.MAX_VALUE;
         this.minY = Integer.MAX_VALUE;
@@ -1660,7 +1669,7 @@ public class RenderDataFactory {
         }
 
         //We only care if we have quads
-        if (BUILD_OCCUPANCY_SET && this.quadCount != 0 && (flags&1) != 0) {
+        if (this.occupancy != null && section.lvl == 0 /*only generate occupancy for lowest lod level*/ && this.quadCount != 0 && (flags&1) != 0) {
             this.buildOccupancy();
         }
 
@@ -1699,7 +1708,7 @@ public class RenderDataFactory {
         aabb |= (this.maxZ-this.minZ-1)<<25;
 
         MemoryBuffer occupancy = null;
-        if (BUILD_OCCUPANCY_SET && !this.occupancy.isEmpty()) {
+        if (this.occupancy != null && !this.occupancy.isEmpty()) {
             occupancy = new MemoryBuffer(this.occupancy.writeSize());
             this.occupancy.write(occupancy.address, false);
         }
