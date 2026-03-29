@@ -3,7 +3,6 @@ package me.cortex.voxy.common;
 import me.cortex.voxy.common.config.Serialization;
 import me.cortex.voxy.common.config.compressors.ZSTDCompressor;
 import me.cortex.voxy.common.config.section.SectionSerializationStorage;
-import me.cortex.voxy.common.config.section.SectionStorageConfig;
 import me.cortex.voxy.common.config.storage.other.CompressionStorageAdaptor;
 import me.cortex.voxy.common.config.storage.rocksdb.RocksDBStorageBackend;
 

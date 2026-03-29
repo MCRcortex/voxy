@@ -964,7 +964,7 @@ public class NodeManager {
             int reqMsk = Byte.toUnsignedInt(request.getMsk());
             if ((byte) (existingChildMsk|reqMsk) != this.nodeData.getNodeChildExistence(parentNodeId)) {
                 //System.out.println(Integer.toBinaryString(Byte.toUnsignedInt(this.nodeData.getNodeChildExistence(parentNodeId))));System.out.println(Integer.toBinaryString(existingChildMsk));System.out.println(Integer.toBinaryString(reqMsk));
-                    throw new IllegalStateException("node data existence state does not match pointer mask");
+                throw new IllegalStateException("node data existence state does not match pointer mask");
             }
 
 
@@ -1091,7 +1091,7 @@ public class NodeManager {
 
         //TODO: ADJUST AND FIX THIS TO MAKE IT REMOVE THE LAST THING IN QUEUE OR SOMETHING
         //if (this.activeNodeRequestCount > 100 && WorldEngine.getLevel(pos) < 2) {
-            //Logger.info("Many active requests, declining request at " + WorldEngine.pprintPos(pos));
+        //Logger.info("Many active requests, declining request at " + WorldEngine.pprintPos(pos));
         //    this.invalidateNode(nodeId);
         //    return;
         //}
@@ -1244,7 +1244,7 @@ public class NodeManager {
 
         if (nodeType == NODE_TYPE_INNER) {
             this.clearGeometryInternal(pos, nodeId);
-        //    this.clearId(nodeId);
+            //    this.clearId(nodeId);
         } else {//NODE_TYPE_LEAF
             //TODO: here we need to make the parent node a leaf node...
             // TODO? think about maybe only doing it if all children of the parent are leaf nodes aswell

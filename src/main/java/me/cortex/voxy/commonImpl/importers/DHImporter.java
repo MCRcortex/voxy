@@ -1,5 +1,6 @@
 package me.cortex.voxy.commonImpl.importers;
 
+import me.cortex.voxy.client.core.util.ExpansionUtil;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.Service;
 import me.cortex.voxy.common.thread.ServiceManager;
@@ -14,7 +15,7 @@ import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.core.Holder;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
@@ -100,11 +101,11 @@ public class DHImporter implements IDataImporter {
     public DHImporter(File file, WorldEngine worldEngine, Level mcWorld, ServiceManager servicePool, BooleanSupplier rateLimiter) {
         this.engine = worldEngine;
         this.world = mcWorld;
-        this.biomeRegistry = mcWorld.registryAccess().lookupOrThrow(Registries.BIOME);
-        this.defaultBiome = this.biomeRegistry.getOrThrow(Biomes.PLAINS);
-        this.blockRegistry = mcWorld.registryAccess().lookupOrThrow(Registries.BLOCK);
+        this.biomeRegistry = mcWorld.registryAccess().registryOrThrow(Registries.BIOME);
+        this.defaultBiome = this.biomeRegistry.getHolder(Biomes.PLAINS).orElseThrow();
+        this.blockRegistry = mcWorld.registryAccess().registryOrThrow(Registries.BLOCK);
 
-        this.bottomOfWorld = mcWorld.getMinY();
+        this.bottomOfWorld = mcWorld.getMinBuildHeight();
         int worldHeight = mcWorld.getHeight();
         this.worldHeightSections = (worldHeight+15)/16;
 
@@ -227,9 +228,9 @@ public class DHImporter implements IDataImporter {
             if (idx == -1)
                 throw new IllegalStateException();
             {
-                var biomeRes = Identifier.parse(encEntry.substring(0, idx));
-                var biome = this.biomeRegistry.get(biomeRes).orElse(this.defaultBiome);
-                biomeId = this.engine.getMapper().getIdForBiome(biome);
+                var biomeRes = ResourceLocation.tryParse(encEntry.substring(0, idx));
+                var biome = this.biomeRegistry.getOptional(biomeRes).orElse(this.defaultBiome.value());
+                biomeId = this.engine.getMapper().getIdForBiome(this.biomeRegistry.wrapAsHolder(biome));
             }
             {
                 int b = idx + BLOCK_STATE_SEPARATOR_STRING.length();
@@ -241,11 +242,11 @@ public class DHImporter implements IDataImporter {
                     if (sIdx != -1) {
                         bStateStr = encEntry.substring(sIdx + STATE_STRING_SEPARATOR.length());
                     }
-                    var bId = Identifier.parse(encEntry.substring(b, sIdx != -1 ? sIdx : encEntry.length()));
-                    var maybeBlock = this.blockRegistry.get(bId);
+                    var bId = ResourceLocation.tryParse(encEntry.substring(b, sIdx != -1 ? sIdx : encEntry.length()));
+                    var maybeBlock = this.blockRegistry.getOptional(bId);
                     Block block = Blocks.AIR;
                     if (maybeBlock.isPresent()) {
-                        block = maybeBlock.get().value();
+                        block = maybeBlock.get();
                     }
                     var state = block.defaultBlockState();
                     if (bStateStr != null && block != Blocks.AIR) {
@@ -340,8 +341,8 @@ public class DHImporter implements IDataImporter {
         byte[] col = ctx.colScratch;
         for (int x = 0; x < 64; x++) {
             for (int z = 0; z < 64; z++) {
-                int bPos = Integer.expand(x&0xF, 0b00_00_0000_0000_1111) |
-                           Integer.expand(z, 0b00_11_0000_1111_0000);
+                int bPos = ExpansionUtil.expand(x&0xF, 0b00_00_0000_0000_1111) |
+                           ExpansionUtil.expand(z, 0b00_11_0000_1111_0000);
                 short cl = stream.readShort();
                 if (cl < 0) {
                     throw new IllegalStateException();
@@ -357,8 +358,8 @@ public class DHImporter implements IDataImporter {
                     //    int a = 0;
                     //}
                     //Insert all entries into data cache
-                    startY = Integer.expand(startY, 0b11111111_00_1111_0000_0000);
-                    endY = Integer.expand(endY, 0b11111111_00_1111_0000_0000);
+                    startY = ExpansionUtil.expand(startY, 0b11111111_00_1111_0000_0000);
+                    endY = ExpansionUtil.expand(endY, 0b11111111_00_1111_0000_0000);
                     final int Msk = 0b11111111_00_1111_0000_0000;
                     final int iMsk1 = (~Msk)+1;
                     for (int y = startY; y != endY; y = (y+iMsk1)&Msk) {

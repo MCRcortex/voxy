@@ -6,6 +6,7 @@ import com.google.gson.GsonBuilder;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.cpu.CpuLayout;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import me.jellysquid.mods.sodium.client.gui.options.storage.OptionStorage;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.FileReader;
@@ -14,7 +15,7 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-public class VoxyConfig {
+public class VoxyConfig implements OptionStorage<VoxyConfig> {
     private static final Gson GSON = new GsonBuilder()
             .setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_UNDERSCORES)
             .setPrettyPrinting()
@@ -29,7 +30,7 @@ public class VoxyConfig {
     public float sectionRenderDistance = 16;
     public int serviceThreads = (int) Math.max(CpuLayout.getCoreCount()/1.5, 1);
     public float subDivisionSize = 64;
-    public boolean useEnvironmentalFog = true;
+    public boolean renderVanillaFog = true;
     public boolean dontUseSodiumBuilderThreads = false;
 
     private static VoxyConfig loadOrCreate() {
@@ -77,6 +78,11 @@ public class VoxyConfig {
         return FabricLoader.getInstance()
                 .getConfigDir()
                 .resolve("voxy-config.json");
+    }
+
+    @Override
+    public VoxyConfig getData() {
+        return this;
     }
 
     public boolean isRenderingEnabled() {

@@ -148,7 +148,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
     private void uploadUniformBuffer(MDICViewport viewport) {
         long ptr = UploadStream.INSTANCE.upload(this.uniform, 0, 1024);
-        
+
         var mat = new Matrix4f(viewport.MVP);
         mat.translate(-viewport.innerTranslation.x, -viewport.innerTranslation.y, -viewport.innerTranslation.z);
         mat.getToAddress(ptr); ptr += 4*4*4;

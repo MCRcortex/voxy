@@ -283,9 +283,9 @@ public class RenderGenerationService {
         boolean[] isOurs = new boolean[1];
         long stamp = this.taskMapLock.writeLock();
         BuildTask task = this.taskMap.computeIfAbsent(pos, p->{
-                isOurs[0] = true;
-                return new BuildTask(p);
-            });
+            isOurs[0] = true;
+            return new BuildTask(p);
+        });
         this.taskMapLock.unlockWrite(stamp);
 
         if (isOurs[0]) {//If its not ours we dont care about it

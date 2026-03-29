@@ -17,14 +17,9 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.Minecraft;
 import net.minecraft.commands.SharedSuggestionProvider;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.level.dimension.DimensionType;
 import net.minecraft.world.level.storage.LevelResource;
-import org.apache.commons.math3.analysis.function.Min;
 
 import java.io.File;
 import java.io.IOException;
@@ -62,8 +57,8 @@ public class VoxyCommands {
         if (DHImporter.HasRequiredLibraries) {
             imports = imports
                     .then(ClientCommandManager.literal("distant_horizons")
-                    .then(ClientCommandManager.argument("sqlDbPath", StringArgumentType.string())
-                            .executes(VoxyCommands::importDistantHorizons)));
+                            .then(ClientCommandManager.argument("sqlDbPath", StringArgumentType.string())
+                                    .executes(VoxyCommands::importDistantHorizons)));
         }
 
         var debug = ClientCommandManager.literal("debug")

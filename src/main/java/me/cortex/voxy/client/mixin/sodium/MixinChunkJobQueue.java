@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.util.concurrent.Semaphore;
 
-@Mixin(targets={"net.caffeinemc.mods.sodium.client.render.chunk.compile.executor.ChunkJobQueue"},remap = false)
+@Mixin(targets={"me.jellysquid.mods.sodium.client.render.chunk.compile.executor.ChunkJobQueue"},remap = false)
 public class MixinChunkJobQueue {
     @Unique private MultiThreadPrioritySemaphore.Block voxy$semaphoreBlock;
 

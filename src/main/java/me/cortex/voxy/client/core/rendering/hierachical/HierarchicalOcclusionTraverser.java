@@ -104,32 +104,32 @@ public class HierarchicalOcclusionTraverser {
             this.pipeline = pipeline;
         }
         this.traversal = Shader.makeAuto(PRINTF_processor)
-            .defineIf("DEBUG", HIERARCHICAL_SHADER_DEBUG)
-            .define("MAX_ITERATIONS", MAX_ITERATIONS)
-            .define("LOCAL_SIZE_BITS", LOCAL_WORK_SIZE_BITS)
-            .define("MAX_REQUEST_QUEUE_SIZE", MAX_REQUEST_QUEUE_SIZE)
+                .defineIf("DEBUG", HIERARCHICAL_SHADER_DEBUG)
+                .define("MAX_ITERATIONS", MAX_ITERATIONS)
+                .define("LOCAL_SIZE_BITS", LOCAL_WORK_SIZE_BITS)
+                .define("MAX_REQUEST_QUEUE_SIZE", MAX_REQUEST_QUEUE_SIZE)
 
-            .define("HIZ_BINDING", 0)
+                .define("HIZ_BINDING", 0)
 
-            .define("SCENE_UNIFORM_BINDING", SCENE_UNIFORM_BINDING)
-            .define("REQUEST_QUEUE_BINDING", REQUEST_QUEUE_BINDING)
-            .define("RENDER_QUEUE_BINDING", RENDER_QUEUE_BINDING)
-            .define("NODE_DATA_BINDING", NODE_DATA_BINDING)
+                .define("SCENE_UNIFORM_BINDING", SCENE_UNIFORM_BINDING)
+                .define("REQUEST_QUEUE_BINDING", REQUEST_QUEUE_BINDING)
+                .define("RENDER_QUEUE_BINDING", RENDER_QUEUE_BINDING)
+                .define("NODE_DATA_BINDING", NODE_DATA_BINDING)
 
-            .define("NODE_QUEUE_INDEX_BINDING", NODE_QUEUE_INDEX_BINDING)
-            .define("NODE_QUEUE_META_BINDING", NODE_QUEUE_META_BINDING)
-            .define("NODE_QUEUE_SOURCE_BINDING", NODE_QUEUE_SOURCE_BINDING)
-            .define("NODE_QUEUE_SINK_BINDING", NODE_QUEUE_SINK_BINDING)
+                .define("NODE_QUEUE_INDEX_BINDING", NODE_QUEUE_INDEX_BINDING)
+                .define("NODE_QUEUE_META_BINDING", NODE_QUEUE_META_BINDING)
+                .define("NODE_QUEUE_SOURCE_BINDING", NODE_QUEUE_SOURCE_BINDING)
+                .define("NODE_QUEUE_SINK_BINDING", NODE_QUEUE_SINK_BINDING)
 
-            .define("RENDER_TRACKER_BINDING", RENDER_TRACKER_BINDING)
+                .define("RENDER_TRACKER_BINDING", RENDER_TRACKER_BINDING)
 
-            .defineIf("HAS_STATISTICS", RenderStatistics.enabled)
-            .defineIf("STATISTICS_BUFFER_BINDING", RenderStatistics.enabled, STATISTICS_BUFFER_BINDING)
+                .defineIf("HAS_STATISTICS", RenderStatistics.enabled)
+                .defineIf("STATISTICS_BUFFER_BINDING", RenderStatistics.enabled, STATISTICS_BUFFER_BINDING)
 
-            .defineIf("TAA", taa != null)
+                .defineIf("TAA", taa != null)
 
-            .addSource(ShaderType.COMPUTE, scr)
-            .compile();
+                .addSource(ShaderType.COMPUTE, scr)
+                .compile();
 
 
         this.traversal

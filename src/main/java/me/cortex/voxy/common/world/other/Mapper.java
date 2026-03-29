@@ -6,6 +6,8 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.IMappingStorage;
 import me.cortex.voxy.common.util.Pair;
 import net.minecraft.SharedConstants;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
@@ -260,7 +262,7 @@ public class Mapper {
     }
 
     public int getIdForBiome(Holder<Biome> biome) {
-        String biomeId = biome.unwrapKey().get().identifier().toString();
+        String biomeId = biome.unwrapKey().get().location().toString();
         var entry = this.biome2biomeEntry.get(biomeId);
         if (entry == null) {
             entry = this.registerNewBiome(biomeId);
@@ -359,7 +361,7 @@ public class Mapper {
             if (state.getBlock() instanceof LeavesBlock) {
                 this.opacity = 15;
             } else {
-                this.opacity = state.getLightBlock();
+                this.opacity = state.getLightBlock(Minecraft.getInstance().level, new BlockPos(0,0,0));
             }
         }
 
@@ -378,26 +380,26 @@ public class Mapper {
 
         public static StateEntry deserialize(int id, byte[] data, boolean[] forceResave) {
             try {
-                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data), NbtAccounter.unlimitedHeap());
-                if (compound.getIntOr("id", -1) != id) {
+                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data));
+                if (compound.getInt("id") != id) {
                     throw new IllegalStateException("Encoded id != expected id");
                 }
-                var bsc = compound.getCompound("block_state").orElseThrow();
+                var bsc = compound.getCompound("block_state");
                 var state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
-                if (state.isError()) {
+                if (state.error().isPresent()) {
                     Logger.info("Could not decode blockstate, attempting fixes, error: "+ state.error().get().message());
-                    bsc = (CompoundTag) DataFixers.getDataFixer().update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE,bsc),0, SharedConstants.getCurrentVersion().dataVersion().version()).getValue();
+                    bsc = (CompoundTag) DataFixers.getDataFixer().update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE,bsc),0, SharedConstants.getCurrentVersion().getDataVersion().getVersion()).getValue();
                     state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
-                    if (state.isError()) {
+                    if (state.error().isPresent()) {
                         Logger.error("Could not decode blockstate setting to air. id:" + id + " error: " + state.error().get().message());
                         return new StateEntry(id, Blocks.AIR.defaultBlockState());
                     } else {
-                        Logger.info("Fixed blockstate to: " + state.getOrThrow());
+                        Logger.info("Fixed blockstate to: " + state.getOrThrow(false, Logger::error));
                         forceResave[0] |= true;
-                        return new StateEntry(id, state.getOrThrow());
+                        return new StateEntry(id, state.getOrThrow(false, Logger::error));
                     }
                 } else {
-                    return new StateEntry(id, state.getOrThrow());
+                    return new StateEntry(id, state.getOrThrow(false, Logger::error));
                 }
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -429,11 +431,11 @@ public class Mapper {
 
         public static BiomeEntry deserialize(int id, byte[] data) {
             try {
-                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data), NbtAccounter.unlimitedHeap());
-                if (compound.getIntOr("id", -1) != id) {
+                var compound = NbtIo.readCompressed(new ByteArrayInputStream(data));
+                if (compound.getInt("id") != id) {
                     throw new IllegalStateException("Encoded id != expected id");
                 }
-                String biome = compound.getStringOr("biome_id", null);
+                String biome = compound.getString("biome_id");
                 return new BiomeEntry(id, biome);
             } catch (IOException e) {
                 throw new RuntimeException(e);

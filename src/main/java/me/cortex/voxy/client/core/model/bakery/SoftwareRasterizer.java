@@ -1,14 +1,12 @@
 package me.cortex.voxy.client.core.model.bakery;
 
+import me.cortex.voxy.client.core.model.ARGB;
 import me.cortex.voxy.client.core.model.ModelFactory;
-import net.caffeinemc.mods.sodium.client.util.color.ColorSRGB;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
-import org.lwjgl.system.MemoryUtil;
 
 import java.util.Arrays;
-import java.util.Random;
 
 public class SoftwareRasterizer {
     public static final int TARGET_SIZE = ModelFactory.MODEL_TEXTURE_SIZE;
@@ -64,8 +62,8 @@ public class SoftwareRasterizer {
     }
 
     private int sampleTexture(float u, float v) {
-        int pu = Math.clamp(Math.round(u*this.samplerWidth-0.5f), 0, this.samplerWidth-1);
-        int pv = Math.clamp(Math.round(v*this.samplerHeight-0.5f), 0, this.samplerHeight-1);
+        int pu = ARGB.clamp(Math.round(u*this.samplerWidth-0.5f), 0, this.samplerWidth-1);
+        int pv = ARGB.clamp(Math.round(v*this.samplerHeight-0.5f), 0, this.samplerHeight-1);
         return this.samplerTexture[this.samplerWidth*pv+pu];
     }
 

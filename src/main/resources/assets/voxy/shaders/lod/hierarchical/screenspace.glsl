@@ -187,4 +187,3 @@ bool isCulledByHiz() {
 bool shouldDecend() {
     return _screenSize > minSSS;
 }
-

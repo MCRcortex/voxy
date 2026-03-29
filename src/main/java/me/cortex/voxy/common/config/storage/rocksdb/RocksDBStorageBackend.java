@@ -1,6 +1,7 @@
 package me.cortex.voxy.common.config.storage.rocksdb;
 
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import me.cortex.voxy.client.core.util.ExpansionUtil;
 import me.cortex.voxy.common.config.ConfigBuildCtx;
 import me.cortex.voxy.common.config.storage.StorageBackend;
 import me.cortex.voxy.common.config.storage.StorageConfig;
@@ -74,9 +75,9 @@ public class RocksDBStorageBackend extends StorageBackend {
         );
 
         final List<ColumnFamilyDescriptor> cfDescriptors = Arrays.asList(
-            new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
-            new ColumnFamilyDescriptor("world_sections".getBytes(), cfWorldSecOpts),
-            new ColumnFamilyDescriptor("id_mappings".getBytes(), cfOpts)
+                new ColumnFamilyDescriptor(RocksDB.DEFAULT_COLUMN_FAMILY, cfOpts),
+                new ColumnFamilyDescriptor("world_sections".getBytes(), cfWorldSecOpts),
+                new ColumnFamilyDescriptor("id_mappings".getBytes(), cfOpts)
         );
 
         final DBOptions options = new DBOptions()
@@ -268,8 +269,8 @@ public class RocksDBStorageBackend extends StorageBackend {
         }
         if (WorldEngine.POS_FORMAT_VERSION != 1) throw new IllegalStateException("TODO: UPDATE THIS");
         return  (key&(0xFL<<60)) |
-                Long.expand((key>>> 4)&((1L<<24)-1), 0b01010101010101010101010101010101_001001001001001001001001L) |
-                Long.expand((key>>>52)&0xFF,         0b00000000000000000000000000000000_100100100100100100100100L) |
-                Long.expand((key>>>28)&((1L<<24)-1), 0b10101010101010101010101010101010_010010010010010010010010L);
+                ExpansionUtil.expand((key>>> 4)&((1L<<24)-1), 0b01010101010101010101010101010101_001001001001001001001001L) |
+                ExpansionUtil.expand((key>>>52)&0xFF,         0b00000000000000000000000000000000_100100100100100100100100L) |
+                ExpansionUtil.expand((key>>>28)&((1L<<24)-1), 0b10101010101010101010101010101010_010010010010010010010010L);
     }
 }

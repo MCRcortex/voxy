@@ -5,3 +5,11 @@
 /run/
 /out/
 /logs/
+
+bin/
+.classpath
+.project
+*.launch
+.settings/
+
+.vscode/

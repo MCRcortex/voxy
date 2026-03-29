@@ -136,7 +136,7 @@ public class BasicSectionGeometryManager extends AbstractSectionGeometryManager 
         var oldMetadata = this.sectionMetadata.set(id, null);
         this.geometry.downloadRemove(oldMetadata.geometryPtr, buffer ->
                 //TODO: occupancy
-            callback.accept(new BuiltSection(oldMetadata.position, oldMetadata.childExistence, oldMetadata.aabb, buffer.copy(), oldMetadata.offsets, null))
+                callback.accept(new BuiltSection(oldMetadata.position, oldMetadata.childExistence, oldMetadata.aabb, buffer.copy(), oldMetadata.offsets, null))
         );
         //this.geometry.free(oldMetadata.geometryPtr);
         this.invalidatedSectionIds.add(id);

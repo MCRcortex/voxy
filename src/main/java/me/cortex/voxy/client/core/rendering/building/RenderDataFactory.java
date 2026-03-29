@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.rendering.building;
 import me.cortex.voxy.client.core.model.IdNotYetComputedException;
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.client.core.model.ModelQueries;
+import me.cortex.voxy.client.core.util.ExpansionUtil;
 import me.cortex.voxy.client.core.util.ScanMesher2D;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
@@ -62,7 +63,7 @@ public class RenderDataFactory {
 
     private int quadCount = 0;
 
-    private final OccupancySet occupancy;
+    private final OccupancySet occupancy = new OccupancySet();
 
     //Wont work for double sided quads
     private final class Mesher extends ScanMesher2D {
@@ -185,16 +186,8 @@ public class RenderDataFactory {
     private final Mesher seondaryblockMesher = new Mesher();//Used for dual non-opaque geometry
 
     public RenderDataFactory(WorldEngine world, ModelFactory modelManager, boolean emitMeshlets) {
-        this(world, modelManager, emitMeshlets, false);
-    }
-    public RenderDataFactory(WorldEngine world, ModelFactory modelManager, boolean emitMeshlets, boolean generateOccupancy) {
         this.world = world;
         this.modelMan = modelManager;
-        if (generateOccupancy && BUILD_OCCUPANCY_SET) {
-            this.occupancy = new OccupancySet();
-        } else {
-            this.occupancy = null;
-        }
     }
 
     private static long getQuadTyping(long metadata) {//2 bits
@@ -335,7 +328,7 @@ public class RenderDataFactory {
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
-                this.neighboringFaces[i+32*32*4] = raw[Integer.expand(i,0b11111_00000_11111)|(0x1F<<5)];//pull the +z faces from the section
+                this.neighboringFaces[i+32*32*4] = raw[ExpansionUtil.expand(i,0b11111_00000_11111)|(0x1F<<5)];//pull the +z faces from the section
             }
             sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
@@ -344,7 +337,7 @@ public class RenderDataFactory {
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
-                this.neighboringFaces[i+32*32*5] = raw[Integer.expand(i,0b11111_00000_11111)];//pull the -z faces from the section
+                this.neighboringFaces[i+32*32*5] = raw[ExpansionUtil.expand(i,0b11111_00000_11111)];//pull the -z faces from the section
             }
             sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
@@ -356,7 +349,7 @@ public class RenderDataFactory {
         if (((quad^neighborQuad)&(0xFFFFL<<26))==0 && (DISABLE_CULL_SAME_OCCLUDES || (ModelQueries.cullsSame(meta)||ModelQueries.faceOccludes(meta, face)))) return false;//This is a hack, if the neigbor and this are the same, dont mesh the face// TODO: FIXME
         if (!ModelQueries.faceExists(meta, face)) return false;//Dont mesh if no face
         if (ModelQueries.faceCanBeOccluded(meta, face)) //TODO: maybe enable this
-          if (ModelQueries.faceOccludes(neighborMeta, face^1)) return false;
+            if (ModelQueries.faceOccludes(neighborMeta, face^1)) return false;
         return true;
     }
 
@@ -900,9 +893,9 @@ public class RenderDataFactory {
                         this.xAxisMeshers[index].skip(31);
                     }
                     //Clear the sum
-                    sumA &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount), X_I_MSK)*0x1F);
-                    sumB &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>11, X_I_MSK)*0x1F);
-                    sumC &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>22, X_I_MSK)*0x1F);
+                    sumA &= ~(ExpansionUtil.expand(Integer.toUnsignedLong(partialHasCount), X_I_MSK)*0x1F);
+                    sumB &= ~(ExpansionUtil.expand(Integer.toUnsignedLong(partialHasCount)>>11, X_I_MSK)*0x1F);
+                    sumC &= ~(ExpansionUtil.expand(Integer.toUnsignedLong(partialHasCount)>>22, X_I_MSK)*0x1F);
                 }
 
                 if (msk == 0) {
@@ -913,9 +906,9 @@ public class RenderDataFactory {
                 {//Dont need this as can just increment everything then -1 in mask
                     //Compute and increment skips for indexes
                     long imsk = Integer.toUnsignedLong(~msk);// we only want to increment where there isnt a face
-                    sumA += Long.expand(imsk, X_I_MSK);
-                    sumB += Long.expand(imsk>>11, X_I_MSK);
-                    sumC += Long.expand(imsk>>22, X_I_MSK);
+                    sumA += ExpansionUgly.expand(imsk, X_I_MSK);
+                    sumB += ExpansionUgly.expand(imsk>>11, X_I_MSK);
+                    sumC += ExpansionUgly.expand(imsk>>22, X_I_MSK);
                 }*/
 
                 int faceForwardMsk = msk&lMsk;
@@ -1105,9 +1098,9 @@ public class RenderDataFactory {
                         this.xAxisMeshers[index].skip(31);
                     }
                     //Clear the sum
-                    sumA &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount), X_I_MSK)*0x1F);
-                    sumB &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>11, X_I_MSK)*0x1F);
-                    sumC &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>22, X_I_MSK)*0x1F);
+                    sumA &= ~(ExpansionUtil.expand(Integer.toUnsignedLong(partialHasCount), X_I_MSK)*0x1F);
+                    sumB &= ~(ExpansionUtil.expand(Integer.toUnsignedLong(partialHasCount)>>11, X_I_MSK)*0x1F);
+                    sumC &= ~(ExpansionUtil.expand(Integer.toUnsignedLong(partialHasCount)>>22, X_I_MSK)*0x1F);
                 }
 
                 if (msk == 0) {
@@ -1388,9 +1381,9 @@ public class RenderDataFactory {
                         this.secondaryXAxisMeshers[index].skip(31);
                     }
                     //Clear the sum
-                    sumA &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount), X_I_MSK)*0x1F);
-                    sumB &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>11, X_I_MSK)*0x1F);
-                    sumC &= ~(Long.expand(Integer.toUnsignedLong(partialHasCount)>>22, X_I_MSK)*0x1F);
+                    sumA &= ~(ExpansionUtil.expand(Integer.toUnsignedLong(partialHasCount), X_I_MSK)*0x1F);
+                    sumB &= ~(ExpansionUtil.expand(Integer.toUnsignedLong(partialHasCount)>>11, X_I_MSK)*0x1F);
+                    sumC &= ~(ExpansionUtil.expand(Integer.toUnsignedLong(partialHasCount)>>22, X_I_MSK)*0x1F);
                 }
 
                 if (msk == 0) {
@@ -1631,9 +1624,8 @@ public class RenderDataFactory {
                 }
             }
         }
-        if (this.occupancy != null) {
-            this.occupancy.reset();
-        }
+
+        this.occupancy.reset();
 
         this.minX = Integer.MAX_VALUE;
         this.minY = Integer.MAX_VALUE;
@@ -1668,7 +1660,7 @@ public class RenderDataFactory {
         }
 
         //We only care if we have quads
-        if (this.occupancy != null && section.lvl == 0 /*only generate occupancy for lowest lod level*/ && this.quadCount != 0 && (flags&1) != 0) {
+        if (BUILD_OCCUPANCY_SET && this.quadCount != 0 && (flags&1) != 0) {
             this.buildOccupancy();
         }
 
@@ -1707,7 +1699,7 @@ public class RenderDataFactory {
         aabb |= (this.maxZ-this.minZ-1)<<25;
 
         MemoryBuffer occupancy = null;
-        if (this.occupancy != null && !this.occupancy.isEmpty()) {
+        if (BUILD_OCCUPANCY_SET && !this.occupancy.isEmpty()) {
             occupancy = new MemoryBuffer(this.occupancy.writeSize());
             this.occupancy.write(occupancy.address, false);
         }

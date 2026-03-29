@@ -2,7 +2,7 @@ package me.cortex.voxy.client.mixin.minecraft;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.mojang.blaze3d.opengl.GlDebug;
+import com.mojang.blaze3d.platform.GlDebug;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Mixin;
@@ -15,7 +15,7 @@ import java.io.StringWriter;
 @Mixin(GlDebug.class)
 public class MixinGlDebug {
     @WrapOperation(method = "printDebugLog", at = @At(value = "INVOKE", target = "Lorg/slf4j/Logger;info(Ljava/lang/String;Ljava/lang/Object;)V", remap = false))
-    private void voxy$wrapDebug(Logger instance, String base, Object msgObj, Operation<Void> original) {
+    private static void voxy$wrapDebug(Logger instance, String base, Object msgObj, Operation<Void> original) {
         if (msgObj instanceof GlDebug.LogEntry msg) {
             var throwable = new Throwable(msg.toString());
             if (isCausedByVoxy(throwable.getStackTrace())) {
@@ -39,7 +39,7 @@ public class MixinGlDebug {
     }
 
     @Unique
-    private boolean isCausedByVoxy(StackTraceElement[] trace) {
+    private static boolean isCausedByVoxy(StackTraceElement[] trace) {
         for (var elem : trace) {
             if (elem.getClassName().startsWith("me.cortex.voxy")) {
                 return true;
@@ -49,7 +49,7 @@ public class MixinGlDebug {
     }
 
     @Unique
-    private boolean isCausedByShaderCompileTest(StackTraceElement[] trace) {
+    private static boolean isCausedByShaderCompileTest(StackTraceElement[] trace) {
         for (var elem : trace) {
             if (elem.getClassName().equals(Capabilities.class.getName()) && elem.getMethodName().equals("testShaderCompilesOk")) {
                 return true;

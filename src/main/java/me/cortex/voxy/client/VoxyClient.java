@@ -2,6 +2,7 @@ package me.cortex.voxy.client;
 
 import me.cortex.voxy.client.core.gl.Capabilities;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
+import me.cortex.voxy.client.core.util.ExpansionUtil;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.fabricmc.api.ClientModInitializer;
@@ -30,7 +31,7 @@ public class VoxyClient implements ClientModInitializer {
 
         boolean systemSupported = Capabilities.INSTANCE.compute && Capabilities.INSTANCE.indirectParameters && !Capabilities.INSTANCE.hasBrokenDepthSampler;
         if (!systemSupported) {
-             Logger.error("Voxy is unsupported on your system.");
+            Logger.error("Voxy is unsupported on your system.");
         }
 
         if (systemSupported && System.getProperty("voxy.exclusiveLock", "false").equalsIgnoreCase("true")) {
@@ -61,12 +62,15 @@ public class VoxyClient implements ClientModInitializer {
             }
 
         }
+
+        if (!ExpansionUtil.isJava21()) {
+            Logger.warn("Cannot use native Integer/Long compression. Using fallback...");
+        }
     }
 
     @Override
     public void onInitializeClient() {
-        DebugEntries.init();
-
+        // DebugScreenEntries.register(ResourceLocation.fromNamespaceAndPath("voxy","debug"), new VoxyDebugScreenEntry());
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
             if (VoxyCommon.isAvailable()) {
                 dispatcher.register(VoxyCommands.register());

@@ -1,11 +1,12 @@
 package me.cortex.voxy.client;
 
+import me.cortex.voxy.client.compat.Kernel32;
 import me.cortex.voxy.common.Logger;
 import org.lwjgl.system.JNI;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
+import org.lwjgl.system.SharedLibrary;
 import org.lwjgl.system.windows.GDI32;
-import org.lwjgl.system.windows.Kernel32;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -13,9 +14,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-import static org.lwjgl.system.APIUtil.apiGetFunctionAddressOptional;
+import static org.lwjgl.system.MemoryUtil.NULL;
 
 public class GPUSelectorWindows2 {
+    private static long apiGetFunctionAddressOptional(SharedLibrary library, String functionName) {
+        long a = library.getFunctionAddress(functionName);
+        if (a == NULL) {
+            Logger.error("[LWJGL] Failed to locate address for " + library.getName() + " function " + functionName + "\n");
+        }
+        return a;
+    }
+
     private static final long D3DKMTSetProperties = apiGetFunctionAddressOptional(GDI32.getLibrary(), "D3DKMTSetProperties");
     private static final long D3DKMTEnumAdapters2 = apiGetFunctionAddressOptional(GDI32.getLibrary(), "D3DKMTEnumAdapters2");
     private static final long D3DKMTCloseAdapter = apiGetFunctionAddressOptional(GDI32.getLibrary(), "D3DKMTCloseAdapter");

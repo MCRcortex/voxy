@@ -1,19 +1,15 @@
 package me.cortex.voxy.client.core.model.bakery;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.TextureFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.LightLayer;
@@ -32,11 +28,9 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CompletableFuture;
 
-import static org.lwjgl.opengl.GL11.glFinish;
+import static org.lwjgl.opengl.GL11.*;
 
 public class SoftwareModelTextureBakery {
     //Note: the first bit of metadata is if alpha discard is enabled
@@ -49,55 +43,50 @@ public class SoftwareModelTextureBakery {
     }
 
     public void setupTexture() {
-        var tex = Minecraft.getInstance().getTextureManager().getTexture(Identifier.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png")).getTexture();
-        if (tex.getFormat() != TextureFormat.RGBA8) {
-            throw new IllegalStateException("Block atlas not rgba8");
-        }
+        var texture = Minecraft.getInstance().getTextureManager().getTexture(new ResourceLocation("minecraft", "textures/atlas/blocks.png"));
 
-        int targetMipLevel = 0;// Math.min(tex.getMipLevels(), 4)-1;//todo: we want to target the mip layer that has the 16x16 sized textures
+        int textureId = texture.getId();
 
-        int width = tex.getWidth(targetMipLevel);
-        int height = tex.getHeight(targetMipLevel);
-        GpuBuffer gpuBuffer = RenderSystem.getDevice().createBuffer(() -> "Texture output buffer", 9, (4L*width)*height);//USAGE_COPY_SRC|USAGE_MAP_READ
-        CommandEncoder commandEncoder = RenderSystem.getDevice().createCommandEncoder();
-        boolean[] done = new boolean[1];
-        Runnable runnable = () -> {
-            var texture = new int[width*height];
-            final long BATCH_SIZE = (1L<<31)-(1L<<20);
-            for (long offset = 0; offset < (4L*width)*height; offset += BATCH_SIZE) {
-                long size = Math.min((4L*width)*height-offset, BATCH_SIZE);
-                try (GpuBuffer.MappedView mappedView = commandEncoder.mapBuffer(gpuBuffer.slice(offset, size), true, false)) {
-                    mappedView.data().asIntBuffer().get(texture, (int) (offset/4), (int) (size/4));
+        if (!RenderSystem.isOnRenderThread()) {
+            CompletableFuture<Void> future = new CompletableFuture<>();
+
+            RenderSystem.recordRenderCall(() -> {
+                try {
+                    _doSetupTexture(textureId);
+                    future.complete(null);
+                } catch (Exception e) {
+                    future.completeExceptionally(e);
                 }
-            }
-            this.rasterizer.setSamplerTexture(texture, width, height);
-            gpuBuffer.close();
-            done[0] = true;
-        };
+            });
 
-        commandEncoder.copyTextureToBuffer(tex, gpuBuffer, 0, runnable, targetMipLevel);
-        glFinish();//Required for intel since they dont insert there own flush in, causing this loop to never exit
-        while (!done[0]) {
-            try {
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
-            RenderSystem.executePendingTasks();
+            future.join();
+        } else {
+            _doSetupTexture(textureId);
         }
     }
 
-    public static int getMetaFromLayer(ChunkSectionLayer layer) {
-        boolean hasDiscard = layer == ChunkSectionLayer.CUTOUT ||
-                layer == ChunkSectionLayer.TRANSLUCENT||
-                layer == ChunkSectionLayer.TRIPWIRE;
+    private void _doSetupTexture(int glId) {
+        glBindTexture(GL_TEXTURE_2D, glId);
+        int width = glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH);
+        int height = glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT);
+
+        int[] pixels = new int[width * height];
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+        this.rasterizer.setSamplerTexture(pixels, width, height);
+    }
+
+    public static int getMetaFromLayer(RenderType layer) {
+        boolean hasDiscard = layer == RenderType.cutout() ||
+                layer == RenderType.cutoutMipped() ||
+                layer == RenderType.tripwire();
 
         int meta = hasDiscard?1:0;
         meta |= true?2:0;
         return meta;
     }
 
-    private void bakeBlockModel(BlockState state, ChunkSectionLayer layer) {
+    private void bakeBlockModel(BlockState state, RenderType layer) {
         if (state.getRenderShape() == RenderShape.INVISIBLE) {
             return;//Dont bake if invisible
         }
@@ -108,18 +97,16 @@ public class SoftwareModelTextureBakery {
 
         int meta = getMetaFromLayer(layer);
 
-        for (var part : model.collectParts(new SingleThreadedRandomSource(42L))) {
-            for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null}) {
-                var quads = part.getQuads(direction);
-                for (var quad : quads) {
-                    this.vc.quad(quad, meta|(quad.isTinted()?4:0));
-                }
+        for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null}) {
+            var quads = model.getQuads(state, direction, new SingleThreadedRandomSource(42L));
+            for (var quad : quads) {
+                this.vc.quad(quad, meta|(quad.isTinted()?4:0));
             }
         }
     }
 
 
-    private void bakeFluidState(BlockState state, ChunkSectionLayer layer, int face) {
+    private void bakeFluidState(BlockState state, RenderType layer, int face) {
         {
             //TODO: somehow set the tint flag per quad or something?
             int metadata = getMetaFromLayer(layer);
@@ -188,7 +175,7 @@ public class SoftwareModelTextureBakery {
             }
 
             @Override
-            public int getMinY() {
+            public int getMinBuildHeight() {
                 return 0;
             }
         }, this.vc, state, state.getFluidState());
@@ -196,7 +183,7 @@ public class SoftwareModelTextureBakery {
     }
 
     private static boolean shouldReturnAirForFluid(BlockPos pos, int face) {
-        var fv = Direction.from3DDataValue(face).getUnitVec3i();
+        var fv = Direction.from3DDataValue(face).getNormal();
         int dot = fv.getX()*pos.getX() + fv.getY()*pos.getY() + fv.getZ()*pos.getZ();
         return dot >= 1;
     }
@@ -214,13 +201,13 @@ public class SoftwareModelTextureBakery {
 
 
         boolean isBlock = true;
-        ChunkSectionLayer layer;
+        RenderType layer;
         if (state.getBlock() instanceof LiquidBlock) {
             layer = ItemBlockRenderTypes.getRenderLayer(state.getFluidState());
             isBlock = false;
         } else {
             if (state.getBlock() instanceof LeavesBlock) {
-                layer = ChunkSectionLayer.SOLID;
+                layer = RenderType.solid();
             } else {
                 layer = ItemBlockRenderTypes.getChunkRenderType(state);
             }
@@ -233,10 +220,9 @@ public class SoftwareModelTextureBakery {
         }
 
         {
-            this.rasterizer.setBlending(layer == ChunkSectionLayer.TRANSLUCENT);
+            this.rasterizer.setBlending(layer == RenderType.translucent());
 
-            //var tex = Minecraft.getInstance().getTextureManager().getTexture(Identifier.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png")).getTexture();
-            //blockTextureId = ((com.mojang.blaze3d.opengl.GlTexture)tex).glId();
+            //blockTextureId = Minecraft.getInstance().getTextureManager().getTexture(new ResourceLocation("minecraft", "textures/atlas/blocks.png")).getId();
         }
 
         boolean isAnyShaded = false;
@@ -297,7 +283,7 @@ public class SoftwareModelTextureBakery {
         stack.mulPose(makeQuatFromAxisExact(new Vector3f(0,0,1), rotation));
         stack.mulPose(makeQuatFromAxisExact(new Vector3f(1,0,0), pitch));
         stack.mulPose(makeQuatFromAxisExact(new Vector3f(0,1,0), yaw));
-        stack.mulPose(new Matrix4f().scale(1-2*(flip&1), 1-(flip&2), 1-((flip>>1)&2)));
+        stack.mulPoseMatrix(new Matrix4f().scale(1-2*(flip&1), 1-(flip&2), 1-((flip>>1)&2)));
         stack.translate(-0.5f,-0.5f,-0.5f);
         var mat = new Matrix4f(stack.last().pose());
 

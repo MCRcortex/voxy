@@ -101,4 +101,3 @@ vec4 getLighting(uint index) {
     return texture(lightSampler, clamp((vec2((i2>>4)&0xF, i2&0xF))/15, vec2(8.0f/256), vec2(248.0f/256)));
 }
 #endif
-

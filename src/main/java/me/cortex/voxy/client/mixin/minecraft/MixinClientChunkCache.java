@@ -7,7 +7,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
-import org.jspecify.annotations.Nullable;
+import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -38,9 +38,9 @@ public class MixinClientChunkCache implements ICheekyClientChunkCache {
     }
 
     @Inject(method = "drop", at = @At("HEAD"))
-    public void voxy$captureChunkBeforeUnload(ChunkPos pos, CallbackInfo ci) {
+    public void voxy$captureChunkBeforeUnload(int x, int z, CallbackInfo ci) {
         if (VoxyConfig.CONFIG.ingestEnabled && BOBBY_INSTALLED) {
-            var chunk = this.voxy$cheekyGetChunk(pos.x, pos.z);
+            var chunk = this.voxy$cheekyGetChunk(x, z);
             if (chunk != null) {
                 VoxelIngestService.tryAutoIngestChunk(chunk);
             }

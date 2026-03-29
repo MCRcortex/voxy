@@ -1,9 +1,10 @@
 package me.cortex.voxy.common.voxelization;
 
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
+import me.cortex.voxy.client.core.util.ExpansionUtil;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.common.world.other.Mipper;
-import net.caffeinemc.mods.lithium.common.world.chunk.LithiumHashPalette;
+import me.jellysquid.mods.lithium.common.world.chunk.LithiumHashPalette;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -180,7 +181,7 @@ public class WorldConversionFactory {
 
                 byte light = lightSupplier.supply(i&0xF, (i>>8)&0xF, (i>>4)&0xF);
                 nonZeroCnt += (bId != 0)?1:0;
-                data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
+                data[i] = Mapper.composeMappingId(light, bId, biomes[ExpansionUtil.compress(i,0b1100_1100_1100)]);
             }
         } else {
             if (!(blockContainer.data.storage instanceof ZeroBitStorage)) {
@@ -195,7 +196,7 @@ public class WorldConversionFactory {
                 nonZeroCnt = 4096;
                 for (int i = 0; i <= 0xFFF; i++) {
                     byte light = lightSupplier.supply(i&0xF, (i>>8)&0xF, (i>>4)&0xF);
-                    data[i] = Mapper.composeMappingId(light, bId, biomes[Integer.compress(i,0b1100_1100_1100)]);
+                    data[i] = Mapper.composeMappingId(light, bId, biomes[ExpansionUtil.compress(i,0b1100_1100_1100)]);
                 }
             }
         }

@@ -4,9 +4,10 @@ package me.cortex.voxy.client.core.model.bakery;
 import me.cortex.voxy.common.Logger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.Model;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.core.BlockPos;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -19,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 
 public class BakedBlockEntityModel {
-
     private record LayerConsumer(RenderType layer, ReuseVertexConsumer consumer) {}
     private final List<LayerConsumer> layers;
     private BakedBlockEntityModel(List<LayerConsumer> layers) {
@@ -30,11 +30,11 @@ public class BakedBlockEntityModel {
         for (var layer : this.layers) {
             if (layer.consumer.isEmpty()) continue;
             if (layer.layer instanceof RenderType.CompositeRenderType mp) {
-                Identifier textureId = mp.state.textureState.cutoutTexture().orElse(null);
+                ResourceLocation textureId = mp.state.textureState.cutoutTexture().orElse(null);
                 if (textureId == null) {
                     Logger.error("ERROR: Empty texture id for layer: " + layer);
                 } else {
-                    texId = ((com.mojang.blaze3d.opengl.GlTexture)Minecraft.getInstance().getTextureManager().getTexture(textureId).getTexture()).glId();
+                    texId = Minecraft.getInstance().getTextureManager().getTexture(textureId).getId();
                 }
             }
             if (texId == 0) continue;
@@ -54,7 +54,7 @@ public class BakedBlockEntityModel {
 
         boolean isMipped = layer == RenderType.cutoutMipped() ||
                 layer == RenderType.solid() ||
-                layer.sortOnUpload() ||
+                layer == RenderType.translucent() ||
                 layer == RenderType.tripwire();
 
         int meta = hasDiscard?1:0;

@@ -1,5 +1,6 @@
 package me.cortex.voxy.client.core;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.GlFramebuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
@@ -12,6 +13,7 @@ import me.cortex.voxy.client.core.rendering.hierachical.NodeCleaner;
 import me.cortex.voxy.client.core.rendering.post.FullscreenBlit;
 import me.cortex.voxy.client.core.rendering.util.DepthFramebuffer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
 
@@ -48,7 +50,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
 
     protected NormalRenderPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
         super(nodeManager, nodeCleaner, traversal, frexSupplier, false);
-        this.useEnvFog = VoxyConfig.CONFIG.useEnvironmentalFog;
+        this.useEnvFog = VoxyConfig.CONFIG.renderVanillaFog;
         this.finalBlit = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag",
                 a->a.defineIf("USE_ENV_FOG", this.useEnvFog).define("EMIT_COLOUR"));
     }
@@ -108,18 +110,23 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
     protected void finish(Viewport<?> viewport, int sourceFrameBuffer, int srcWidth, int srcHeight) {
         this.finalBlit.bind();
 
-        boolean fogCoversAllRendering = viewport.fogParameters.environmentalEnd()<Minecraft.getInstance().gameRenderer.getRenderDistance();
+        float fogStart = RenderSystem.getShaderFogStart();
+        float fogEnd = RenderSystem.getShaderFogEnd();
+        float[] fogColor = RenderSystem.getShaderFogColor();
+
+        float renderDistance = Minecraft.getInstance().gameRenderer.getRenderDistance();
+
+        boolean fogCoversAllRendering = fogEnd < renderDistance;
 
         if (this.useEnvFog) {
-            float start = viewport.fogParameters.environmentalStart();
-            float end = viewport.fogParameters.environmentalEnd();
-            if (Math.abs(end-start)>1) {
-                float invEndFogDelta = 1f / (end - start);
-                float endDistance = Math.max(Minecraft.getInstance().gameRenderer.getRenderDistance(), 20*16);//TODO: make this constant a config option
-                endDistance *= (float)Math.sqrt(3);
-                float startDelta = -start * invEndFogDelta;
-                glUniform4f(4, invEndFogDelta, startDelta, Math.clamp(endDistance*invEndFogDelta+startDelta, 0, 1),0);//
-                glUniform4f(5, viewport.fogParameters.red(), viewport.fogParameters.green(), viewport.fogParameters.blue(), viewport.fogParameters.alpha());
+            if (Math.abs(fogEnd - fogStart) > 1) {
+                float invEndFogDelta = 1f / (fogEnd - fogStart);
+                float endDistance = Math.max(renderDistance, 20 * 16); //TODO: make this constant a config option
+                endDistance *= (float) Math.sqrt(3);
+                float startDelta = -fogStart * invEndFogDelta;
+                float clampedDist = Mth.clamp(endDistance * invEndFogDelta + startDelta, 0.0f, 1.0f);
+                glUniform4f(4, invEndFogDelta, startDelta, clampedDist, 0);
+                glUniform4f(5, fogColor[0], fogColor[1], fogColor[2], 1.0f);
             } else {
                 glUniform4f(4, 0, 0, 0, 0);
                 glUniform4f(5, 0, 0, 0, 0);

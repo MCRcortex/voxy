@@ -246,4 +246,3 @@ colour = textureGrad(blockModelAtlas, texPos, dx, dy);
 //#else
 //colour = texture(blockModelAtlas, texPos);
 //#endif
-
