@@ -223,7 +223,7 @@ public class ActiveSectionTracker {
         WorldSection sec = null;
         final var lock = this.locks[index];
         long stamp = lock.writeLock();
-        {
+        try {
             VarHandle.loadLoadFence();
             if (section.isDirty) {
                 if (section.tryAcquire()) {
@@ -246,6 +246,10 @@ public class ActiveSectionTracker {
                     throw new IllegalStateException("Removed section not the same as the referenced section in the cache: cached: " + obj + " got: " + section + " A: " + WorldSection.ATOMIC_STATE_HANDLE.get(obj) + " B: " +WorldSection.ATOMIC_STATE_HANDLE.get(section));
                 }
                 sec = section;
+            }
+        } finally {
+            if (sec == null) {
+                lock.unlockWrite(stamp);
             }
         }
 
