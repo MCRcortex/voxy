@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core;
 
 import com.mojang.blaze3d.opengl.GlConst;
 import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.config.VoxyConfig;
@@ -419,6 +420,8 @@ public class VoxyRenderSystem {
 
         float far = 16*3000;
 
+        boolean zZeroToOne = RenderSystem.getDevice().isZZeroToOne();
+
         /* jank way of just modifying the base raw
         if (true) {
             return new Matrix4f(base)
@@ -428,8 +431,8 @@ public class VoxyRenderSystem {
 
         return extraProjection.mulLocal(
                 new Matrix4f(rawMCProj)
-                .m22((far + near) / (near - far))
-                .m32((far+far) * near / (near - far))
+                .m22((zZeroToOne ? far : (far + near)) / (near - far))
+                .m32((zZeroToOne ? far : (far+far)) * near / (near - far))
         );
     }
 
