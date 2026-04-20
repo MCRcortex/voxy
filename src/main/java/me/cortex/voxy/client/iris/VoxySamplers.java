@@ -31,7 +31,7 @@ public class VoxySamplers {
                 if (dt == null) {
                     return 0;
                 }
-                return dt.id;
+                return dt.id();
             }, null, opaqueNames);
 
             samplers.addDynamicSampler(TextureType.TEXTURE_2D, () -> {
@@ -47,7 +47,7 @@ public class VoxySamplers {
                 if (dt == null) {
                     return 0;
                 }
-                return dt.id;
+                return dt.id();
             }, null, translucentNames);
         }
     }
