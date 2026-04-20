@@ -10,8 +10,8 @@ import me.cortex.voxy.common.world.SaveLoadSystem3;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 
+import java.lang.foreign.ValueLayout;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.function.LongConsumer;
 
 public class SectionSerializationStorage extends SectionStorage {
@@ -30,7 +30,9 @@ public class SectionSerializationStorage extends SectionStorage {
             if (!SaveLoadSystem3.deserialize(into, data)) {
                 this.backend.deleteSectionData(into.key);
                 //TODO: regenerate the section from children
-                Arrays.fill(into._unsafeGetRawDataArray(), Mapper.AIR);
+                for (int i = 0; i < into._unsafeGetRawDataArrayLength(); i++) {
+                    into._unsafeGetRawDataArray().setAtIndex(ValueLayout.JAVA_LONG, i, Mapper.AIR);
+                }
                 Logger.error("Section " + into.lvl + ", " + into.x + ", " + into.y + ", " + into.z + " was unable to load, removing");
                 return -1;
             } else {

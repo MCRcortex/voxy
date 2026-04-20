@@ -4,6 +4,8 @@ import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 
+import java.lang.foreign.ValueLayout;
+
 import static me.cortex.voxy.common.world.WorldEngine.*;
 
 public class WorldUpdater {
@@ -122,10 +124,14 @@ public class WorldUpdater {
                     int cSecIdx = secIdx + baseSec;
                     secIdx = (secIdx + iSecMsk1) & secMsk;
 
-                    long oldId0 = secD[cSecIdx+0]; secD[cSecIdx+0] = vdat[i+0];
-                    long oldId1 = secD[cSecIdx+1]; secD[cSecIdx+1] = vdat[i+1];
-                    long oldId2 = secD[cSecIdx+2]; secD[cSecIdx+2] = vdat[i+2];
-                    long oldId3 = secD[cSecIdx+3]; secD[cSecIdx+3] = vdat[i+3];
+                    long oldId0 = secD.getAtIndex(ValueLayout.JAVA_LONG, cSecIdx+0);
+                    secD.setAtIndex(ValueLayout.JAVA_LONG, cSecIdx+0, vdat[i+0]);
+                    long oldId1 = secD.getAtIndex(ValueLayout.JAVA_LONG, cSecIdx+1);
+                    secD.setAtIndex(ValueLayout.JAVA_LONG, cSecIdx+1, vdat[i+1]);
+                    long oldId2 = secD.getAtIndex(ValueLayout.JAVA_LONG, cSecIdx+2);
+                    secD.setAtIndex(ValueLayout.JAVA_LONG, cSecIdx+2, vdat[i+2]);
+                    long oldId3 = secD.getAtIndex(ValueLayout.JAVA_LONG, cSecIdx+3);
+                    secD.setAtIndex(ValueLayout.JAVA_LONG, cSecIdx+3, vdat[i+3]);
 
                     airCount += Mapper.isAir(oldId0)?1:0; didStateChange |= vdat[i+0] != oldId0;
                     airCount += Mapper.isAir(oldId1)?1:0; didStateChange |= vdat[i+1] != oldId1;
@@ -145,9 +151,9 @@ public class WorldUpdater {
                     int cSecIdx = secIdx + baseSec;
                     secIdx = (secIdx + iSecMsk1) & secMsk;
                     long newId = vdat[i];
-                    long oldId = secD[cSecIdx];
+                    long oldId = secD.getAtIndex(ValueLayout.JAVA_LONG, cSecIdx);
                     didStateChange |= newId != oldId;
-                    secD[cSecIdx] = newId;
+                    secD.setAtIndex(ValueLayout.JAVA_LONG, cSecIdx, newId);
                 }
             }
         }

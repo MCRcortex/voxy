@@ -7,6 +7,8 @@ import me.cortex.voxy.common.util.ThreadLocalMemoryBuffer;
 import me.cortex.voxy.common.world.other.Mapper;
 import org.lwjgl.system.MemoryUtil;
 
+import java.lang.foreign.ValueLayout;
+
 public class SaveLoadSystem3 {
     public static final int STORAGE_VERSION = 0;
 
@@ -38,6 +40,7 @@ public class SaveLoadSystem3 {
     public static MemoryBuffer serialize(WorldSection section) {
         var cache = CACHE.get();
         var data = section.data;
+        var dataLength = section.dataLength;
 
         Long2ShortOpenHashMap LUT = cache.lutMapCache; LUT.clear();
 
@@ -48,9 +51,10 @@ public class SaveLoadSystem3 {
         long metadataPtr = ptr; ptr += 8;
 
         long blockPtr = ptr; ptr += WorldSection.SECTION_VOLUME*2;
-        long prev = data[0]; MemoryUtil.memPutLong(ptr, prev); ptr+=8; LUT.put(prev, (short) 0);
+        long prev = data.getAtIndex(ValueLayout.JAVA_LONG, 0); MemoryUtil.memPutLong(ptr, prev); ptr+=8; LUT.put(prev, (short) 0);
         short mapping = 0;
-        for (long block : data) {
+        for (int i = 0; i < dataLength; i++) {
+            long block = data.getAtIndex(ValueLayout.JAVA_LONG, i);
             if (prev != block) {
                 prev = block;
                 mapping = LUT.putIfAbsent(block, (short) LUT.size());
@@ -92,13 +96,16 @@ public class SaveLoadSystem3 {
         final long lutBasePtr = ptr + WorldSection.SECTION_VOLUME * 2;
 
         final var blockData = section.data;
+        final var blockDataLength = section.dataLength;
         for (int i = 0; i < WorldSection.SECTION_VOLUME; i++) {
-            blockData[i] = MemoryUtil.memGetLong(lutBasePtr + Short.toUnsignedLong(MemoryUtil.memGetShort(ptr)) * 8L);ptr += 2;
+            blockData.setAtIndex(ValueLayout.JAVA_LONG, i, MemoryUtil.memGetLong(lutBasePtr + Short.toUnsignedLong(MemoryUtil.memGetShort(ptr)) * 8L));
+            ptr += 2;
         }
 
         if (section.lvl == 0) {
             int emptyBlockCount = 0;
-            for (long block : blockData) {
+            for (int i = 0; i < blockDataLength; i++) {
+                long block = blockData.getAtIndex(ValueLayout.JAVA_LONG, i);
                 emptyBlockCount += Mapper.isAir(block) ? 1 : 0;
             }
             section.nonEmptyBlockCount = WorldSection.SECTION_VOLUME-emptyBlockCount;

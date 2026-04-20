@@ -11,6 +11,8 @@ import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.util.List;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -107,7 +109,12 @@ public class RenderGenerationService {
     private void computeAndRequestRequiredModels(IntOpenHashSet seenMissedIds, WorldSection section) {
         //Know this is... very much not safe, however it reduces allocation rates and other garbage, am sure its "fine"
         final var factory = this.modelBakery.factory;
-        for (long state : section._unsafeGetRawDataArray()) {
+
+        MemorySegment data = section._unsafeGetRawDataArray();
+        int dataLength = section._unsafeGetRawDataArrayLength();
+
+        for (int i = 0; i < dataLength; i++) {
+            long state = data.getAtIndex(ValueLayout.JAVA_LONG, i);
             int block = Mapper.getBlockId(state);
             if (block != 0 && !factory.hasModelForBlockId(block)) {
                 if (seenMissedIds.add(block)) {

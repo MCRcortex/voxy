@@ -6,9 +6,9 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.other.Mapper;
 import org.jetbrains.annotations.Nullable;
 
+import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.StampedLock;
 
@@ -66,10 +66,18 @@ public class ActiveSectionTracker {
     }
 
     public WorldSection acquire(int lvl, int x, int y, int z, boolean nullOnEmpty) {
-        return this.acquire(WorldEngine.getWorldSectionId(lvl, x, y, z), nullOnEmpty);
+        return this.acquire(lvl, x, y, z, nullOnEmpty, WorldSection.DEFAULT_ALLOCATOR);
+    }
+
+    public WorldSection acquire(int lvl, int x, int y, int z, boolean nullOnEmpty, WorldSection.Allocator allocator) {
+        return this.acquire(WorldEngine.getWorldSectionId(lvl, x, y, z), nullOnEmpty, allocator);
     }
 
     public WorldSection acquire(long key, boolean nullOnEmpty) {
+        return this.acquire(key, nullOnEmpty, WorldSection.DEFAULT_ALLOCATOR);
+    }
+
+    public WorldSection acquire(long key, boolean nullOnEmpty, WorldSection.Allocator allocator) {
         //TODO: add optional verification check to ensure this (or other critical systems) arnt being called on the render or server thread
         if (this.engine != null) this.engine.lastActiveTime = System.currentTimeMillis();
         int index = this.getCacheArrayIndex(key);
@@ -142,7 +150,7 @@ public class ActiveSectionTracker {
                         WorldEngine.getX(key),
                         WorldEngine.getY(key),
                         WorldEngine.getZ(key),
-                        this);
+                        this, allocator);
 
                 status = this.loader.load(section);
 
@@ -158,7 +166,12 @@ public class ActiveSectionTracker {
                     //We need to set the data to air as it is undefined state
                     int sky = 15;
                     int block = 0;
-                    Arrays.fill(section.data, Mapper.composeMappingId((byte) (sky|(block<<4)),0,0));
+
+                    long id = Mapper.composeMappingId((byte) (sky|(block<<4)),0,0);
+
+                    for (int i = 0; i < section.dataLength; i++) {
+                        section.data.setAtIndex(ValueLayout.JAVA_LONG, i, id);
+                    }
                 }
                 section.acquire(1);
             }

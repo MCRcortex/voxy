@@ -13,6 +13,8 @@ import me.cortex.voxy.common.world.other.Mapper;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import org.lwjgl.system.MemoryUtil;
 
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.util.Arrays;
 
 
@@ -213,7 +215,7 @@ public class RenderDataFactory {
         return quadData;
     }
 
-    private int prepareSectionData(final long[] rawSectionData) {
+    private int prepareSectionData(final MemorySegment rawSectionData) {
         final var sectionData = this.sectionData;
         final var rawModelIds = this.modelMan._unsafeRawAccess();
         long opaque = 0;
@@ -225,7 +227,7 @@ public class RenderDataFactory {
         int i = 0;
         for (int q = 0; q < 512; q++) {
             for (int j = 0; j < 64; i++, j++) {
-                long block = rawSectionData[i];//Get the block mapping
+                long block = rawSectionData.getAtIndex(ValueLayout.JAVA_LONG, i);//Get the block mapping
                 if (Mapper.isAir(block)) {//If it is air, just emit lighting
                     sectionData[i * 2] = (block & (0xFFL << 56)) >>> 1;
                     sectionData[i * 2 + 1] = 0;
@@ -297,7 +299,8 @@ public class RenderDataFactory {
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
-                this.neighboringFaces[i] = raw[(i<<5)+31];//pull the +x faces from the section
+                //pull the +x faces from the section
+                this.neighboringFaces[i] = raw.getAtIndex(ValueLayout.JAVA_LONG, (i<<5)+31);
             }
             sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
@@ -306,7 +309,8 @@ public class RenderDataFactory {
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
-                this.neighboringFaces[i+32*32] = raw[(i<<5)];//pull the -x faces from the section
+                //pull the -x faces from the section
+                this.neighboringFaces[i+32*32] = raw.getAtIndex(ValueLayout.JAVA_LONG, (i<<5));
             }
             sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
@@ -316,7 +320,8 @@ public class RenderDataFactory {
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
-                this.neighboringFaces[i+32*32*2] = raw[i|(0x1F<<10)];//pull the +y faces from the section
+                //pull the +y faces from the section
+                this.neighboringFaces[i+32*32*2] = raw.getAtIndex(ValueLayout.JAVA_LONG, i|(0x1F<<10));
             }
             sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
@@ -325,7 +330,8 @@ public class RenderDataFactory {
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
-                this.neighboringFaces[i+32*32*3] = raw[i];//pull the -y faces from the section
+                //pull the -y faces from the section
+                this.neighboringFaces[i+32*32*3] = raw.getAtIndex(ValueLayout.JAVA_LONG, i);
             }
             sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
@@ -335,7 +341,8 @@ public class RenderDataFactory {
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
-                this.neighboringFaces[i+32*32*4] = raw[Integer.expand(i,0b11111_00000_11111)|(0x1F<<5)];//pull the +z faces from the section
+                //pull the +z faces from the section
+                this.neighboringFaces[i+32*32*4] = raw.getAtIndex(ValueLayout.JAVA_LONG, Integer.expand(i,0b11111_00000_11111)|(0x1F<<5));
             }
             sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }
@@ -344,7 +351,8 @@ public class RenderDataFactory {
             //Note this is not thread safe! (but eh, fk it)
             var raw = sec._unsafeGetRawDataArray();
             for (int i = 0; i < 32*32; i++) {
-                this.neighboringFaces[i+32*32*5] = raw[Integer.expand(i,0b11111_00000_11111)];//pull the -z faces from the section
+                //pull the -z faces from the section
+                this.neighboringFaces[i+32*32*5] = raw.getAtIndex(ValueLayout.JAVA_LONG, Integer.expand(i,0b11111_00000_11111));
             }
             sec.release(WorldSection.RELEASE_HINT_POSSIBLE_REUSE);
         }

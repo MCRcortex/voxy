@@ -3,9 +3,10 @@ package me.cortex.voxy.common.world;
 
 import me.cortex.voxy.commonImpl.VoxyCommon;
 
+import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
-import java.util.Arrays;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -34,13 +35,37 @@ public final class WorldSection {
         }
     }
 
+    public static final Allocator DEFAULT_ALLOCATOR = new Allocator() {
+        //TODO: should make it dynamically adjust the size allowance based on memory pressure/WorldSection allocation rate (e.g. is it doing a world import)
+        private static final int ARRAY_REUSE_CACHE_SIZE = 400;//500;//32*32*32*8*ARRAY_REUSE_CACHE_SIZE == number of bytes
+        //TODO: maybe just swap this to a ConcurrentLinkedDeque
+        private static final AtomicInteger ARRAY_REUSE_CACHE_COUNT = new AtomicInteger(0);
+        private static final ConcurrentLinkedDeque<long[]> ARRAY_REUSE_CACHE = new ConcurrentLinkedDeque<>();
 
-    //TODO: should make it dynamically adjust the size allowance based on memory pressure/WorldSection allocation rate (e.g. is it doing a world import)
-    private static final int ARRAY_REUSE_CACHE_SIZE = 400;//500;//32*32*32*8*ARRAY_REUSE_CACHE_SIZE == number of bytes
-    //TODO: maybe just swap this to a ConcurrentLinkedDeque
-    private static final AtomicInteger ARRAY_REUSE_CACHE_COUNT = new AtomicInteger(0);
-    private static final ConcurrentLinkedDeque<long[]> ARRAY_REUSE_CACHE = new ConcurrentLinkedDeque<>();
+        @Override
+        public MemorySegment allocate(int size) {
+            // TODO: this is subtly incorrect as a general allocator, the polled array might not be of the size we need
+            long[] data = ARRAY_REUSE_CACHE.poll();
 
+            if (data == null) {
+                data = new long[size];
+            } else {
+                ARRAY_REUSE_CACHE_COUNT.decrementAndGet();
+            }
+
+            return MemorySegment.ofArray(data);
+        }
+
+        @Override
+        public void release(MemorySegment segment) {
+            long[] data = (long[])segment.heapBase().orElseThrow();
+
+            if (ARRAY_REUSE_CACHE_COUNT.get() < ARRAY_REUSE_CACHE_SIZE) {
+                ARRAY_REUSE_CACHE.add(data);
+                ARRAY_REUSE_CACHE_COUNT.incrementAndGet();
+            }
+        }
+    };
 
     public final int lvl;
     public final int x;
@@ -51,7 +76,8 @@ public final class WorldSection {
 
     //Serialized states
     long metadata;
-    long[] data = null;
+    MemorySegment data = null;
+    final int dataLength;
     volatile int nonEmptyBlockCount = 0;//Note: only needed for level 0 sections
     volatile byte nonEmptyChildren;
 
@@ -59,32 +85,35 @@ public final class WorldSection {
     volatile boolean inSaveQueue;
     volatile boolean isDirty;
 
+    final Allocator allocator;
+
     //When the first bit is set it means its loaded
     @SuppressWarnings("all")
     private volatile int atomicState = 1;
 
-    WorldSection(int lvl, int x, int y, int z, ActiveSectionTracker tracker) {
+    WorldSection(int lvl, int x, int y, int z, ActiveSectionTracker tracker, Allocator allocator) {
         this.lvl = lvl;
         this.x = x;
         this.y = y;
         this.z = z;
         this.key = WorldEngine.getWorldSectionId(lvl, x, y, z);
         this.tracker = tracker;
+        this.allocator = allocator;
 
-        this.data = ARRAY_REUSE_CACHE.poll();
-        if (this.data == null) {
-            this.data = new long[32 * 32 * 32];
-        } else {
-            ARRAY_REUSE_CACHE_COUNT.decrementAndGet();
-        }
+        this.dataLength = 32 * 32 * 32;
+        this.data = this.allocator.allocate(this.dataLength);
     }
 
     void primeForReuse() {
         ATOMIC_STATE_HANDLE.set(this, 1);
     }
 
-    public long[] _unsafeGetRawDataArray() {
+    public MemorySegment _unsafeGetRawDataArray() {
         return this.data;
+    }
+
+    public int _unsafeGetRawDataArrayLength() {
+        return this.dataLength;
     }
 
     @Override
@@ -180,10 +209,8 @@ public final class WorldSection {
         if (VERIFY_WORLD_SECTION_EXECUTION && this.data == null) {
             throw new IllegalStateException();
         }
-        if (ARRAY_REUSE_CACHE_COUNT.get() < ARRAY_REUSE_CACHE_SIZE) {
-            ARRAY_REUSE_CACHE.add(this.data);
-            ARRAY_REUSE_CACHE_COUNT.incrementAndGet();
-        }
+
+        this.allocator.release(this.data);
         this.data = null;
     }
 
@@ -209,15 +236,15 @@ public final class WorldSection {
     public long set(int x, int y, int z, long id) {
         //TODO: this needs to update the block counts
         int idx = getIndex(x,y,z);
-        long old = this.data[idx];
-        this.data[idx] = id;
+        long old = this.data.getAtIndex(ValueLayout.JAVA_LONG, idx);
+        this.data.setAtIndex(ValueLayout.JAVA_LONG, idx, id);
         return old;
     }
 
     //Generates a copy of the data array, this is to help with atomic operations like rendering
     public long[] copyData() {
         this.assertNotFree();
-        return Arrays.copyOf(this.data, this.data.length);
+        return this.data.toArray(ValueLayout.JAVA_LONG);
     }
 
     public void copyDataTo(long[] cache) {
@@ -226,8 +253,8 @@ public final class WorldSection {
 
     public void copyDataTo(long[] cache, int dstOffset) {
         this.assertNotFree();
-        if ((cache.length-dstOffset) < this.data.length) throw new IllegalArgumentException();
-        System.arraycopy(this.data, 0, cache, dstOffset, this.data.length);
+        if ((cache.length-dstOffset) < this.dataLength) throw new IllegalArgumentException();
+        MemorySegment.copy(this.data, ValueLayout.JAVA_LONG, 0, cache, dstOffset, dataLength);
     }
 
     public static int getChildIndex(int x, int y, int z) {
@@ -285,7 +312,7 @@ public final class WorldSection {
     }
 
     public static WorldSection _createRawUntrackedUnsafeSection(int lvl, int x, int y, int z) {
-        return new WorldSection(lvl, x, y, z, null);
+        return new WorldSection(lvl, x, y, z, null, DEFAULT_ALLOCATOR);
     }
 
     public void markDirty() {
@@ -309,4 +336,10 @@ public final class WorldSection {
     public boolean isFreed() {
         return (((int)ATOMIC_STATE_HANDLE.get(this))&1)==0;
     }
+
+    public interface Allocator {
+        MemorySegment allocate(int size);
+        void release(MemorySegment segment);
+    }
+
 }
