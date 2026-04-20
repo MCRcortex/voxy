@@ -4,10 +4,10 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.IGpuVertexArray;
 import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import org.joml.Matrix4f;
@@ -39,7 +39,7 @@ public class BudgetBufferRenderer {
     }
 
     private static final int STRIDE = 24;
-    private static final GlVertexArray VA = new GlVertexArray()
+    private static final IGpuVertexArray VA = RenderBackendFactory.get().createVertexArray()
             .setStride(STRIDE)
             .setF(0, GL_FLOAT, 4, 0)//pos, metadata
             .setF(1, GL_FLOAT, 2, 4 * 4)//UV

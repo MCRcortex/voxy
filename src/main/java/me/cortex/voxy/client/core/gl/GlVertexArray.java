@@ -41,6 +41,7 @@ public class GlVertexArray extends TrackedObject implements me.cortex.voxy.clien
         glDeleteVertexArrays(this.id);
     }
 
+    @Override
     public void bind() {
         glBindVertexArray(this.id);
     }

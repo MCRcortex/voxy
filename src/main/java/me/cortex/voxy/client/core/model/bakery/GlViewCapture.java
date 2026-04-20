@@ -19,6 +19,18 @@ import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.opengl.GL43.*;
 import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfi;
 
+/**
+ * Model texture bakery capture target — OpenGL-only.
+ *
+ * Although resources (framebuffer, textures) are created via the GPU abstraction,
+ * this class issues direct OpenGL DSA calls (glClearNamedFramebufferfi,
+ * glBindBufferRange, glDispatchCompute, glMemoryBarrier) that are not portable
+ * to Metal. A parallel MetalViewCapture implementation with blit/compute
+ * encoders would be required for the Metal backend.
+ *
+ * For now, callers on the Metal backend must use an alternative path or stub
+ * this subsystem out.
+ */
 public class GlViewCapture {
     private final int width;
     private final int height;
