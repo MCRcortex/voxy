@@ -1,9 +1,9 @@
 package me.cortex.voxy.client.core.rendering.util;
 
 import me.cortex.voxy.client.core.gl.GLCompat;
-import me.cortex.voxy.client.core.gl.GlFramebuffer;
-import me.cortex.voxy.client.core.gl.GlTexture;
-import org.lwjgl.opengl.GL30C;
+import me.cortex.voxy.client.core.gpu.IGpuFramebuffer;
+import me.cortex.voxy.client.core.gpu.IGpuTexture;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 
 import static org.lwjgl.opengl.GL14.GL_DEPTH_COMPONENT24;
 import static org.lwjgl.opengl.GL30C.GL_DEPTH24_STENCIL8;
@@ -14,8 +14,8 @@ import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
 
 public class DepthFramebuffer {
     private final int depthType;
-    private GlTexture depthBuffer;
-    public final GlFramebuffer framebuffer = new GlFramebuffer();
+    private IGpuTexture depthBuffer;
+    public final IGpuFramebuffer framebuffer = RenderBackendFactory.get().createFramebuffer();
 
     public DepthFramebuffer() {
         this(GL_DEPTH_COMPONENT24);
@@ -30,7 +30,7 @@ public class DepthFramebuffer {
             if (this.depthBuffer != null) {
                 this.depthBuffer.free();
             }
-            this.depthBuffer = new GlTexture().store(this.depthType, 1, width, height);
+            this.depthBuffer = RenderBackendFactory.get().createTexture().store(this.depthType, 1, width, height);
             this.framebuffer.bind(this.getDepthAttachmentType(), this.depthBuffer).verify();
             return true;
         }
@@ -46,10 +46,10 @@ public class DepthFramebuffer {
     }
 
     public void clear(float depth) {
-        GLCompat.clearDepthFramebuffer(this.framebuffer.id, depth);
+        GLCompat.clearDepthFramebuffer(this.framebuffer.id(), depth);
     }
 
-    public GlTexture getDepthTex() {
+    public IGpuTexture getDepthTex() {
         return this.depthBuffer;
     }
 
@@ -61,7 +61,7 @@ public class DepthFramebuffer {
     }
 
     public void bind() {
-        glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id);
+        glBindFramebuffer(GL_FRAMEBUFFER, this.framebuffer.id());
     }
 
     public int getFormat() {

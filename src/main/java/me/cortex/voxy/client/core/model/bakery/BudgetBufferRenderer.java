@@ -4,10 +4,11 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryUtil;
@@ -26,15 +27,15 @@ public class BudgetBufferRenderer {
 
 
     public static void init(){}
-    private static final GlBuffer indexBuffer;
+    private static final IGpuBuffer indexBuffer;
     static {
         var i = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
         int id = ((com.mojang.blaze3d.opengl.GlBuffer) i.getBuffer(4096*3*2)).handle;
         if (i.type() != VertexFormat.IndexType.SHORT) {
             throw new IllegalStateException();
         }
-        indexBuffer = new GlBuffer(3*2*2*4096);
-        glCopyNamedBufferSubData(id, indexBuffer.id, 0, 0, 3*2*2*4096);
+        indexBuffer = RenderBackendFactory.get().createBuffer(3*2*2*4096);
+        glCopyNamedBufferSubData(id, indexBuffer.id(), 0, 0, 3*2*2*4096);
     }
 
     private static final int STRIDE = 24;
@@ -42,9 +43,9 @@ public class BudgetBufferRenderer {
             .setStride(STRIDE)
             .setF(0, GL_FLOAT, 4, 0)//pos, metadata
             .setF(1, GL_FLOAT, 2, 4 * 4)//UV
-            .bindElementBuffer(indexBuffer.id);
+            .bindElementBuffer(indexBuffer.id());
 
-    private static GlBuffer immediateBuffer;
+    private static IGpuBuffer immediateBuffer;
     private static int quadCount;
     public static void drawFast(MeshData buffer, GpuTexture tex, Matrix4f matrix) {
         if (buffer.drawState().mode() != VertexFormat.Mode.QUADS) {
@@ -75,8 +76,8 @@ public class BudgetBufferRenderer {
             if (immediateBuffer != null) {
                 immediateBuffer.free();
             }
-            immediateBuffer = new GlBuffer(size*2L);//This also accounts for when immediateBuffer == null
-            VA.bindBuffer(immediateBuffer.id);
+            immediateBuffer = RenderBackendFactory.get().createBuffer(size*2L);//This also accounts for when immediateBuffer == null
+            VA.bindBuffer(immediateBuffer.id());
         }
         long ptr = UploadStream.INSTANCE.upload(immediateBuffer, 0, size);
         MemoryUtil.memCopy(dataPtr, ptr, size);

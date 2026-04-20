@@ -1,7 +1,7 @@
 package me.cortex.voxy.client.core.model;
 
-import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.IGpuTexture;
 import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
@@ -22,13 +22,13 @@ public class ModelStore {
     public static final int MODEL_SIZE = 64;
     final IGpuBuffer modelBuffer;
     final IGpuBuffer modelColourBuffer;
-    final GlTexture textures;
+    final IGpuTexture textures;
     public final int blockSampler = glGenSamplers();
 
     public ModelStore() {
         this.modelBuffer = RenderBackendFactory.get().createBuffer(MODEL_SIZE * (1<<16));
         this.modelColourBuffer = RenderBackendFactory.get().createBuffer(4 * (1<<16));
-        this.textures = new GlTexture().store(GL_RGBA8, Integer.numberOfTrailingZeros(ModelFactory.MODEL_TEXTURE_SIZE), ModelFactory.MODEL_TEXTURE_SIZE*3*256,ModelFactory.MODEL_TEXTURE_SIZE*2*256).name("ModelTextures");
+        this.textures = RenderBackendFactory.get().createTexture().store(GL_RGBA8, Integer.numberOfTrailingZeros(ModelFactory.MODEL_TEXTURE_SIZE), ModelFactory.MODEL_TEXTURE_SIZE*3*256,ModelFactory.MODEL_TEXTURE_SIZE*2*256).name("ModelTextures");
 
 
         //Limit the mips of the texture to match that of the terrain atlas
@@ -54,7 +54,7 @@ public class ModelStore {
     public void bind(int modelBindingIndex, int colourBindingIndex, int textureBindingIndex) {
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, modelBindingIndex, this.modelBuffer.id());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, colourBindingIndex, this.modelColourBuffer.id());
-        bindTextureUnit(textureBindingIndex, this.textures.id);
+        bindTextureUnit(textureBindingIndex, this.textures.id());
         glBindSampler(textureBindingIndex, this.blockSampler);
     }
 }

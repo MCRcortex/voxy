@@ -6,8 +6,6 @@ import me.cortex.voxy.client.TimingStatistics;
 import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.gl.Capabilities;
-import me.cortex.voxy.client.core.gl.GlBuffer;
-import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
 import me.cortex.voxy.client.core.rendering.ChunkBoundRenderer;
@@ -418,7 +416,8 @@ public class VoxyRenderSystem {
 
 
     public void addDebugInfo(List<String> debug) {
-        debug.add("Buf/Tex [#/Mb]: [" + GlBuffer.getCount() + "/" + (GlBuffer.getTotalSize()/1_000_000) + "],[" + GlTexture.getCount() + "/" + (GlTexture.getEstimatedTotalSize()/1_000_000)+"]");
+        var backend = me.cortex.voxy.client.core.gpu.RenderBackendFactory.get();
+        debug.add("Buf/Tex [#/Mb]: [" + backend.getBufferCount() + "/" + (backend.getBufferTotalSize()/1_000_000) + "],[" + backend.getTextureCount() + "/" + (backend.getTextureEstimatedTotalSize()/1_000_000)+"]");
         {
             this.modelService.addDebugData(debug);
             this.renderGen.addDebugData(debug);

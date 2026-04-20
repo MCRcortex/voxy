@@ -3,7 +3,6 @@ package me.cortex.voxy.client.core.rendering;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxy.client.core.AbstractRenderPipeline;
-import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
@@ -123,7 +122,7 @@ public class ChunkBoundRenderer {
             glDepthFunc(GL_GREATER);
         }
 
-        glBindVertexArray(GlVertexArray.STATIC_VAO);
+        glBindVertexArray(RenderBackendFactory.get().getStaticVAO());
         viewport.depthBoundingBuffer.bind();
         this.rasterShader.bind();
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BB_BYTE.id());

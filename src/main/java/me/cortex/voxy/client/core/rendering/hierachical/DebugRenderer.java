@@ -1,6 +1,5 @@
 package me.cortex.voxy.client.core.rendering.hierachical;
 
-import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.gl.shader.Shader;
@@ -68,7 +67,7 @@ public class DebugRenderer {
 
         glEnable(GL_DEPTH_TEST);
         this.debugShader.bind();
-        glBindVertexArray(GlVertexArray.STATIC_VAO);
+        glBindVertexArray(RenderBackendFactory.get().getStaticVAO());
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, this.drawBuffer.id());
         GL15.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BYTE.id());
         glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniformBuffer.id());

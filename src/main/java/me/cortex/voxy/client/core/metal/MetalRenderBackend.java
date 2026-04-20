@@ -260,6 +260,28 @@ public class MetalRenderBackend implements RenderBackend {
         return 0; // Metal doesn't use VAOs
     }
 
+    // --- Resource statistics ---
+
+    @Override
+    public int getBufferCount() {
+        return MetalBuffer.getCount();
+    }
+
+    @Override
+    public long getBufferTotalSize() {
+        return MetalBuffer.getTotalSize();
+    }
+
+    @Override
+    public int getTextureCount() {
+        return MetalTexture.getCount();
+    }
+
+    @Override
+    public long getTextureEstimatedTotalSize() {
+        return MetalTexture.getEstimatedTotalSize();
+    }
+
     // --- Metal-specific accessors ---
 
     public long getDevice() {

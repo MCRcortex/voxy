@@ -5,7 +5,6 @@ import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.core.AbstractRenderPipeline;
 import me.cortex.voxy.client.core.gl.Capabilities;
-import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.gl.shader.Shader;
@@ -162,7 +161,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.modelStore.bind(3, 4, 0);
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.positionScratchBuffer.id());
         LightMapHelper.bind(1);
-        bindTextureUnit(2, GL_TEXTURE_2D, viewport.depthBoundingBuffer.getDepthTex().id);
+        bindTextureUnit(2, GL_TEXTURE_2D, viewport.depthBoundingBuffer.getDepthTex().id());
 
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, viewport.drawCallBuffer.id());
@@ -176,7 +175,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
         this.terrainShader.bind();
-        glBindVertexArray(GlVertexArray.STATIC_VAO);//Needs to be before binding
+        glBindVertexArray(RenderBackendFactory.get().getStaticVAO());//Needs to be before binding
         this.pipeline.setupAndBindOpaque(viewport);
         this.bindRenderingBuffers(viewport);
 
@@ -225,7 +224,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
         this.translucentTerrainShader.bind();
-        glBindVertexArray(GlVertexArray.STATIC_VAO);//Needs to be before binding
+        glBindVertexArray(RenderBackendFactory.get().getStaticVAO());//Needs to be before binding
         this.pipeline.setupAndBindTranslucent(viewport);
         this.bindRenderingBuffers(viewport);
 
@@ -272,7 +271,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             if (Capabilities.INSTANCE.repFragTest) {
                 glEnable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
             }
-            glBindVertexArray(GlVertexArray.STATIC_VAO);
+            glBindVertexArray(RenderBackendFactory.get().getStaticVAO());
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getMetadataBuffer().id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.visibilityBuffer.id());

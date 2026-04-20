@@ -33,8 +33,17 @@ public final class RenderBackendFactory {
 
     private static RenderBackend createBackend() {
         if (shouldUseMetal()) {
-            Logger.info("Metal backend requested but not yet implemented, falling back to OpenGL");
-            // TODO: return new MetalRenderBackend(); when Metal implementation is ready
+            try {
+                // Only attempt Metal if the native library is available.
+                // This avoids hard-failing on macOS hosts without the libvoxy_metal.dylib.
+                if (me.cortex.voxy.client.core.metal.MetalNative.load()) {
+                    Logger.info("Using Metal render backend (Apple Silicon)");
+                    return new me.cortex.voxy.client.core.metal.MetalRenderBackend();
+                }
+                Logger.info("Metal native library not available, falling back to OpenGL");
+            } catch (Throwable t) {
+                Logger.error("Failed to initialize Metal backend, falling back to OpenGL: " + t.getMessage());
+            }
         }
         Logger.info("Using OpenGL render backend");
         // Lazy import to avoid class loading issues on platforms without OpenGL

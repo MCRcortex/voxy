@@ -217,7 +217,7 @@ public class ModelTextureBakery {
             glGetIntegerv(GL_VIEWPORT, viewdat);//TODO: faster way todo this, or just use main framebuffer resolution
 
             //Bind the capture framebuffer
-            glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
+            glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id());
 
             var tex = Minecraft.getInstance().getTextureManager().getTexture(Identifier.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png")).getTexture();
             blockTextureId = ((com.mojang.blaze3d.opengl.GlTexture)tex).glId();
@@ -329,7 +329,7 @@ public class ModelTextureBakery {
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT|GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         this.capture.emitToStream(streamBuffer, streamOffset);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id);
+        glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id());
         glClearDepth(1);
         glClear(GL_DEPTH_BUFFER_BIT);
         if (layer == ChunkSectionLayer.TRANSLUCENT) {

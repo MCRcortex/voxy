@@ -199,4 +199,24 @@ public class GlRenderBackend implements RenderBackend {
     public int getStaticVAO() {
         return GlVertexArray.STATIC_VAO;
     }
+
+    @Override
+    public int getBufferCount() {
+        return GlBuffer.getCount();
+    }
+
+    @Override
+    public long getBufferTotalSize() {
+        return GlBuffer.getTotalSize();
+    }
+
+    @Override
+    public int getTextureCount() {
+        return GlTexture.getCount();
+    }
+
+    @Override
+    public long getTextureEstimatedTotalSize() {
+        return GlTexture.getEstimatedTotalSize();
+    }
 }

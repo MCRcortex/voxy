@@ -1,10 +1,11 @@
 package me.cortex.voxy.client.core;
 
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.gl.GlFramebuffer;
-import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.gpu.IGpuFramebuffer;
+import me.cortex.voxy.client.core.gpu.IGpuTexture;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import me.cortex.voxy.client.core.rendering.hierachical.AsyncNodeManager;
 import me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser;
@@ -36,9 +37,9 @@ import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
 import static me.cortex.voxy.client.core.gl.GLCompat.textureParameterf;
 
 public class NormalRenderPipeline extends AbstractRenderPipeline {
-    private GlTexture colourTex;
-    private GlTexture colourSSAOTex;
-    private final GlFramebuffer fbSSAO = new GlFramebuffer();
+    private IGpuTexture colourTex;
+    private IGpuTexture colourSSAOTex;
+    private final IGpuFramebuffer fbSSAO = RenderBackendFactory.get().createFramebuffer();
 
     private final boolean useEnvFog;
     private final FullscreenBlit finalBlit;
@@ -63,23 +64,23 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             }
             this.fb.resize(viewport.width, viewport.height);
 
-            this.colourTex = new GlTexture().store(GL_RGBA8, 1, viewport.width, viewport.height);
-            this.colourSSAOTex = new GlTexture().store(GL_RGBA8, 1, viewport.width, viewport.height);
+            this.colourTex = RenderBackendFactory.get().createTexture().store(GL_RGBA8, 1, viewport.width, viewport.height);
+            this.colourSSAOTex = RenderBackendFactory.get().createTexture().store(GL_RGBA8, 1, viewport.width, viewport.height);
 
             this.fb.framebuffer.bind(GL_COLOR_ATTACHMENT0, this.colourTex).verify();
             this.fbSSAO.bind(this.fb.getDepthAttachmentType(), this.fb.getDepthTex()).bind(GL_COLOR_ATTACHMENT0, this.colourSSAOTex).verify();
 
 
-            textureParameterf(this.colourTex.id, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            textureParameterf(this.colourTex.id, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            textureParameterf(this.colourSSAOTex.id, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            textureParameterf(this.colourSSAOTex.id, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            textureParameterf(this.fb.getDepthTex().id, GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+            textureParameterf(this.colourTex.id(), GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            textureParameterf(this.colourTex.id(), GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            textureParameterf(this.colourSSAOTex.id(), GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            textureParameterf(this.colourSSAOTex.id(), GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            textureParameterf(this.fb.getDepthTex().id(), GL_TEXTURE_2D, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
         }
 
-        this.initDepthStencil(sourceFB, this.fb.framebuffer.id, viewport.width, viewport.height, viewport.width, viewport.height);
+        this.initDepthStencil(sourceFB, this.fb.framebuffer.id(), viewport.width, viewport.height, viewport.width, viewport.height);
 
-        return this.fb.getDepthTex().id;
+        return this.fb.getDepthTex().id();
     }
 
     @Override
@@ -94,13 +95,13 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
         }
 
 
-        glBindImageTexture(0, this.colourSSAOTex.id, 0, false,0, GL_READ_WRITE, GL_RGBA8);
-        bindTextureUnit(1, GL_TEXTURE_2D, this.fb.getDepthTex().id);
-        bindTextureUnit(2, GL_TEXTURE_2D, this.colourTex.id);
+        glBindImageTexture(0, this.colourSSAOTex.id(), 0, false,0, GL_READ_WRITE, GL_RGBA8);
+        bindTextureUnit(1, GL_TEXTURE_2D, this.fb.getDepthTex().id());
+        bindTextureUnit(2, GL_TEXTURE_2D, this.colourTex.id());
 
         glDispatchCompute((viewport.width+31)/32, (viewport.height+31)/32, 1);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, this.fbSSAO.id);
+        glBindFramebuffer(GL_FRAMEBUFFER, this.fbSSAO.id());
     }
 
     @Override
@@ -122,13 +123,13 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
             }
         }
 
-        bindTextureUnit(3, GL_TEXTURE_2D, this.colourSSAOTex.id);
+        bindTextureUnit(3, GL_TEXTURE_2D, this.colourSSAOTex.id());
 
         //Do alpha blending
 
         glEnable(GL_BLEND);
         glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        AbstractRenderPipeline.transformBlitDepth(this.finalBlit, this.fb.getDepthTex().id, sourceFrameBuffer, viewport, new Matrix4f(viewport.vanillaProjection).mul(viewport.modelView));
+        AbstractRenderPipeline.transformBlitDepth(this.finalBlit, this.fb.getDepthTex().id(), sourceFrameBuffer, viewport, new Matrix4f(viewport.vanillaProjection).mul(viewport.modelView));
         glDisable(GL_BLEND);
         //glBlitNamedFramebuffer(this.fbSSAO.id, sourceFrameBuffer, 0,0, viewport.width, viewport.height, 0,0, viewport.width, viewport.height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
@@ -140,7 +141,7 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
 
     @Override
     public void setupAndBindTranslucent(Viewport<?> viewport) {
-        glBindFramebuffer(GL_FRAMEBUFFER, this.fbSSAO.id);
+        glBindFramebuffer(GL_FRAMEBUFFER, this.fbSSAO.id());
     }
 
     @Override

@@ -1,9 +1,10 @@
 package me.cortex.voxy.client.core.model.bakery;
 
-import me.cortex.voxy.client.core.gl.GlFramebuffer;
-import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.gpu.IGpuFramebuffer;
+import me.cortex.voxy.client.core.gpu.IGpuTexture;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
@@ -21,33 +22,33 @@ import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfi;
 public class GlViewCapture {
     private final int width;
     private final int height;
-    private final GlTexture colourTex;
-    private final GlTexture depthTex;
-    private final GlTexture stencilTex;
-    private final GlTexture metaTex;
-    final GlFramebuffer framebuffer;
+    private final IGpuTexture colourTex;
+    private final IGpuTexture depthTex;
+    private final IGpuTexture stencilTex;
+    private final IGpuTexture metaTex;
+    final IGpuFramebuffer framebuffer;
     private final Shader copyOutShader;
 
     public GlViewCapture(int width, int height) {
         this.width = width;
         this.height = height;
-        this.metaTex = new GlTexture().store(GL_R32UI, 1, width*3, height*2).name("ModelBakeryMetadata");
-        this.colourTex = new GlTexture().store(GL_RGBA8, 1, width*3, height*2).name("ModelBakeryColour");
-        this.depthTex = new GlTexture().store(GL_DEPTH24_STENCIL8, 1, width*3, height*2).name("ModelBakeryDepth");
+        this.metaTex = RenderBackendFactory.get().createTexture().store(GL_R32UI, 1, width*3, height*2).name("ModelBakeryMetadata");
+        this.colourTex = RenderBackendFactory.get().createTexture().store(GL_RGBA8, 1, width*3, height*2).name("ModelBakeryColour");
+        this.depthTex = RenderBackendFactory.get().createTexture().store(GL_DEPTH24_STENCIL8, 1, width*3, height*2).name("ModelBakeryDepth");
         //TODO: FIXME: Mesa is broken when trying to read from a sampler of GL_STENCIL_INDEX
         // it seems to just ignore the value set in GL_DEPTH_STENCIL_TEXTURE_MODE
-        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.depthTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.depthTex.id(), GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
         this.stencilTex = this.depthTex.createView();
-        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.depthTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.depthTex.id(), GL_DEPTH_STENCIL_TEXTURE_MODE, GL_DEPTH_COMPONENT);
 
-        this.framebuffer = new GlFramebuffer().bind(GL_COLOR_ATTACHMENT0, this.colourTex).bind(GL_COLOR_ATTACHMENT1, this.metaTex).setDrawBuffers(GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1).bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthTex).verify().name("ModelFramebuffer");
+        this.framebuffer = RenderBackendFactory.get().createFramebuffer().bind(GL_COLOR_ATTACHMENT0, this.colourTex).bind(GL_COLOR_ATTACHMENT1, this.metaTex).setDrawBuffers(GL_COLOR_ATTACHMENT0,GL_COLOR_ATTACHMENT1).bind(GL_DEPTH_STENCIL_ATTACHMENT, this.depthTex).verify().name("ModelFramebuffer");
 
-        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.stencilTex.id, GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
-        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.stencilTex.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.stencilTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.stencilTex.id(), GL_DEPTH_STENCIL_TEXTURE_MODE, GL_STENCIL_INDEX);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.stencilTex.id(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.stencilTex.id(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.metaTex.id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.metaTex.id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.metaTex.id(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        me.cortex.voxy.client.core.gl.GLCompat.textureParameteri(this.metaTex.id(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
         this.copyOutShader = Shader.makeAuto()
                 .define("WIDTH", width)
@@ -79,12 +80,12 @@ public class GlViewCapture {
             long ptr = stack.nmalloc(4*4);
             MemoryUtil.memPutLong(ptr, 0);
             MemoryUtil.memPutLong(ptr+8, 0);
-            nglClearNamedFramebufferfv(this.framebuffer.id, GL_COLOR, 0, ptr);
-            nglClearNamedFramebufferuiv(this.framebuffer.id, GL_COLOR, 1, ptr);
+            nglClearNamedFramebufferfv(this.framebuffer.id(), GL_COLOR, 0, ptr);
+            nglClearNamedFramebufferuiv(this.framebuffer.id(), GL_COLOR, 1, ptr);
             //TODO: fix the draw buffer thing maybe? it might need todo multiple clears
-            //nglClearNamedFramebufferfv(this.framebuffer.id, GL_COLOR, 0, ptr);
+            //nglClearNamedFramebufferfv(this.framebuffer.id(), GL_COLOR, 0, ptr);
         }
-        glClearNamedFramebufferfi(this.framebuffer.id, GL_DEPTH_STENCIL, 0, 1.0f, 0);
+        glClearNamedFramebufferfi(this.framebuffer.id(), GL_DEPTH_STENCIL, 0, 1.0f, 0);
     }
 
     public void free() {

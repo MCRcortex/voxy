@@ -1,11 +1,11 @@
 package me.cortex.voxy.client.core.rendering.util;
 
 import me.cortex.voxy.client.core.gl.GLCompat;
-import me.cortex.voxy.client.core.gl.GlFramebuffer;
-import me.cortex.voxy.client.core.gl.GlTexture;
-import me.cortex.voxy.client.core.gl.GlVertexArray;
 import me.cortex.voxy.client.core.gl.shader.Shader;
 import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.gpu.IGpuFramebuffer;
+import me.cortex.voxy.client.core.gpu.IGpuTexture;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import org.lwjgl.opengl.GL11;
 
 import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_TEXTURE_FETCH_BARRIER_BIT;
@@ -29,10 +29,10 @@ public class HiZBuffer2 {
             .add(ShaderType.FRAGMENT, "voxy:hiz/blit.fsh")
             .define("OUTPUT_COLOUR")
             .compile();
-    private final GlFramebuffer fb = new GlFramebuffer().name("HiZ");
+    private final IGpuFramebuffer fb = RenderBackendFactory.get().createFramebuffer().name("HiZ");
     private final int sampler = glGenSamplers();
     private final int type;
-    private GlTexture texture;
+    private IGpuTexture texture;
     private int levels;
     private int width;
     private int height;
@@ -41,7 +41,7 @@ public class HiZBuffer2 {
         this(GL_R32F);
     }
     public HiZBuffer2(int type) {
-        GLCompat.framebufferDrawBuffers(this.fb.id, GL_COLOR_ATTACHMENT0);
+        GLCompat.framebufferDrawBuffers(this.fb.id(), GL_COLOR_ATTACHMENT0);
         this.type = type;
     }
 
@@ -52,12 +52,12 @@ public class HiZBuffer2 {
         // (could probably increase it to be defined by a max meshlet coverage computation thing)
 
         //GL_DEPTH_COMPONENT32F //Cant use this as it does not match the depth format of the provided depth buffer
-        this.texture = new GlTexture().store(this.type, this.levels, width, height).name("HiZ");
-        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        textureParameteri(this.texture.id, GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        this.texture = RenderBackendFactory.get().createTexture().store(this.type, this.levels, width, height).name("HiZ");
+        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         glSamplerParameteri(this.sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
         glSamplerParameteri(this.sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -84,9 +84,9 @@ public class HiZBuffer2 {
         {//Mip down to initial chain
             int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
 
-            glBindVertexArray(GlVertexArray.STATIC_VAO);
+            glBindVertexArray(RenderBackendFactory.get().getStaticVAO());
             this.hizInitial.bind();
-            glBindFramebuffer(GL_FRAMEBUFFER, this.fb.id);
+            glBindFramebuffer(GL_FRAMEBUFFER, this.fb.id());
 
             glDisable(GL_DEPTH_TEST);
 
@@ -110,10 +110,10 @@ public class HiZBuffer2 {
             this.hizMip.bind();
 
             glUniform2f(0, 1f/this.width, 1f/this.height);
-            bindTextureUnit(0, GL_TEXTURE_2D, this.texture.id);
+            bindTextureUnit(0, GL_TEXTURE_2D, this.texture.id());
             glBindSampler(0, this.sampler);
             for (int i = 1; i < 7; i++) {
-                glBindImageTexture(i, this.texture.id, i, false, 0, GL_WRITE_ONLY, GL_R32F);
+                glBindImageTexture(i, this.texture.id(), i, false, 0, GL_WRITE_ONLY, GL_R32F);
             }
 
             glDispatchCompute(this.width/64, this.height/64, 1);
@@ -139,7 +139,7 @@ public class HiZBuffer2 {
     }
 
     public int getHizTextureId() {
-        return this.texture.id;
+        return this.texture.id();
     }
 
     public int getPackedLevels() {

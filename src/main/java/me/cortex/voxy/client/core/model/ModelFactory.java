@@ -6,7 +6,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
 import me.cortex.voxy.client.core.gl.Capabilities;
-import me.cortex.voxy.client.core.gl.GlTexture;
+import me.cortex.voxy.client.core.gpu.IGpuTexture;
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.model.bakery.ModelTextureBakery;
 import me.cortex.voxy.client.core.rendering.util.RawDownloadStream;
@@ -311,7 +311,7 @@ public class ModelFactory {
             this.upload(store.modelBuffer, store.modelColourBuffer, store.textures);
         }
 
-        public void upload(IGpuBuffer modelBuffer, IGpuBuffer colourBuffer, GlTexture atlas) {//Uploads and resets for reuse
+        public void upload(IGpuBuffer modelBuffer, IGpuBuffer colourBuffer, IGpuTexture atlas) {//Uploads and resets for reuse
             this.model.cpyTo(UploadStream.INSTANCE.upload(modelBuffer, (long) this.modelId * MODEL_SIZE, MODEL_SIZE));
             if (this.biomeUploadIndex != -1) {
                 this.biomeUpload.cpyTo(UploadStream.INSTANCE.upload(colourBuffer, this.biomeUploadIndex * 4L, this.biomeUpload.size));
@@ -325,7 +325,7 @@ public class ModelFactory {
 
             long cAddr = this.texture.address;
             for (int lvl = 0; lvl < LAYERS; lvl++) {
-                textureSubImage2D(atlas.id, GL_TEXTURE_2D, lvl, X >> lvl, Y >> lvl, (MODEL_TEXTURE_SIZE*3) >> lvl, (MODEL_TEXTURE_SIZE*2) >> lvl, GL_RGBA, GL_UNSIGNED_BYTE, cAddr);
+                textureSubImage2D(atlas.id(), GL_TEXTURE_2D, lvl, X >> lvl, Y >> lvl, (MODEL_TEXTURE_SIZE*3) >> lvl, (MODEL_TEXTURE_SIZE*2) >> lvl, GL_RGBA, GL_UNSIGNED_BYTE, cAddr);
                 cAddr += (MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*3*2*4)>>(lvl<<1);
             }
 

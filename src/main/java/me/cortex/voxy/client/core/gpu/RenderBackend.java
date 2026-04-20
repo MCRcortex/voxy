@@ -75,4 +75,11 @@ public interface RenderBackend {
     // --- Static Vertex Array ---
 
     int getStaticVAO();
+
+    // --- Resource statistics (for debug/F3 display) ---
+
+    int getBufferCount();
+    long getBufferTotalSize();
+    int getTextureCount();
+    long getTextureEstimatedTotalSize();
 }
