@@ -43,7 +43,7 @@ public final class WorldSection {
         private static final ConcurrentLinkedDeque<long[]> ARRAY_REUSE_CACHE = new ConcurrentLinkedDeque<>();
 
         @Override
-        public MemorySegment allocate(int size) {
+        public MemorySegment allocate(int lvl, int x, int y, int z, int size) {
             // TODO: this is subtly incorrect as a general allocator, the polled array might not be of the size we need
             long[] data = ARRAY_REUSE_CACHE.poll();
 
@@ -101,7 +101,7 @@ public final class WorldSection {
         this.allocator = allocator;
 
         this.dataLength = 32 * 32 * 32;
-        this.data = this.allocator.allocate(this.dataLength);
+        this.data = this.allocator.allocate(lvl, x, y, z, this.dataLength);
     }
 
     void primeForReuse() {
@@ -338,7 +338,7 @@ public final class WorldSection {
     }
 
     public interface Allocator {
-        MemorySegment allocate(int size);
+        MemorySegment allocate(int lvl, int x, int y, int z, int size);
         void release(MemorySegment segment);
     }
 
