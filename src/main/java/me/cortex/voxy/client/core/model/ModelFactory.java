@@ -24,6 +24,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.tags.BlockTags;
+import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.CardinalLighting;
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.LightLayer;
@@ -582,6 +583,9 @@ public class ModelFactory {
         boolean canBeCorrectlyRendered = true;//This represents if a model can be correctly (perfectly) represented
         // i.e. no gaps
 
+        //block emission
+        metadata |= ((long)getBlockLightEmission(blockState))<<(48+7);
+
         this.metadataCache[modelId] = metadata;
 
         uploadPtr += 4*6;
@@ -650,6 +654,39 @@ public class ModelFactory {
         this.blockStatesInFlightLock.unlock();
 
         return uploadResult;
+    }
+
+    private static int getBlockLightEmission(BlockState state) {
+        boolean isEmissive = state.emissiveRendering(new BlockGetter() {
+            @Override
+            public @org.jspecify.annotations.Nullable BlockEntity getBlockEntity(BlockPos pos) {
+                return null;
+            }
+
+            @Override
+            public BlockState getBlockState(BlockPos pos) {
+                return state;
+            }
+
+            @Override
+            public FluidState getFluidState(BlockPos pos) {
+                return state.getFluidState();
+            }
+
+            @Override
+            public int getHeight() {
+                return 0;
+            }
+
+            @Override
+            public int getMinY() {
+                return 0;
+            }
+        }, BlockPos.ZERO);
+        if (isEmissive) {
+            return 15;//full bright
+        }
+        return Math.clamp(state.getLightEmission(),0,15);
     }
 
     private static final class BiomeUploadResult implements ResultUploader {

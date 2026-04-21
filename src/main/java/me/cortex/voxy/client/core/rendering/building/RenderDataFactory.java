@@ -370,12 +370,23 @@ public class RenderDataFactory {
 
     private static void meshNonOpaqueFace(int face, long quad, long meta, long neighborQuad, long neighborMeta, Mesher mesher) {
         if (shouldMeshNonOpaqueBlockFace(face, quad, meta, neighborQuad, neighborMeta)) {
-            mesher.putNext((long) (face&1) |
+            mesher.putNext(applyQuadLight(
+                    (long) (face&1) |
                     (quad&~LM) |
-                    ((ModelQueries.faceUsesSelfLighting(meta, face)?quad:neighborQuad) & LM));
+                    ((ModelQueries.faceUsesSelfLighting(meta, face)?quad:neighborQuad) & LM),
+                    meta));
         } else {
             mesher.skip(1);
         }
+    }
+
+    private static long applyQuadLight(long quad, long selfmeta) {
+        final long BLMSK = 0xFL<<(55+4);//block light mask
+        long bl = quad&BLMSK;
+        bl = Math.max(bl, ModelQueries.lightEmission(selfmeta)<<(55+4));
+        quad &= ~(BLMSK);
+        quad |= bl;
+        return quad;
     }
 
     private void generateYZOpaqueInnerGeometry(int axis) {
@@ -418,6 +429,7 @@ public class RenderDataFactory {
                         int iB = idx * 2 + (facingForward == 1 ? shift : 0);
 
                         long selfModel = this.sectionData[iA];
+                        long selfMeta  = this.sectionData[iA+1];
                         long nextModel = this.sectionData[iB];
 
                         //Check if next culls this face
@@ -432,10 +444,13 @@ public class RenderDataFactory {
                             }
                         }
 
-                        this.blockMesher.putNext(((long) facingForward) |//Facing
+                        this.blockMesher.putNext(
+                            applyQuadLight(
+                                ((long) facingForward) |//Facing
                                 (selfModel&~LM) |
-                                (nextModel&LM)//Apply lighting
-                        );
+                                (nextModel&LM),//Apply lighting
+                                selfMeta
+                            ));
                     }
                 }
 
@@ -478,9 +493,12 @@ public class RenderDataFactory {
                         int neighborIdx = ((axis+1)*32*32 * 2)+(side)*32*32;
                         long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
                         long A = this.sectionData[idx * 2];
+                        long selfMeta = this.sectionData[idx * 2 +1];
 
                         int nib = Mapper.getBlockId(neighborId);
                         if (nib != 0) {//Not air
+                            //FIXME need to use selfMeta to check for if it can be culled against this block
+
                             int cid = this.modelMan.getModelId(nib);
                             long meta = this.modelMan.getModelMetadataFromClientId(cid);
                             if (ModelQueries.isFullyOpaque(meta)) {//Dont mesh this face
@@ -503,9 +521,12 @@ public class RenderDataFactory {
 
 
 
-                        this.blockMesher.putNext(((side == 0) ? 0L : 1L) |
+                        this.blockMesher.putNext(applyQuadLight(
+                                ((side == 0) ? 0L : 1L) |
                                 (A&~LM) |
-                                ((neighborId & (0xFFL << 56)) >>> 1)
+                                ((neighborId & (0xFFL << 56)) >>> 1),
+                                selfMeta
+                                )
                         );
                     }
                 }
@@ -587,9 +608,11 @@ public class RenderDataFactory {
                         //    lighter = this.sectionData[bi];
                         //}
 
-                        this.blockMesher.putNext(((long) facingForward) |//Facing
+                        this.blockMesher.putNext(applyQuadLight(
+                                ((long) facingForward) |//Facing
                                 (A&~LM) |
-                                (lighter&LM)//Apply lighting
+                                (lighter&LM),//Apply lighting
+                                Am)
                         );
                     }
                 }
@@ -634,17 +657,17 @@ public class RenderDataFactory {
                         long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
 
                         long A = this.sectionData[idx * 2];
-                        long B = this.sectionData[idx * 2 + 1];
+                        long Am = this.sectionData[idx * 2 + 1];
 
-                        if (ModelQueries.containsFluid(B)) {
+                        if (ModelQueries.containsFluid(Am)) {
                             int modelId = (int) ((A>>26)&0xFFFF);
                             A &= ~(0xFFFFL<<26);
                             int fluidId = this.modelMan.getFluidClientStateId(modelId);
                             A |= Integer.toUnsignedLong(fluidId)<<26;
-                            B = this.modelMan.getModelMetadataFromClientId(fluidId);
+                            Am = this.modelMan.getModelMetadataFromClientId(fluidId);
 
                             //We need to update the typing info for A
-                            A &= ~0b110L; A |= getQuadTyping(B);
+                            A &= ~0b110L; A |= getQuadTyping(Am);
                         }
 
                         //Check and test if can cull W.R.T neighbor
@@ -654,7 +677,7 @@ public class RenderDataFactory {
                             if (ModelQueries.containsFluid(meta)) {
                                 modelId = this.modelMan.getFluidClientStateId(modelId);
                             }
-                            if (ModelQueries.cullsSame(B)) {
+                            if (ModelQueries.cullsSame(Am)) {
                                 if (modelId == ((A>>26)&0xFFFF)) {
                                     this.blockMesher.skip(1);
                                     continue;
@@ -669,9 +692,11 @@ public class RenderDataFactory {
                             }
                         }
 
-                        this.blockMesher.putNext((side == 0 ? 0L : 1L) |
+                        this.blockMesher.putNext(applyQuadLight(
+                                (side == 0 ? 0L : 1L) |
                                 (A&~LM) |
-                                ((neighborId&(0xFFL<<56))>>>1)
+                                ((neighborId&(0xFFL<<56))>>>1),
+                                Am)
                         );
                     }
                 }
@@ -777,7 +802,7 @@ public class RenderDataFactory {
                         long neighborId = this.neighboringFaces[neighborIdx + (other*32) + index];
 
                         long A = this.sectionData[idx * 2];
-                        long B = this.sectionData[idx * 2 + 1];
+                        long Am = this.sectionData[idx * 2 + 1];
 
                         boolean fail = false;
                         //Check and test if can cull W.R.T neighbor
@@ -785,7 +810,7 @@ public class RenderDataFactory {
                             int modelId = this.modelMan.getModelId(Mapper.getBlockId(neighborId));
 
 
-                            if (ModelQueries.cullsSame(B) && modelId == ((A>>26)&0xFFFF)) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
+                            if (ModelQueries.cullsSame(Am) && modelId == ((A>>26)&0xFFFF)) {//TODO: FIXME, this technically isnt correct as need to check self occulsion, thinks?
                                 //TODO: check self occlsuion in the if statment
                                 fail = true;
                             } else {
@@ -813,19 +838,23 @@ public class RenderDataFactory {
 
 
                         //TODO: LIGHTING
-                        if (ModelQueries.faceExists(B, (axis<<1)|1) && ((side==1&&!fail) || (side==0&&!failB))) {
-                            this.blockMesher.putNext((long) (false ? 0L : 1L) |
+                        if (ModelQueries.faceExists(Am, (axis<<1)|1) && ((side==1&&!fail) || (side==0&&!failB))) {
+                            this.blockMesher.putNext(applyQuadLight(
+                                    (long) (false ? 0L : 1L) |
                                     A |
-                                    0//((ModelQueries.faceUsesSelfLighting(B, (axis<<1)|1)?A:) & (0xFFL << 55))
+                                    0,//((ModelQueries.faceUsesSelfLighting(B, (axis<<1)|1)?A:) & (0xFFL << 55))//TODO:THIS
+                                    Am)
                             );
                         } else {
                             this.blockMesher.skip(1);
                         }
 
-                        if (ModelQueries.faceExists(B, (axis<<1)|0) && ((side==0&&!fail) || (side==1&&!failB))) {
-                            this.seondaryblockMesher.putNext((long) (true ? 0L : 1L) |
+                        if (ModelQueries.faceExists(Am, (axis<<1)|0) && ((side==0&&!fail) || (side==1&&!failB))) {
+                            this.seondaryblockMesher.putNext(applyQuadLight(
+                                    (long) (true ? 0L : 1L) |
                                     A |
-                                    0//(((0xFFL) & 0xFF) << 55)
+                                    0,//(((0xFFL) & 0xFF) << 55)//TODO:THIS
+                                    Am)
                             );
                         } else {
                             this.seondaryblockMesher.skip(1);
@@ -974,12 +1003,16 @@ public class RenderDataFactory {
                         }
 
                         long selfModel = this.sectionData[iA];
+                        long selfMeta  = this.sectionData[iA+1];
                         long nextModel = this.sectionData[iB];
 
                         //Example thing thats just wrong but as example
-                        mesher.putNext(((long) facingForward) |//Facing
+                        mesher.putNext(applyQuadLight(
+                                ((long) facingForward) |//Facing
                                 (selfModel&~LM) |
-                                (nextModel&LM)
+                                (nextModel&LM),//TODO FIX THIS (self lighting)
+                                selfMeta
+                                )
                         );
                     }
                 }
@@ -1040,9 +1073,13 @@ public class RenderDataFactory {
                     if (oki) {
                         ma.skip(skipA); skipA = 0;
                         long A = this.sectionData[(i<<5) * 2];
-                        ma.putNext(0L |
+                        long Am = this.sectionData[(i<<5) * 2+1];
+                        ma.putNext(applyQuadLight(
+                                0L |
                                 (A&~LM) |
-                                ((neighborId&(0xFFL<<56))>>>1)
+                                ((neighborId&(0xFFL<<56))>>>1),
+                                Am
+                                )
                         );
                     } else {skipA++;}
                 } else {skipA++;}
@@ -1062,9 +1099,13 @@ public class RenderDataFactory {
                     if (oki) {
                         mb.skip(skipB); skipB = 0;
                         long A = this.sectionData[(i*32+31) * 2];
-                        mb.putNext(1L |
+                        long Am = this.sectionData[(i*32+31) * 2+1];
+                        mb.putNext(applyQuadLight(
+                                1L |
                                 (A&~LM) |
-                                ((neighborId&(0xFFL<<56))>>>1)
+                                ((neighborId&(0xFFL<<56))>>>1),
+                                Am
+                                )
                         );
                     } else {skipB++;}
                 } else {skipB++;}
@@ -1188,9 +1229,12 @@ public class RenderDataFactory {
                         //}
 
                         //Example thing thats just wrong but as example
-                        mesher.putNext(((long) facingForward) |//Facing
+                        mesher.putNext(applyQuadLight(
+                                ((long) facingForward) |//Facing
                                 (A&~LM) |
-                                (lighter&LM)//Lighting
+                                (lighter&LM),//Lighting
+                                Am
+                                )
                         );
                     }
                 }
@@ -1291,9 +1335,12 @@ public class RenderDataFactory {
                         //    lighter = this.sectionData[bi];
                         //}
 
-                        ma.putNext(0L |
+                        ma.putNext(applyQuadLight(
+                                0L |
                                 (A&~LM) |
-                                lightData
+                                lightData,
+                                Am
+                                )
                         );
                     } else {skipA++;}
                 } else {skipA++;}
@@ -1352,9 +1399,12 @@ public class RenderDataFactory {
                         //    lighter = this.sectionData[bi];
                         //}
 
-                        mb.putNext(1L |
+                        mb.putNext(applyQuadLight(
+                                1L |
                                 (A&~LM) |
-                                lightData
+                                lightData,
+                                Am
+                                )
                         );
                     } else {skipB++;}
                 } else {skipB++;}
@@ -1480,18 +1530,24 @@ public class RenderDataFactory {
 
         //TODO: Check (neighborAId!=0) && works oki
         if ((neighborAId==0 && ModelQueries.faceExists(meta, ((2<<1)|0)^side))||(neighborAId!=0&&shouldMeshNonOpaqueBlockFace(((2<<1)|0)^side, quad, meta, ((long)neighborAId)<<26, neighborAMeta))) {
-            ma.putNext(((long)side)|
+            ma.putNext(applyQuadLight(
+                    ((long)side)|
                     (quad&~LM) |
-                    (ModelQueries.faceUsesSelfLighting(meta, ((2<<1)|0)^side)?quad:(((long)neighborLight)<<55))
+                    (ModelQueries.faceUsesSelfLighting(meta, ((2<<1)|0)^side)?quad:(((long)neighborLight)<<55)),
+                    meta
+                    )
             );
         } else {
             ma.skip(1);
         }
 
         if (shouldMeshNonOpaqueBlockFace(((2<<1)|1)^side, quad, meta, neighborBQuad, neighborBMeta)) {
-            mb.putNext(((long)(side^1))|
+            mb.putNext(applyQuadLight(
+                    ((long)(side^1))|
                     (quad&~LM) |
-                    ((ModelQueries.faceUsesSelfLighting(meta, ((2<<1)|1)^side)?quad:neighborBQuad)&(0xFFL<<55))
+                    ((ModelQueries.faceUsesSelfLighting(meta, ((2<<1)|1)^side)?quad:neighborBQuad)&(0xFFL<<55)),
+                    meta
+                    )
             );
         } else {
             mb.skip(1);
