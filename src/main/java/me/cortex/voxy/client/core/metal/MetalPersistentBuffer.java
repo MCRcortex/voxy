@@ -67,6 +67,14 @@ public class MetalPersistentBuffer extends TrackedObject implements IGpuPersiste
     }
 
     @Override
+    public void flushRange(long offset, long length) {
+        // MTLStorageModeShared on Apple Silicon is coherent unified memory —
+        // CPU writes are visible to the GPU without an explicit flush.
+        // (If we ever switch to MTLStorageModeManaged we will need to call
+        // mtlBufferDidModifyRange here.)
+    }
+
+    @Override
     public void free() {
         this.free0();
         MetalHandleMap.unregister(this.id);
