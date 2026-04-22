@@ -282,6 +282,31 @@ public class MetalRenderBackend implements RenderBackend {
         return MetalTexture.getEstimatedTotalSize();
     }
 
+    @Override
+    public void memoryBarrier(int flags) {
+        // Metal performs automatic hazard tracking between encoders by default,
+        // so most glMemoryBarrier bits are implicit. Explicit fences are needed
+        // only for untracked resources, which we don't currently create.
+    }
+
+    @Override
+    public void copyBufferSubData(IGpuBuffer src, IGpuBuffer dst, long srcOffset, long dstOffset, long size) {
+        if (size <= 0) return;
+        if (!(src instanceof MetalBuffer) || !(dst instanceof MetalBuffer)) {
+            throw new IllegalArgumentException("copyBufferSubData on Metal backend requires MetalBuffer arguments");
+        }
+        long srcHandle = ((MetalBuffer) src).getHandle();
+        long dstHandle = ((MetalBuffer) dst).getHandle();
+
+        long cmdBuf = MetalNative.mtlCommandQueueNewCommandBuffer(this.commandQueue);
+        long blit = MetalNative.mtlCommandBufferNewBlitEncoder(cmdBuf);
+        MetalNative.mtlBlitEncoderCopyBuffer(blit, srcHandle, srcOffset, dstHandle, dstOffset, size);
+        MetalNative.mtlEncoderEndEncoding(blit);
+        MetalNative.mtlRelease(blit);
+        MetalNative.mtlCommandBufferCommit(cmdBuf);
+        MetalNative.mtlRelease(cmdBuf);
+    }
+
     // --- Metal-specific accessors ---
 
     public long getDevice() {
