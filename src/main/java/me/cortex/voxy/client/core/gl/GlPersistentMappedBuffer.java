@@ -77,4 +77,18 @@ public class GlPersistentMappedBuffer extends TrackedObject implements me.cortex
     public GlPersistentMappedBuffer name(String name) {
         return GlDebug.name(name, this);
     }
+
+    @Override
+    public void flushRange(long offset, long length) {
+        if (length <= 0) return;
+        boolean hasDSA = GL.getCapabilities().GL_ARB_direct_state_access || GL.getCapabilities().OpenGL45;
+        if (hasDSA) {
+            GL45C.glFlushMappedNamedBufferRange(this.id, offset, length);
+        } else {
+            int prev = GL15C.glGetInteger(GL15C.GL_ARRAY_BUFFER_BINDING);
+            GL15C.glBindBuffer(GL_ARRAY_BUFFER, this.id);
+            GL30C.glFlushMappedBufferRange(GL_ARRAY_BUFFER, offset, length);
+            GL15C.glBindBuffer(GL_ARRAY_BUFFER, prev);
+        }
+    }
 }
