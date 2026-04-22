@@ -99,4 +99,12 @@ public interface RenderBackend {
      * Metal enqueues a blit encoder on a transient command buffer.
      */
     void copyBufferSubData(IGpuBuffer src, IGpuBuffer dst, long srcOffset, long dstOffset, long size);
+
+    /**
+     * Persistent-buffer overload used by UploadStream.commit(): the upload
+     * buffer is an IGpuPersistentBuffer but the destination is a regular
+     * IGpuBuffer. Backends bridge the two without exposing raw handles to
+     * the caller.
+     */
+    void copyBufferSubData(IGpuPersistentBuffer src, IGpuBuffer dst, long srcOffset, long dstOffset, long size);
 }

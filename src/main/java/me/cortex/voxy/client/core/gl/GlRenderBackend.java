@@ -227,16 +227,25 @@ public class GlRenderBackend implements RenderBackend {
 
     @Override
     public void copyBufferSubData(IGpuBuffer src, IGpuBuffer dst, long srcOffset, long dstOffset, long size) {
+        copyBufferSubDataById(src.id(), dst.id(), srcOffset, dstOffset, size);
+    }
+
+    @Override
+    public void copyBufferSubData(IGpuPersistentBuffer src, IGpuBuffer dst, long srcOffset, long dstOffset, long size) {
+        copyBufferSubDataById(src.id(), dst.id(), srcOffset, dstOffset, size);
+    }
+
+    private static void copyBufferSubDataById(int srcId, int dstId, long srcOffset, long dstOffset, long size) {
         if (size <= 0) return;
         boolean hasDSA = org.lwjgl.opengl.GL.getCapabilities().GL_ARB_direct_state_access
                 || org.lwjgl.opengl.GL.getCapabilities().OpenGL45;
         if (hasDSA) {
-            org.lwjgl.opengl.GL45C.glCopyNamedBufferSubData(src.id(), dst.id(), srcOffset, dstOffset, size);
+            org.lwjgl.opengl.GL45C.glCopyNamedBufferSubData(srcId, dstId, srcOffset, dstOffset, size);
         } else {
             int prevRead = org.lwjgl.opengl.GL15C.glGetInteger(org.lwjgl.opengl.GL31C.GL_COPY_READ_BUFFER_BINDING);
             int prevWrite = org.lwjgl.opengl.GL15C.glGetInteger(org.lwjgl.opengl.GL31C.GL_COPY_WRITE_BUFFER_BINDING);
-            org.lwjgl.opengl.GL15C.glBindBuffer(org.lwjgl.opengl.GL31C.GL_COPY_READ_BUFFER, src.id());
-            org.lwjgl.opengl.GL15C.glBindBuffer(org.lwjgl.opengl.GL31C.GL_COPY_WRITE_BUFFER, dst.id());
+            org.lwjgl.opengl.GL15C.glBindBuffer(org.lwjgl.opengl.GL31C.GL_COPY_READ_BUFFER, srcId);
+            org.lwjgl.opengl.GL15C.glBindBuffer(org.lwjgl.opengl.GL31C.GL_COPY_WRITE_BUFFER, dstId);
             org.lwjgl.opengl.GL31C.glCopyBufferSubData(
                     org.lwjgl.opengl.GL31C.GL_COPY_READ_BUFFER,
                     org.lwjgl.opengl.GL31C.GL_COPY_WRITE_BUFFER,

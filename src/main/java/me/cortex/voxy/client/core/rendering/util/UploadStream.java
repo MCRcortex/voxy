@@ -13,13 +13,10 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 import static me.cortex.voxy.common.util.AllocationArena.SIZE_LIMIT;
-import static org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData;
 import static org.lwjgl.opengl.ARBMapBufferRange.*;
 import static org.lwjgl.opengl.GL11.glFinish;
-import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL42C.GL_BUFFER_UPDATE_BARRIER_BIT;
 import static org.lwjgl.opengl.GL44.GL_MAP_COHERENT_BIT;
-import static org.lwjgl.opengl.GL45C.glFlushMappedNamedBufferRange;
 
 public class UploadStream {
     private final AllocationArena allocationArena = new AllocationArena();
@@ -73,7 +70,7 @@ public class UploadStream {
         long addr;
         if (this.caddr == -1 || !this.allocationArena.expand(this.caddr, (int) size)) {
             if ((!USE_COHERENT)&&this.caddr!=-1) {
-                glFlushMappedNamedBufferRange(this.uploadBuffer.id(), this.caddr, this.offset);
+                this.uploadBuffer.flushRange(this.caddr, this.offset);
             }
             this.caddr = this.allocationArena.alloc((int) size);//TODO: replace with allocFromLargest
             if (this.caddr == SIZE_LIMIT) {
@@ -109,21 +106,22 @@ public class UploadStream {
     public void commit() {
         if ((!USE_COHERENT)&&this.caddr != -1) {
             //Flush this allocation
-            glFlushMappedNamedBufferRange(this.uploadBuffer.id(), this.caddr, this.offset);
+            this.uploadBuffer.flushRange(this.caddr, this.offset);
         }
 
         if (this.uploadList.isEmpty()) {
             return;
         }
 
-        glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+        var backend = RenderBackendFactory.get();
+        backend.memoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
         //Execute all the copies
         for (var entry : this.uploadList) {
-            glCopyNamedBufferSubData(this.uploadBuffer.id(), entry.target.id(), entry.uploadOffset, entry.targetOffset, entry.size);
+            backend.copyBufferSubData(this.uploadBuffer, entry.target, entry.uploadOffset, entry.targetOffset, entry.size);
         }
         this.uploadList.clear();
 
-        glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);//|GL_SHADER_STORAGE_BARRIER_BIT|GL_UNIFORM_BARRIER_BIT //expected + other barriers which may cause issues if not
+        backend.memoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);//|GL_SHADER_STORAGE_BARRIER_BIT|GL_UNIFORM_BARRIER_BIT //expected + other barriers which may cause issues if not
 
         this.caddr = -1;
         this.offset = 0;

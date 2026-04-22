@@ -291,13 +291,24 @@ public class MetalRenderBackend implements RenderBackend {
 
     @Override
     public void copyBufferSubData(IGpuBuffer src, IGpuBuffer dst, long srcOffset, long dstOffset, long size) {
-        if (size <= 0) return;
         if (!(src instanceof MetalBuffer) || !(dst instanceof MetalBuffer)) {
             throw new IllegalArgumentException("copyBufferSubData on Metal backend requires MetalBuffer arguments");
         }
-        long srcHandle = ((MetalBuffer) src).getHandle();
-        long dstHandle = ((MetalBuffer) dst).getHandle();
+        enqueueBufferCopy(((MetalBuffer) src).getHandle(), ((MetalBuffer) dst).getHandle(),
+                srcOffset, dstOffset, size);
+    }
 
+    @Override
+    public void copyBufferSubData(IGpuPersistentBuffer src, IGpuBuffer dst, long srcOffset, long dstOffset, long size) {
+        if (!(src instanceof MetalPersistentBuffer) || !(dst instanceof MetalBuffer)) {
+            throw new IllegalArgumentException("copyBufferSubData on Metal backend requires Metal buffer arguments");
+        }
+        enqueueBufferCopy(((MetalPersistentBuffer) src).getHandle(), ((MetalBuffer) dst).getHandle(),
+                srcOffset, dstOffset, size);
+    }
+
+    private void enqueueBufferCopy(long srcHandle, long dstHandle, long srcOffset, long dstOffset, long size) {
+        if (size <= 0) return;
         long cmdBuf = MetalNative.mtlCommandQueueNewCommandBuffer(this.commandQueue);
         long blit = MetalNative.mtlCommandBufferNewBlitEncoder(cmdBuf);
         MetalNative.mtlBlitEncoderCopyBuffer(blit, srcHandle, srcOffset, dstHandle, dstOffset, size);
