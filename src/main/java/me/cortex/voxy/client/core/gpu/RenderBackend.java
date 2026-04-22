@@ -82,4 +82,21 @@ public interface RenderBackend {
     long getBufferTotalSize();
     int getTextureCount();
     long getTextureEstimatedTotalSize();
+
+    // --- Cross-backend synchronization / copies ---
+
+    /**
+     * Inserts a memory barrier so subsequent operations observe prior writes.
+     * `flags` uses GL memoryBarrier semantics (GL_BUFFER_UPDATE_BARRIER_BIT, etc.)
+     * on OpenGL; Metal performs automatic hazard tracking between command
+     * encoders so the Metal backend treats this as a no-op.
+     */
+    void memoryBarrier(int flags);
+
+    /**
+     * Copies `size` bytes from `src`+srcOffset to `dst`+dstOffset.
+     * OpenGL uses glCopyNamedBufferSubData (or the bound-buffer fallback);
+     * Metal enqueues a blit encoder on a transient command buffer.
+     */
+    void copyBufferSubData(IGpuBuffer src, IGpuBuffer dst, long srcOffset, long dstOffset, long size);
 }
