@@ -3,6 +3,8 @@ package me.cortex.voxy.client;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.client.core.gl.Capabilities;
+import me.cortex.voxy.client.core.gpu.RenderBackend;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.model.bakery.BudgetBufferRenderer;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.common.Logger;
@@ -34,7 +36,17 @@ public class VoxyClient implements ClientModInitializer {
             Logger.error("AMD broken depth sampler detected, voxy does not work correctly and has been disabled, this will hopefully be fixed in the future");
         }
 
-        boolean systemSupported = Capabilities.INSTANCE.compute && Capabilities.INSTANCE.indirectParameters && !Capabilities.INSTANCE.hasBrokenDepthSampler;
+        // Query the active render backend instead of OpenGL capabilities directly:
+        // on macOS Apple Silicon the OpenGL driver tops out at 4.1 (no compute,
+        // no indirect draws), which would fail this check even though the Metal
+        // backend supports both. MetalRenderBackend reports compute and indirect
+        // as available; the OpenGL backend delegates to the legacy Capabilities.
+        RenderBackend backend = RenderBackendFactory.get();
+        Logger.info("Render backend: " + backend.getType()
+                + " (compute=" + backend.hasCompute()
+                + ", indirectParameters=" + backend.hasIndirectParameters() + ")");
+
+        boolean systemSupported = backend.hasCompute() && backend.hasIndirectParameters() && !Capabilities.INSTANCE.hasBrokenDepthSampler;
         if (systemSupported) {
 
             SharedIndexBuffer.INSTANCE.id();
