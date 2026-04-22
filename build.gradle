@@ -284,3 +284,47 @@ if (!isInGHA) {
         }*/
     }
 }
+
+// -------- Metal native library (macOS Apple Silicon only) --------
+// Builds libvoxy_metal.dylib via CMake and bundles it at
+// resources/natives/macos-arm64/ so it is included in the jar and can be
+// loaded by MetalNative.load() on M-series Macs. On other platforms or when
+// the toolchain is missing, this task is skipped so the regular build still
+// produces a working OpenGL-only jar.
+tasks.register('buildMetalNative', Exec) {
+    group = 'build'
+    description = 'Builds libvoxy_metal.dylib (macOS Apple Silicon only)'
+
+    def nativeDir = file("$projectDir/native/metal")
+    def output = file("$projectDir/src/main/resources/natives/macos-arm64/libvoxy_metal.dylib")
+
+    inputs.dir file("$nativeDir/src")
+    inputs.file file("$nativeDir/CMakeLists.txt")
+    outputs.file output
+
+    workingDir = nativeDir
+    commandLine 'bash', 'build.sh', 'Release'
+
+    onlyIf {
+        def osName = System.getProperty('os.name').toLowerCase()
+        def osArch = System.getProperty('os.arch').toLowerCase()
+        def isMacArm = osName.contains('mac') && osArch.contains('aarch64')
+        if (!isMacArm) {
+            logger.lifecycle("Skipping buildMetalNative: host is ${osName}/${osArch}, not macOS aarch64")
+        }
+        return isMacArm
+    }
+
+    // Do not fail the overall build if the native toolchain is unavailable;
+    // the jar will simply ship without the dylib and Metal will fall back to GL.
+    ignoreExitValue = true
+    doLast {
+        if (executionResult.get().exitValue != 0) {
+            logger.warn('buildMetalNative failed; jar will ship without libvoxy_metal.dylib and fall back to OpenGL on Mac')
+        }
+    }
+}
+
+processResources {
+    dependsOn tasks.named('buildMetalNative')
+}

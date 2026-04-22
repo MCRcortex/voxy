@@ -32,20 +32,64 @@ public final class MetalNative {
 
     /**
      * Attempts to load the native Metal library.
+     *
+     * Load order:
+     *   1. System.loadLibrary("voxy_metal") — honors java.library.path, useful
+     *      for dev builds where the dylib sits next to the repo.
+     *   2. Extract /natives/macos-arm64/libvoxy_metal.dylib from the mod jar
+     *      into a temp file and System.load() that.
+     *
      * Returns true if Metal is available on this platform.
      */
     public static synchronized boolean load() {
         if (loaded) return available;
         loaded = true;
+
+        String os = System.getProperty("os.name", "").toLowerCase();
+        String arch = System.getProperty("os.arch", "").toLowerCase();
+        if (!(os.contains("mac") && arch.contains("aarch64"))) {
+            Logger.info("Metal backend skipped: requires macOS aarch64 (got " + os + "/" + arch + ")");
+            available = false;
+            return false;
+        }
+
         try {
             System.loadLibrary("voxy_metal");
             available = true;
-            Logger.info("Metal native library loaded successfully");
-        } catch (UnsatisfiedLinkError e) {
-            Logger.warn("Metal native library not available: " + e.getMessage());
-            available = false;
+            Logger.info("Metal native library loaded from java.library.path");
+            return true;
+        } catch (UnsatisfiedLinkError ignored) {
+            // Fall through to resource extraction.
         }
-        return available;
+
+        try {
+            java.nio.file.Path tmp = extractResourceToTemp(
+                    "/natives/macos-arm64/libvoxy_metal.dylib", "libvoxy_metal", ".dylib");
+            if (tmp == null) {
+                Logger.warn("Metal native library not bundled in jar; falling back to OpenGL");
+                available = false;
+                return false;
+            }
+            System.load(tmp.toAbsolutePath().toString());
+            available = true;
+            Logger.info("Metal native library loaded from " + tmp);
+            return true;
+        } catch (Throwable t) {
+            Logger.warn("Metal native library not available: " + t.getMessage());
+            available = false;
+            return false;
+        }
+    }
+
+    private static java.nio.file.Path extractResourceToTemp(
+            String resourcePath, String prefix, String suffix) throws java.io.IOException {
+        try (java.io.InputStream in = MetalNative.class.getResourceAsStream(resourcePath)) {
+            if (in == null) return null;
+            java.nio.file.Path tmp = java.nio.file.Files.createTempFile(prefix, suffix);
+            tmp.toFile().deleteOnExit();
+            java.nio.file.Files.copy(in, tmp, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return tmp;
+        }
     }
 
     public static boolean isAvailable() {
