@@ -218,18 +218,6 @@ public class ModelFactory {
 
         int flags = this.bakery2.renderToOutput(bake.state, this.bakeScratchBuffer);
 
-        boolean hasDarkenedTextures = (flags&2)!=0;
-        boolean isShaded = (flags&1)!=0;
-        ChunkSectionLayer layer = ChunkSectionLayer.SOLID;
-        if ((flags&4)!=0) {
-            layer = ChunkSectionLayer.TRANSLUCENT;
-        } else if ((flags&8)!=0) {
-            layer = ChunkSectionLayer.CUTOUT;
-        }
-        if (bake.state.is(BlockTags.LEAVES)) {
-            layer = ChunkSectionLayer.SOLID;
-        }
-
 
         {//Create texture data
             long ptr = this.bakeScratchBuffer;
@@ -253,6 +241,45 @@ public class ModelFactory {
                 textureData[face] = new ColourDepthTextureData(colour, depth, MODEL_TEXTURE_SIZE, MODEL_TEXTURE_SIZE);
             }
         }
+
+
+        boolean hasDarkenedTextures = (flags&2)!=0;
+        boolean isShaded = (flags&1)!=0;
+        ChunkSectionLayer layer = null;
+        if (layer==null && (flags&4)!=0) {
+            //we do an extra check here to be sure texture is translucent
+
+            //TODO: check this is right
+            boolean anyTranslucent = false;
+            for (var face : textureData) {
+                anyTranslucent|=TextureUtils.hasTranslucentPixel(face);
+                if (anyTranslucent) break;
+            }
+            if (anyTranslucent) {
+                layer = ChunkSectionLayer.TRANSLUCENT;
+            } else {
+                boolean solid = true;
+                for (var face : textureData) {
+                    solid&=TextureUtils.isSolidWhereDrawn(face);
+                    if (!solid) break;
+                }
+                if (solid) {
+                    layer = ChunkSectionLayer.SOLID;
+                } else {
+                    layer = ChunkSectionLayer.CUTOUT;
+                }
+            }
+        }
+        if (layer==null && (flags&8)!=0) {
+            layer = ChunkSectionLayer.CUTOUT;
+        }
+        if (bake.state.is(BlockTags.LEAVES)) {
+            layer = ChunkSectionLayer.SOLID;
+        }
+        if (layer == null) {
+            layer = ChunkSectionLayer.SOLID;
+        }
+
 
         var bakeResult = this.processTextureBakeResult(bake.blockId, bake.state, textureData, isShaded, hasDarkenedTextures, layer);
         if (bakeResult!=null) {
@@ -609,16 +636,17 @@ public class ModelFactory {
             MemoryUtil.memPutInt(uploadPtr, -1);//Set the default to nothing so that its faster on the gpu
         } else if (!isBiomeColourDependent) {
             MemoryUtil.memPutInt(uploadPtr, entry.tintingColour);
-        } else if (!this.biomes.isEmpty()) {
+        } else {
             //Populate the list of biomes for the model state
             int biomeIndex = this.modelsRequiringBiomeColours.size() * this.biomes.size();
             MemoryUtil.memPutInt(uploadPtr, biomeIndex);
             this.modelsRequiringBiomeColours.add(new Pair<>(modelId, blockState));
-
-            uploadResult.biomeUploadIndex = biomeIndex;
-            long clrUploadPtr = (uploadResult.biomeUpload = new MemoryBuffer(4L * this.biomes.size())).address;
-            for (var biome : this.biomes) {
-                MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(tintSources, blockState, biome)|0xFF000000); clrUploadPtr += 4;
+            if (!this.biomes.isEmpty()) {
+                uploadResult.biomeUploadIndex = biomeIndex;
+                long clrUploadPtr = (uploadResult.biomeUpload = new MemoryBuffer(4L * this.biomes.size())).address;
+                for (var biome : this.biomes) {
+                    MemoryUtil.memPutInt(clrUploadPtr, captureColourConstant(tintSources, blockState, biome) | 0xFF000000); clrUploadPtr += 4;
+                }
             }
         }
         uploadPtr += 4;
