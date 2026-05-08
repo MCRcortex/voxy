@@ -28,6 +28,9 @@
   "voxy.config.general.environmental_fog": "Enable environmental fog",
   "voxy.config.general.environmental_fog.tooltip": "Enables or disables voxy rendering environmental fog",
 
+  "voxy.config.general.render_beacon_beams": "Render beacon beams at any distance",
+  "voxy.config.general.render_beacon_beams.tooltip": "Keeps loaded beacon beams visible beyond vanilla render distance",
+
   "voxy.config.general.render_fog": "Enable render fog",
   "voxy.config.general.render_fog.tooltip": "Enables or disables render fog effect",
 

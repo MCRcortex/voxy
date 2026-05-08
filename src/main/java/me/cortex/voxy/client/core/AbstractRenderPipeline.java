@@ -20,6 +20,7 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import static org.lwjgl.opengl.GL11C.GL_ALWAYS;
 import static org.lwjgl.opengl.GL11C.GL_DEPTH_TEST;
@@ -53,6 +54,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     private final HierarchicalOcclusionTraverser traversal;
 
     protected AbstractSectionRenderer<?,?> sectionRenderer;
+    private Consumer<Viewport<?>> afterTranslucentRenderer;
 
     private final FullscreenBlit depthStencilSetup;
 
@@ -83,6 +85,10 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     public final void setSectionRenderer(AbstractSectionRenderer<?,?> sectionRenderer) {//Stupid java ordering not allowing something pre super
         if (this.sectionRenderer != null) throw new IllegalStateException();
         this.sectionRenderer = sectionRenderer;
+    }
+
+    public final void setAfterTranslucentRenderer(Consumer<Viewport<?>> renderer) {
+        this.afterTranslucentRenderer = renderer;
     }
 
     //Called before the pipeline starts running, used to update uniforms etc
@@ -126,6 +132,9 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
         if (!this.deferTranslucency) {
             rs.renderTranslucent(viewport);
+        }
+        if (this.afterTranslucentRenderer != null) {
+            this.afterTranslucentRenderer.accept(viewport);
         }
         GPUTiming.INSTANCE.marker();
 
