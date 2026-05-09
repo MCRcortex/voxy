@@ -34,6 +34,7 @@ public class VoxyConfig {
     public boolean useEnvironmentalFog = true;
     public boolean dontUseSodiumBuilderThreads = false;
     public String ssaoMode;
+    public boolean chatLoggingEnabled = true;
 
     public SSAO.SSAOMode getSSAOMode() {
         if (this.ssaoMode == null) return SSAO.SSAOMode.AUTO;

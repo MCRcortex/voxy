@@ -32,5 +32,8 @@
   "voxy.config.general.render_fog.tooltip": "Enables or disables render fog effect",
 
   "voxy.config.general.ssao_mode": "SSAO Mode",
-  "voxy.config.general.ssao_mode.tooltip": "The mode used for screenspace ambient occlusion (Auto attempts to pick the best option while reducing performance impact)"
+  "voxy.config.general.ssao_mode.tooltip": "The mode used for screenspace ambient occlusion (Auto attempts to pick the best option while reducing performance impact)",
+
+  "voxy.config.general.chat_logging": "Show debug messages",
+  "voxy.config.general.chat_logging.tooltip": "Enables or disables debug messages such as warnings and errors from appearing in the chat. Debug messages will still appear in log files."
 }

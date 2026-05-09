@@ -75,6 +75,11 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                         "voxy:ingest_enabled",
                                         Component.translatable("voxy.config.general.ingest"),
                                         ()->CFG.ingestEnabled, v->CFG.ingestEnabled=v)
+                        ), new Group(
+                                new BoolOption(
+                                        "voxy:logging_enabled",
+                                        Component.translatable("voxy.config.general.chat_logging"),
+                                        ()->CFG.chatLoggingEnabled, v->CFG.chatLoggingEnabled =v)
                         )
                 ).setEnabler("voxy:enabled"),
                 new Page(Component.translatable("voxy.config.rendering"),

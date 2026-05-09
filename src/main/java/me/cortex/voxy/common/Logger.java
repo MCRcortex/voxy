@@ -1,5 +1,6 @@
 package me.cortex.voxy.common;
 
+import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
@@ -58,6 +59,9 @@ public class Logger {
     }
 
     public static void showInHUD(String msg) {
+        if (!VoxyConfig.CONFIG.chatLoggingEnabled) {
+            return;
+        }
         var instance = Minecraft.getInstance();
         if (instance != null) {
             instance.executeIfPossible(() -> {
