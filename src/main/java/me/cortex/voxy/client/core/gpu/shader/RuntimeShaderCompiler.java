@@ -182,9 +182,11 @@ public final class RuntimeShaderCompiler {
 
                 // MSL 3.0 (Apple Silicon supports up to MSL 3.x). 30000 = 3.0.0 in spvc encoding.
                 spvc_compiler_options_set_uint(opts, SPVC_COMPILER_OPTION_MSL_VERSION, 30000);
-                // Argument buffers let us bind multiple resources via a single buffer pointer,
-                // which maps cleanly to Vulkan-style descriptor sets when we extend the backend.
-                spvc_compiler_options_set_bool(opts, SPVC_COMPILER_OPTION_MSL_ARGUMENT_BUFFERS, true);
+                // Direct buffer/texture bindings (one [[buffer(N)]] per resource) instead of
+                // argument buffers. Argument buffers would require building a separate
+                // descriptor MTLBuffer per draw, which doesn't match Voxy's per-shader-binding
+                // pattern. Direct bindings let setBuffer(N, ...) hit the right MSL slot.
+                spvc_compiler_options_set_bool(opts, SPVC_COMPILER_OPTION_MSL_ARGUMENT_BUFFERS, false);
                 // Voxy shaders use explicit binding=N decorations everywhere; honor them.
                 spvc_compiler_options_set_bool(opts, SPVC_COMPILER_OPTION_MSL_ENABLE_DECORATION_BINDING, true);
 

@@ -311,6 +311,18 @@ public class GlRenderBackend implements RenderBackend {
                         + "GL path uses the legacy Shader.Builder pipeline through M8");
     }
 
+    @Override
+    public IGpuPipeline createComputePipeline(ComputePipelineDesc desc) {
+        throw new UnsupportedOperationException(
+                "GlRenderBackend.createComputePipeline is not implemented yet (see M9)");
+    }
+
+    @Override
+    public ComputeEncoder beginComputePass() {
+        throw new UnsupportedOperationException(
+                "GlRenderBackend.beginComputePass is not implemented yet (see M9)");
+    }
+
     /** Concrete encoder for the GL backend. Methods after close() are no-ops. */
     private static final class GlRenderEncoder implements RenderEncoder {
         private final int fbo;

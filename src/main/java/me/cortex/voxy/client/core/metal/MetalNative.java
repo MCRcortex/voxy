@@ -291,6 +291,24 @@ public final class MetalNative {
             int firstVertex, int vertexCount,
             int instanceCount, int baseInstance);
 
+    // --- Compute encoder (M7) ---
+
+    /** Creates a compute command encoder on the active command buffer. */
+    public static native long mtlCommandBufferNewComputeEncoder(long cmdBuffer);
+
+    /** Sets the active MTLComputePipelineState on a compute encoder. */
+    public static native void mtlComputeEncoderSetComputePipelineState(long encoder, long pipelineState);
+
+    /** Binds a MTLBuffer at a given index for the active compute pipeline. */
+    public static native void mtlComputeEncoderSetBuffer(long encoder, long buffer, long offset, int index);
+
+    /**
+     * Dispatch (gx, gy, gz) thread-groups, each containing (tx, ty, tz) threads.
+     * tx/ty/tz must match the local_size_* declared in the compute shader.
+     */
+    public static native void mtlComputeEncoderDispatchThreadgroups(
+            long encoder, int gx, int gy, int gz, int tx, int ty, int tz);
+
     // --- Blit encoder readback (M5) ---
 
     /** Copies a region of a texture into a buffer (for CPU readback). */

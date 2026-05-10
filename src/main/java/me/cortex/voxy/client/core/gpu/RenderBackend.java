@@ -144,4 +144,25 @@ public interface RenderBackend {
      * call sites that need the new abstraction on Win/Linux as well.
      */
     IGpuPipeline createGraphicsPipeline(GraphicsPipelineDesc desc);
+
+    /**
+     * Compile a compute pipeline state object. Same backend split as
+     * {@link #createGraphicsPipeline} — Metal uses MSL, Vulkan SPIRV, GL
+     * is deferred.
+     */
+    IGpuPipeline createComputePipeline(ComputePipelineDesc desc);
+
+    /**
+     * Begin a compute pass. The returned encoder is the only handle for
+     * issuing compute work until {@link ComputeEncoder#close()}.
+     *
+     * Backend semantics:
+     *  - Metal: {@code commandBuffer newComputeCommandEncoder} on the active
+     *    frame command buffer.
+     *  - Vulkan: starts encoding compute commands on the active command
+     *    buffer; barriers must be issued explicitly.
+     *  - OpenGL: returns a thin shim over {@code glDispatchCompute};
+     *    barriers fall through to {@link #memoryBarrier(int)}.
+     */
+    ComputeEncoder beginComputePass();
 }

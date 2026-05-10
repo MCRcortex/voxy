@@ -482,6 +482,62 @@ public class MetalRenderBackend implements RenderBackend {
         }
     }
 
+    @Override
+    public IGpuPipeline createComputePipeline(ComputePipelineDesc desc) {
+        if (desc.computeMsl == null) {
+            throw new IllegalArgumentException("createComputePipeline: compute MSL required");
+        }
+        long library = MetalNative.mtlDeviceNewLibraryWithSource(this.device, desc.computeMsl);
+        if (library == 0) {
+            throw new RuntimeException("Compute MSL compile failed: " + MetalNative.mtlGetLastCompileError());
+        }
+        long function = 0;
+        long pipelineState = 0;
+        try {
+            function = MetalNative.mtlLibraryNewFunction(library, "main0");
+            if (function == 0) {
+                function = MetalNative.mtlLibraryNewFunction(library, "main");
+                if (function == 0) {
+                    throw new RuntimeException("Compute function 'main0'/'main' not found in compiled library");
+                }
+            }
+            pipelineState = MetalNative.mtlDeviceNewComputePipelineState(this.device, function);
+            if (pipelineState == 0) {
+                throw new RuntimeException("Compute pipeline state link failed: " + MetalNative.mtlGetLastCompileError());
+            }
+            if (desc.label != null) {
+                MetalNative.mtlSetLabel(pipelineState, desc.label);
+            }
+
+            MetalComputePipeline result = new MetalComputePipeline(
+                    pipelineState, library, function,
+                    desc.localSizeX, desc.localSizeY, desc.localSizeZ);
+            pipelineState = 0;
+            function = 0;
+            library = 0;
+            return result;
+        } finally {
+            if (pipelineState != 0) MetalNative.mtlRelease(pipelineState);
+            if (function != 0) MetalNative.mtlRelease(function);
+            if (library != 0) MetalNative.mtlRelease(library);
+        }
+    }
+
+    @Override
+    public ComputeEncoder beginComputePass() {
+        if (this.activeCommandBuffer == 0) {
+            this.activeCommandBuffer = MetalNative.mtlCommandQueueNewCommandBuffer(this.commandQueue);
+            if (this.activeCommandBuffer == 0) {
+                throw new RuntimeException("mtlCommandQueueNewCommandBuffer returned NULL");
+            }
+        }
+        long encoder = MetalNative.mtlCommandBufferNewComputeEncoder(this.activeCommandBuffer);
+        if (encoder == 0) {
+            throw new RuntimeException("mtlCommandBufferNewComputeEncoder returned NULL");
+        }
+        return new MetalComputeEncoder(encoder);
+    }
+
     /**
      * Synchronously read RGBA8 pixels from a texture region into a byte array.
      * Allocates a transient Shared-storage MTLBuffer, runs a blit-encoder copy,

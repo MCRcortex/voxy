@@ -45,6 +45,11 @@ public class MetalBuffer extends TrackedObject implements IGpuBuffer {
         TOTAL_SIZE += size;
     }
 
+    /** Native MTLBuffer handle (package-private for backend-internal use). */
+    long handle() {
+        return this.handle;
+    }
+
     @Override
     public int id() {
         return this.id;

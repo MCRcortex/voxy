@@ -409,6 +409,18 @@ tasks.register('testMetalTriangle', JavaExec) {
     errorOutput = System.err
 }
 
+// M7 verification: compile a tiny SSBO-writing compute shader, dispatch
+// it on Metal, and verify the GPU wrote the expected per-invocation values.
+tasks.register('testMetalCompute', JavaExec) {
+    group = 'verification'
+    description = 'Smoke-test the Metal compute pipeline + dispatch chain.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'me.cortex.voxy.tools.MetalComputeSmokeTest'
+    workingDir = rootProject.projectDir
+    standardOutput = System.out
+    errorOutput = System.err
+}
+
 // M4 Stage A: bootstrap MoltenVK via LWJGL Vulkan and enumerate the GPU.
 // Tells us the loader/dylib path is wired correctly before we invest in the
 // rest of VulkanRenderBackend.

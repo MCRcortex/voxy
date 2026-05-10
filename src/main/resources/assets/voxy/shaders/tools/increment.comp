@@ -1,0 +1,16 @@
+#version 460 core
+
+// M7 smoke-test compute shader: writes (gl_GlobalInvocationID.x * 2 + 1)
+// into a SSBO at index gl_GlobalInvocationID.x. The host dispatches a
+// single thread-group of 64 invocations and verifies the readback.
+
+layout(local_size_x = 64) in;
+
+layout(binding = 0, std430) buffer DataBlock {
+    uint values[];
+};
+
+void main() {
+    uint i = gl_GlobalInvocationID.x;
+    values[i] = i * 2u + 1u;
+}
