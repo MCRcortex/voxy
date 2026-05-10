@@ -303,116 +303,276 @@ public class GlRenderBackend implements RenderBackend {
 
     @Override
     public IGpuPipeline createGraphicsPipeline(GraphicsPipelineDesc desc) {
-        // The GL backend reaches Voxy through its existing Shader.Builder compile
-        // flow rather than this abstraction. M9 is the milestone where call sites
-        // migrate over and we wire up a real GL implementation here.
-        throw new UnsupportedOperationException(
-                "GlRenderBackend.createGraphicsPipeline is not implemented yet — "
-                        + "GL path uses the legacy Shader.Builder pipeline through M8");
+        return new GlGraphicsPipeline(desc);
     }
 
     @Override
     public IGpuPipeline createComputePipeline(ComputePipelineDesc desc) {
-        throw new UnsupportedOperationException(
-                "GlRenderBackend.createComputePipeline is not implemented yet (see M9)");
+        return new GlComputePipeline(desc);
     }
 
     @Override
     public ComputeEncoder beginComputePass() {
-        throw new UnsupportedOperationException(
-                "GlRenderBackend.beginComputePass is not implemented yet (see M9)");
+        return new GlComputeEncoder();
     }
 
     @Override
     public IGpuSampler createSampler(SamplerDesc desc) {
-        throw new UnsupportedOperationException(
-                "GlRenderBackend.createSampler is not implemented yet (see M9)");
+        return new GlSampler(desc);
     }
 
-    /** Concrete encoder for the GL backend. Most methods stub through M8;
-     *  M9 wires them to the existing Voxy GL helpers as call-sites migrate. */
+    /**
+     * Concrete encoder for the GL backend. Each pass owns a transient VAO so
+     * vertex attribute formats from {@link GlGraphicsPipeline#vertexLayout}
+     * can be applied without polluting Voxy's shared VAOs. Push-constant
+     * emulation uses a per-encoder UBO; resource bindings are forwarded to
+     * the relevant {@code glBind*} entry points.
+     */
     private static final class GlRenderEncoder implements RenderEncoder {
         private final int fbo;
+        /** Per-encoder VAO created on first vertex-attribute set; 0 means uninitialized. */
+        private int vao;
+        /** Currently bound graphics pipeline (drives index-type and vertex layout). */
+        private GlGraphicsPipeline pipeline;
+        /** Index type captured from {@link #bindIndexBuffer} (GL_UNSIGNED_SHORT / GL_UNSIGNED_INT). */
+        private int indexGlType = org.lwjgl.opengl.GL11C.GL_UNSIGNED_INT;
+        /** Index buffer offset captured from {@link #bindIndexBuffer}, in bytes. */
+        private long indexBaseOffset;
+        /** Lazy UBO used to back {@link #setBytes}; created on first use. */
+        private int pushUbo;
+        private long pushUboCapacity;
         private boolean closed;
 
         GlRenderEncoder(int fbo) { this.fbo = fbo; }
 
         @Override
         public void setPipeline(IGpuPipeline pipeline) {
-            throw new UnsupportedOperationException("GlRenderEncoder.setPipeline (see M9)");
+            if (!(pipeline instanceof GlGraphicsPipeline gl)) {
+                throw new IllegalArgumentException(
+                        "GlRenderEncoder.setPipeline requires GlGraphicsPipeline, got "
+                                + (pipeline == null ? "null" : pipeline.getClass().getName()));
+            }
+            this.pipeline = gl;
+            org.lwjgl.opengl.GL20C.glUseProgram(gl.program());
+            GlPipelineStateApplier.apply(gl.state);
+            applyVertexLayout(gl.vertexLayout);
         }
 
         @Override
         public void setBuffer(int binding, IGpuBuffer buffer, long offset) {
-            throw new UnsupportedOperationException("GlRenderEncoder.setBuffer (see M9)");
+            if (offset == 0) {
+                org.lwjgl.opengl.GL43C.glBindBufferBase(
+                        org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER, binding, buffer.id());
+            } else {
+                org.lwjgl.opengl.GL43C.glBindBufferRange(
+                        org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER, binding,
+                        buffer.id(), offset, buffer.size() - offset);
+            }
         }
 
         @Override
         public void setTexture(int binding, IGpuTexture texture) {
-            throw new UnsupportedOperationException("GlRenderEncoder.setTexture (see M9)");
+            // Render-pass setTexture is "sampled texture" semantics: bind the
+            // texture object to texture unit `binding`. setSampler(binding, ...)
+            // pairs with this via glBindSampler at the same unit.
+            org.lwjgl.opengl.GL45C.glBindTextureUnit(binding, texture.id());
         }
 
         @Override
         public void setSampler(int binding, IGpuSampler sampler) {
-            throw new UnsupportedOperationException("GlRenderEncoder.setSampler (see M9)");
+            if (!(sampler instanceof GlSampler gl)) {
+                throw new IllegalArgumentException(
+                        "GlRenderEncoder.setSampler requires GlSampler, got "
+                                + (sampler == null ? "null" : sampler.getClass().getName()));
+            }
+            org.lwjgl.opengl.GL33C.glBindSampler(binding, gl.handle());
         }
 
         @Override
         public void setBytes(int binding, long dataAddr, int dataSize) {
-            throw new UnsupportedOperationException("GlRenderEncoder.setBytes (see M9)");
+            ensurePushUbo(dataSize);
+            org.lwjgl.opengl.GL45C.nglNamedBufferSubData(this.pushUbo, 0, dataSize, dataAddr);
+            org.lwjgl.opengl.GL30C.glBindBufferRange(
+                    org.lwjgl.opengl.GL31C.GL_UNIFORM_BUFFER, binding,
+                    this.pushUbo, 0, dataSize);
         }
 
         @Override
         public void bindVertexBuffer(int slot, IGpuBuffer buffer, long offset) {
-            throw new UnsupportedOperationException("GlRenderEncoder.bindVertexBuffer (see M9)");
+            ensureVao();
+            int stride = strideForSlot(slot);
+            org.lwjgl.opengl.GL45C.glVertexArrayVertexBuffer(this.vao, slot,
+                    buffer.id(), offset, stride);
         }
 
         @Override
         public void bindIndexBuffer(IGpuBuffer buffer, int indexType, long offset) {
-            throw new UnsupportedOperationException("GlRenderEncoder.bindIndexBuffer (see M9)");
+            ensureVao();
+            this.indexGlType = (indexType == INDEX_TYPE_UINT16)
+                    ? org.lwjgl.opengl.GL11C.GL_UNSIGNED_SHORT
+                    : org.lwjgl.opengl.GL11C.GL_UNSIGNED_INT;
+            this.indexBaseOffset = offset;
+            org.lwjgl.opengl.GL45C.glVertexArrayElementBuffer(this.vao, buffer.id());
         }
 
         @Override
         public void setViewport(float x, float y, float width, float height,
                                  float minDepth, float maxDepth) {
-            throw new UnsupportedOperationException("GlRenderEncoder.setViewport (see M9)");
+            org.lwjgl.opengl.GL41C.glViewportIndexedf(0, x, y, width, height);
+            org.lwjgl.opengl.GL41C.glDepthRangeIndexed(0, minDepth, maxDepth);
         }
 
         @Override
         public void setScissor(int x, int y, int width, int height) {
-            throw new UnsupportedOperationException("GlRenderEncoder.setScissor (see M9)");
+            org.lwjgl.opengl.GL30C.glEnable(org.lwjgl.opengl.GL11C.GL_SCISSOR_TEST);
+            org.lwjgl.opengl.GL41C.glScissorIndexed(0, x, y, width, height);
         }
 
         @Override
         public void draw(int primitiveType, int firstVertex, int vertexCount,
                          int instanceCount, int baseInstance) {
-            throw new UnsupportedOperationException("GlRenderEncoder.draw (see M9)");
+            ensureVao();
+            int mode = mapPrimitive(primitiveType);
+            if (baseInstance == 0) {
+                org.lwjgl.opengl.GL31C.glDrawArraysInstanced(mode, firstVertex, vertexCount, instanceCount);
+            } else {
+                org.lwjgl.opengl.GL42C.glDrawArraysInstancedBaseInstance(
+                        mode, firstVertex, vertexCount, instanceCount, baseInstance);
+            }
         }
 
         @Override
         public void drawIndexed(int primitiveType, int indexCount, int instanceCount,
                                  int firstIndex, int vertexOffset, int firstInstance) {
-            throw new UnsupportedOperationException("GlRenderEncoder.drawIndexed (see M9)");
+            ensureVao();
+            int mode = mapPrimitive(primitiveType);
+            int indexSize = (this.indexGlType == org.lwjgl.opengl.GL11C.GL_UNSIGNED_SHORT) ? 2 : 4;
+            long indexByteOffset = this.indexBaseOffset + (long) firstIndex * indexSize;
+            if (firstInstance == 0 && vertexOffset == 0) {
+                org.lwjgl.opengl.GL31C.glDrawElementsInstanced(
+                        mode, indexCount, this.indexGlType, indexByteOffset, instanceCount);
+            } else {
+                org.lwjgl.opengl.GL42C.glDrawElementsInstancedBaseVertexBaseInstance(
+                        mode, indexCount, this.indexGlType, indexByteOffset,
+                        instanceCount, vertexOffset, firstInstance);
+            }
         }
 
         @Override
         public void drawIndirect(int primitiveType, IGpuBuffer buffer, long offset,
                                   int drawCount, int stride) {
-            throw new UnsupportedOperationException("GlRenderEncoder.drawIndirect (see M9)");
+            ensureVao();
+            int mode = mapPrimitive(primitiveType);
+            int prev = org.lwjgl.opengl.GL15C.glGetInteger(
+                    org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER_BINDING);
+            org.lwjgl.opengl.GL15C.glBindBuffer(
+                    org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER, buffer.id());
+            org.lwjgl.opengl.GL43C.glMultiDrawArraysIndirect(mode, offset, drawCount, stride);
+            org.lwjgl.opengl.GL15C.glBindBuffer(
+                    org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER, prev);
         }
 
         @Override
         public void drawIndexedIndirect(int primitiveType, IGpuBuffer buffer, long offset,
                                          int drawCount, int stride) {
-            throw new UnsupportedOperationException("GlRenderEncoder.drawIndexedIndirect (see M9)");
+            ensureVao();
+            int mode = mapPrimitive(primitiveType);
+            int prev = org.lwjgl.opengl.GL15C.glGetInteger(
+                    org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER_BINDING);
+            org.lwjgl.opengl.GL15C.glBindBuffer(
+                    org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER, buffer.id());
+            org.lwjgl.opengl.GL43C.glMultiDrawElementsIndirect(
+                    mode, this.indexGlType, offset, drawCount, stride);
+            org.lwjgl.opengl.GL15C.glBindBuffer(
+                    org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER, prev);
         }
 
         @Override
         public void close() {
             if (this.closed) return;
             this.closed = true;
+            if (this.vao != 0) {
+                org.lwjgl.opengl.GL45C.glDeleteVertexArrays(this.vao);
+                this.vao = 0;
+            }
+            if (this.pushUbo != 0) {
+                org.lwjgl.opengl.GL15C.glDeleteBuffers(this.pushUbo);
+                this.pushUbo = 0;
+            }
             org.lwjgl.opengl.GL45C.glBindFramebuffer(org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER, 0);
             org.lwjgl.opengl.GL45C.glDeleteFramebuffers(this.fbo);
+        }
+
+        private void ensureVao() {
+            if (this.vao == 0) {
+                this.vao = org.lwjgl.opengl.GL45C.glCreateVertexArrays();
+                org.lwjgl.opengl.GL30C.glBindVertexArray(this.vao);
+            } else {
+                int active = org.lwjgl.opengl.GL15C.glGetInteger(
+                        org.lwjgl.opengl.GL30C.GL_VERTEX_ARRAY_BINDING);
+                if (active != this.vao) {
+                    org.lwjgl.opengl.GL30C.glBindVertexArray(this.vao);
+                }
+            }
+        }
+
+        private void applyVertexLayout(me.cortex.voxy.client.core.gpu.VertexLayout layout) {
+            if (layout == null || layout.attributes.length == 0) return;
+            ensureVao();
+            for (var attr : layout.attributes) {
+                int loc = attr.location;
+                org.lwjgl.opengl.GL45C.glEnableVertexArrayAttrib(this.vao, loc);
+                int glType = GlVertexFormatMap.glType(attr.format);
+                int comps = GlVertexFormatMap.components(attr.format);
+                if (GlVertexFormatMap.integerAttribute(attr.format)) {
+                    org.lwjgl.opengl.GL45C.glVertexArrayAttribIFormat(
+                            this.vao, loc, comps, glType, attr.offset);
+                } else {
+                    org.lwjgl.opengl.GL45C.glVertexArrayAttribFormat(
+                            this.vao, loc, comps, glType,
+                            GlVertexFormatMap.normalized(attr.format), attr.offset);
+                }
+                org.lwjgl.opengl.GL45C.glVertexArrayAttribBinding(this.vao, loc, attr.bufferSlot);
+            }
+            for (var buf : layout.buffers) {
+                if (buf.stepRate == me.cortex.voxy.client.core.gpu.VertexLayout.StepRate.PER_INSTANCE) {
+                    org.lwjgl.opengl.GL45C.glVertexArrayBindingDivisor(this.vao, buf.slot, 1);
+                } else {
+                    org.lwjgl.opengl.GL45C.glVertexArrayBindingDivisor(this.vao, buf.slot, 0);
+                }
+            }
+        }
+
+        private int strideForSlot(int slot) {
+            if (this.pipeline == null) return 0;
+            for (var buf : this.pipeline.vertexLayout.buffers) {
+                if (buf.slot == slot) return buf.stride;
+            }
+            return 0;
+        }
+
+        private static int mapPrimitive(int primitiveType) {
+            return switch (primitiveType) {
+                case PRIMITIVE_TRIANGLES -> org.lwjgl.opengl.GL11C.GL_TRIANGLES;
+                case PRIMITIVE_TRIANGLE_STRIP -> org.lwjgl.opengl.GL11C.GL_TRIANGLE_STRIP;
+                case PRIMITIVE_LINES -> org.lwjgl.opengl.GL11C.GL_LINES;
+                case PRIMITIVE_POINTS -> org.lwjgl.opengl.GL11C.GL_POINTS;
+                default -> throw new IllegalArgumentException("Unknown primitive: " + primitiveType);
+            };
+        }
+
+        private void ensurePushUbo(int size) {
+            long needed = (size + 255) & ~255L;
+            if (this.pushUbo == 0) {
+                this.pushUbo = org.lwjgl.opengl.GL45C.glCreateBuffers();
+                this.pushUboCapacity = Math.max(needed, 256);
+                org.lwjgl.opengl.GL45C.glNamedBufferData(this.pushUbo, this.pushUboCapacity,
+                        org.lwjgl.opengl.GL15C.GL_DYNAMIC_DRAW);
+            } else if (needed > this.pushUboCapacity) {
+                this.pushUboCapacity = needed;
+                org.lwjgl.opengl.GL45C.glNamedBufferData(this.pushUbo, this.pushUboCapacity,
+                        org.lwjgl.opengl.GL15C.GL_DYNAMIC_DRAW);
+            }
         }
     }
 }
