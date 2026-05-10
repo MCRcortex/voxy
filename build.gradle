@@ -432,11 +432,23 @@ tasks.register('testVulkanLoader', JavaExec) {
     workingDir = rootProject.projectDir
     standardOutput = System.out
     errorOutput = System.err
-    // The Vulkan loader looks for ICDs in standard system paths that don't
-    // exist on macOS; point it at the Homebrew-installed MoltenVK ICD JSON
-    // so vkEnumeratePhysicalDevices returns the Apple GPU. At ship time the
-    // VulkanLoader class extracts a bundled libMoltenVK.dylib and bypasses
-    // the loader entirely; this env var is dev-only.
+    def moltenVkIcd = file('/opt/homebrew/etc/vulkan/icd.d/MoltenVK_icd.json')
+    if (moltenVkIcd.exists()) {
+        environment 'VK_ICD_FILENAMES', moltenVkIcd.absolutePath
+    }
+}
+
+// M4 Stages B-D: full Vulkan clear-color render pass on MoltenVK.
+// Runs the device + image + dynamic_rendering setup and reads pixels back
+// to confirm the GPU wrote the expected RGBA8 values.
+tasks.register('testVulkanClear', JavaExec) {
+    group = 'verification'
+    description = 'Smoke-test a Vulkan clear-color render pass via MoltenVK + dynamic_rendering.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'me.cortex.voxy.tools.VulkanClearSmokeTest'
+    workingDir = rootProject.projectDir
+    standardOutput = System.out
+    errorOutput = System.err
     def moltenVkIcd = file('/opt/homebrew/etc/vulkan/icd.d/MoltenVK_icd.json')
     if (moltenVkIcd.exists()) {
         environment 'VK_ICD_FILENAMES', moltenVkIcd.absolutePath
