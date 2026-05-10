@@ -23,19 +23,33 @@ public final class GraphicsPipelineDesc {
     public final int colorAttachmentFormat;
     /** Vertex inputs. Use {@link VertexLayout#EMPTY} for gl_VertexIndex-driven shaders. */
     public final VertexLayout vertexLayout;
+    /** Static state baked into the pipeline (depth, blend, raster). */
+    public final PipelineState state;
     public final String label;
 
     public GraphicsPipelineDesc(String vertexMsl, String fragmentMsl,
                                 byte[] vertexSpirv, byte[] fragmentSpirv,
                                 int colorAttachmentFormat,
-                                VertexLayout vertexLayout, String label) {
+                                VertexLayout vertexLayout,
+                                PipelineState state,
+                                String label) {
         this.vertexMsl = vertexMsl;
         this.fragmentMsl = fragmentMsl;
         this.vertexSpirv = vertexSpirv;
         this.fragmentSpirv = fragmentSpirv;
         this.colorAttachmentFormat = colorAttachmentFormat;
         this.vertexLayout = vertexLayout != null ? vertexLayout : VertexLayout.EMPTY;
+        this.state = state != null ? state : PipelineState.DEFAULT;
         this.label = label;
+    }
+
+    /** Backward-compat overload without explicit pipeline state (uses DEFAULT). */
+    public GraphicsPipelineDesc(String vertexMsl, String fragmentMsl,
+                                byte[] vertexSpirv, byte[] fragmentSpirv,
+                                int colorAttachmentFormat,
+                                VertexLayout vertexLayout, String label) {
+        this(vertexMsl, fragmentMsl, vertexSpirv, fragmentSpirv,
+             colorAttachmentFormat, vertexLayout, PipelineState.DEFAULT, label);
     }
 
     /** Convenience overload for shaders without vertex inputs. */
@@ -43,6 +57,6 @@ public final class GraphicsPipelineDesc {
                                 byte[] vertexSpirv, byte[] fragmentSpirv,
                                 int colorAttachmentFormat, String label) {
         this(vertexMsl, fragmentMsl, vertexSpirv, fragmentSpirv,
-             colorAttachmentFormat, VertexLayout.EMPTY, label);
+             colorAttachmentFormat, VertexLayout.EMPTY, PipelineState.DEFAULT, label);
     }
 }

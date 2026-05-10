@@ -365,6 +365,66 @@ public final class MetalNative {
             long indexBuffer, long indexBufferOffset,
             long indirectBuffer, long indirectOffset);
 
+    // --- Pipeline static state: depth-stencil + blend + raster ---
+
+    /** Configures color attachment N's blend state on a render pipeline descriptor. */
+    public static native void mtlRenderPipelineDescriptorSetColorAttachmentBlending(
+            long descriptor, int index, boolean enable,
+            int rgbOp, int alphaOp,
+            int srcRgb, int dstRgb, int srcAlpha, int dstAlpha);
+
+    public static native long mtlNewDepthStencilDescriptor();
+    public static native void mtlDepthStencilDescriptorSetCompareFunction(long descriptor, int compareFunction);
+    public static native void mtlDepthStencilDescriptorSetDepthWriteEnabled(long descriptor, boolean enabled);
+    public static native long mtlDeviceNewDepthStencilState(long device, long descriptor);
+
+    public static native void mtlRenderEncoderSetDepthStencilState(long encoder, long state);
+    public static native void mtlRenderEncoderSetCullMode(long encoder, int cullMode);
+    public static native void mtlRenderEncoderSetFrontFacingWinding(long encoder, int winding);
+    public static native void mtlRenderEncoderSetTriangleFillMode(long encoder, int fillMode);
+
+    /** MTLCompareFunction enum (Never=0 ... Always=7). */
+    public static final int MTLCompareFunctionNever = 0;
+    public static final int MTLCompareFunctionLess = 1;
+    public static final int MTLCompareFunctionEqual = 2;
+    public static final int MTLCompareFunctionLessEqual = 3;
+    public static final int MTLCompareFunctionGreater = 4;
+    public static final int MTLCompareFunctionNotEqual = 5;
+    public static final int MTLCompareFunctionGreaterEqual = 6;
+    public static final int MTLCompareFunctionAlways = 7;
+
+    /** MTLCullMode enum. */
+    public static final int MTLCullModeNone = 0;
+    public static final int MTLCullModeFront = 1;
+    public static final int MTLCullModeBack = 2;
+
+    /** MTLWinding enum. */
+    public static final int MTLWindingClockwise = 0;
+    public static final int MTLWindingCounterClockwise = 1;
+
+    /** MTLTriangleFillMode enum. */
+    public static final int MTLTriangleFillModeFill = 0;
+    public static final int MTLTriangleFillModeLines = 1;
+
+    /** MTLBlendOperation enum. */
+    public static final int MTLBlendOperationAdd = 0;
+    public static final int MTLBlendOperationSubtract = 1;
+    public static final int MTLBlendOperationReverseSubtract = 2;
+    public static final int MTLBlendOperationMin = 3;
+    public static final int MTLBlendOperationMax = 4;
+
+    /** MTLBlendFactor enum (subset). */
+    public static final int MTLBlendFactorZero = 0;
+    public static final int MTLBlendFactorOne = 1;
+    public static final int MTLBlendFactorSourceColor = 2;
+    public static final int MTLBlendFactorOneMinusSourceColor = 3;
+    public static final int MTLBlendFactorSourceAlpha = 4;
+    public static final int MTLBlendFactorOneMinusSourceAlpha = 5;
+    public static final int MTLBlendFactorDestinationColor = 6;
+    public static final int MTLBlendFactorOneMinusDestinationColor = 7;
+    public static final int MTLBlendFactorDestinationAlpha = 8;
+    public static final int MTLBlendFactorOneMinusDestinationAlpha = 9;
+
     // --- Compute encoder (M7) ---
 
     /** Creates a compute command encoder on the active command buffer. */

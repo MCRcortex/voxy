@@ -33,6 +33,15 @@ public final class MetalRenderEncoder implements RenderEncoder {
                             + (pipeline == null ? "null" : pipeline.getClass().getName()));
         }
         MetalNative.mtlRenderEncoderSetRenderPipelineState(this.encoderHandle, mp.pipelineStateHandle());
+        // Depth-stencil, cull, winding, and triangle fill mode live on the encoder
+        // (not on the render pipeline state object) — apply them every time the
+        // pipeline changes so the encoder picks up the per-pipeline raster state.
+        if (mp.depthStencilStateHandle() != 0) {
+            MetalNative.mtlRenderEncoderSetDepthStencilState(this.encoderHandle, mp.depthStencilStateHandle());
+        }
+        MetalNative.mtlRenderEncoderSetCullMode(this.encoderHandle, mp.cullMode);
+        MetalNative.mtlRenderEncoderSetFrontFacingWinding(this.encoderHandle, mp.winding);
+        MetalNative.mtlRenderEncoderSetTriangleFillMode(this.encoderHandle, mp.fillMode);
     }
 
     @Override

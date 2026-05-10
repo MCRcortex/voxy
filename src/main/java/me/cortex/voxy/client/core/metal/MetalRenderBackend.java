@@ -409,6 +409,7 @@ public class MetalRenderBackend implements RenderBackend {
         long fragmentFn = 0;
         long pipelineState = 0;
         long pipelineDesc = 0;
+        long dssHandle = 0;
         try {
             fragmentLib = MetalNative.mtlDeviceNewLibraryWithSource(this.device, desc.fragmentMsl);
             if (fragmentLib == 0) {
@@ -439,6 +440,15 @@ public class MetalRenderBackend implements RenderBackend {
             MetalNative.mtlRenderPipelineDescriptorSetFragmentFunction(pipelineDesc, fragmentFn);
             MetalNative.mtlRenderPipelineDescriptorSetColorAttachmentFormat(pipelineDesc, 0, metalPixelFormat);
 
+            // Bake blend state into the pipeline (Metal stores it on the pipeline,
+            // not on the encoder).
+            PipelineState.BlendState blend = desc.state.blend;
+            MetalNative.mtlRenderPipelineDescriptorSetColorAttachmentBlending(pipelineDesc, 0,
+                    blend.enabled,
+                    mapBlendOp(blend.colorOp), mapBlendOp(blend.alphaOp),
+                    mapBlendFactor(blend.srcColor), mapBlendFactor(blend.dstColor),
+                    mapBlendFactor(blend.srcAlpha), mapBlendFactor(blend.dstAlpha));
+
             // Build + attach vertex descriptor if the pipeline declares vertex inputs.
             // Empty layout → no descriptor (gl_VertexIndex-driven shaders).
             long vertexDescHandle = 0;
@@ -466,6 +476,26 @@ public class MetalRenderBackend implements RenderBackend {
                 // Pipeline state retained the descriptor; drop our reference.
                 MetalNative.mtlRelease(vertexDescHandle);
             }
+
+            // Build the depth-stencil state. Skip if both test + write are off.
+            if (desc.state.depth.testEnabled || desc.state.depth.writeEnabled) {
+                long dssDesc = MetalNative.mtlNewDepthStencilDescriptor();
+                if (dssDesc == 0) throw new RuntimeException("mtlNewDepthStencilDescriptor returned NULL");
+                try {
+                    int compareFn = desc.state.depth.testEnabled
+                            ? mapCompareOp(desc.state.depth.compareOp)
+                            : MetalNative.MTLCompareFunctionAlways;
+                    MetalNative.mtlDepthStencilDescriptorSetCompareFunction(dssDesc, compareFn);
+                    MetalNative.mtlDepthStencilDescriptorSetDepthWriteEnabled(dssDesc, desc.state.depth.writeEnabled);
+                    dssHandle = MetalNative.mtlDeviceNewDepthStencilState(this.device, dssDesc);
+                    if (dssHandle == 0) throw new RuntimeException("mtlDeviceNewDepthStencilState returned NULL");
+                } finally {
+                    MetalNative.mtlRelease(dssDesc);
+                }
+            }
+            int cullModeI = mapCullMode(desc.state.raster.cullMode);
+            int windingI = mapFrontFace(desc.state.raster.frontFace);
+            int fillModeI = mapPolygonMode(desc.state.raster.polygonMode);
             if (pipelineState == 0) {
                 throw new RuntimeException("Pipeline state link failed: " + MetalNative.mtlGetLastCompileError());
             }
@@ -474,22 +504,87 @@ public class MetalRenderBackend implements RenderBackend {
             }
 
             MetalGraphicsPipeline result = new MetalGraphicsPipeline(
-                    pipelineState, vertexLib, fragmentLib, vertexFn, fragmentFn);
+                    pipelineState, vertexLib, fragmentLib, vertexFn, fragmentFn,
+                    dssHandle, cullModeI, windingI, fillModeI);
             // result owns the handles now; clear locals so the catch path doesn't double-release.
             pipelineState = 0;
             vertexFn = 0;
             fragmentFn = 0;
             vertexLib = 0;
             fragmentLib = 0;
+            dssHandle = 0;
             return result;
         } finally {
             if (pipelineDesc != 0) MetalNative.mtlRelease(pipelineDesc);
             if (pipelineState != 0) MetalNative.mtlRelease(pipelineState);
+            if (dssHandle != 0) MetalNative.mtlRelease(dssHandle);
             if (fragmentFn != 0) MetalNative.mtlRelease(fragmentFn);
             if (vertexFn != 0) MetalNative.mtlRelease(vertexFn);
             if (fragmentLib != 0) MetalNative.mtlRelease(fragmentLib);
             if (vertexLib != 0) MetalNative.mtlRelease(vertexLib);
         }
+    }
+
+    // --- PipelineState → Metal enum translators ---
+
+    private static int mapCompareOp(PipelineState.CompareOp op) {
+        return switch (op) {
+            case NEVER -> MetalNative.MTLCompareFunctionNever;
+            case LESS -> MetalNative.MTLCompareFunctionLess;
+            case EQUAL -> MetalNative.MTLCompareFunctionEqual;
+            case LESS_EQUAL -> MetalNative.MTLCompareFunctionLessEqual;
+            case GREATER -> MetalNative.MTLCompareFunctionGreater;
+            case NOT_EQUAL -> MetalNative.MTLCompareFunctionNotEqual;
+            case GREATER_EQUAL -> MetalNative.MTLCompareFunctionGreaterEqual;
+            case ALWAYS -> MetalNative.MTLCompareFunctionAlways;
+        };
+    }
+
+    private static int mapCullMode(PipelineState.CullMode mode) {
+        return switch (mode) {
+            case NONE -> MetalNative.MTLCullModeNone;
+            case FRONT -> MetalNative.MTLCullModeFront;
+            case BACK -> MetalNative.MTLCullModeBack;
+        };
+    }
+
+    private static int mapFrontFace(PipelineState.FrontFace face) {
+        return switch (face) {
+            case CLOCKWISE -> MetalNative.MTLWindingClockwise;
+            case COUNTER_CLOCKWISE -> MetalNative.MTLWindingCounterClockwise;
+        };
+    }
+
+    private static int mapPolygonMode(PipelineState.PolygonMode mode) {
+        return switch (mode) {
+            case FILL -> MetalNative.MTLTriangleFillModeFill;
+            case LINE -> MetalNative.MTLTriangleFillModeLines;
+        };
+    }
+
+    private static int mapBlendOp(PipelineState.BlendOp op) {
+        return switch (op) {
+            case ADD -> MetalNative.MTLBlendOperationAdd;
+            case SUBTRACT -> MetalNative.MTLBlendOperationSubtract;
+            case REVERSE_SUBTRACT -> MetalNative.MTLBlendOperationReverseSubtract;
+            case MIN -> MetalNative.MTLBlendOperationMin;
+            case MAX -> MetalNative.MTLBlendOperationMax;
+        };
+    }
+
+    private static int mapBlendFactor(PipelineState.BlendFactor f) {
+        return switch (f) {
+            case ZERO -> MetalNative.MTLBlendFactorZero;
+            case ONE -> MetalNative.MTLBlendFactorOne;
+            case SRC_COLOR -> MetalNative.MTLBlendFactorSourceColor;
+            case ONE_MINUS_SRC_COLOR -> MetalNative.MTLBlendFactorOneMinusSourceColor;
+            case DST_COLOR -> MetalNative.MTLBlendFactorDestinationColor;
+            case ONE_MINUS_DST_COLOR -> MetalNative.MTLBlendFactorOneMinusDestinationColor;
+            case SRC_ALPHA -> MetalNative.MTLBlendFactorSourceAlpha;
+            case ONE_MINUS_SRC_ALPHA -> MetalNative.MTLBlendFactorOneMinusSourceAlpha;
+            case DST_ALPHA -> MetalNative.MTLBlendFactorDestinationAlpha;
+            case ONE_MINUS_DST_ALPHA -> MetalNative.MTLBlendFactorOneMinusDestinationAlpha;
+        };
     }
 
     @Override

@@ -280,3 +280,93 @@ Java_me_cortex_voxy_client_core_metal_MetalNative_mtlBlitEncoderCopyTextureToBuf
       destinationBytesPerRow:(NSUInteger)bytesPerRow
     destinationBytesPerImage:(NSUInteger)bytesPerImage];
 }
+
+// -------- Blend state on render pipeline descriptor --------
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderPipelineDescriptorSetColorAttachmentBlending(
+        JNIEnv *, jclass, jlong descHandle, jint index, jboolean enable,
+        jint rgbOp, jint alphaOp,
+        jint srcRgb, jint dstRgb, jint srcAlpha, jint dstAlpha) {
+    if (descHandle == 0) return;
+    MTLRenderPipelineDescriptor *desc = voxy_handle_cast<MTLRenderPipelineDescriptor *>(descHandle);
+    MTLRenderPipelineColorAttachmentDescriptor *att = desc.colorAttachments[(NSUInteger)index];
+    att.blendingEnabled = (enable == JNI_TRUE);
+    att.rgbBlendOperation = (MTLBlendOperation)rgbOp;
+    att.alphaBlendOperation = (MTLBlendOperation)alphaOp;
+    att.sourceRGBBlendFactor = (MTLBlendFactor)srcRgb;
+    att.destinationRGBBlendFactor = (MTLBlendFactor)dstRgb;
+    att.sourceAlphaBlendFactor = (MTLBlendFactor)srcAlpha;
+    att.destinationAlphaBlendFactor = (MTLBlendFactor)dstAlpha;
+}
+
+// -------- Depth-stencil descriptor + state --------
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlNewDepthStencilDescriptor(JNIEnv *, jclass) {
+    MTLDepthStencilDescriptor *desc = [[MTLDepthStencilDescriptor alloc] init];
+    if (desc == nil) return 0;
+    return voxy_handle_from(desc);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlDepthStencilDescriptorSetCompareFunction(
+        JNIEnv *, jclass, jlong descHandle, jint compareFunction) {
+    if (descHandle == 0) return;
+    MTLDepthStencilDescriptor *desc = voxy_handle_cast<MTLDepthStencilDescriptor *>(descHandle);
+    desc.depthCompareFunction = (MTLCompareFunction)compareFunction;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlDepthStencilDescriptorSetDepthWriteEnabled(
+        JNIEnv *, jclass, jlong descHandle, jboolean enabled) {
+    if (descHandle == 0) return;
+    MTLDepthStencilDescriptor *desc = voxy_handle_cast<MTLDepthStencilDescriptor *>(descHandle);
+    desc.depthWriteEnabled = (enabled == JNI_TRUE);
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlDeviceNewDepthStencilState(
+        JNIEnv *, jclass, jlong deviceHandle, jlong descHandle) {
+    if (deviceHandle == 0 || descHandle == 0) return 0;
+    id<MTLDevice> device = voxy_handle_cast<id<MTLDevice>>(deviceHandle);
+    MTLDepthStencilDescriptor *desc = voxy_handle_cast<MTLDepthStencilDescriptor *>(descHandle);
+    id<MTLDepthStencilState> state = [device newDepthStencilStateWithDescriptor:desc];
+    if (state == nil) return 0;
+    return voxy_handle_from(state);
+}
+
+// -------- Render encoder static state --------
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetDepthStencilState(
+        JNIEnv *, jclass, jlong encoderHandle, jlong stateHandle) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    id<MTLDepthStencilState> state = stateHandle ? voxy_handle_cast<id<MTLDepthStencilState>>(stateHandle) : nil;
+    [encoder setDepthStencilState:state];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetCullMode(
+        JNIEnv *, jclass, jlong encoderHandle, jint cullMode) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    [encoder setCullMode:(MTLCullMode)cullMode];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetFrontFacingWinding(
+        JNIEnv *, jclass, jlong encoderHandle, jint winding) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    [encoder setFrontFacingWinding:(MTLWinding)winding];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetTriangleFillMode(
+        JNIEnv *, jclass, jlong encoderHandle, jint fillMode) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    [encoder setTriangleFillMode:(MTLTriangleFillMode)fillMode];
+}

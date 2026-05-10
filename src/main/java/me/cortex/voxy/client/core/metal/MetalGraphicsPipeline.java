@@ -19,18 +19,33 @@ public final class MetalGraphicsPipeline implements IGpuPipeline {
     private long fragmentLibrary;
     private long vertexFunction;
     private long fragmentFunction;
+    /** Depth-stencil state object — 0 if no depth testing/writing requested. */
+    private long depthStencilState;
+    /** Encoder-time raster state pulled from PipelineState; applied each setPipeline. */
+    final int cullMode;
+    final int winding;
+    final int fillMode;
 
     MetalGraphicsPipeline(long pipelineState, long vertexLibrary, long fragmentLibrary,
-                          long vertexFunction, long fragmentFunction) {
+                          long vertexFunction, long fragmentFunction,
+                          long depthStencilState, int cullMode, int winding, int fillMode) {
         this.pipelineState = pipelineState;
         this.vertexLibrary = vertexLibrary;
         this.fragmentLibrary = fragmentLibrary;
         this.vertexFunction = vertexFunction;
         this.fragmentFunction = fragmentFunction;
+        this.depthStencilState = depthStencilState;
+        this.cullMode = cullMode;
+        this.winding = winding;
+        this.fillMode = fillMode;
     }
 
     long pipelineStateHandle() {
         return this.pipelineState;
+    }
+
+    long depthStencilStateHandle() {
+        return this.depthStencilState;
     }
 
     @Override
@@ -38,6 +53,10 @@ public final class MetalGraphicsPipeline implements IGpuPipeline {
         if (this.pipelineState != 0) {
             MetalNative.mtlRelease(this.pipelineState);
             this.pipelineState = 0;
+        }
+        if (this.depthStencilState != 0) {
+            MetalNative.mtlRelease(this.depthStencilState);
+            this.depthStencilState = 0;
         }
         if (this.fragmentFunction != 0) {
             MetalNative.mtlRelease(this.fragmentFunction);
