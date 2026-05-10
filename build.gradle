@@ -253,6 +253,19 @@ dependencies {
     include(runtimeOnly "org.lwjgl:lwjgl-lmdb:$lwjglVersion:natives-linux")
     include(runtimeOnly "org.lwjgl:lwjgl-zstd:$lwjglVersion:natives-linux")
 
+    // Runtime shader translation (Metal/Vulkan backends only).
+    // GL backend on Win/Linux uses the driver compiler and never touches these
+    // — natives are shipped only for macos-arm64 to keep jar size minimal.
+    implementation "org.lwjgl:lwjgl-shaderc"
+    implementation "org.lwjgl:lwjgl-spvc"
+    include(runtimeOnly "org.lwjgl:lwjgl-shaderc:$lwjglVersion:natives-macos-arm64")
+    include(runtimeOnly "org.lwjgl:lwjgl-spvc:$lwjglVersion:natives-macos-arm64")
+
+    // Core LWJGL natives for macos-arm64 dev/test only — at game runtime MC ships
+    // its own copy, but standalone JavaExec tasks like testShaderCompiler need
+    // them on the classpath. Not bundled into the mod jar.
+    runtimeOnly "org.lwjgl:lwjgl:$lwjglVersion:natives-macos-arm64"
+
     include(implementation 'redis.clients:jedis:5.1.0')
     include(implementation('org.rocksdb:rocksdbjni:10.2.1'))
     include(implementation 'org.apache.commons:commons-pool2:2.12.0')
@@ -344,4 +357,33 @@ tasks.register('buildMetalNative', Exec) {
 
 processResources {
     dependsOn tasks.named('buildMetalNative')
+}
+
+// -------- Shader compiler smoke test --------
+// Runs me.cortex.voxy.tools.ShaderCompilerSmokeTest against the on-disk shader
+// tree to validate that GLSL -> SPIRV -> MSL works for a representative slice
+// of Voxy's shaders (incl. cmdgen.comp with injected runtime defines and
+// hiz.comp with subgroup ops). Used to gate M1 progress before wiring the
+// compiler into the Metal/Vulkan backends.
+tasks.register('testShaderCompiler', JavaExec) {
+    group = 'verification'
+    description = 'Smoke-test RuntimeShaderCompiler against representative Voxy shaders.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'me.cortex.voxy.tools.ShaderCompilerSmokeTest'
+    workingDir = rootProject.projectDir
+    standardOutput = System.out
+    errorOutput = System.err
+}
+
+// M3 verification: open a Metal render pass with clear-color load action and
+// confirm the command buffer commits + completes. Requires macos-arm64 host
+// with libvoxy_metal.dylib built (./gradlew buildMetalNative).
+tasks.register('testMetalRender', JavaExec) {
+    group = 'verification'
+    description = 'Smoke-test MetalRenderBackend by issuing a clear-color render pass.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'me.cortex.voxy.tools.MetalRenderBackendSmokeTest'
+    workingDir = rootProject.projectDir
+    standardOutput = System.out
+    errorOutput = System.err
 }

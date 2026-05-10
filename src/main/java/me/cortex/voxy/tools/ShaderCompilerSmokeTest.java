@@ -1,0 +1,127 @@
+package me.cortex.voxy.tools;
+
+import me.cortex.voxy.client.core.gpu.shader.RuntimeShaderCompiler;
+
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Standalone smoke test for {@link RuntimeShaderCompiler}: walks Voxy's
+ * shaders/ tree, attempts GLSL → SPIRV → MSL for each stage with the
+ * runtime defines we pulled from grep'ing the Java source, and reports
+ * pass/fail counts plus first-failure error per shader.
+ *
+ * Invoked via the {@code testShaderCompiler} Gradle task — not part of the
+ * mod runtime. Lives under {@code me.cortex.voxy.tools} to make that obvious.
+ */
+public final class ShaderCompilerSmokeTest {
+
+    private ShaderCompilerSmokeTest() {}
+
+    private record ShaderCase(String relPath, RuntimeShaderCompiler.Stage stage, Map<String, String> defines, String label) {}
+
+    public static void main(String[] args) throws Exception {
+        Path root = Path.of(args.length > 0 ? args[0] : "src/main/resources/assets/voxy/shaders").toAbsolutePath();
+        if (!Files.isDirectory(root)) {
+            System.err.println("Shaders directory not found: " + root);
+            System.exit(2);
+        }
+
+        Map<String, String> empty = Map.of();
+        // Defines pulled from MDICSectionRenderer.java:58–91 — cmdgen.comp gets compiled twice
+        // with different TRANSLUCENT_DISTANCE_BUFFER_BINDING values per pipeline.
+        Map<String, String> cmdgenA = Map.of(
+                "TRANSLUCENT_WRITE_BASE", "1024",
+                "TEMPORAL_OFFSET", "0",
+                "TRANSLUCENT_DISTANCE_BUFFER_BINDING", "7",
+                "HAS_STATISTICS", "1",
+                "STATISTICS_BUFFER_BINDING", "8");
+
+        ShaderCase[] cases = new ShaderCase[]{
+                new ShaderCase("post/noop.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "post/noop.frag (no defines)"),
+                new ShaderCase("post/blit_texture_cutout.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "post/blit_texture_cutout.frag"),
+                new ShaderCase("post/depth0.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "post/depth0.frag"),
+                new ShaderCase("hiz/blit.fsh", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "hiz/blit.fsh"),
+                new ShaderCase("post/fullscreen.vert", RuntimeShaderCompiler.Stage.VERTEX, empty, "post/fullscreen.vert"),
+                new ShaderCase("lod/gl46/prep.comp", RuntimeShaderCompiler.Stage.COMPUTE, empty, "lod/gl46/prep.comp"),
+                new ShaderCase("hiz/hiz.comp", RuntimeShaderCompiler.Stage.COMPUTE, empty, "hiz/hiz.comp (subgroups)"),
+                new ShaderCase("lod/gl46/cmdgen.comp", RuntimeShaderCompiler.Stage.COMPUTE, cmdgenA, "lod/gl46/cmdgen.comp + injected defines"),
+                new ShaderCase("lod/hierarchical/debug/setup.comp", RuntimeShaderCompiler.Stage.COMPUTE, empty, "lod/hierarchical/debug/setup.comp"),
+        };
+
+        int passSpv = 0, failSpv = 0, passMsl = 0, failMsl = 0;
+        StringBuilder failures = new StringBuilder();
+        long start = System.nanoTime();
+        // assetsBase is the directory CONTAINING `assets/`, i.e. the resource root
+        // (src/main/resources). expand() prepends "assets/" + namespace + "/shaders/".
+        Path assetsBase = root.getParent().getParent().getParent();
+        for (ShaderCase c : cases) {
+            String src = expandImports(root.resolve(c.relPath), assetsBase);
+            RuntimeShaderCompiler.Result spvResult;
+            try {
+                spvResult = RuntimeShaderCompiler.compile(src, c.stage, c.defines, RuntimeShaderCompiler.Target.VULKAN_SPIRV);
+                System.out.printf("PASS spv  %5d B  %s%n", spvResult.spirv().length, c.label);
+                passSpv++;
+            } catch (Throwable t) {
+                System.out.printf("FAIL spv             %s%n", c.label);
+                failures.append("  ").append(c.label).append(" [SPIRV]: ").append(t.getMessage()).append('\n');
+                failSpv++;
+                continue;
+            }
+            try {
+                RuntimeShaderCompiler.Result mslResult = RuntimeShaderCompiler.compile(src, c.stage, c.defines, RuntimeShaderCompiler.Target.METAL_MSL);
+                int mslLen = mslResult.mslSource() == null ? 0 : mslResult.mslSource().length();
+                System.out.printf("PASS msl  %5d ch %s%n", mslLen, c.label);
+                passMsl++;
+            } catch (Throwable t) {
+                System.out.printf("FAIL msl             %s%n", c.label);
+                failures.append("  ").append(c.label).append(" [MSL]: ").append(t.getMessage()).append('\n');
+                failMsl++;
+            }
+        }
+        long ms = (System.nanoTime() - start) / 1_000_000;
+        System.out.println();
+        System.out.printf("=== SPV: %d/%d  MSL: %d/%d  in %d ms ===%n",
+                passSpv, passSpv + failSpv, passMsl, passMsl + failMsl, ms);
+        if (failures.length() > 0) {
+            System.out.println("Failures:");
+            System.out.println(failures);
+            System.exit(1);
+        }
+    }
+
+    /** Resolve Voxy's #import &lt;ns:path&gt; directives recursively against the assets root. */
+    private static String expandImports(Path file, Path assetsRoot) throws Exception {
+        return expand(file, assetsRoot, new java.util.HashSet<>());
+    }
+
+    private static String expand(Path file, Path assetsRoot, java.util.Set<String> seen) throws Exception {
+        String key = file.toAbsolutePath().toString();
+        if (!seen.add(key)) return ""; // already included; first wins
+        StringBuilder out = new StringBuilder();
+        for (String line : Files.readString(file, StandardCharsets.UTF_8).split("\n", -1)) {
+            String trimmed = line.strip();
+            if (trimmed.startsWith("#import")) {
+                int lt = trimmed.indexOf('<');
+                int gt = trimmed.indexOf('>');
+                if (lt >= 0 && gt > lt) {
+                    String ref = trimmed.substring(lt + 1, gt);
+                    int colon = ref.indexOf(':');
+                    if (colon < 0) { out.append(line).append('\n'); continue; }
+                    String ns = ref.substring(0, colon);
+                    String rel = ref.substring(colon + 1);
+                    Path target = assetsRoot.resolve("assets/" + ns + "/shaders/" + rel);
+                    out.append("// >>> ").append(ref).append('\n');
+                    out.append(expand(target, assetsRoot, seen));
+                    out.append("// <<< ").append(ref).append('\n');
+                    continue;
+                }
+            }
+            out.append(line).append('\n');
+        }
+        return out.toString();
+    }
+}

@@ -257,4 +257,51 @@ public class GlRenderBackend implements RenderBackend {
             org.lwjgl.opengl.GL15C.glBindBuffer(org.lwjgl.opengl.GL31C.GL_COPY_WRITE_BUFFER, prevWrite);
         }
     }
+
+    // --- Render pass encoding ---
+
+    @Override
+    public RenderEncoder beginRenderPass(RenderPassDesc desc) {
+        // Allocate a transient framebuffer for the pass and attach the color/depth
+        // textures. We don't cache because Voxy's M2 caller (just clears) is
+        // low-frequency; M5+ will introduce a per-attachment-set FBO cache when
+        // pipeline state binding lands.
+        int fbo = org.lwjgl.opengl.GL45C.glCreateFramebuffers();
+        int[] drawBuffers = new int[Math.max(1, desc.colorAttachments().size())];
+        int clearMask = 0;
+        for (int i = 0; i < desc.colorAttachments().size(); i++) {
+            RenderPassDesc.ColorAttachment c = desc.colorAttachments().get(i);
+            int attachment = org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT0 + i;
+            org.lwjgl.opengl.GL45C.glNamedFramebufferTexture(fbo, attachment, c.texture().id(), c.level());
+            drawBuffers[i] = attachment;
+            if (c.loadAction() == RenderPassDesc.LoadAction.CLEAR) {
+                org.lwjgl.opengl.GL45C.glClearNamedFramebufferfv(fbo, org.lwjgl.opengl.GL30C.GL_COLOR, i,
+                        new float[]{c.clearR(), c.clearG(), c.clearB(), c.clearA()});
+            }
+        }
+        if (!desc.colorAttachments().isEmpty()) {
+            org.lwjgl.opengl.GL45C.glNamedFramebufferDrawBuffers(fbo, drawBuffers);
+        }
+        if (desc.depthAttachment() != null) {
+            RenderPassDesc.DepthAttachment d = desc.depthAttachment();
+            org.lwjgl.opengl.GL45C.glNamedFramebufferTexture(fbo,
+                    org.lwjgl.opengl.GL30C.GL_DEPTH_ATTACHMENT, d.texture().id(), d.level());
+            if (d.loadAction() == RenderPassDesc.LoadAction.CLEAR) {
+                org.lwjgl.opengl.GL45C.glClearNamedFramebufferfv(fbo,
+                        org.lwjgl.opengl.GL30C.GL_DEPTH, 0, new float[]{d.clearDepth()});
+            }
+        }
+        org.lwjgl.opengl.GL45C.glBindFramebuffer(org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER, fbo);
+        org.lwjgl.opengl.GL11C.glViewport(0, 0, desc.viewportWidth(), desc.viewportHeight());
+
+        return () -> {
+            org.lwjgl.opengl.GL45C.glBindFramebuffer(org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER, 0);
+            org.lwjgl.opengl.GL45C.glDeleteFramebuffers(fbo);
+        };
+    }
+
+    @Override
+    public void submit() {
+        org.lwjgl.opengl.GL11C.glFlush();
+    }
 }

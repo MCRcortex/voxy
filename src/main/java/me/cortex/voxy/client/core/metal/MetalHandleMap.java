@@ -58,6 +58,30 @@ public final class MetalHandleMap {
     }
 
     /**
+     * Updates the native handle associated with an existing ID.
+     *
+     * Used when a resource is allocated lazily (e.g. {@link MetalTexture#store})
+     * after the ID was reserved at construction with a sentinel handle. Keeps
+     * the int ID stable across the construction → allocation transition so any
+     * caller that holds the ID continues to resolve to the correct handle.
+     *
+     * @throws IllegalArgumentException if the ID was never registered.
+     */
+    public static void setHandle(int id, long handle) {
+        if (handle == 0) {
+            throw new IllegalArgumentException("Cannot set null Metal handle for id=" + id);
+        }
+        Long previous = ID_TO_HANDLE.put(id, handle);
+        if (previous == null) {
+            // Restore and complain — caller must register() before setHandle().
+            ID_TO_HANDLE.remove(id);
+            throw new IllegalArgumentException("setHandle on unknown id=" + id);
+        }
+        HANDLE_TO_ID.remove(previous);
+        HANDLE_TO_ID.put(handle, id);
+    }
+
+    /**
      * Unregisters an ID and its associated handle.
      * Call this when the Metal resource is freed.
      * @return the native handle that was associated, or 0 if not found

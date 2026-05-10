@@ -29,6 +29,8 @@ public class MetalRenderBackend implements RenderBackend {
     private final long sharedEvent;
     private final AtomicLong fenceCounter = new AtomicLong(1);
     private final long maxBufferLength;
+    /** Lazily allocated MTLCommandBuffer for the current frame; 0 when no commands are queued. */
+    private long activeCommandBuffer = 0;
 
     public MetalRenderBackend() {
         if (!MetalNative.load()) {
@@ -341,5 +343,87 @@ public class MetalRenderBackend implements RenderBackend {
         MetalNative.mtlRelease(this.commandQueue);
         MetalNative.mtlRelease(this.device);
         Logger.info("Metal backend shut down");
+    }
+
+    // --- Render pass encoding ---
+
+    @Override
+    public RenderEncoder beginRenderPass(RenderPassDesc desc) {
+        long passDescHandle = MetalNative.mtlNewRenderPassDescriptor();
+        if (passDescHandle == 0) {
+            throw new RuntimeException("mtlNewRenderPassDescriptor returned NULL");
+        }
+        long encoder;
+        try {
+            for (int i = 0; i < desc.colorAttachments().size(); i++) {
+                RenderPassDesc.ColorAttachment c = desc.colorAttachments().get(i);
+                long texHandle = MetalHandleMap.getHandle(c.texture().id());
+                MetalNative.mtlRenderPassSetColorAttachment(passDescHandle, i,
+                        texHandle, mapLoadAction(c.loadAction()),
+                        mapStoreAction(c.storeAction()), c.level());
+                if (c.loadAction() == RenderPassDesc.LoadAction.CLEAR) {
+                    MetalNative.mtlRenderPassSetColorClearColor(passDescHandle, i,
+                            c.clearR(), c.clearG(), c.clearB(), c.clearA());
+                }
+            }
+            if (desc.depthAttachment() != null) {
+                RenderPassDesc.DepthAttachment d = desc.depthAttachment();
+                long texHandle = MetalHandleMap.getHandle(d.texture().id());
+                MetalNative.mtlRenderPassSetDepthAttachment(passDescHandle, texHandle,
+                        mapLoadAction(d.loadAction()), mapStoreAction(d.storeAction()),
+                        d.clearDepth(), d.level());
+            }
+
+            if (this.activeCommandBuffer == 0) {
+                this.activeCommandBuffer = MetalNative.mtlCommandQueueNewCommandBuffer(this.commandQueue);
+                if (this.activeCommandBuffer == 0) {
+                    throw new RuntimeException("mtlCommandQueueNewCommandBuffer returned NULL");
+                }
+            }
+
+            encoder = MetalNative.mtlCommandBufferNewRenderEncoder(this.activeCommandBuffer, passDescHandle);
+            if (encoder == 0) {
+                throw new RuntimeException("mtlCommandBufferNewRenderEncoder returned NULL");
+            }
+        } finally {
+            // The render encoder retains a reference to the descriptor; we can drop ours.
+            MetalNative.mtlRelease(passDescHandle);
+        }
+
+        return () -> {
+            MetalNative.mtlEncoderEndEncoding(encoder);
+            MetalNative.mtlRelease(encoder);
+        };
+    }
+
+    @Override
+    public void submit() {
+        if (this.activeCommandBuffer == 0) return;
+        MetalNative.mtlCommandBufferCommit(this.activeCommandBuffer);
+        // Sync mode for M3: wait for completion so the smoke test can check status
+        // before the buffer is released. M5+ will move to async + per-frame fences.
+        MetalNative.mtlCommandBufferWaitUntilCompleted(this.activeCommandBuffer);
+        int status = MetalNative.mtlCommandBufferGetStatus(this.activeCommandBuffer);
+        MetalNative.mtlRelease(this.activeCommandBuffer);
+        this.activeCommandBuffer = 0;
+        if (status != MetalNative.MTLCommandBufferStatusCompleted) {
+            throw new RuntimeException("Metal command buffer ended with status=" + status
+                    + " (expected " + MetalNative.MTLCommandBufferStatusCompleted + " = Completed)");
+        }
+    }
+
+    private static int mapLoadAction(RenderPassDesc.LoadAction action) {
+        return switch (action) {
+            case LOAD -> MetalNative.MTLLoadActionLoad;
+            case CLEAR -> MetalNative.MTLLoadActionClear;
+            case DONT_CARE -> MetalNative.MTLLoadActionDontCare;
+        };
+    }
+
+    private static int mapStoreAction(RenderPassDesc.StoreAction action) {
+        return switch (action) {
+            case STORE -> MetalNative.MTLStoreActionStore;
+            case DONT_CARE -> MetalNative.MTLStoreActionDontCare;
+        };
     }
 }

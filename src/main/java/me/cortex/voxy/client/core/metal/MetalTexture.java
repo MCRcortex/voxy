@@ -87,7 +87,9 @@ public class MetalTexture extends TrackedObject implements IGpuTexture {
 
         long descriptor = MetalNative.mtlNewTextureDescriptor(
                 metalTextureType, metalPixelFormat, width, height, levels,
-                MetalNative.MTLTextureUsageShaderRead | MetalNative.MTLTextureUsageShaderWrite,
+                MetalNative.MTLTextureUsageShaderRead
+                        | MetalNative.MTLTextureUsageShaderWrite
+                        | MetalNative.MTLTextureUsageRenderTarget,
                 MetalNative.MTLStorageModePrivate);
 
         this.handle = MetalNative.mtlDeviceNewTexture(this.deviceHandle, descriptor);
@@ -97,10 +99,10 @@ public class MetalTexture extends TrackedObject implements IGpuTexture {
             throw new RuntimeException("Failed to create Metal texture " + width + "x" + height);
         }
 
-        // Update the handle map with the real handle
-        MetalHandleMap.unregister(this.id);
-        // Re-register with same ID is not possible, but we can track handle separately
-        // The id stays the same; handle is tracked internally
+        // Replace the sentinel handle the constructor reserved with the real
+        // MTLTexture handle, keeping the int id() stable so callers that
+        // captured the id pre-store() still resolve correctly.
+        MetalHandleMap.setHandle(this.id, this.handle);
 
         ESTIMATED_TOTAL_SIZE += estimateSize();
         return this;

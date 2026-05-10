@@ -24,7 +24,14 @@ uint swizzleId(uint id) {
     return bitfieldExtract(spread[id>>2], (int(id)&3)*8, 8);
 }
 
+#ifdef VOXY_VULKAN
+// Vulkan/Metal path: non-opaque uniforms must live in a uniform block.
+// VOXY_VULKAN is injected by RuntimeShaderCompiler; the GL path keeps the
+// traditional location-based uniform so existing glUniform2f calls work.
+layout(binding = 7, std140) uniform _InvImSizeBlock { vec2 invImSize; };
+#else
 layout(location = 0) uniform vec2 invImSize;
+#endif
 
 layout(binding = 0) uniform sampler2D mip_0;
 layout(binding = 1, r32f) uniform restrict writeonly image2D mip_1;

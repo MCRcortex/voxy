@@ -34,7 +34,8 @@ set(VOXY_METAL_SOURCES
     src/voxy_metal_device.mm
     src/voxy_metal_buffer.mm
     src/voxy_metal_texture.mm
-    src/voxy_metal_memutil.mm)
+    src/voxy_metal_memutil.mm
+    src/voxy_metal_render.mm)
 
 add_library(voxy_metal SHARED ${VOXY_METAL_SOURCES})
 

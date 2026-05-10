@@ -107,4 +107,30 @@ public interface RenderBackend {
      * the caller.
      */
     void copyBufferSubData(IGpuPersistentBuffer src, IGpuBuffer dst, long srcOffset, long dstOffset, long size);
+
+    // --- Render pass encoding (M2 minimal surface; expanded in M5+) ---
+
+    /**
+     * Begin a render pass with the given description. The returned encoder
+     * holds the in-flight state; call {@link RenderEncoder#close()} to end
+     * encoding before issuing further work or beginning another pass.
+     *
+     * Backend semantics:
+     *  - OpenGL: binds the framebuffer composed from the attachments,
+     *    applies clear values via glClearColor/glClear, leaves the FBO
+     *    bound until close() (which unbinds to default).
+     *  - Metal: builds an MTLRenderPassDescriptor with load/store/clear
+     *    actions and creates an MTLRenderCommandEncoder. Clear runs as
+     *    part of the load action; close() ends encoding.
+     *  - Vulkan: dynamic rendering — vkCmdBeginRendering with attachments;
+     *    close() runs vkCmdEndRendering.
+     */
+    RenderEncoder beginRenderPass(RenderPassDesc desc);
+
+    /**
+     * Submit any pending command buffers to the GPU. On OpenGL this is a
+     * glFlush (commands are already implicitly submitted); on Metal/Vulkan
+     * this commits the active command buffer and rotates to a fresh one.
+     */
+    void submit();
 }

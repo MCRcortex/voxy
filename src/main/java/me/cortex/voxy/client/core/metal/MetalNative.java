@@ -215,6 +215,10 @@ public final class MetalNative {
     public static native void mtlRenderPassSetColorAttachment(
             long descriptor, int index, long texture, int loadAction, int storeAction, int level);
 
+    /** Sets the clear color for a color attachment (only honored when loadAction == Clear). */
+    public static native void mtlRenderPassSetColorClearColor(
+            long descriptor, int index, float r, float g, float b, float a);
+
     /** Sets the texture for the depth attachment. */
     public static native void mtlRenderPassSetDepthAttachment(
             long descriptor, long texture, int loadAction, int storeAction,
@@ -244,6 +248,13 @@ public final class MetalNative {
      * @return encoder handle
      */
     public static native long mtlCommandBufferNewBlitEncoder(long cmdBuffer);
+
+    /**
+     * Creates a render command encoder bound to a render pass descriptor.
+     * Load actions (incl. Clear) execute as the encoder is created.
+     * @return encoder handle (must be released after endEncoding)
+     */
+    public static native long mtlCommandBufferNewRenderEncoder(long cmdBuffer, long renderPassDesc);
 
     /** Ends encoding on an encoder. */
     public static native void mtlEncoderEndEncoding(long encoder);
