@@ -1,0 +1,434 @@
+# Voxy → Mac M-Series Port — Knowledge Transfer (LLM-oriented)
+
+**Audience:** AI/LLM agent picking up this branch.
+**Purpose:** Hand off enough context to continue M9 (Voxy migration) without re-deriving prior decisions.
+**Companion doc:** `docs/M-SERIES-PORT-OVERVIEW.md` (narrative, human-readable).
+
+---
+
+## TL;DR
+
+Goal: make Voxy (Minecraft Java mod, requires GL 4.3+ compute) run on Mac Apple Silicon by adding Metal direct + Vulkan/MoltenVK backends.
+
+Current state: **infrastructure ~95% complete, M9 (per-file migration) not started**. 12 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green.
+
+The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration of Voxy's render code, blocked primarily by ICB (`MTLIndirectCommandBuffer`) for `MDICSectionRenderer` and by the GL backend stubbing the new abstraction (so the migration doesn't break Win/Linux).
+
+---
+
+## Repository state
+
+| Field | Value |
+|---|---|
+| Branch | `claude/opengl-mac-migration-analysis-6319V` |
+| Base | `dev` |
+| Last commit | `b50109e5` |
+| Commits ahead of `dev` | 12 |
+| Test machine | Apple M4 Max, macOS 26.4.1, JDK 24.0.2 |
+| MC target | 1.21.11 (Fabric 0.18.2, Java 21+) |
+| LWJGL | 3.3.3 |
+
+---
+
+## Decisions already made (do not re-litigate)
+
+1. **Migration path**: parallel Metal direct + Vulkan/MoltenVK. User confirmed "Prototipo paralelo de ambos". Both backends now validated for clear/triangle/compute.
+2. **Shader translation**: runtime via LWJGL `shaderc` + `spvc` (pivoted from build-time after dry-run showed Voxy's runtime `#define` permutations + Vulkan-strict GLSL would force a per-permutation manifest). Disk cache at `~/.voxy/shader-cache/`.
+3. **Iris compatibility**: deferred to phase 2. Mac launches with Voxy's built-in shaders; Iris stays GL-only on Win/Linux. User confirmed "Deferir Iris a fase 2".
+4. **First-test goal**: full LOD distance rendering as M14 acceptance. User confirmed "Renderizado de chunks LOD funcional".
+5. **Timeline**: ~6 weeks accepted ("Aceptar 6 semanas, scope completo").
+6. **`MSL_ARGUMENT_BUFFERS=false`** in `RuntimeShaderCompiler` — direct `[[buffer(N)]]` bindings match Voxy's per-binding pattern.
+7. **`PipelineState.DEFAULT` is depth-disabled**. Use `OPAQUE_MESH` for production opaque rendering, `TRANSLUCENT_MESH` for translucent.
+
+---
+
+## Commit history (chronological, reverse order)
+
+| SHA | Title | Validates |
+|---|---|---|
+| `b50109e5` | Add IGpuSampler + setBytes to encoders (M9 prep finishing batch) | Sampler API, push-constant equivalent |
+| `4e5131d0` | Add depth/blend/raster state to graphics pipeline | PipelineState (depth, blend, raster) end-to-end on Metal |
+| `c47dfe82` | Fix MTLVertexFormat enum values + add M9-prep smoke test | testMetalVertexBuffer caught off-by-9 in MTLVertexFormat |
+| `79dc1033` | Add VertexLayout and indirect-draw to encoder API | VertexLayout + drawIndirect + drawIndexedIndirect (single-draw) |
+| `2079e43c` | Expand encoder API for M9 prep — buffers, textures, indexed/indirect | Compute setTexture/dispatchIndirect/barrier; render setBuffer/setTexture/bindVertex/bindIndex/draw/drawIndexed/setViewport/setScissor |
+| `8fd586b1` | Add Vulkan triangle + compute smoke tests (M6 + M8) | Vulkan graphics pipeline + draw, compute pipeline + descriptor sets |
+| `07aa7d31` | Add Vulkan clear-color render pass via MoltenVK (M4 Stages B-D) | Vulkan VkDevice + VkImage + dynamic_rendering clear, pixel-exact readback |
+| `6c1e661e` | Add Metal compute pipeline + dispatch (M7) | MetalComputePipeline + ComputeEncoder + SSBO write/read 64/64 |
+| `864b9a7c` | Bootstrap Vulkan/MoltenVK loader (M4 Stage A) | VulkanLoader → VkInstance → Apple M4 Max enumerated |
+| `6d4f0308` | Add Metal graphics pipeline + draw chain (M5 — first triangle) | MetalGraphicsPipeline + RenderEncoder.setPipeline/draw + readback |
+| `16fe5667` | Add Mac M-series rendering: shaderc/spvc + Metal clear-color pass | M0 (env), M1 (RuntimeShaderCompiler 9/9), M2 (encoder API), M3 (Metal clear) |
+| `5420ed03` | Route UploadStream.commit() through the render backend | (pre-existing — UploadStream uses RenderBackend.copyBufferSubData) |
+
+---
+
+## Smoke test inventory (all green on Apple M4 Max)
+
+```bash
+./gradlew testShaderCompiler    # 9/9 SPIRV pass on representative slice (incl. cmdgen.comp + hiz.comp). 8/9 MSL — hiz.comp deferred.
+./gradlew testMetalRender       # M3: clear-color render pass commits + completes
+./gradlew testMetalTriangle     # M5: gl_VertexIndex triangle, interpolated colors
+./gradlew testMetalCompute      # M7: increment.comp on SSBO, 64/64 values match
+./gradlew testMetalVertexBuffer # M9-prep: VertexLayout + bindVertexBuffer + drawIndirect
+./gradlew testVulkanLoader      # M4-A: MoltenVK + VkInstance + physical device
+./gradlew testVulkanClear       # M4-D: dynamic_rendering clear, pixel-exact readback
+./gradlew testVulkanTriangle    # M6: Vulkan graphics pipeline + draw
+./gradlew testVulkanCompute     # M8: compute pipeline + descriptor sets, 64/64 values match
+```
+
+Each test is a standalone `me.cortex.voxy.tools.*SmokeTest` class with `main()`. Useful as regression gates after any change to the encoder API or backend code.
+
+---
+
+## Critical gotchas already hit (do not repeat)
+
+1. **Repo didn't compile baseline.** `GlRenderBackend` referenced `GL31C.GL_COPY_READ_BUFFER_BINDING` / `GL_COPY_WRITE_BUFFER_BINDING`, which LWJGL 3.3.3 doesn't expose. The bind-target enums share numeric values per OpenGL spec, so `GL_COPY_READ_BUFFER` works as the `glGetIntegerv` `pname`. Fixed in `16fe5667`.
+
+2. **MTLVertexFormat values were off-by-9.** Initial `VertexFormat.metalValue` assignments assumed values from "standard order" without checking the Metal SDK header. `FLOAT` was 37 (actually `UInt2`); pipeline link failed with "MTLAttributeFormatUInt3". Caught only because `testMetalVertexBuffer` exercised it. **Rule: always verify enum values against the SDK header**, never infer from order. Fixed in `c47dfe82`.
+
+3. **`VkWriteDescriptorSet.descriptorCount(1)` is required.** `calloc`'d struct defaults to 0, which means "write 0 descriptors" — the update is a silent no-op. Compute dispatched, but the buffer was effectively unbound, and all values came back as zero. Set `descriptorCount` + `dstArrayElement` explicitly on every Vulkan descriptor write. Fixed in `8fd586b1`.
+
+4. **`SPVC_COMPILER_OPTION_MSL_ARGUMENT_BUFFERS=true` wraps each binding in a descriptor-set struct.** Output had `spvDescriptorSetBuffer0` with `[[id(N)]]` members, accessed via a single `[[buffer(0)]]` slot. Doesn't match Voxy's per-binding pattern; setBuffer(0) silently bound to the wrong slot. Disabled (`false`) in `RuntimeShaderCompiler`. Fixed in `6c1e661e`.
+
+5. **Auto-injected GLSL → Vulkan macros.** `RuntimeShaderCompiler` injects `#define VOXY_VULKAN 1`, `#define gl_VertexID gl_VertexIndex`, `#define gl_InstanceID gl_InstanceIndex` so the same Voxy GLSL source compiles for both GL and Vulkan/Metal targets. Patched `hiz.comp` with `#ifdef VOXY_VULKAN` to wrap `invImSize` in a uniform block (the GL path keeps the location-based uniform).
+
+6. **`createBuffer` returns Shared (CPU-visible) on Metal.** Means `((MetalBuffer)buf).getContentsPtr()` works for write/read from Java. M7 + M9-prep tests use this. For DEVICE_LOCAL we'd need a flag, currently not exposed.
+
+7. **`MTLIndirectCommandBuffer` (ICB) needed for `glMultiDrawElementsIndirectCountARB`.** Metal lacks native multi-draw-indirect-count. The current `drawIndirect` impl loops on the host. For Voxy's MDIC use (potentially 100,000s of draws/frame), ICB is required for performance. **Not yet implemented.**
+
+8. **Metal has no `TRIANGLE_FAN` primitive.** `RenderEncoder.PRIMITIVE_TRIANGLE_STRIP` is the closest. Voxy's `hiz/blit.vsh` outputs corners in fan order; needs patching for Metal use.
+
+9. **`glBindImageTexture(unit, tex, mipLevel, ...)` — Metal needs a per-mip texture view.** `MetalTexture.createView()` exists but doesn't take a mip level. Blocks HiZBuffer2's compute pass migration (binds mips 1..6 as storage images).
+
+10. **`hiz.comp` MSL fails — spvc-MSL only supports cluster size 4.** The shader uses `subgroupClusteredAdd` with cluster > 4. Vulkan/MoltenVK consumes the SPIRV directly (works). Metal direct via spvc-MSL needs a handwritten MSL replacement OR algorithm rewrite.
+
+11. **LWJGL Vulkan auto-initializes** — `VK.create()` was being called before `VulkanLoader.load()` set `Configuration.VULKAN_LIBRARY_NAME`. Caught the `IllegalStateException("Vulkan has already been created.")` and continued.
+
+12. **MoltenVK 1.4 doesn't need `VK_KHR_portability_enumeration`.** Initial Vulkan smoke test enabled the extension and it failed with `VK_ERROR_EXTENSION_NOT_PRESENT`. LWJGL bundles its own MoltenVK that loads directly; portability_enumeration is a loader-only extension.
+
+---
+
+## What's pending
+
+### Blocker 1 — ICB for `drawIndirectCount` (~1 day)
+
+Why: `MDICSectionRenderer` uses `glMultiDrawElementsIndirectCountARB` (count from a separate buffer). Metal needs `MTLIndirectCommandBuffer` + `executeCommandsInBuffer:indirectBuffer:indirectBufferOffset:`. Vulkan has `vkCmdDrawIndexedIndirectCount` natively (core 1.2, MoltenVK 1.2.5+).
+
+To implement:
+- New JNI in `voxy_metal_render.mm` (or new `voxy_metal_icb.mm`):
+  - `mtlDeviceNewIndirectCommandBuffer(device, type, maxCmds, options)`
+  - `mtlIndirectCommandBufferGetCommand(icb, index)`
+  - `mtlIndirectRenderCommandSetPipelineState(cmd, pso)`
+  - `mtlIndirectRenderCommandSetVertexBuffer(cmd, buf, offset, idx)`
+  - `mtlIndirectRenderCommandDrawIndexedPrimitives(cmd, prim, idxCount, idxType, idxBuf, idxOff, instCount, baseVertex, baseInstance)`
+  - `mtlRenderEncoderExecuteCommandsInBuffer(enc, icb, indirectRangeBuf, indirectRangeOff)` — for GPU-determined count via Metal 2.1 `executeCommandsInBuffer:indirectBuffer:indirectBufferOffset:`
+- Java: `IGpuIndirectCommandBuffer` interface, `MetalIndirectCommandBuffer`, `RenderBackend.createIndirectCommandBuffer`, `RenderEncoder.executeCommandsInBuffer(...)`.
+- `cmdgen.comp` rewrite: shader populates ICB via Metal argument-buffer-style `[[buffer(N)]]` writes instead of plain `DrawElementsIndirectCommand` struct writes. Significant compute-shader work.
+- For Vulkan: just expose `RenderEncoder.drawIndexedIndirectCount(buf, offset, countBuf, countOffset, maxDraws, stride)` → `vkCmdDrawIndexedIndirectCount` directly.
+
+### Blocker 2 — GL backend implements the abstraction (~1-2 days)
+
+Why: `GlRenderBackend.createGraphicsPipeline / createComputePipeline / beginComputePass / createSampler` and most `GlRenderEncoder` / (future) `GlComputeEncoder` methods throw `UnsupportedOperationException("see M9")`. Migrating any Voxy file that uses the new abstraction would break Win/Linux GL users at runtime.
+
+To implement:
+- `GlGraphicsPipeline implements IGpuPipeline` — wraps a GL program object compiled from GLSL (NOT MSL/SPIRV). Metal-only callers in M9 won't pass GLSL through `GraphicsPipelineDesc`; need to either:
+  - Add a `glslVertex/glslFragment/glslCompute` field to descs, OR
+  - Have GL backend reverse-compile MSL/SPIRV via spvc to GLSL (slow, complex).
+  - **Recommended**: add `String[] glslVertexSources` etc., shipped alongside the precompiled SPIRV/MSL.
+- `GlComputePipeline` — wraps a GL compute program.
+- `GlSampler` — wraps `glGenSamplers` + `glSamplerParameteri`.
+- `GlRenderEncoder` / `GlComputeEncoder` — translate setBuffer/setTexture/setSampler to `glBindBufferBase`/`glBindTextureUnit`/`glBindSampler`; setBytes to a UBO write; setViewport to `glViewport`.
+- Consider whether `RenderBackend.beginRenderPass` should bind a real GL FBO eagerly or lazily.
+
+### Blocker 3 — Per-mip texture view JNI (~1-2 hours)
+
+Why: HiZBuffer2 binds mip levels 1..6 as separate storage images (`glBindImageTexture(i, tex, mipLevel=i, ...)`).
+
+To implement:
+- New JNI: `mtlTextureNewViewWithMipLevel(tex, pixelFormat, mipLevel, mipLevelCount)` (uses `[texture newTextureViewWithPixelFormat:textureType:levels:slices:]`).
+- `IGpuTexture.createView(int mipLevel, int mipLevelCount)` overload.
+- For Vulkan, `VkImageView` already supports `subresourceRange.baseMipLevel` — ready when Vulkan backend is wired in.
+
+### Blocker 4 — `hiz.comp` MSL workaround (~0.5-1 day)
+
+Why: spvc-MSL fails on cluster size > 4 ClusteredReduce.
+
+Options:
+- Handwrite MSL for hiz.comp specifically. Live alongside the GLSL/SPIRV path.
+- Rewrite hiz.comp algorithm using only quad subgroups (cluster=4) or threadgroup-memory reductions.
+
+Vulkan/MoltenVK is unaffected — the extension SPIRV consumes natively.
+
+### Blocker 5 — `GL_TRIANGLE_FAN` shader patches (~30 min/shader)
+
+Voxy uses fan-order corners in `hiz/blit.vsh`. Metal has no fan primitive; calls map to TRIANGLE_STRIP, but the vertex order differs. Either:
+- Patch shaders to emit strip-order corners always. Test on GL side (most cards still accept either).
+- Branch via a `#define` injected by `RuntimeShaderCompiler`.
+
+### Source patches still pending (from M1 sweep)
+
+Five shaders fail SPIRV compilation as-is and weren't yet patched because their compute paths haven't been migrated:
+
+| Shader | Issue | Fix |
+|---|---|---|
+| `chunkoutline/outline.vsh` | `mix(int, int)` requires extension | `#extension GL_EXT_shader_integer_mix : enable` |
+| `lod/gl46/quads.frag` | `gl_HelperInvocation` undeclared | `#extension GL_ARB_shader_helper_invocation : enable` |
+| `post/depth_copy.frag` | `binding=` not supported in this version | bump `#version` or add `GL_ARB_shading_language_420pack` |
+| `post/blit_texture_depth_cutout.frag` | `gl_DepthRange` undeclared in newer profile | replace with uniform OR version bump |
+| `lod/gl46/test/raw.vert` | syntax error around line 190 | likely needs runtime define injection |
+
+### M9 file migration order (after Blocker 2 cleared)
+
+Recommended (simplest first):
+1. **Util compute callers** in `NodeCleaner.java` first (compute-only, well-covered by current API).
+2. **HiZBuffer2.java** (needs Blocker 3 + Blocker 4 + Blocker 5 patches).
+3. **HierarchicalOcclusionTraverser.java** (compute + indirect dispatch + memory barriers).
+4. **NormalRenderPipeline.java**, **VoxyRenderSystem.java**, **AbstractRenderPipeline.java**.
+5. **MDICSectionRenderer.java** (needs Blocker 1; central render path; also needs `cmdgen.comp` rewrite for ICB writes).
+6. **Iris* paths** — gate behind `RenderBackendFactory.get().getType() == OPENGL`; skip on Mac.
+
+---
+
+## File map
+
+### New abstraction (`src/main/java/me/cortex/voxy/client/core/gpu/`)
+
+| File | Purpose |
+|---|---|
+| `RenderBackend.java` | Central interface — buffers, textures, framebuffers, fences, render/compute pipelines, encoders, samplers, copy/barrier |
+| `RenderBackendFactory.java` | Auto-detects Mac+aarch64 → MetalRenderBackend, else GlRenderBackend |
+| `BackendType.java` | enum: OPENGL, METAL (VULKAN deferred) |
+| `RenderEncoder.java` | Encoder for inside a render pass (setPipeline, setBuffer, setTexture, setSampler, setBytes, draw/drawIndexed/drawIndirect/drawIndexedIndirect, setViewport, setScissor, bindVertex/IndexBuffer) |
+| `ComputeEncoder.java` | Encoder for compute pass (setPipeline, setBuffer, setTexture, setSampler, setBytes, dispatch, dispatchIndirect, barrier) |
+| `RenderPassDesc.java` | Render pass description (color/depth attachments, load/store, clear values, viewport size). Has Builder. |
+| `GraphicsPipelineDesc.java` | Graphics pipeline desc (vertex/fragment MSL+SPIRV, color format, vertex layout, pipeline state, label). Three constructors for backwards compat. |
+| `ComputePipelineDesc.java` | Compute pipeline desc (compute MSL+SPIRV, local thread-group size, label) |
+| `IGpuPipeline.java` | Marker for a graphics or compute pipeline state object. AutoCloseable. |
+| `IGpuSampler.java` | Marker for a sampler state object. AutoCloseable. |
+| `SamplerDesc.java` | Sampler config (filters, wrap modes, LOD clamps, comparison). Has Builder. |
+| `VertexLayout.java` | Vertex inputs (attributes + buffer bindings). VertexFormat enum carries `metalValue` (raw MTLVertexFormat int). |
+| `PipelineState.java` | Static state: DepthState, BlendState, RasterState. Presets: DEFAULT, OPAQUE_MESH, TRANSLUCENT_MESH. |
+| `IGpuBuffer.java`, `IGpuTexture.java`, `IGpuFramebuffer.java`, `IGpuRenderBuffer.java`, `IGpuVertexArray.java`, `IGpuFence.java`, `IGpuPersistentBuffer.java`, `IGpuShader.java`, `IGpuResource.java` | Pre-existing resource interfaces |
+| `shader/RuntimeShaderCompiler.java` | Runtime GLSL→SPIRV (LWJGL `Shaderc`) → MSL (LWJGL `Spvc`). Disk cache. Auto-injects `gl_VertexID`→`gl_VertexIndex` etc. |
+
+### Metal backend (`src/main/java/me/cortex/voxy/client/core/metal/`)
+
+| File | Purpose |
+|---|---|
+| `MetalRenderBackend.java` | Backend impl. Holds device, command queue, shared event, active command buffer. Implements all `RenderBackend` methods incl. `createGraphicsPipeline` / `createComputePipeline` / `createSampler`. Has `readPixelsRGBA8` for test smoke verification. |
+| `MetalRenderEncoder.java` | Render encoder impl. Tracks bound index buffer for drawIndexed/drawIndexedIndirect. Implements all `RenderEncoder` methods. |
+| `MetalComputeEncoder.java` | Compute encoder impl. Tracks bound pipeline for dispatch threadsPerThreadgroup. |
+| `MetalGraphicsPipeline.java` | Wraps MTLRenderPipelineState + library + functions + MTLDepthStencilState + cull/winding/fill ints. |
+| `MetalComputePipeline.java` | Wraps MTLComputePipelineState + library + function + local thread-group size. |
+| `MetalSampler.java` | Wraps MTLSamplerState. |
+| `MetalNative.java` | All JNI declarations (~85 methods now). Plus Metal enum constants pinned to SDK header values. |
+| `MetalHandleMap.java` | int-id ↔ long-handle bridge (legacy of pre-existing pattern). Has `setHandle(id, handle)` to update after lazy alloc. |
+| `MetalBuffer.java`, `MetalTexture.java`, `MetalFramebuffer.java`, `MetalFence.java`, `MetalPersistentBuffer.java` | Pre-existing resource wrappers (with M3 fixes) |
+
+### Vulkan backend (`src/main/java/me/cortex/voxy/client/core/vulkan/`)
+
+| File | Purpose |
+|---|---|
+| `VulkanLoader.java` | Bootstrap — extracts MoltenVK from jar OR reads from java.library.path / /opt/homebrew, calls `VK.create()`, swallows "already created" exception |
+
+**Note: no `VulkanRenderBackend` class yet.** Vulkan path is exercised via standalone smoke tests (`tools/Vulkan*SmokeTest.java`). Wrapping into `RenderBackend` happens after M9 prep is fully done.
+
+### Native (`native/metal/src/`)
+
+| File | Purpose |
+|---|---|
+| `voxy_metal.h` | Shared header — type-id ranges, helper macros |
+| `voxy_metal_jni.mm` | Generic retain/release/setLabel/getLastCompileError |
+| `voxy_metal_device.mm` | MTLDevice creation, command queue, device props |
+| `voxy_metal_buffer.mm` | MTLBuffer creation, contents, didModifyRange |
+| `voxy_metal_texture.mm` | MTLTexture creation, view, replaceRegion + render pass descriptor + color/depth/stencil attachments + setColorClearColor (M3) |
+| `voxy_metal_render.mm` | Render encoder + pipeline state object + vertex descriptor + sampler + blend + depth-stencil + indirect draw |
+| `voxy_metal_compute.mm` | Compute encoder + sampler bind + setBytes + dispatch + dispatchIndirect + memoryBarrier |
+| `voxy_metal_memutil.mm` | memset helpers |
+| `CMakeLists.txt` | Lists all sources; output to `src/main/resources/natives/macos-arm64/libvoxy_metal.dylib` |
+| `build.sh` | Convenience build script (CMake Release) |
+
+### Shaders (`src/main/resources/assets/voxy/shaders/tools/`)
+
+| File | Purpose |
+|---|---|
+| `triangle.vert` | M5 — gl_VertexIndex-driven, hardcoded positions |
+| `triangle.frag` | M5/M6 — passthrough vertex color |
+| `triangle_vbuf.vert` | M9-prep — explicit `in vec2 inPos; in vec3 inColor;` |
+| `increment.comp` | M7/M8 — writes `i*2+1` to SSBO |
+
+### Smoke tests (`src/main/java/me/cortex/voxy/tools/`)
+
+All have a `main()` and a corresponding `./gradlew test*` task in `build.gradle`.
+
+| File | Validates |
+|---|---|
+| `ShaderCompilerSmokeTest.java` | M1 `RuntimeShaderCompiler` against representative shaders |
+| `MetalRenderBackendSmokeTest.java` | M3 — clear-color render pass |
+| `MetalTriangleSmokeTest.java` | M5 — graphics pipeline + draw |
+| `MetalComputeSmokeTest.java` | M7 — compute pipeline + dispatch + SSBO readback |
+| `MetalVertexBufferSmokeTest.java` | M9-prep — VertexLayout + bindVertexBuffer + drawIndirect |
+| `VulkanLoaderSmokeTest.java` | M4-A — MoltenVK + VkInstance + physical device |
+| `VulkanClearSmokeTest.java` | M4-D — full clear-color render pass |
+| `VulkanTriangleSmokeTest.java` | M6 — graphics pipeline + draw |
+| `VulkanComputeSmokeTest.java` | M8 — compute pipeline + descriptor sets |
+
+---
+
+## Build / verification commands
+
+### Standard
+
+```bash
+./gradlew compileJava                  # Compile only
+./gradlew build                        # Compile + jar (~5 min cold)
+./gradlew runClient                    # Launch sandbox MC + Voxy. Will boot, log "Metal backend selected", crash on first chunk render (M9 not done).
+```
+
+### Smoke tests (each ~5-10s after first build)
+
+See "Smoke test inventory" section above.
+
+### Native rebuild
+
+```bash
+native/metal/build.sh Release          # Rebuild libvoxy_metal.dylib
+nm -gU src/main/resources/natives/macos-arm64/libvoxy_metal.dylib | grep mtl | wc -l   # Should print ~85
+```
+
+---
+
+## Environment
+
+| Requirement | Where |
+|---|---|
+| macOS Apple Silicon (M1+) | required for Metal+Vulkan |
+| JDK 21+ (Java 24 also works) | `java -version` |
+| Xcode CLT | `xcode-select -p` |
+| CMake 3.20+ | `cmake --version` |
+| Homebrew | for tooling installs |
+| `glslang`, `spirv-cross` | `brew install glslang spirv-cross` (used for dev shader inspection; runtime uses LWJGL natives) |
+| `molten-vk`, `vulkan-loader`, `vulkan-headers`, `vulkan-tools` | `brew install ...` |
+| LWJGL natives (auto-resolved by Gradle) | `lwjgl-shaderc:natives-macos-arm64`, `lwjgl-spvc:natives-macos-arm64`, `lwjgl-vulkan:natives-macos-arm64`, `lwjgl:natives-macos-arm64` |
+| `VK_ICD_FILENAMES` env (dev only) | Gradle JavaExec sets it for testVulkan* tasks if `/opt/homebrew/etc/vulkan/icd.d/MoltenVK_icd.json` exists |
+
+---
+
+## Untracked / build-artifact files
+
+These are intentionally not in git and will appear in `git status`:
+
+- `src/main/resources/natives/macos-arm64/libvoxy_metal.dylib` — auto-rebuilt by the `buildMetalNative` Gradle task on macOS aarch64 hosts
+- `src/main/resources/natives/macos-arm64/libMoltenVK.dylib` — copied manually from `/opt/homebrew/Cellar/molten-vk/1.4.1/lib/`. Should eventually be replaced with a `downloadMoltenVK` Gradle task that fetches the official KhronosGroup release.
+- `.DS_Store`
+
+---
+
+## Plan file
+
+The live plan (used during planning sessions) lives at:
+
+`/Users/jargueta/.claude-personal/plans/context-en-el-prancy-sunrise.md`
+
+Has the full strategic context. Read it for higher-level architectural decisions and risk analysis.
+
+---
+
+## Communication style with user
+
+- User is bilingual; defaults to **Spanish**, English is OK.
+- Defaults to **auto mode** — wants visible progress, status updates, fewer questions per chunk.
+- Has Voxy installed via Modrinth at `~/Library/Application Support/ModrinthApp/profiles/Voxy-m-series-support-test/` for eventual real-MC testing.
+- Asks for honest scope estimates and pushes for progress; respects "pause for hygiene" recommendations when made with reasoning.
+
+---
+
+## Next-session playbook
+
+1. Read this doc end-to-end.
+2. Run all smoke tests as a sanity check (`./gradlew testShaderCompiler testMetalRender testMetalTriangle testMetalCompute testMetalVertexBuffer testVulkanLoader testVulkanClear testVulkanTriangle testVulkanCompute`). All should pass.
+3. **Recommended order to unblock M9**:
+   - **(a) GL backend implements abstraction (~1-2 days)** — biggest blocker for M9 file migration without breaking Win/Linux. Implement `GlRenderBackend.createGraphicsPipeline / createComputePipeline / createSampler / beginComputePass`, plus all `GlRenderEncoder` and a new `GlComputeEncoder`. Route to existing Voxy GL helpers.
+   - **(b) ICB (~1 day)** — needed specifically for `MDICSectionRenderer.glMultiDrawElementsIndirectCountARB`. Less urgent if migrating compute-only files first.
+   - **(c) Per-mip texture view JNI (~1-2 hours)** — unblocks HiZBuffer2.
+   - **(d) Source patches** for the 5 shaders from the M1 sweep (~30 min/shader).
+   - **(e) Start M9 file migration** with simplest compute-only files (NodeCleaner pieces, util compute callers) before tackling MDIC.
+4. Each commit should be small, focused, and gated by a smoke test or regression check.
+5. Update this doc as work progresses.
+
+---
+
+## Quick API reference for new agent
+
+### Creating a graphics pipeline
+
+```java
+RenderBackend backend = RenderBackendFactory.get();
+
+// Compile shaders
+RuntimeShaderCompiler.Result vert = RuntimeShaderCompiler.compile(
+    glslSource, RuntimeShaderCompiler.Stage.VERTEX, defines,
+    RuntimeShaderCompiler.Target.METAL_MSL);
+RuntimeShaderCompiler.Result frag = RuntimeShaderCompiler.compile(...);
+
+// Optional: declare vertex inputs
+VertexLayout layout = VertexLayout.builder()
+    .buffer(0, /*stride*/ 20, VertexLayout.StepRate.PER_VERTEX)
+    .attribute(0, VertexLayout.VertexFormat.FLOAT2, /*offset*/ 0, /*bufSlot*/ 0)
+    .attribute(1, VertexLayout.VertexFormat.FLOAT3, 8, 0)
+    .build();
+
+IGpuPipeline pipeline = backend.createGraphicsPipeline(new GraphicsPipelineDesc(
+    vert.mslSource(), frag.mslSource(),
+    vert.spirv(), frag.spirv(),
+    /*GL color format*/ 0x8058 /*GL_RGBA8*/,
+    layout,
+    PipelineState.OPAQUE_MESH,
+    "voxy:my-shader"));
+```
+
+### Render pass
+
+```java
+IGpuTexture target = backend.createTexture(0x0DE1 /*GL_TEXTURE_2D*/);
+target.store(0x8058 /*GL_RGBA8*/, 1, 256, 256);
+
+RenderPassDesc pass = RenderPassDesc.builder(256, 256)
+    .clearColor(target, 0.1f, 0.1f, 0.15f, 1.0f)
+    .build();
+
+try (RenderEncoder enc = backend.beginRenderPass(pass)) {
+    enc.setPipeline(pipeline);
+    enc.setViewport(0, 0, 256, 256, 0, 1);
+    enc.setBuffer(/*binding*/ 0, ssbo, /*offset*/ 0);
+    enc.bindVertexBuffer(0, vbo, 0);
+    enc.bindIndexBuffer(ibo, RenderEncoder.INDEX_TYPE_UINT32, 0);
+    enc.drawIndexed(RenderEncoder.PRIMITIVE_TRIANGLES, indexCount, 1, 0, 0, 0);
+}
+backend.submit();
+```
+
+### Compute pass
+
+```java
+IGpuPipeline computePipeline = backend.createComputePipeline(new ComputePipelineDesc(
+    msl, spirv, /*localSize*/ 64, 1, 1, "voxy:my-compute"));
+
+try (ComputeEncoder enc = backend.beginComputePass()) {
+    enc.setPipeline(computePipeline);
+    enc.setBuffer(0, ssbo, 0);
+    enc.setTexture(1, storageImage);
+    enc.setSampler(2, sampler);
+    enc.setBytes(3, /*addr*/ stack.ints(42).address(), 4);
+    enc.dispatch(/*groups*/ 1, 1, 1);
+    enc.barrier(ComputeEncoder.BARRIER_SHADER, ComputeEncoder.BARRIER_SHADER);
+    enc.dispatch(...);
+}
+backend.submit();
+```
+
+### Reading pixels back (Metal-only, smoke-test-grade)
+
+```java
+byte[] rgba = ((MetalRenderBackend) backend).readPixelsRGBA8(texture, 0, 0, 256, 256);
+// rgba is 256*256*4 bytes, RGBA8 little-endian
+```
