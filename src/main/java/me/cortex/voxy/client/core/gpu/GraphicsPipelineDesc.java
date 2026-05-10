@@ -21,16 +21,28 @@ public final class GraphicsPipelineDesc {
     public final byte[] fragmentSpirv;
     /** OpenGL-style color format (e.g. GL_RGBA8 = 0x8058). Backends translate. */
     public final int colorAttachmentFormat;
+    /** Vertex inputs. Use {@link VertexLayout#EMPTY} for gl_VertexIndex-driven shaders. */
+    public final VertexLayout vertexLayout;
     public final String label;
 
     public GraphicsPipelineDesc(String vertexMsl, String fragmentMsl,
                                 byte[] vertexSpirv, byte[] fragmentSpirv,
-                                int colorAttachmentFormat, String label) {
+                                int colorAttachmentFormat,
+                                VertexLayout vertexLayout, String label) {
         this.vertexMsl = vertexMsl;
         this.fragmentMsl = fragmentMsl;
         this.vertexSpirv = vertexSpirv;
         this.fragmentSpirv = fragmentSpirv;
         this.colorAttachmentFormat = colorAttachmentFormat;
+        this.vertexLayout = vertexLayout != null ? vertexLayout : VertexLayout.EMPTY;
         this.label = label;
+    }
+
+    /** Convenience overload for shaders without vertex inputs. */
+    public GraphicsPipelineDesc(String vertexMsl, String fragmentMsl,
+                                byte[] vertexSpirv, byte[] fragmentSpirv,
+                                int colorAttachmentFormat, String label) {
+        this(vertexMsl, fragmentMsl, vertexSpirv, fragmentSpirv,
+             colorAttachmentFormat, VertexLayout.EMPTY, label);
     }
 }

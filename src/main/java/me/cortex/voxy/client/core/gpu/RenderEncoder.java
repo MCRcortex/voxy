@@ -87,6 +87,27 @@ public interface RenderEncoder extends AutoCloseable {
     void drawIndexed(int primitiveType, int indexCount, int instanceCount,
                      int firstIndex, int vertexOffset, int firstInstance);
 
+    /**
+     * Multi-draw indirect: read {@code drawCount} {@code VkDrawIndirectCommand}-shaped
+     * structs from {@code buffer} starting at {@code offset}, separated by
+     * {@code stride} bytes, and issue one draw per struct. Each struct holds
+     * (vertexCount, instanceCount, firstVertex, firstInstance) as 4 uint32 values.
+     *
+     * On Metal this lowers to a CPU-side loop calling {@code drawPrimitives:indirectBuffer:};
+     * Vulkan and GL use {@code vkCmdDrawIndirect} / {@code glMultiDrawArraysIndirect}.
+     */
+    void drawIndirect(int primitiveType, IGpuBuffer buffer, long offset,
+                      int drawCount, int stride);
+
+    /**
+     * Indexed equivalent of {@link #drawIndirect}. Each struct in the indirect
+     * buffer holds (indexCount, instanceCount, firstIndex, vertexOffset, firstInstance)
+     * as 5 uint32 values. The index buffer must be bound via
+     * {@link #bindIndexBuffer} first.
+     */
+    void drawIndexedIndirect(int primitiveType, IGpuBuffer buffer, long offset,
+                              int drawCount, int stride);
+
     @Override
     void close();
 }

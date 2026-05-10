@@ -182,6 +182,80 @@ Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetScissorRect
     [encoder setScissorRect:rect];
 }
 
+// -------- Vertex descriptor --------
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlNewVertexDescriptor(
+        JNIEnv *, jclass) {
+    MTLVertexDescriptor *desc = [[MTLVertexDescriptor alloc] init];
+    if (desc == nil) return 0;
+    return voxy_handle_from(desc);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlVertexDescriptorSetAttribute(
+        JNIEnv *, jclass, jlong descHandle,
+        jint index, jint format, jlong offset, jint bufferIndex) {
+    if (descHandle == 0) return;
+    MTLVertexDescriptor *desc = voxy_handle_cast<MTLVertexDescriptor *>(descHandle);
+    MTLVertexAttributeDescriptor *attr = desc.attributes[(NSUInteger)index];
+    attr.format = (MTLVertexFormat)format;
+    attr.offset = (NSUInteger)offset;
+    attr.bufferIndex = (NSUInteger)bufferIndex;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlVertexDescriptorSetLayout(
+        JNIEnv *, jclass, jlong descHandle,
+        jint bufferIndex, jlong stride, jint stepFunction, jint stepRate) {
+    if (descHandle == 0) return;
+    MTLVertexDescriptor *desc = voxy_handle_cast<MTLVertexDescriptor *>(descHandle);
+    MTLVertexBufferLayoutDescriptor *layout = desc.layouts[(NSUInteger)bufferIndex];
+    layout.stride = (NSUInteger)stride;
+    layout.stepFunction = (MTLVertexStepFunction)stepFunction;
+    layout.stepRate = (NSUInteger)stepRate;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderPipelineDescriptorSetVertexDescriptor(
+        JNIEnv *, jclass, jlong pipelineDescHandle, jlong vertexDescHandle) {
+    if (pipelineDescHandle == 0) return;
+    MTLRenderPipelineDescriptor *pipelineDesc = voxy_handle_cast<MTLRenderPipelineDescriptor *>(pipelineDescHandle);
+    MTLVertexDescriptor *vertexDesc = vertexDescHandle ? voxy_handle_cast<MTLVertexDescriptor *>(vertexDescHandle) : nil;
+    pipelineDesc.vertexDescriptor = vertexDesc;
+}
+
+// -------- Indirect draw (single per call) --------
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderDrawPrimitivesIndirect(
+        JNIEnv *, jclass, jlong encoderHandle, jint primitiveType,
+        jlong indirectBufferHandle, jlong indirectOffset) {
+    if (encoderHandle == 0 || indirectBufferHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    id<MTLBuffer> indirectBuffer = voxy_handle_cast<id<MTLBuffer>>(indirectBufferHandle);
+    [encoder drawPrimitives:(MTLPrimitiveType)primitiveType
+             indirectBuffer:indirectBuffer
+       indirectBufferOffset:(NSUInteger)indirectOffset];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderDrawIndexedPrimitivesIndirect(
+        JNIEnv *, jclass, jlong encoderHandle, jint primitiveType, jint indexType,
+        jlong indexBufferHandle, jlong indexBufferOffset,
+        jlong indirectBufferHandle, jlong indirectOffset) {
+    if (encoderHandle == 0 || indexBufferHandle == 0 || indirectBufferHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    id<MTLBuffer> indexBuffer = voxy_handle_cast<id<MTLBuffer>>(indexBufferHandle);
+    id<MTLBuffer> indirectBuffer = voxy_handle_cast<id<MTLBuffer>>(indirectBufferHandle);
+    [encoder drawIndexedPrimitives:(MTLPrimitiveType)primitiveType
+                         indexType:(MTLIndexType)indexType
+                       indexBuffer:indexBuffer
+                 indexBufferOffset:(NSUInteger)indexBufferOffset
+                    indirectBuffer:indirectBuffer
+              indirectBufferOffset:(NSUInteger)indirectOffset];
+}
+
 // -------- Blit encoder readback (M5) --------
 
 extern "C" JNIEXPORT void JNICALL

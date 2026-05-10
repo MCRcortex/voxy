@@ -439,7 +439,33 @@ public class MetalRenderBackend implements RenderBackend {
             MetalNative.mtlRenderPipelineDescriptorSetFragmentFunction(pipelineDesc, fragmentFn);
             MetalNative.mtlRenderPipelineDescriptorSetColorAttachmentFormat(pipelineDesc, 0, metalPixelFormat);
 
+            // Build + attach vertex descriptor if the pipeline declares vertex inputs.
+            // Empty layout → no descriptor (gl_VertexIndex-driven shaders).
+            long vertexDescHandle = 0;
+            if (desc.vertexLayout.attributes.length > 0 || desc.vertexLayout.buffers.length > 0) {
+                vertexDescHandle = MetalNative.mtlNewVertexDescriptor();
+                if (vertexDescHandle == 0) {
+                    throw new RuntimeException("mtlNewVertexDescriptor returned NULL");
+                }
+                for (VertexLayout.VertexAttribute attr : desc.vertexLayout.attributes) {
+                    MetalNative.mtlVertexDescriptorSetAttribute(vertexDescHandle,
+                            attr.location, attr.format.metalValue, attr.offset, attr.bufferSlot);
+                }
+                for (VertexLayout.VertexBufferBinding buf : desc.vertexLayout.buffers) {
+                    int stepFunction = buf.stepRate == VertexLayout.StepRate.PER_INSTANCE
+                            ? MetalNative.MTLVertexStepFunctionPerInstance
+                            : MetalNative.MTLVertexStepFunctionPerVertex;
+                    MetalNative.mtlVertexDescriptorSetLayout(vertexDescHandle,
+                            buf.slot, buf.stride, stepFunction, 1);
+                }
+                MetalNative.mtlRenderPipelineDescriptorSetVertexDescriptor(pipelineDesc, vertexDescHandle);
+            }
+
             pipelineState = MetalNative.mtlDeviceNewRenderPipelineState(this.device, pipelineDesc);
+            if (vertexDescHandle != 0) {
+                // Pipeline state retained the descriptor; drop our reference.
+                MetalNative.mtlRelease(vertexDescHandle);
+            }
             if (pipelineState == 0) {
                 throw new RuntimeException("Pipeline state link failed: " + MetalNative.mtlGetLastCompileError());
             }

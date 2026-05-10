@@ -321,6 +321,50 @@ public final class MetalNative {
     public static final int MTLIndexTypeUInt16 = 0;
     public static final int MTLIndexTypeUInt32 = 1;
 
+    // --- Vertex descriptor (for graphics pipelines with vertex inputs) ---
+
+    /** Creates an empty MTLVertexDescriptor. */
+    public static native long mtlNewVertexDescriptor();
+
+    /** Sets attribute N of a vertex descriptor (location, format, offset, bufferIndex). */
+    public static native void mtlVertexDescriptorSetAttribute(
+            long descriptor, int index, int format, long offset, int bufferIndex);
+
+    /**
+     * Sets buffer layout N of a vertex descriptor: stride, step function
+     * (1=PerVertex, 2=PerInstance), step rate (usually 1).
+     */
+    public static native void mtlVertexDescriptorSetLayout(
+            long descriptor, int bufferIndex, long stride, int stepFunction, int stepRate);
+
+    /** Attaches a vertex descriptor to a render pipeline descriptor. */
+    public static native void mtlRenderPipelineDescriptorSetVertexDescriptor(
+            long pipelineDescriptor, long vertexDescriptor);
+
+    /** MTLVertexStepFunction values. */
+    public static final int MTLVertexStepFunctionPerVertex = 1;
+    public static final int MTLVertexStepFunctionPerInstance = 2;
+
+    // --- Indirect draw (single-draw-per-call; multi-draw is a CPU loop in MetalRenderEncoder) ---
+
+    /**
+     * Indirect non-indexed draw. {@code indirectBuffer} holds a struct of
+     * (vertexCount, instanceCount, firstVertex, firstInstance) as 4 uint32 values
+     * at byte offset {@code indirectOffset}.
+     */
+    public static native void mtlRenderEncoderDrawPrimitivesIndirect(
+            long encoder, int primitiveType, long indirectBuffer, long indirectOffset);
+
+    /**
+     * Indirect indexed draw. {@code indirectBuffer} holds (indexCount, instanceCount,
+     * firstIndex, vertexOffset, firstInstance) as 5 uint32 values at byte offset
+     * {@code indirectOffset}. Caller must have set up the index buffer separately.
+     */
+    public static native void mtlRenderEncoderDrawIndexedPrimitivesIndirect(
+            long encoder, int primitiveType, int indexType,
+            long indexBuffer, long indexBufferOffset,
+            long indirectBuffer, long indirectOffset);
+
     // --- Compute encoder (M7) ---
 
     /** Creates a compute command encoder on the active command buffer. */

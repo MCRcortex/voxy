@@ -380,6 +380,18 @@ public class GlRenderBackend implements RenderBackend {
         }
 
         @Override
+        public void drawIndirect(int primitiveType, IGpuBuffer buffer, long offset,
+                                  int drawCount, int stride) {
+            throw new UnsupportedOperationException("GlRenderEncoder.drawIndirect (see M9)");
+        }
+
+        @Override
+        public void drawIndexedIndirect(int primitiveType, IGpuBuffer buffer, long offset,
+                                         int drawCount, int stride) {
+            throw new UnsupportedOperationException("GlRenderEncoder.drawIndexedIndirect (see M9)");
+        }
+
+        @Override
         public void close() {
             if (this.closed) return;
             this.closed = true;

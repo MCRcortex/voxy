@@ -108,6 +108,39 @@ public final class MetalRenderEncoder implements RenderEncoder {
     }
 
     @Override
+    public void drawIndirect(int primitiveType, IGpuBuffer buffer, long offset,
+                              int drawCount, int stride) {
+        long indirectBuf = bufferHandle(buffer);
+        if (indirectBuf == 0) throw new IllegalArgumentException("drawIndirect: indirect buffer is null");
+        int metalPrimitive = mapPrimitiveType(primitiveType);
+        // Metal lacks native multi-draw-indirect; loop on the host. Each iteration
+        // dispatches one indirect draw at offset + i*stride. For drawCount=1 this
+        // is a single call; for larger counts we accept the per-call overhead
+        // until M11+ wires up an MTLIndirectCommandBuffer cache.
+        for (int i = 0; i < drawCount; i++) {
+            MetalNative.mtlRenderEncoderDrawPrimitivesIndirect(this.encoderHandle,
+                    metalPrimitive, indirectBuf, offset + (long) i * stride);
+        }
+    }
+
+    @Override
+    public void drawIndexedIndirect(int primitiveType, IGpuBuffer buffer, long offset,
+                                     int drawCount, int stride) {
+        if (this.boundIndexBuffer == 0) {
+            throw new IllegalStateException("drawIndexedIndirect() before bindIndexBuffer()");
+        }
+        long indirectBuf = bufferHandle(buffer);
+        if (indirectBuf == 0) throw new IllegalArgumentException("drawIndexedIndirect: indirect buffer is null");
+        int metalPrimitive = mapPrimitiveType(primitiveType);
+        for (int i = 0; i < drawCount; i++) {
+            MetalNative.mtlRenderEncoderDrawIndexedPrimitivesIndirect(this.encoderHandle,
+                    metalPrimitive, this.boundIndexType,
+                    this.boundIndexBuffer, this.boundIndexBufferOffset,
+                    indirectBuf, offset + (long) i * stride);
+        }
+    }
+
+    @Override
     public void close() {
         if (this.encoderHandle == 0) return;
         MetalNative.mtlEncoderEndEncoding(this.encoderHandle);
