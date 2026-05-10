@@ -17,7 +17,14 @@ layout(binding = VISIBILITY_BUFFER_BINDING, std430) restrict buffer VisibilityBu
     uint[] visibility;
 };
 
-layout(location=0) uniform uint visibilityCounter;
+// M9 migration: location-based uniform wrapped in a UBO block so the
+// shader compiles on Metal/Vulkan. GL backend pushes via setBytes.
+#ifndef PUSH_BINDING
+#define PUSH_BINDING 14
+#endif
+layout(binding = PUSH_BINDING, std140) uniform Push {
+    uint visibilityCounter;
+};
 void main() {
     uint id = minVisIds[gl_LocalInvocationID.x];
     uvec4 node = nodes[id];

@@ -10,8 +10,17 @@ layout(binding = LIST_BUFFER_BINDING, std430) restrict readonly buffer SetListBu
     uint[] ids;
 };
 
-layout(location=0) uniform uint count;
-layout(location=1) uniform uint setTo;
+// M9 migration: location-based uniforms wrapped in a UBO block so the
+// shader compiles on Metal/Vulkan (which have no glUniform equivalent).
+// GL backend pushes via setBytes → glBindBufferRange(GL_UNIFORM_BUFFER, ...).
+// Field order matches the byte layout the Java side writes.
+#ifndef PUSH_BINDING
+#define PUSH_BINDING 14
+#endif
+layout(binding = PUSH_BINDING, std140) uniform Push {
+    uint count;
+    uint setTo;
+};
 void main() {
     uint id = gl_GlobalInvocationID.x;
     if (count <= id) {
