@@ -39,9 +39,12 @@ public final class MetalFormatUtil {
             case GL_R32F -> MTLPixelFormatR32Float;
             case GL_R8UI -> MTLPixelFormatR8Uint;
             case GL_DEPTH_COMPONENT32F -> MTLPixelFormatDepth32Float;
-            case GL_DEPTH_COMPONENT24 -> MTLPixelFormatDepth24Unorm_Stencil8; // Closest match on macOS
+            // Apple Silicon GPUs DO NOT support Depth24Unorm_Stencil8 (that
+            // format is macOS-Intel only). Use the 32-bit float depth formats
+            // instead — fully lossless re-encoding for the values Voxy stores.
+            case GL_DEPTH_COMPONENT24 -> MTLPixelFormatDepth32Float;
             case GL_DEPTH_COMPONENT32 -> MTLPixelFormatDepth32Float;
-            case GL_DEPTH24_STENCIL8 -> MTLPixelFormatDepth24Unorm_Stencil8;
+            case GL_DEPTH24_STENCIL8 -> MTLPixelFormatDepth32Float_Stencil8;
             default -> throw new IllegalArgumentException(
                     "Unsupported GL format for Metal conversion: 0x" + Integer.toHexString(glFormat));
         };

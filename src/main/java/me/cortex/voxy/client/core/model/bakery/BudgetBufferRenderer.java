@@ -29,13 +29,22 @@ public class BudgetBufferRenderer {
     public static void init(){}
     private static final IGpuBuffer indexBuffer;
     static {
-        var i = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
-        int id = ((com.mojang.blaze3d.opengl.GlBuffer) i.getBuffer(4096*3*2)).handle;
-        if (i.type() != VertexFormat.IndexType.SHORT) {
-            throw new IllegalStateException();
-        }
         indexBuffer = RenderBackendFactory.get().createBuffer(3*2*2*4096);
-        glCopyNamedBufferSubData(id, indexBuffer.id(), 0, 0, 3*2*2*4096);
+        // M9 transitional: copying MC's sequential quad index buffer here only
+        // works on the GL backend because the source handle comes from
+        // com.mojang.blaze3d.opengl.GlBuffer (GL-only) and the destination
+        // is bound to a GL function. On Metal/Vulkan the destination buffer
+        // exists but is left zeroed; the bakery codepath that consumes it
+        // hasn't been migrated yet, so this stays unused until M9 reaches
+        // BudgetBufferRenderer/the bakery renderer proper.
+        if (RenderBackendFactory.get().getType() == me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+            var i = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
+            int id = ((com.mojang.blaze3d.opengl.GlBuffer) i.getBuffer(4096*3*2)).handle;
+            if (i.type() != VertexFormat.IndexType.SHORT) {
+                throw new IllegalStateException();
+            }
+            glCopyNamedBufferSubData(id, indexBuffer.id(), 0, 0, 3*2*2*4096);
+        }
     }
 
     private static final int STRIDE = 24;

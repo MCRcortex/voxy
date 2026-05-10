@@ -172,6 +172,21 @@ public class Shader extends TrackedObject implements me.cortex.voxy.client.core.
         }
 
         public T compile() {
+            // M9 transitional: legacy Shader.Builder targets the GL driver, which
+            // on macOS is frozen at GL 4.1 — Voxy's `#version 460` shaders fail
+            // to compile and the JVM aborts during static-init of any class that
+            // holds a Shader as a field (BudgetBufferRenderer, MDICSectionRenderer,
+            // HiZBuffer*, etc.). Return a no-op stub on non-OpenGL backends so
+            // the bootstrap finishes; callers must migrate to
+            // RenderBackend.createGraphicsPipeline / createComputePipeline before
+            // they actually try to use this shader (a crash later in M9 work
+            // points to the next file that needs migration).
+            if (me.cortex.voxy.client.core.gpu.RenderBackendFactory.get().getType()
+                    != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+                Logger.warn("[M9 TRANSITIONAL] Skipping legacy GL Shader.compile on non-OpenGL backend (returning stub program=0). "
+                        + "Caller must migrate to RenderBackend.createGraphicsPipeline / createComputePipeline before using this shader.");
+                return this.constructor.make(this, 0);
+            }
             this.defineIf("IS_INTEL", Capabilities.INSTANCE.isIntel);
             this.defineIf("IS_WINDOWS", ThreadUtils.isWindows);
             return this.constructor.make(this, this.compileToProgram());
