@@ -10,9 +10,9 @@
 
 Goal: make Voxy (Minecraft Java mod, requires GL 4.3+ compute) run on Mac Apple Silicon by adding Metal direct + Vulkan/MoltenVK backends.
 
-Current state: **infrastructure ~95% complete, M9 (per-file migration) not started**. 12 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green.
+Current state: **infrastructure complete, M9 Phase 1 (GL backend abstraction) DONE; Phase 4 (per-file migration) not started**. 13 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green.
 
-The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration of Voxy's render code, blocked primarily by ICB (`MTLIndirectCommandBuffer`) for `MDICSectionRenderer` and by the GL backend stubbing the new abstraction (so the migration doesn't break Win/Linux).
+The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration of Voxy's render code, blocked primarily by ICB (`MTLIndirectCommandBuffer`) for `MDICSectionRenderer`. The GL-backend-stubbing blocker is cleared as of commit `3dc0ae4c` — the encoder API is now real on every backend, so per-file migration can proceed without breaking Win/Linux GL users.
 
 ---
 
@@ -46,6 +46,7 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 
 | SHA | Title | Validates |
 |---|---|---|
+| `3dc0ae4c` | M9 Phase 1 — implement GL backend behind RenderBackend abstraction | GlGraphicsPipeline/GlComputePipeline/GlSampler/GlComputeEncoder + full GlRenderEncoder + GLSL fields on (Graphics\|Compute)PipelineDesc |
 | `b50109e5` | Add IGpuSampler + setBytes to encoders (M9 prep finishing batch) | Sampler API, push-constant equivalent |
 | `4e5131d0` | Add depth/blend/raster state to graphics pipeline | PipelineState (depth, blend, raster) end-to-end on Metal |
 | `c47dfe82` | Fix MTLVertexFormat enum values + add M9-prep smoke test | testMetalVertexBuffer caught off-by-9 in MTLVertexFormat |
@@ -125,19 +126,42 @@ To implement:
 - `cmdgen.comp` rewrite: shader populates ICB via Metal argument-buffer-style `[[buffer(N)]]` writes instead of plain `DrawElementsIndirectCommand` struct writes. Significant compute-shader work.
 - For Vulkan: just expose `RenderEncoder.drawIndexedIndirectCount(buf, offset, countBuf, countOffset, maxDraws, stride)` → `vkCmdDrawIndexedIndirectCount` directly.
 
-### Blocker 2 — GL backend implements the abstraction (~1-2 days)
+### Blocker 2 — GL backend implements the abstraction (~~~1-2 days~~ DONE — commit `3dc0ae4c`)
 
-Why: `GlRenderBackend.createGraphicsPipeline / createComputePipeline / beginComputePass / createSampler` and most `GlRenderEncoder` / (future) `GlComputeEncoder` methods throw `UnsupportedOperationException("see M9")`. Migrating any Voxy file that uses the new abstraction would break Win/Linux GL users at runtime.
+✅ **Cleared 2026-05-10.** All four `GlRenderBackend` methods that previously
+threw `UnsupportedOperationException("see M9")` now have real
+implementations, and the inline `GlRenderEncoder` was rewritten end-to-end
+(every former stub is wired).
 
-To implement:
-- `GlGraphicsPipeline implements IGpuPipeline` — wraps a GL program object compiled from GLSL (NOT MSL/SPIRV). Metal-only callers in M9 won't pass GLSL through `GraphicsPipelineDesc`; need to either:
-  - Add a `glslVertex/glslFragment/glslCompute` field to descs, OR
-  - Have GL backend reverse-compile MSL/SPIRV via spvc to GLSL (slow, complex).
-  - **Recommended**: add `String[] glslVertexSources` etc., shipped alongside the precompiled SPIRV/MSL.
-- `GlComputePipeline` — wraps a GL compute program.
-- `GlSampler` — wraps `glGenSamplers` + `glSamplerParameteri`.
-- `GlRenderEncoder` / `GlComputeEncoder` — translate setBuffer/setTexture/setSampler to `glBindBufferBase`/`glBindTextureUnit`/`glBindSampler`; setBytes to a UBO write; setViewport to `glViewport`.
-- Consider whether `RenderBackend.beginRenderPass` should bind a real GL FBO eagerly or lazily.
+Files added under `src/main/java/me/cortex/voxy/client/core/gl/`:
+- `GlGraphicsPipeline.java` — wraps a `Shader` compiled from raw GLSL via
+  `Shader.Builder.addSource()`. Reads `defines` map straight from
+  `GraphicsPipelineDesc`. Holds `VertexLayout` + `PipelineState` so the
+  encoder can apply state on bind.
+- `GlComputePipeline.java` — same pattern for compute.
+- `GlSampler.java` — `glGenSamplers` + parameter mapping (filter, wrap,
+  LOD clamps, compare). `CLAMP_TO_ZERO` → `GL_CLAMP_TO_BORDER` (GL's
+  closest equivalent).
+- `GlComputeEncoder.java` — direct lowering: SSBO base/range, image
+  bind, sampler bind, UBO push (named buffer), `glDispatchCompute`,
+  `glDispatchComputeIndirect`, `glMemoryBarrier` mask translation.
+- `GlPipelineStateApplier.java` — depth/blend/raster GL state, called
+  from `setPipeline`. (Metal/Vulkan bake this; GL has no PSO so we
+  re-issue per bind.)
+- `GlVertexFormatMap.java` — `VertexFormat` → (gl_type, count,
+  normalized, isInteger) tuple table, used by `glVertexArrayAttrib*Format`.
+
+Descriptor changes — `GraphicsPipelineDesc` and `ComputePipelineDesc`
+now carry `vertexGlsl/fragmentGlsl/computeGlsl` + `defines` so call
+sites can pass the same source they fed `Shader.Builder`. Existing
+constructors delegate with `null` GLSL so the M3-M8 smoke tests stay
+valid.
+
+Build: `./gradlew compileJava` — green.
+
+**Caveat**: legacy GL paths still call raw `org.lwjgl.opengl.*` directly.
+The encoder API is *available* for the migration; nothing in Voxy uses
+it yet (Phase 4 — see "M9 file migration order" below).
 
 ### Blocker 3 — Per-mip texture view JNI (~1-2 hours)
 
@@ -176,15 +200,105 @@ Five shaders fail SPIRV compilation as-is and weren't yet patched because their 
 | `post/blit_texture_depth_cutout.frag` | `gl_DepthRange` undeclared in newer profile | replace with uniform OR version bump |
 | `lod/gl46/test/raw.vert` | syntax error around line 190 | likely needs runtime define injection |
 
-### M9 file migration order (after Blocker 2 cleared)
+### M9 Phase 4 — file migration order (Blocker 2 now cleared)
 
-Recommended (simplest first):
-1. **Util compute callers** in `NodeCleaner.java` first (compute-only, well-covered by current API).
-2. **HiZBuffer2.java** (needs Blocker 3 + Blocker 4 + Blocker 5 patches).
-3. **HierarchicalOcclusionTraverser.java** (compute + indirect dispatch + memory barriers).
-4. **NormalRenderPipeline.java**, **VoxyRenderSystem.java**, **AbstractRenderPipeline.java**.
-5. **MDICSectionRenderer.java** (needs Blocker 1; central render path; also needs `cmdgen.comp` rewrite for ICB writes).
-6. **Iris* paths** — gate behind `RenderBackendFactory.get().getType() == OPENGL`; skip on Mac.
+Each migration follows the same pattern (validated against the GL backend
+in Phase 1):
+
+1. Replace `Shader.makeAuto(...).compile()` /
+   `Shader.make(...).compile()` with `RenderBackend.createComputePipeline(
+   new ComputePipelineDesc(glsl, defines, null, null, lx, ly, lz, label))`
+   (or `createGraphicsPipeline` for v+f stages).
+2. Replace direct `glBindBufferBase / glBindBufferRange` with
+   `ComputeEncoder.setBuffer(binding, buf, offset)`.
+3. Replace `glBindImageTexture(binding, tex, 0, ...)` with
+   `setTexture(binding, tex)` — note: the encoder always binds level 0.
+   Multi-mip storage images (HiZBuffer2) need an API extension
+   (`setStorageImage(binding, texture, level)`) — file under "API gaps"
+   below.
+4. Replace `glBindSampler` with `setSampler(binding, sampler)`; sampler
+   must be created via `RenderBackend.createSampler(SamplerDesc)`.
+5. Replace `glDispatchCompute(x, y, z)` with `dispatch(x, y, z)`.
+   `glDispatchComputeIndirect` → `dispatchIndirect`.
+6. Replace `glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT)` with
+   `barrier(BARRIER_SHADER, BARRIER_SHADER)`.
+7. **Edit the shader** to convert `layout(location=N) uniform X;` into
+   a UBO block (see "Uniform-block pattern" below). Then push the data
+   from Java with `setBytes(binding, dataAddr, dataSize)`.
+
+#### Uniform-block pattern (mandatory for every shader during migration)
+
+GL allows `layout(location=N) uniform uint count;` set via
+`glUniform1ui(N, value)`. Vulkan and Metal don't have location-based
+uniforms — they need a UBO block (or push constants) the host writes
+into. To stay single-source across backends, every migrated shader
+wraps these:
+
+```glsl
+// Before
+layout(location=0) uniform uint count;
+layout(location=1) uniform uint setTo;
+
+// After
+layout(binding = PUSH_CONSTANTS_BINDING, std140) uniform Push {
+    uint count;
+    uint setTo;
+};
+```
+
+Java side replaces the `glUniform*` calls:
+
+```java
+// Before
+glUniform1ui(0, count); glUniform1ui(1, setTo);
+
+// After (push 8 bytes via setBytes)
+try (var stack = MemoryStack.stackPush()) {
+    long addr = stack.nmalloc(8);
+    MemoryUtil.memPutInt(addr,     count);
+    MemoryUtil.memPutInt(addr + 4, setTo);
+    encoder.setBytes(PUSH_CONSTANTS_BINDING, addr, 8);
+}
+```
+
+`PUSH_CONSTANTS_BINDING` should be a stable binding index per shader
+(the migration convention: pick a high binding that doesn't collide
+with SSBO bindings — e.g. 14). Defines map carries it so the same
+GLSL works for GL (UBO at that binding) and the Metal/Vulkan transpile
+path.
+
+#### API gaps to fix mid-Phase-4
+
+These extensions weren't needed to validate Phase 1 but are required by
+specific Voxy callers:
+
+- `ComputeEncoder.setStorageImage(binding, texture, level, access)` —
+  HiZBuffer2 binds mip levels 1..6 as separate storage images. GL
+  implementation: `glBindImageTexture(binding, tex.id, level, false, 0,
+  GL_WRITE_ONLY, format)`. Metal: `MTLTexture newTextureViewWithMipLevel:`.
+  Vulkan: `VkImageView` per mip (already supported in
+  `VkImageViewCreateInfo.subresourceRange.baseMipLevel`).
+- `RenderEncoder.drawIndexedIndirectCount(...)` — for
+  `MDICSectionRenderer`. GL: `glMultiDrawElementsIndirectCountARB`.
+  Vulkan: `vkCmdDrawIndexedIndirectCount` (core 1.2). Metal: emulated
+  via ICB (Blocker 1 above).
+
+Recommended migration order (simplest first):
+1. **`NodeCleaner.java`** — pure compute, three small shaders. The
+   pilot for the uniform-block pattern; once one shader is converted
+   the rest are mechanical.
+2. **`HierarchicalOcclusionTraverser.java`** — compute + indirect
+   dispatch + memory barriers. Exercises `dispatchIndirect`.
+3. **`HiZBuffer2.java`** — needs `setStorageImage(level)` API (above)
+   + Blocker 4 + Blocker 5 patches. Mixed compute + graphics.
+4. **`NormalRenderPipeline.java`**, **`VoxyRenderSystem.java`**,
+   **`AbstractRenderPipeline.java`** — global GL state reads
+   (viewport, blend) → `RenderSystem` / `getMainRenderTarget()`.
+5. **`MDICSectionRenderer.java`** — needs Blocker 1 + the
+   `drawIndexedIndirectCount` API surface. Central render path, also
+   needs `cmdgen.comp` rewrite for ICB writes if Metal-bound.
+6. **Iris* paths** — gate behind
+   `RenderBackendFactory.get().getType() == OPENGL`; skip on Mac.
 
 ---
 
@@ -200,8 +314,8 @@ Recommended (simplest first):
 | `RenderEncoder.java` | Encoder for inside a render pass (setPipeline, setBuffer, setTexture, setSampler, setBytes, draw/drawIndexed/drawIndirect/drawIndexedIndirect, setViewport, setScissor, bindVertex/IndexBuffer) |
 | `ComputeEncoder.java` | Encoder for compute pass (setPipeline, setBuffer, setTexture, setSampler, setBytes, dispatch, dispatchIndirect, barrier) |
 | `RenderPassDesc.java` | Render pass description (color/depth attachments, load/store, clear values, viewport size). Has Builder. |
-| `GraphicsPipelineDesc.java` | Graphics pipeline desc (vertex/fragment MSL+SPIRV, color format, vertex layout, pipeline state, label). Three constructors for backwards compat. |
-| `ComputePipelineDesc.java` | Compute pipeline desc (compute MSL+SPIRV, local thread-group size, label) |
+| `GraphicsPipelineDesc.java` | Graphics pipeline desc. Carries vertex/fragment GLSL (used by GL), MSL (Metal), SPIRV (Vulkan) — backends pick whichever they need. Plus `defines` map (forwarded to all three compile paths), color format, `VertexLayout`, `PipelineState`, label. Multiple constructors for backwards compat. |
+| `ComputePipelineDesc.java` | Compute pipeline desc — same tri-source pattern (GLSL/MSL/SPIRV) + `defines` map, local thread-group size, label. |
 | `IGpuPipeline.java` | Marker for a graphics or compute pipeline state object. AutoCloseable. |
 | `IGpuSampler.java` | Marker for a sampler state object. AutoCloseable. |
 | `SamplerDesc.java` | Sampler config (filters, wrap modes, LOD clamps, comparison). Has Builder. |
@@ -223,6 +337,23 @@ Recommended (simplest first):
 | `MetalNative.java` | All JNI declarations (~85 methods now). Plus Metal enum constants pinned to SDK header values. |
 | `MetalHandleMap.java` | int-id ↔ long-handle bridge (legacy of pre-existing pattern). Has `setHandle(id, handle)` to update after lazy alloc. |
 | `MetalBuffer.java`, `MetalTexture.java`, `MetalFramebuffer.java`, `MetalFence.java`, `MetalPersistentBuffer.java` | Pre-existing resource wrappers (with M3 fixes) |
+
+### OpenGL backend (`src/main/java/me/cortex/voxy/client/core/gl/`)
+
+| File | Purpose |
+|---|---|
+| `GlRenderBackend.java` | Backend impl. Resource creation + framebuffer ops + `createGraphicsPipeline` / `createComputePipeline` / `createSampler` / `beginComputePass`. Owns the inline `GlRenderEncoder` (transient FBO + transient VAO + transient UBO for push constants). |
+| `GlGraphicsPipeline.java` | Wraps a `Shader` compiled from raw GLSL via `Shader.Builder.addSource()`. Holds `VertexLayout` + `PipelineState` so the encoder can apply state on bind. |
+| `GlComputePipeline.java` | Same pattern for compute. |
+| `GlSampler.java` | Wraps `glGenSamplers` + parameter mapping (filter / wrap / LOD clamps / compare). |
+| `GlComputeEncoder.java` | Compute encoder — SSBO bind, image bind, sampler bind, push UBO, dispatch[Indirect], `glMemoryBarrier` mask translation. |
+| `GlPipelineStateApplier.java` | Re-issues depth/blend/raster GL state when encoder binds a pipeline. (Metal/Vulkan bake this into the PSO.) |
+| `GlVertexFormatMap.java` | `VertexFormat` → (gl_type, count, normalized, isInteger) tuple table for `glVertexArrayAttrib*Format`. |
+| `GlBuffer.java`, `GlTexture.java`, `GlFramebuffer.java`, `GlFence.java`, `GlPersistentMappedBuffer.java`, `GlVertexArray.java`, `GlRenderBuffer.java` | Pre-existing resource wrappers |
+| `GLCompat.java` | Pre-existing GL helper layer (DSA fallback, framebuffer ops). |
+| `Capabilities.java` | Pre-existing feature/extension detection. |
+| `GlDebug.java` | Pre-existing `glObjectLabel` wrapper. |
+| `shader/Shader.java`, `shader/ShaderType.java`, `shader/ShaderLoader.java`, `shader/AutoBindingShader.java` | Pre-existing GLSL compile + binding-by-reflection. M9 Phase 4 starts replacing these call sites with the abstraction. |
 
 ### Vulkan backend (`src/main/java/me/cortex/voxy/client/core/vulkan/`)
 
