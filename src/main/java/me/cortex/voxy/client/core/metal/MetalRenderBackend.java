@@ -572,6 +572,30 @@ public class MetalRenderBackend implements RenderBackend {
         };
     }
 
+    private static int mapSamplerFilter(SamplerDesc.Filter f) {
+        return switch (f) {
+            case NEAREST -> MetalNative.MTLSamplerFilterNearest;
+            case LINEAR -> MetalNative.MTLSamplerFilterLinear;
+        };
+    }
+
+    private static int mapSamplerMipFilter(SamplerDesc.MipFilter f) {
+        return switch (f) {
+            case NOT_MIPMAPPED -> MetalNative.MTLSamplerMipFilterNotMipmapped;
+            case NEAREST -> MetalNative.MTLSamplerMipFilterNearest;
+            case LINEAR -> MetalNative.MTLSamplerMipFilterLinear;
+        };
+    }
+
+    private static int mapSamplerWrap(SamplerDesc.Wrap w) {
+        return switch (w) {
+            case CLAMP_TO_EDGE -> MetalNative.MTLSamplerAddressModeClampToEdge;
+            case REPEAT -> MetalNative.MTLSamplerAddressModeRepeat;
+            case MIRRORED_REPEAT -> MetalNative.MTLSamplerAddressModeMirrorRepeat;
+            case CLAMP_TO_ZERO -> MetalNative.MTLSamplerAddressModeClampToZero;
+        };
+    }
+
     private static int mapBlendFactor(PipelineState.BlendFactor f) {
         return switch (f) {
             case ZERO -> MetalNative.MTLBlendFactorZero;
@@ -641,6 +665,33 @@ public class MetalRenderBackend implements RenderBackend {
             if (pipelineState != 0) MetalNative.mtlRelease(pipelineState);
             if (function != 0) MetalNative.mtlRelease(function);
             if (library != 0) MetalNative.mtlRelease(library);
+        }
+    }
+
+    @Override
+    public IGpuSampler createSampler(SamplerDesc desc) {
+        long descHandle = MetalNative.mtlNewSamplerDescriptor();
+        if (descHandle == 0) throw new RuntimeException("mtlNewSamplerDescriptor returned NULL");
+        try {
+            MetalNative.mtlSamplerDescriptorSetMinFilter(descHandle, mapSamplerFilter(desc.minFilter));
+            MetalNative.mtlSamplerDescriptorSetMagFilter(descHandle, mapSamplerFilter(desc.magFilter));
+            MetalNative.mtlSamplerDescriptorSetMipFilter(descHandle, mapSamplerMipFilter(desc.mipFilter));
+            MetalNative.mtlSamplerDescriptorSetSAddressMode(descHandle, mapSamplerWrap(desc.wrapS));
+            MetalNative.mtlSamplerDescriptorSetTAddressMode(descHandle, mapSamplerWrap(desc.wrapT));
+            MetalNative.mtlSamplerDescriptorSetRAddressMode(descHandle, mapSamplerWrap(desc.wrapR));
+            MetalNative.mtlSamplerDescriptorSetLodMinClamp(descHandle, desc.lodMinClamp);
+            MetalNative.mtlSamplerDescriptorSetLodMaxClamp(descHandle, desc.lodMaxClamp);
+            int compareFn = desc.compareEnable
+                    ? mapCompareOp(desc.compareOp)
+                    : MetalNative.MTLCompareFunctionNever;
+            MetalNative.mtlSamplerDescriptorSetCompareFunction(descHandle, compareFn);
+
+            long stateHandle = MetalNative.mtlDeviceNewSamplerState(this.device, descHandle);
+            if (stateHandle == 0) throw new RuntimeException("mtlDeviceNewSamplerState returned NULL");
+            if (desc.label != null) MetalNative.mtlSetLabel(stateHandle, desc.label);
+            return new MetalSampler(stateHandle);
+        } finally {
+            MetalNative.mtlRelease(descHandle);
         }
     }
 

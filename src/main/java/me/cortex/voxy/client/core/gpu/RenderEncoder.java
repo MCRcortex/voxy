@@ -52,6 +52,25 @@ public interface RenderEncoder extends AutoCloseable {
     void setTexture(int binding, IGpuTexture texture);
 
     /**
+     * Bind a sampler state object at the given binding index. Voxy GLSL
+     * uses {@code layout(binding=N) uniform sampler2D ...}; this method
+     * pairs with {@link #setTexture} to fill the same binding's
+     * sampler-side slot. Available to both vertex and fragment stages.
+     */
+    void setSampler(int binding, IGpuSampler sampler);
+
+    /**
+     * Push a small block of bytes inline as a uniform buffer at the given
+     * binding index. Used for the {@code glUniform1ui}-style "single
+     * scalar uniform" pattern Voxy uses everywhere — caller supplies
+     * the data via a direct {@code ByteBuffer}; backend emits the
+     * appropriate per-stage call (Metal {@code setVertexBytes} +
+     * {@code setFragmentBytes}, Vulkan {@code vkCmdPushConstants}, GL
+     * UBO mirror).
+     */
+    void setBytes(int binding, long dataAddr, int dataSize);
+
+    /**
      * Bind a buffer at the given vertex-input slot (the slot defined by the
      * pipeline's vertex layout). Distinct from {@link #setBuffer} — this
      * feeds the rasterizer's per-vertex attribute fetch, not a shader-side

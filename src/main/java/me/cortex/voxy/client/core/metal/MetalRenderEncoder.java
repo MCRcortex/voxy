@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.metal;
 
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.gpu.IGpuPipeline;
+import me.cortex.voxy.client.core.gpu.IGpuSampler;
 import me.cortex.voxy.client.core.gpu.IGpuTexture;
 import me.cortex.voxy.client.core.gpu.RenderEncoder;
 
@@ -59,6 +60,26 @@ public final class MetalRenderEncoder implements RenderEncoder {
         long handle = texture == null ? 0 : MetalHandleMap.getHandle(texture.id());
         MetalNative.mtlRenderEncoderSetVertexTexture(this.encoderHandle, handle, binding);
         MetalNative.mtlRenderEncoderSetFragmentTexture(this.encoderHandle, handle, binding);
+    }
+
+    @Override
+    public void setSampler(int binding, IGpuSampler sampler) {
+        long handle = 0;
+        if (sampler != null) {
+            if (!(sampler instanceof MetalSampler ms)) {
+                throw new IllegalArgumentException("MetalRenderEncoder.setSampler expected MetalSampler, got "
+                        + sampler.getClass().getName());
+            }
+            handle = ms.handle();
+        }
+        MetalNative.mtlRenderEncoderSetVertexSamplerState(this.encoderHandle, handle, binding);
+        MetalNative.mtlRenderEncoderSetFragmentSamplerState(this.encoderHandle, handle, binding);
+    }
+
+    @Override
+    public void setBytes(int binding, long dataAddr, int dataSize) {
+        MetalNative.mtlRenderEncoderSetVertexBytes(this.encoderHandle, dataAddr, dataSize, binding);
+        MetalNative.mtlRenderEncoderSetFragmentBytes(this.encoderHandle, dataAddr, dataSize, binding);
     }
 
     @Override

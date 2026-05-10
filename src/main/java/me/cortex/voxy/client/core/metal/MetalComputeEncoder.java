@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.metal;
 import me.cortex.voxy.client.core.gpu.ComputeEncoder;
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.gpu.IGpuPipeline;
+import me.cortex.voxy.client.core.gpu.IGpuSampler;
 import me.cortex.voxy.client.core.gpu.IGpuTexture;
 
 /**
@@ -45,6 +46,24 @@ public final class MetalComputeEncoder implements ComputeEncoder {
     public void setTexture(int binding, IGpuTexture texture) {
         long handle = texture == null ? 0 : MetalHandleMap.getHandle(texture.id());
         MetalNative.mtlComputeEncoderSetTexture(this.encoderHandle, handle, binding);
+    }
+
+    @Override
+    public void setSampler(int binding, IGpuSampler sampler) {
+        long handle = 0;
+        if (sampler != null) {
+            if (!(sampler instanceof MetalSampler ms)) {
+                throw new IllegalArgumentException("MetalComputeEncoder.setSampler expected MetalSampler, got "
+                        + sampler.getClass().getName());
+            }
+            handle = ms.handle();
+        }
+        MetalNative.mtlComputeEncoderSetSamplerState(this.encoderHandle, handle, binding);
+    }
+
+    @Override
+    public void setBytes(int binding, long dataAddr, int dataSize) {
+        MetalNative.mtlComputeEncoderSetBytes(this.encoderHandle, dataAddr, dataSize, binding);
     }
 
     @Override

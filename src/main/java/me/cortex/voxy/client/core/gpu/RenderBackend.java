@@ -153,6 +153,13 @@ public interface RenderBackend {
     IGpuPipeline createComputePipeline(ComputePipelineDesc desc);
 
     /**
+     * Build a sampler state object from the supplied description. Samplers
+     * are immutable and shareable; one sampler can be bound to many shader
+     * stages and many draws.
+     */
+    IGpuSampler createSampler(SamplerDesc desc);
+
+    /**
      * Begin a compute pass. The returned encoder is the only handle for
      * issuing compute work until {@link ComputeEncoder#close()}.
      *

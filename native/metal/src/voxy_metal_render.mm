@@ -370,3 +370,133 @@ Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetTriangleFil
     id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
     [encoder setTriangleFillMode:(MTLTriangleFillMode)fillMode];
 }
+
+// -------- Sampler descriptor + state --------
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlNewSamplerDescriptor(JNIEnv *, jclass) {
+    MTLSamplerDescriptor *desc = [[MTLSamplerDescriptor alloc] init];
+    if (desc == nil) return 0;
+    return voxy_handle_from(desc);
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlSamplerDescriptorSetMinFilter(
+        JNIEnv *, jclass, jlong descHandle, jint filter) {
+    if (descHandle == 0) return;
+    MTLSamplerDescriptor *desc = voxy_handle_cast<MTLSamplerDescriptor *>(descHandle);
+    desc.minFilter = (MTLSamplerMinMagFilter)filter;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlSamplerDescriptorSetMagFilter(
+        JNIEnv *, jclass, jlong descHandle, jint filter) {
+    if (descHandle == 0) return;
+    MTLSamplerDescriptor *desc = voxy_handle_cast<MTLSamplerDescriptor *>(descHandle);
+    desc.magFilter = (MTLSamplerMinMagFilter)filter;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlSamplerDescriptorSetMipFilter(
+        JNIEnv *, jclass, jlong descHandle, jint filter) {
+    if (descHandle == 0) return;
+    MTLSamplerDescriptor *desc = voxy_handle_cast<MTLSamplerDescriptor *>(descHandle);
+    desc.mipFilter = (MTLSamplerMipFilter)filter;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlSamplerDescriptorSetSAddressMode(
+        JNIEnv *, jclass, jlong descHandle, jint mode) {
+    if (descHandle == 0) return;
+    MTLSamplerDescriptor *desc = voxy_handle_cast<MTLSamplerDescriptor *>(descHandle);
+    desc.sAddressMode = (MTLSamplerAddressMode)mode;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlSamplerDescriptorSetTAddressMode(
+        JNIEnv *, jclass, jlong descHandle, jint mode) {
+    if (descHandle == 0) return;
+    MTLSamplerDescriptor *desc = voxy_handle_cast<MTLSamplerDescriptor *>(descHandle);
+    desc.tAddressMode = (MTLSamplerAddressMode)mode;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlSamplerDescriptorSetRAddressMode(
+        JNIEnv *, jclass, jlong descHandle, jint mode) {
+    if (descHandle == 0) return;
+    MTLSamplerDescriptor *desc = voxy_handle_cast<MTLSamplerDescriptor *>(descHandle);
+    desc.rAddressMode = (MTLSamplerAddressMode)mode;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlSamplerDescriptorSetLodMinClamp(
+        JNIEnv *, jclass, jlong descHandle, jfloat value) {
+    if (descHandle == 0) return;
+    MTLSamplerDescriptor *desc = voxy_handle_cast<MTLSamplerDescriptor *>(descHandle);
+    desc.lodMinClamp = value;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlSamplerDescriptorSetLodMaxClamp(
+        JNIEnv *, jclass, jlong descHandle, jfloat value) {
+    if (descHandle == 0) return;
+    MTLSamplerDescriptor *desc = voxy_handle_cast<MTLSamplerDescriptor *>(descHandle);
+    desc.lodMaxClamp = value;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlSamplerDescriptorSetCompareFunction(
+        JNIEnv *, jclass, jlong descHandle, jint compareFunction) {
+    if (descHandle == 0) return;
+    MTLSamplerDescriptor *desc = voxy_handle_cast<MTLSamplerDescriptor *>(descHandle);
+    desc.compareFunction = (MTLCompareFunction)compareFunction;
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlDeviceNewSamplerState(
+        JNIEnv *, jclass, jlong deviceHandle, jlong descHandle) {
+    if (deviceHandle == 0 || descHandle == 0) return 0;
+    id<MTLDevice> device = voxy_handle_cast<id<MTLDevice>>(deviceHandle);
+    MTLSamplerDescriptor *desc = voxy_handle_cast<MTLSamplerDescriptor *>(descHandle);
+    id<MTLSamplerState> state = [device newSamplerStateWithDescriptor:desc];
+    if (state == nil) return 0;
+    return voxy_handle_from(state);
+}
+
+// -------- Sampler binding on render encoder --------
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetVertexSamplerState(
+        JNIEnv *, jclass, jlong encoderHandle, jlong samplerHandle, jint index) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    id<MTLSamplerState> sampler = samplerHandle ? voxy_handle_cast<id<MTLSamplerState>>(samplerHandle) : nil;
+    [encoder setVertexSamplerState:sampler atIndex:(NSUInteger)index];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetFragmentSamplerState(
+        JNIEnv *, jclass, jlong encoderHandle, jlong samplerHandle, jint index) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    id<MTLSamplerState> sampler = samplerHandle ? voxy_handle_cast<id<MTLSamplerState>>(samplerHandle) : nil;
+    [encoder setFragmentSamplerState:sampler atIndex:(NSUInteger)index];
+}
+
+// -------- Inline byte uniforms (render encoder) --------
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetVertexBytes(
+        JNIEnv *, jclass, jlong encoderHandle, jlong dataAddr, jint size, jint index) {
+    if (encoderHandle == 0 || dataAddr == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    [encoder setVertexBytes:(const void *)dataAddr length:(NSUInteger)size atIndex:(NSUInteger)index];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetFragmentBytes(
+        JNIEnv *, jclass, jlong encoderHandle, jlong dataAddr, jint size, jint index) {
+    if (encoderHandle == 0 || dataAddr == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    [encoder setFragmentBytes:(const void *)dataAddr length:(NSUInteger)size atIndex:(NSUInteger)index];
+}

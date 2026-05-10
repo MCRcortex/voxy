@@ -323,6 +323,12 @@ public class GlRenderBackend implements RenderBackend {
                 "GlRenderBackend.beginComputePass is not implemented yet (see M9)");
     }
 
+    @Override
+    public IGpuSampler createSampler(SamplerDesc desc) {
+        throw new UnsupportedOperationException(
+                "GlRenderBackend.createSampler is not implemented yet (see M9)");
+    }
+
     /** Concrete encoder for the GL backend. Most methods stub through M8;
      *  M9 wires them to the existing Voxy GL helpers as call-sites migrate. */
     private static final class GlRenderEncoder implements RenderEncoder {
@@ -344,6 +350,16 @@ public class GlRenderBackend implements RenderBackend {
         @Override
         public void setTexture(int binding, IGpuTexture texture) {
             throw new UnsupportedOperationException("GlRenderEncoder.setTexture (see M9)");
+        }
+
+        @Override
+        public void setSampler(int binding, IGpuSampler sampler) {
+            throw new UnsupportedOperationException("GlRenderEncoder.setSampler (see M9)");
+        }
+
+        @Override
+        public void setBytes(int binding, long dataAddr, int dataSize) {
+            throw new UnsupportedOperationException("GlRenderEncoder.setBytes (see M9)");
         }
 
         @Override

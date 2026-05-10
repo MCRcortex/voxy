@@ -425,6 +425,49 @@ public final class MetalNative {
     public static final int MTLBlendFactorDestinationAlpha = 8;
     public static final int MTLBlendFactorOneMinusDestinationAlpha = 9;
 
+    // --- Sampler descriptor + state ---
+
+    public static native long mtlNewSamplerDescriptor();
+    public static native void mtlSamplerDescriptorSetMinFilter(long descriptor, int filter);
+    public static native void mtlSamplerDescriptorSetMagFilter(long descriptor, int filter);
+    public static native void mtlSamplerDescriptorSetMipFilter(long descriptor, int filter);
+    public static native void mtlSamplerDescriptorSetSAddressMode(long descriptor, int mode);
+    public static native void mtlSamplerDescriptorSetTAddressMode(long descriptor, int mode);
+    public static native void mtlSamplerDescriptorSetRAddressMode(long descriptor, int mode);
+    public static native void mtlSamplerDescriptorSetLodMinClamp(long descriptor, float value);
+    public static native void mtlSamplerDescriptorSetLodMaxClamp(long descriptor, float value);
+    public static native void mtlSamplerDescriptorSetCompareFunction(long descriptor, int compareFunction);
+    public static native long mtlDeviceNewSamplerState(long device, long descriptor);
+
+    // --- Sampler binding on encoders ---
+
+    public static native void mtlRenderEncoderSetVertexSamplerState(long encoder, long sampler, int index);
+    public static native void mtlRenderEncoderSetFragmentSamplerState(long encoder, long sampler, int index);
+    public static native void mtlComputeEncoderSetSamplerState(long encoder, long sampler, int index);
+
+    // --- Inline byte data (push-constant equivalent) ---
+
+    public static native void mtlRenderEncoderSetVertexBytes(long encoder, long addr, int size, int index);
+    public static native void mtlRenderEncoderSetFragmentBytes(long encoder, long addr, int size, int index);
+    public static native void mtlComputeEncoderSetBytes(long encoder, long addr, int size, int index);
+
+    /** MTLSamplerMinMagFilter enum. */
+    public static final int MTLSamplerFilterNearest = 0;
+    public static final int MTLSamplerFilterLinear = 1;
+
+    /** MTLSamplerMipFilter enum. */
+    public static final int MTLSamplerMipFilterNotMipmapped = 0;
+    public static final int MTLSamplerMipFilterNearest = 1;
+    public static final int MTLSamplerMipFilterLinear = 2;
+
+    /** MTLSamplerAddressMode enum. */
+    public static final int MTLSamplerAddressModeClampToEdge = 0;
+    public static final int MTLSamplerAddressModeMirrorClampToEdge = 1;
+    public static final int MTLSamplerAddressModeRepeat = 2;
+    public static final int MTLSamplerAddressModeMirrorRepeat = 3;
+    public static final int MTLSamplerAddressModeClampToZero = 4;
+    public static final int MTLSamplerAddressModeClampToBorderColor = 5;
+
     // --- Compute encoder (M7) ---
 
     /** Creates a compute command encoder on the active command buffer. */

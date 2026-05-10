@@ -75,3 +75,20 @@ Java_me_cortex_voxy_client_core_metal_MetalNative_mtlComputeEncoderMemoryBarrier
     id<MTLComputeCommandEncoder> encoder = voxy_handle_cast<id<MTLComputeCommandEncoder>>(encoderHandle);
     [encoder memoryBarrierWithScope:(MTLBarrierScope)scope];
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlComputeEncoderSetSamplerState(
+        JNIEnv *, jclass, jlong encoderHandle, jlong samplerHandle, jint index) {
+    if (encoderHandle == 0) return;
+    id<MTLComputeCommandEncoder> encoder = voxy_handle_cast<id<MTLComputeCommandEncoder>>(encoderHandle);
+    id<MTLSamplerState> sampler = samplerHandle ? voxy_handle_cast<id<MTLSamplerState>>(samplerHandle) : nil;
+    [encoder setSamplerState:sampler atIndex:(NSUInteger)index];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlComputeEncoderSetBytes(
+        JNIEnv *, jclass, jlong encoderHandle, jlong dataAddr, jint size, jint index) {
+    if (encoderHandle == 0 || dataAddr == 0) return;
+    id<MTLComputeCommandEncoder> encoder = voxy_handle_cast<id<MTLComputeCommandEncoder>>(encoderHandle);
+    [encoder setBytes:(const void *)dataAddr length:(NSUInteger)size atIndex:(NSUInteger)index];
+}

@@ -46,6 +46,19 @@ public interface ComputeEncoder extends AutoCloseable {
     void setTexture(int binding, IGpuTexture texture);
 
     /**
+     * Bind a sampler state object at the given binding index. Pairs with
+     * {@link #setTexture} for sampled-texture compute passes (e.g. HiZ
+     * mip generation that samples the previous mip).
+     */
+    void setSampler(int binding, IGpuSampler sampler);
+
+    /**
+     * Push a small block of bytes inline as a uniform buffer at the given
+     * binding index. Same semantics as {@link RenderEncoder#setBytes}.
+     */
+    void setBytes(int binding, long dataAddr, int dataSize);
+
+    /**
      * Dispatch (groupCountX × groupCountY × groupCountZ) thread-groups. The
      * thread-group size itself comes from the bound pipeline (declared as
      * {@code layout(local_size_x=...)} in the shader).
