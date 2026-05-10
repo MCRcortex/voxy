@@ -102,26 +102,28 @@ public final class VertexLayout {
      * formats can be added as M9 migration encounters them.
      */
     public enum VertexFormat {
-        FLOAT(37),
-        FLOAT2(38),
-        FLOAT3(39),
-        FLOAT4(40),
-        INT(41),
-        INT2(42),
-        INT3(43),
-        INT4(44),
-        UINT(45),
-        UINT2(46),
-        UINT3(47),
-        UINT4(48),
-        UBYTE4_NORM(12),
-        BYTE4_NORM(16),
-        USHORT2(18),
-        USHORT4(20),
-        USHORT2_NORM(26),
-        USHORT4_NORM(28),
-        HALF2(34),
-        HALF4(36);
+        // Values match MTLVertexFormat from <Metal/MTLVertexDescriptor.h> exactly
+        // — confirmed against the SDK header, NOT inferred from header order.
+        FLOAT(28),
+        FLOAT2(29),
+        FLOAT3(30),
+        FLOAT4(31),
+        INT(32),
+        INT2(33),
+        INT3(34),
+        INT4(35),
+        UINT(36),
+        UINT2(37),
+        UINT3(38),
+        UINT4(39),
+        UBYTE4_NORM(9),       // MTLVertexFormatUChar4Normalized
+        BYTE4_NORM(12),       // MTLVertexFormatChar4Normalized
+        USHORT2(13),          // MTLVertexFormatUShort2
+        USHORT4(15),          // MTLVertexFormatUShort4
+        USHORT2_NORM(19),     // MTLVertexFormatUShort2Normalized
+        USHORT4_NORM(21),     // MTLVertexFormatUShort4Normalized
+        HALF2(25),
+        HALF4(27);
 
         /** Raw MTLVertexFormat enum ordinal. */
         public final int metalValue;
