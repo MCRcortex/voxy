@@ -3,6 +3,7 @@ package me.cortex.voxy.client.core.metal;
 import me.cortex.voxy.client.core.gpu.ComputeEncoder;
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.gpu.IGpuPipeline;
+import me.cortex.voxy.client.core.gpu.IGpuTexture;
 
 /**
  * Metal-side {@link ComputeEncoder}: wraps a single MTLComputeCommandEncoder
@@ -41,6 +42,12 @@ public final class MetalComputeEncoder implements ComputeEncoder {
     }
 
     @Override
+    public void setTexture(int binding, IGpuTexture texture) {
+        long handle = texture == null ? 0 : MetalHandleMap.getHandle(texture.id());
+        MetalNative.mtlComputeEncoderSetTexture(this.encoderHandle, handle, binding);
+    }
+
+    @Override
     public void dispatch(int groupCountX, int groupCountY, int groupCountZ) {
         if (this.boundPipeline == null) {
             throw new IllegalStateException("dispatch() before setPipeline() — Metal needs the local size from the bound pipeline");
@@ -51,6 +58,50 @@ public final class MetalComputeEncoder implements ComputeEncoder {
                 this.boundPipeline.localSizeY,
                 this.boundPipeline.localSizeZ);
     }
+
+    @Override
+    public void dispatchIndirect(IGpuBuffer buffer, long offset) {
+        if (this.boundPipeline == null) {
+            throw new IllegalStateException("dispatchIndirect() before setPipeline()");
+        }
+        if (!(buffer instanceof MetalBuffer mb)) {
+            throw new IllegalArgumentException(
+                    "MetalComputeEncoder.dispatchIndirect expected MetalBuffer, got "
+                            + (buffer == null ? "null" : buffer.getClass().getName()));
+        }
+        MetalNative.mtlComputeEncoderDispatchThreadgroupsIndirect(this.encoderHandle,
+                mb.handle(), offset,
+                this.boundPipeline.localSizeX,
+                this.boundPipeline.localSizeY,
+                this.boundPipeline.localSizeZ);
+    }
+
+    @Override
+    public void barrier(int srcStages, int dstStages) {
+        // Map our cross-backend stage flags onto Metal's MTLBarrierScope. The
+        // src/dst distinction collapses: Metal's scope describes which resource
+        // categories need synchronization, regardless of direction. We OR the
+        // resource categories implied by either stage.
+        int merged = srcStages | dstStages;
+        int scope = 0;
+        if ((merged & (BARRIER_SHADER | BARRIER_INDIRECT)) != 0) {
+            scope |= MetalNative.MTLBarrierScopeBuffers;
+            // Storage-image bindings count as textures; safest to flush both.
+            scope |= MetalNative.MTLBarrierScopeTextures;
+        }
+        if ((merged & BARRIER_TRANSFER) != 0) {
+            // Blit/transfer happens outside the compute encoder; dropping the
+            // intra-encoder barrier is safe — hazard tracking handles it.
+        }
+        if (scope != 0) {
+            MetalNative.mtlComputeEncoderMemoryBarrier(this.encoderHandle, scope);
+        }
+    }
+
+    // Re-export so the constants are visible without a static import on the caller side.
+    private static final int BARRIER_SHADER = ComputeEncoder.BARRIER_SHADER;
+    private static final int BARRIER_INDIRECT = ComputeEncoder.BARRIER_INDIRECT;
+    private static final int BARRIER_TRANSFER = ComputeEncoder.BARRIER_TRANSFER;
 
     @Override
     public void close() {

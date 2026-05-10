@@ -291,6 +291,36 @@ public final class MetalNative {
             int firstVertex, int vertexCount,
             int instanceCount, int baseInstance);
 
+    /**
+     * Indexed draw via {@code drawIndexedPrimitives}. {@code indexType} is the Metal
+     * MTLIndexType ordinal (0=UInt16, 1=UInt32).
+     */
+    public static native void mtlRenderEncoderDrawIndexedPrimitives(
+            long encoder, int primitiveType,
+            int indexCount, int indexType,
+            long indexBuffer, long indexBufferOffset,
+            int instanceCount, int baseVertex, int baseInstance);
+
+    // --- Render encoder per-stage resource binding ---
+
+    public static native void mtlRenderEncoderSetVertexBuffer(long encoder, long buffer, long offset, int index);
+    public static native void mtlRenderEncoderSetFragmentBuffer(long encoder, long buffer, long offset, int index);
+    public static native void mtlRenderEncoderSetVertexTexture(long encoder, long texture, int index);
+    public static native void mtlRenderEncoderSetFragmentTexture(long encoder, long texture, int index);
+
+    /** Set viewport. Origin is in pixel coordinates (top-left). */
+    public static native void mtlRenderEncoderSetViewport(long encoder,
+            double originX, double originY, double width, double height,
+            double znear, double zfar);
+
+    /** Set scissor rect in pixel coordinates. */
+    public static native void mtlRenderEncoderSetScissorRect(long encoder,
+            int x, int y, int width, int height);
+
+    /** MTLIndexType values. */
+    public static final int MTLIndexTypeUInt16 = 0;
+    public static final int MTLIndexTypeUInt32 = 1;
+
     // --- Compute encoder (M7) ---
 
     /** Creates a compute command encoder on the active command buffer. */
@@ -308,6 +338,29 @@ public final class MetalNative {
      */
     public static native void mtlComputeEncoderDispatchThreadgroups(
             long encoder, int gx, int gy, int gz, int tx, int ty, int tz);
+
+    /** Binds a texture at a given index for the active compute pipeline. */
+    public static native void mtlComputeEncoderSetTexture(long encoder, long texture, int index);
+
+    /**
+     * Indirect dispatch: groupCountX/Y/Z come from three uint32 values at
+     * (indirectBuffer + indirectOffset). Threads-per-threadgroup still has
+     * to match the shader's local size.
+     */
+    public static native void mtlComputeEncoderDispatchThreadgroupsIndirect(
+            long encoder, long indirectBuffer, long indirectOffset, int tx, int ty, int tz);
+
+    /**
+     * Memory barrier within a compute encoder.
+     * Scope flags: 0x1 = MTLBarrierScopeBuffers, 0x2 = MTLBarrierScopeTextures,
+     * 0x4 = MTLBarrierScopeRenderTargets.
+     */
+    public static native void mtlComputeEncoderMemoryBarrier(long encoder, int scope);
+
+    // MTLBarrierScope (raw enum from Metal)
+    public static final int MTLBarrierScopeBuffers = 0x1;
+    public static final int MTLBarrierScopeTextures = 0x2;
+    public static final int MTLBarrierScopeRenderTargets = 0x4;
 
     // --- Blit encoder readback (M5) ---
 

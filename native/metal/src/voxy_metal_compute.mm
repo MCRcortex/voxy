@@ -45,3 +45,33 @@ Java_me_cortex_voxy_client_core_metal_MetalNative_mtlComputeEncoderDispatchThrea
     MTLSize threadsPerThreadgroup = MTLSizeMake((NSUInteger)tx, (NSUInteger)ty, (NSUInteger)tz);
     [encoder dispatchThreadgroups:threadgroups threadsPerThreadgroup:threadsPerThreadgroup];
 }
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlComputeEncoderSetTexture(
+        JNIEnv *, jclass, jlong encoderHandle, jlong textureHandle, jint index) {
+    if (encoderHandle == 0) return;
+    id<MTLComputeCommandEncoder> encoder = voxy_handle_cast<id<MTLComputeCommandEncoder>>(encoderHandle);
+    id<MTLTexture> texture = textureHandle ? voxy_handle_cast<id<MTLTexture>>(textureHandle) : nil;
+    [encoder setTexture:texture atIndex:(NSUInteger)index];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlComputeEncoderDispatchThreadgroupsIndirect(
+        JNIEnv *, jclass, jlong encoderHandle,
+        jlong indirectBufferHandle, jlong indirectOffset, jint tx, jint ty, jint tz) {
+    if (encoderHandle == 0 || indirectBufferHandle == 0) return;
+    id<MTLComputeCommandEncoder> encoder = voxy_handle_cast<id<MTLComputeCommandEncoder>>(encoderHandle);
+    id<MTLBuffer> indirectBuffer = voxy_handle_cast<id<MTLBuffer>>(indirectBufferHandle);
+    MTLSize threadsPerThreadgroup = MTLSizeMake((NSUInteger)tx, (NSUInteger)ty, (NSUInteger)tz);
+    [encoder dispatchThreadgroupsWithIndirectBuffer:indirectBuffer
+                               indirectBufferOffset:(NSUInteger)indirectOffset
+                              threadsPerThreadgroup:threadsPerThreadgroup];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlComputeEncoderMemoryBarrier(
+        JNIEnv *, jclass, jlong encoderHandle, jint scope) {
+    if (encoderHandle == 0) return;
+    id<MTLComputeCommandEncoder> encoder = voxy_handle_cast<id<MTLComputeCommandEncoder>>(encoderHandle);
+    [encoder memoryBarrierWithScope:(MTLBarrierScope)scope];
+}

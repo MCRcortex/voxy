@@ -105,6 +105,83 @@ Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderDrawPrimitives
                baseInstance:(NSUInteger)baseInstance];
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderDrawIndexedPrimitives(
+        JNIEnv *, jclass, jlong encoderHandle,
+        jint primitiveType, jint indexCount, jint indexType,
+        jlong indexBufferHandle, jlong indexBufferOffset,
+        jint instanceCount, jint baseVertex, jint baseInstance) {
+    if (encoderHandle == 0 || indexBufferHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    id<MTLBuffer> indexBuffer = voxy_handle_cast<id<MTLBuffer>>(indexBufferHandle);
+    [encoder drawIndexedPrimitives:(MTLPrimitiveType)primitiveType
+                        indexCount:(NSUInteger)indexCount
+                         indexType:(MTLIndexType)indexType
+                       indexBuffer:indexBuffer
+                 indexBufferOffset:(NSUInteger)indexBufferOffset
+                     instanceCount:(NSUInteger)instanceCount
+                        baseVertex:(NSInteger)baseVertex
+                      baseInstance:(NSUInteger)baseInstance];
+}
+
+// -------- Per-stage resource binding --------
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetVertexBuffer(
+        JNIEnv *, jclass, jlong encoderHandle, jlong bufferHandle, jlong offset, jint index) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    id<MTLBuffer> buffer = bufferHandle ? voxy_handle_cast<id<MTLBuffer>>(bufferHandle) : nil;
+    [encoder setVertexBuffer:buffer offset:(NSUInteger)offset atIndex:(NSUInteger)index];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetFragmentBuffer(
+        JNIEnv *, jclass, jlong encoderHandle, jlong bufferHandle, jlong offset, jint index) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    id<MTLBuffer> buffer = bufferHandle ? voxy_handle_cast<id<MTLBuffer>>(bufferHandle) : nil;
+    [encoder setFragmentBuffer:buffer offset:(NSUInteger)offset atIndex:(NSUInteger)index];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetVertexTexture(
+        JNIEnv *, jclass, jlong encoderHandle, jlong textureHandle, jint index) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    id<MTLTexture> texture = textureHandle ? voxy_handle_cast<id<MTLTexture>>(textureHandle) : nil;
+    [encoder setVertexTexture:texture atIndex:(NSUInteger)index];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetFragmentTexture(
+        JNIEnv *, jclass, jlong encoderHandle, jlong textureHandle, jint index) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    id<MTLTexture> texture = textureHandle ? voxy_handle_cast<id<MTLTexture>>(textureHandle) : nil;
+    [encoder setFragmentTexture:texture atIndex:(NSUInteger)index];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetViewport(
+        JNIEnv *, jclass, jlong encoderHandle,
+        jdouble originX, jdouble originY, jdouble width, jdouble height,
+        jdouble znear, jdouble zfar) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    MTLViewport viewport = {originX, originY, width, height, znear, zfar};
+    [encoder setViewport:viewport];
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderEncoderSetScissorRect(
+        JNIEnv *, jclass, jlong encoderHandle, jint x, jint y, jint width, jint height) {
+    if (encoderHandle == 0) return;
+    id<MTLRenderCommandEncoder> encoder = voxy_handle_cast<id<MTLRenderCommandEncoder>>(encoderHandle);
+    MTLScissorRect rect = {(NSUInteger)x, (NSUInteger)y, (NSUInteger)width, (NSUInteger)height};
+    [encoder setScissorRect:rect];
+}
+
 // -------- Blit encoder readback (M5) --------
 
 extern "C" JNIEXPORT void JNICALL

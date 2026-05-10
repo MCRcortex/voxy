@@ -323,7 +323,8 @@ public class GlRenderBackend implements RenderBackend {
                 "GlRenderBackend.beginComputePass is not implemented yet (see M9)");
     }
 
-    /** Concrete encoder for the GL backend. Methods after close() are no-ops. */
+    /** Concrete encoder for the GL backend. Most methods stub through M8;
+     *  M9 wires them to the existing Voxy GL helpers as call-sites migrate. */
     private static final class GlRenderEncoder implements RenderEncoder {
         private final int fbo;
         private boolean closed;
@@ -332,15 +333,50 @@ public class GlRenderBackend implements RenderBackend {
 
         @Override
         public void setPipeline(IGpuPipeline pipeline) {
-            throw new UnsupportedOperationException(
-                    "GlRenderEncoder.setPipeline is not implemented yet (see M9)");
+            throw new UnsupportedOperationException("GlRenderEncoder.setPipeline (see M9)");
+        }
+
+        @Override
+        public void setBuffer(int binding, IGpuBuffer buffer, long offset) {
+            throw new UnsupportedOperationException("GlRenderEncoder.setBuffer (see M9)");
+        }
+
+        @Override
+        public void setTexture(int binding, IGpuTexture texture) {
+            throw new UnsupportedOperationException("GlRenderEncoder.setTexture (see M9)");
+        }
+
+        @Override
+        public void bindVertexBuffer(int slot, IGpuBuffer buffer, long offset) {
+            throw new UnsupportedOperationException("GlRenderEncoder.bindVertexBuffer (see M9)");
+        }
+
+        @Override
+        public void bindIndexBuffer(IGpuBuffer buffer, int indexType, long offset) {
+            throw new UnsupportedOperationException("GlRenderEncoder.bindIndexBuffer (see M9)");
+        }
+
+        @Override
+        public void setViewport(float x, float y, float width, float height,
+                                 float minDepth, float maxDepth) {
+            throw new UnsupportedOperationException("GlRenderEncoder.setViewport (see M9)");
+        }
+
+        @Override
+        public void setScissor(int x, int y, int width, int height) {
+            throw new UnsupportedOperationException("GlRenderEncoder.setScissor (see M9)");
         }
 
         @Override
         public void draw(int primitiveType, int firstVertex, int vertexCount,
                          int instanceCount, int baseInstance) {
-            throw new UnsupportedOperationException(
-                    "GlRenderEncoder.draw is not implemented yet (see M9)");
+            throw new UnsupportedOperationException("GlRenderEncoder.draw (see M9)");
+        }
+
+        @Override
+        public void drawIndexed(int primitiveType, int indexCount, int instanceCount,
+                                 int firstIndex, int vertexOffset, int firstInstance) {
+            throw new UnsupportedOperationException("GlRenderEncoder.drawIndexed (see M9)");
         }
 
         @Override
