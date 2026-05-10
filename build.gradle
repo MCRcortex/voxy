@@ -438,6 +438,38 @@ tasks.register('testVulkanLoader', JavaExec) {
     }
 }
 
+// M8 Vulkan: equivalent of M7 — dispatch increment.comp via a Vulkan
+// compute pipeline with descriptor-set-bound SSBO and verify the values.
+tasks.register('testVulkanCompute', JavaExec) {
+    group = 'verification'
+    description = 'Smoke-test the Vulkan compute pipeline + dispatch chain.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'me.cortex.voxy.tools.VulkanComputeSmokeTest'
+    workingDir = rootProject.projectDir
+    standardOutput = System.out
+    errorOutput = System.err
+    def moltenVkIcd = file('/opt/homebrew/etc/vulkan/icd.d/MoltenVK_icd.json')
+    if (moltenVkIcd.exists()) {
+        environment 'VK_ICD_FILENAMES', moltenVkIcd.absolutePath
+    }
+}
+
+// M6 Vulkan: equivalent of M5 — render the triangle through a Vulkan
+// graphics pipeline + dynamic_rendering + readback verification.
+tasks.register('testVulkanTriangle', JavaExec) {
+    group = 'verification'
+    description = 'Smoke-test a Vulkan triangle render via dynamic_rendering + graphics pipeline.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'me.cortex.voxy.tools.VulkanTriangleSmokeTest'
+    workingDir = rootProject.projectDir
+    standardOutput = System.out
+    errorOutput = System.err
+    def moltenVkIcd = file('/opt/homebrew/etc/vulkan/icd.d/MoltenVK_icd.json')
+    if (moltenVkIcd.exists()) {
+        environment 'VK_ICD_FILENAMES', moltenVkIcd.absolutePath
+    }
+}
+
 // M4 Stages B-D: full Vulkan clear-color render pass on MoltenVK.
 // Runs the device + image + dynamic_rendering setup and reads pixels back
 // to confirm the GPU wrote the expected RGBA8 values.
