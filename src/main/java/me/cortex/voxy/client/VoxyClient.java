@@ -47,6 +47,24 @@ public class VoxyClient implements ClientModInitializer {
                 + ", indirectParameters=" + backend.hasIndirectParameters() + ")");
 
         boolean systemSupported = backend.hasCompute() && backend.hasIndirectParameters() && !Capabilities.INSTANCE.hasBrokenDepthSampler;
+
+        // M9 transitional: even though MetalRenderBackend reports compute=true and
+        // indirectParameters=true, Voxy's render path (MDICSectionRenderer,
+        // HiZBuffer2, HierarchicalOcclusionTraverser, ChunkBoundRenderer,
+        // bakery, AbstractRenderPipeline) is still raw OpenGL DSA and aborts
+        // the JVM the first time the GL driver hits an unsupported call on
+        // Apple's frozen GL 4.1. Until that work lands (M9-M11 migration to
+        // the encoder API + IOSurface bridge), force-disable Voxy on
+        // non-OpenGL backends so the mixins find VoxyRenderSystem == null
+        // and Sodium's chunk render runs unmodified — the user sees normal
+        // close-distance MC + Sodium rendering instead of a blue screen.
+        if (systemSupported && backend.getType() != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+            Logger.warn("[M9 TRANSITIONAL] Voxy disabled on " + backend.getType()
+                    + " backend until the render-path migration lands. Sodium will handle close-distance "
+                    + "chunks; Voxy's far-distance LOD won't appear yet.");
+            systemSupported = false;
+        }
+
         if (systemSupported) {
 
             SharedIndexBuffer.INSTANCE.id();
