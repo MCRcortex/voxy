@@ -268,7 +268,6 @@ public class GlRenderBackend implements RenderBackend {
         // pipeline state binding lands.
         int fbo = org.lwjgl.opengl.GL45C.glCreateFramebuffers();
         int[] drawBuffers = new int[Math.max(1, desc.colorAttachments().size())];
-        int clearMask = 0;
         for (int i = 0; i < desc.colorAttachments().size(); i++) {
             RenderPassDesc.ColorAttachment c = desc.colorAttachments().get(i);
             int attachment = org.lwjgl.opengl.GL30C.GL_COLOR_ATTACHMENT0 + i;
@@ -294,14 +293,50 @@ public class GlRenderBackend implements RenderBackend {
         org.lwjgl.opengl.GL45C.glBindFramebuffer(org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER, fbo);
         org.lwjgl.opengl.GL11C.glViewport(0, 0, desc.viewportWidth(), desc.viewportHeight());
 
-        return () -> {
-            org.lwjgl.opengl.GL45C.glBindFramebuffer(org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER, 0);
-            org.lwjgl.opengl.GL45C.glDeleteFramebuffers(fbo);
-        };
+        return new GlRenderEncoder(fbo);
     }
 
     @Override
     public void submit() {
         org.lwjgl.opengl.GL11C.glFlush();
+    }
+
+    @Override
+    public IGpuPipeline createGraphicsPipeline(GraphicsPipelineDesc desc) {
+        // The GL backend reaches Voxy through its existing Shader.Builder compile
+        // flow rather than this abstraction. M9 is the milestone where call sites
+        // migrate over and we wire up a real GL implementation here.
+        throw new UnsupportedOperationException(
+                "GlRenderBackend.createGraphicsPipeline is not implemented yet — "
+                        + "GL path uses the legacy Shader.Builder pipeline through M8");
+    }
+
+    /** Concrete encoder for the GL backend. Methods after close() are no-ops. */
+    private static final class GlRenderEncoder implements RenderEncoder {
+        private final int fbo;
+        private boolean closed;
+
+        GlRenderEncoder(int fbo) { this.fbo = fbo; }
+
+        @Override
+        public void setPipeline(IGpuPipeline pipeline) {
+            throw new UnsupportedOperationException(
+                    "GlRenderEncoder.setPipeline is not implemented yet (see M9)");
+        }
+
+        @Override
+        public void draw(int primitiveType, int firstVertex, int vertexCount,
+                         int instanceCount, int baseInstance) {
+            throw new UnsupportedOperationException(
+                    "GlRenderEncoder.draw is not implemented yet (see M9)");
+        }
+
+        @Override
+        public void close() {
+            if (this.closed) return;
+            this.closed = true;
+            org.lwjgl.opengl.GL45C.glBindFramebuffer(org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER, 0);
+            org.lwjgl.opengl.GL45C.glDeleteFramebuffers(this.fbo);
+        }
     }
 }

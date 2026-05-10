@@ -390,10 +390,80 @@ public class MetalRenderBackend implements RenderBackend {
             MetalNative.mtlRelease(passDescHandle);
         }
 
-        return () -> {
-            MetalNative.mtlEncoderEndEncoding(encoder);
-            MetalNative.mtlRelease(encoder);
-        };
+        return new MetalRenderEncoder(encoder);
+    }
+
+    @Override
+    public IGpuPipeline createGraphicsPipeline(GraphicsPipelineDesc desc) {
+        if (desc.vertexMsl == null || desc.fragmentMsl == null) {
+            throw new IllegalArgumentException(
+                    "MetalRenderBackend.createGraphicsPipeline: vertex/fragment MSL required");
+        }
+
+        long vertexLib = MetalNative.mtlDeviceNewLibraryWithSource(this.device, desc.vertexMsl);
+        if (vertexLib == 0) {
+            throw new RuntimeException("Vertex MSL compile failed: " + MetalNative.mtlGetLastCompileError());
+        }
+        long fragmentLib = 0;
+        long vertexFn = 0;
+        long fragmentFn = 0;
+        long pipelineState = 0;
+        long pipelineDesc = 0;
+        try {
+            fragmentLib = MetalNative.mtlDeviceNewLibraryWithSource(this.device, desc.fragmentMsl);
+            if (fragmentLib == 0) {
+                throw new RuntimeException("Fragment MSL compile failed: " + MetalNative.mtlGetLastCompileError());
+            }
+            vertexFn = MetalNative.mtlLibraryNewFunction(vertexLib, "main0");
+            if (vertexFn == 0) {
+                // SPIRV-Cross emits the entry point as "main0" by default; fall back to "main".
+                vertexFn = MetalNative.mtlLibraryNewFunction(vertexLib, "main");
+                if (vertexFn == 0) {
+                    throw new RuntimeException("Vertex function 'main0'/'main' not found in compiled library");
+                }
+            }
+            fragmentFn = MetalNative.mtlLibraryNewFunction(fragmentLib, "main0");
+            if (fragmentFn == 0) {
+                fragmentFn = MetalNative.mtlLibraryNewFunction(fragmentLib, "main");
+                if (fragmentFn == 0) {
+                    throw new RuntimeException("Fragment function 'main0'/'main' not found in compiled library");
+                }
+            }
+
+            int metalPixelFormat = MetalFormatUtil.glFormatToMetal(desc.colorAttachmentFormat);
+            pipelineDesc = MetalNative.mtlNewRenderPipelineDescriptor();
+            if (pipelineDesc == 0) {
+                throw new RuntimeException("mtlNewRenderPipelineDescriptor returned NULL");
+            }
+            MetalNative.mtlRenderPipelineDescriptorSetVertexFunction(pipelineDesc, vertexFn);
+            MetalNative.mtlRenderPipelineDescriptorSetFragmentFunction(pipelineDesc, fragmentFn);
+            MetalNative.mtlRenderPipelineDescriptorSetColorAttachmentFormat(pipelineDesc, 0, metalPixelFormat);
+
+            pipelineState = MetalNative.mtlDeviceNewRenderPipelineState(this.device, pipelineDesc);
+            if (pipelineState == 0) {
+                throw new RuntimeException("Pipeline state link failed: " + MetalNative.mtlGetLastCompileError());
+            }
+            if (desc.label != null) {
+                MetalNative.mtlSetLabel(pipelineState, desc.label);
+            }
+
+            MetalGraphicsPipeline result = new MetalGraphicsPipeline(
+                    pipelineState, vertexLib, fragmentLib, vertexFn, fragmentFn);
+            // result owns the handles now; clear locals so the catch path doesn't double-release.
+            pipelineState = 0;
+            vertexFn = 0;
+            fragmentFn = 0;
+            vertexLib = 0;
+            fragmentLib = 0;
+            return result;
+        } finally {
+            if (pipelineDesc != 0) MetalNative.mtlRelease(pipelineDesc);
+            if (pipelineState != 0) MetalNative.mtlRelease(pipelineState);
+            if (fragmentFn != 0) MetalNative.mtlRelease(fragmentFn);
+            if (vertexFn != 0) MetalNative.mtlRelease(vertexFn);
+            if (fragmentLib != 0) MetalNative.mtlRelease(fragmentLib);
+            if (vertexLib != 0) MetalNative.mtlRelease(vertexLib);
+        }
     }
 
     @Override
@@ -409,6 +479,63 @@ public class MetalRenderBackend implements RenderBackend {
         if (status != MetalNative.MTLCommandBufferStatusCompleted) {
             throw new RuntimeException("Metal command buffer ended with status=" + status
                     + " (expected " + MetalNative.MTLCommandBufferStatusCompleted + " = Completed)");
+        }
+    }
+
+    /**
+     * Synchronously read RGBA8 pixels from a texture region into a byte array.
+     * Allocates a transient Shared-storage MTLBuffer, runs a blit-encoder copy,
+     * waits for completion, and copies the contents back into the JVM heap.
+     *
+     * Used by the M5 smoke test to verify a triangle actually rasterized over
+     * the cleared background; will likely also serve M14 benchmark capture.
+     * Not part of {@link RenderBackend} yet — backend-agnostic readback lands
+     * in M9 with the migration of GLPixelDownload through the abstraction.
+     */
+    public byte[] readPixelsRGBA8(me.cortex.voxy.client.core.gpu.IGpuTexture texture,
+                                   int x, int y, int width, int height) {
+        final int bytesPerPixel = 4;
+        final int bytesPerRow = width * bytesPerPixel;
+        final long bufferSize = (long) bytesPerRow * height;
+
+        long readbackBuf = MetalNative.mtlDeviceNewBuffer(this.device, bufferSize,
+                MetalNative.MTLResourceStorageModeShared);
+        if (readbackBuf == 0) {
+            throw new RuntimeException("readPixelsRGBA8: failed to allocate readback buffer ("
+                    + bufferSize + " bytes)");
+        }
+        long cmdBuf = 0;
+        long blitEnc = 0;
+        try {
+            cmdBuf = MetalNative.mtlCommandQueueNewCommandBuffer(this.commandQueue);
+            if (cmdBuf == 0) throw new RuntimeException("readPixelsRGBA8: failed to allocate command buffer");
+            blitEnc = MetalNative.mtlCommandBufferNewBlitEncoder(cmdBuf);
+            if (blitEnc == 0) throw new RuntimeException("readPixelsRGBA8: failed to allocate blit encoder");
+
+            long texHandle = MetalHandleMap.getHandle(texture.id());
+            MetalNative.mtlBlitEncoderCopyTextureToBuffer(blitEnc, texHandle, 0,
+                    x, y, width, height,
+                    readbackBuf, 0, bytesPerRow, (int) bufferSize);
+            MetalNative.mtlEncoderEndEncoding(blitEnc);
+            MetalNative.mtlRelease(blitEnc);
+            blitEnc = 0;
+
+            MetalNative.mtlCommandBufferCommit(cmdBuf);
+            MetalNative.mtlCommandBufferWaitUntilCompleted(cmdBuf);
+            int status = MetalNative.mtlCommandBufferGetStatus(cmdBuf);
+            if (status != MetalNative.MTLCommandBufferStatusCompleted) {
+                throw new RuntimeException("readPixelsRGBA8 blit ended with status=" + status);
+            }
+
+            long contentsPtr = MetalNative.mtlBufferContents(readbackBuf);
+            if (contentsPtr == 0) throw new RuntimeException("readPixelsRGBA8: buffer contents pointer is null");
+            byte[] result = new byte[(int) bufferSize];
+            org.lwjgl.system.MemoryUtil.memByteBuffer(contentsPtr, result.length).get(result);
+            return result;
+        } finally {
+            if (blitEnc != 0) MetalNative.mtlRelease(blitEnc);
+            if (cmdBuf != 0) MetalNative.mtlRelease(cmdBuf);
+            MetalNative.mtlRelease(readbackBuf);
         }
     }
 

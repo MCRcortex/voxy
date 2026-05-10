@@ -387,3 +387,16 @@ tasks.register('testMetalRender', JavaExec) {
     standardOutput = System.out
     errorOutput = System.err
 }
+
+// M5 verification: render a 3-vertex triangle through the new graphics
+// pipeline + render encoder API, read the pixels back, and confirm the
+// background corners remain clear while the triangle interior was drawn.
+tasks.register('testMetalTriangle', JavaExec) {
+    group = 'verification'
+    description = 'Smoke-test the Metal graphics pipeline + draw chain by rendering a triangle.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'me.cortex.voxy.tools.MetalTriangleSmokeTest'
+    workingDir = rootProject.projectDir
+    standardOutput = System.out
+    errorOutput = System.err
+}

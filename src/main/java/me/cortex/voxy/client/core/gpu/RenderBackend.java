@@ -133,4 +133,15 @@ public interface RenderBackend {
      * this commits the active command buffer and rotates to a fresh one.
      */
     void submit();
+
+    /**
+     * Compile and link a graphics pipeline state object from the supplied
+     * shader sources. Backends pick whichever representation they need —
+     * Metal consumes MSL via mtlDeviceNewLibraryWithSource, Vulkan consumes
+     * SPIRV via vkCreateShaderModule. The OpenGL backend is unsupported in
+     * the M5 surface (Voxy's GL path keeps using its existing Shader.Builder
+     * compile flow); it will be wired up in M9 when the migration covers
+     * call sites that need the new abstraction on Win/Linux as well.
+     */
+    IGpuPipeline createGraphicsPipeline(GraphicsPipelineDesc desc);
 }

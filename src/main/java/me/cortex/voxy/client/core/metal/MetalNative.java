@@ -256,6 +256,56 @@ public final class MetalNative {
      */
     public static native long mtlCommandBufferNewRenderEncoder(long cmdBuffer, long renderPassDesc);
 
+    // --- Render pipeline descriptor + state (M5) ---
+
+    /** Creates a new MTLRenderPipelineDescriptor; returns handle (must be released). */
+    public static native long mtlNewRenderPipelineDescriptor();
+
+    /** Sets the vertex function (MTLFunction handle) on a render pipeline descriptor. */
+    public static native void mtlRenderPipelineDescriptorSetVertexFunction(long descriptor, long function);
+
+    /** Sets the fragment function (MTLFunction handle) on a render pipeline descriptor. */
+    public static native void mtlRenderPipelineDescriptorSetFragmentFunction(long descriptor, long function);
+
+    /** Sets the pixel format of a color attachment slot on a render pipeline descriptor. */
+    public static native void mtlRenderPipelineDescriptorSetColorAttachmentFormat(
+            long descriptor, int index, int pixelFormat);
+
+    /**
+     * Creates a MTLRenderPipelineState from a descriptor. On failure returns 0
+     * and sets the last compile error retrievable via mtlGetLastCompileError.
+     */
+    public static native long mtlDeviceNewRenderPipelineState(long device, long descriptor);
+
+    // --- Render encoder draw operations (M5) ---
+
+    /** Sets the active render pipeline state on a render encoder. */
+    public static native void mtlRenderEncoderSetRenderPipelineState(long encoder, long pipelineState);
+
+    /**
+     * Issue a non-indexed draw. primitiveType uses the same enum as MTLPrimitiveType
+     * (0=Point, 1=Line, 2=LineStrip, 3=Triangle, 4=TriangleStrip).
+     */
+    public static native void mtlRenderEncoderDrawPrimitives(
+            long encoder, int primitiveType,
+            int firstVertex, int vertexCount,
+            int instanceCount, int baseInstance);
+
+    // --- Blit encoder readback (M5) ---
+
+    /** Copies a region of a texture into a buffer (for CPU readback). */
+    public static native void mtlBlitEncoderCopyTextureToBuffer(
+            long encoder, long srcTexture, int srcLevel,
+            int srcX, int srcY, int srcWidth, int srcHeight,
+            long dstBuffer, long dstOffset, int bytesPerRow, int bytesPerImage);
+
+    // --- Metal primitive types (match MTLPrimitiveType) ---
+    public static final int MTLPrimitiveTypePoint         = 0;
+    public static final int MTLPrimitiveTypeLine          = 1;
+    public static final int MTLPrimitiveTypeLineStrip     = 2;
+    public static final int MTLPrimitiveTypeTriangle      = 3;
+    public static final int MTLPrimitiveTypeTriangleStrip = 4;
+
     /** Ends encoding on an encoder. */
     public static native void mtlEncoderEndEncoding(long encoder);
 
