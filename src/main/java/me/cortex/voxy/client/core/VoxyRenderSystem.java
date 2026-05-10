@@ -214,6 +214,17 @@ public class VoxyRenderSystem {
             return;
         }
 
+        // M9 transitional: every per-frame render method below — chunkBoundRenderer.render,
+        // pipeline.runPipeline, etc. — bottoms out in raw GL calls that don't work on
+        // Apple's frozen GL 4.1 driver (DSA, multi-draw indirect with count, compute
+        // dispatch). On non-OpenGL backends, skip Voxy's render path entirely so MC + Sodium
+        // continue rendering vanilla close-distance chunks. Voxy's far-distance LOD chunks
+        // won't appear until the M9-M11 render path migration completes.
+        if (me.cortex.voxy.client.core.gpu.RenderBackendFactory.get().getType()
+                != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+            return;
+        }
+
         TimingStatistics.resetSamplers();
 
         long startTime = System.nanoTime();
@@ -469,7 +480,21 @@ public class VoxyRenderSystem {
     }
 
     private static long getGeometryBufferSize() {
-        long geometryCapacity = Math.min((1L<<(64-Long.numberOfLeadingZeros(Capabilities.INSTANCE.ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/;
+        // M9 transitional: on Mac with Metal/Vulkan backend, Apple's frozen GL 4.1
+        // doesn't expose GL_MAX_SHADER_STORAGE_BLOCK_SIZE, so Capabilities.INSTANCE.ssboMaxSize
+        // is 0 — the bit-magic computation below produces -1024, which is invalid
+        // and BasicSectionGeometryData rejects it (must be %8==0). Use the
+        // backend-agnostic getter when GL capabilities aren't available.
+        long ssboMaxSize = Capabilities.INSTANCE.ssboMaxSize;
+        if (ssboMaxSize <= 0) {
+            ssboMaxSize = me.cortex.voxy.client.core.gpu.RenderBackendFactory.get().getMaxSSBOSize();
+        }
+        if (ssboMaxSize <= 0) {
+            // Final fallback: a sane 1GB default. Caller may further clamp by
+            // available GPU memory below.
+            ssboMaxSize = 1L << 30;
+        }
+        long geometryCapacity = Math.min((1L<<(64-Long.numberOfLeadingZeros(ssboMaxSize-1)))<<1, 1L<<32)-1024/*(1L<<32)-1024*/;
         if (Capabilities.INSTANCE.isIntel) {
             geometryCapacity = Math.max(geometryCapacity, 1L<<30);//intel moment, force min 1gb
         }

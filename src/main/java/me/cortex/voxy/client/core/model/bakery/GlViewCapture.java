@@ -80,6 +80,14 @@ public class GlViewCapture {
     }
 
     public void emitToStream(int buffer, int offset) {
+        // M9 transitional: GL-only path (uses raw glBindBufferRange / glDispatchCompute /
+        // glMemoryBarrier on MC's GL context). On Metal/Vulkan the bakery output stream
+        // would receive zeroed data; the bakery stays "running" so the boot sequence
+        // doesn't abort, but model textures will be blank until this class is migrated
+        // to the abstraction (compute pass via ComputeEncoder + SSBO bindings).
+        if (RenderBackendFactory.get().getType() != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+            return;
+        }
         this.copyOutShader.bind();
         glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 4, buffer, offset, (this.width*3L)*(this.height*2L)*4L*2);//its 2*4 because colour + depth stencil
         glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_UPDATE_BARRIER_BIT|GL_PIXEL_BUFFER_BARRIER_BIT|GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);//Am not sure if barriers are right
@@ -88,6 +96,11 @@ public class GlViewCapture {
     }
 
     public void clear() {
+        // M9 transitional: ditto — glClearNamedFramebuffer* are GL DSA calls that
+        // don't exist on Apple's frozen GL 4.1 driver. Skip on non-OpenGL backend.
+        if (RenderBackendFactory.get().getType() != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+            return;
+        }
         try (var stack = MemoryStack.stackPush()) {
             long ptr = stack.nmalloc(4*4);
             MemoryUtil.memPutLong(ptr, 0);

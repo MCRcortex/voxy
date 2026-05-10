@@ -95,6 +95,18 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     }
 
     public void runPipeline(Viewport<?> viewport, int sourceFrameBuffer, int srcWidth, int srcHeight) {
+        // M9 transitional: the entire runPipeline body is raw GL — glClearNamedFramebufferfi,
+        // glBindFramebuffer, glBindSampler, glColorMask, plus AbstractSectionRenderer's
+        // glDispatchCompute / glMultiDrawElementsIndirectCountARB / glMemoryBarrier chain.
+        // Migrating it requires the IOSurface bridge + ICB + per-mip texture views + the
+        // proper RenderEncoder/ComputeEncoder rewrite that M9-M11 plans cover. For now
+        // on non-OpenGL backends we early-return: MC + Sodium continue to render the
+        // close-distance vanilla chunks, but Voxy's far-distance LOD chunks don't appear
+        // until the render path migration completes.
+        if (me.cortex.voxy.client.core.gpu.RenderBackendFactory.get().getType()
+                != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+            return;
+        }
         int depthTexture = this.setup(viewport, sourceFrameBuffer, srcWidth, srcHeight);
 
         var rs = ((AbstractSectionRenderer)this.sectionRenderer);

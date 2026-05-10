@@ -174,6 +174,18 @@ public class ModelTextureBakery {
 
 
     public int renderToStream(BlockState state, int streamBuffer, int streamOffset) {
+        // M9 transitional: the entire bake pipeline below is raw GL — glEnable/Disable
+        // (depth/stencil/blend/cull), glBindFramebuffer, glViewport, glBindVertexArray,
+        // glStencilOp, glDispatchCompute, glMemoryBarrier — plus it pulls block textures
+        // through com.mojang.blaze3d.opengl.GlTexture casts that only work on the GL
+        // backend. Migrating it requires a full RenderEncoder + ComputeEncoder rewrite
+        // and per-state pipeline objects. For now, on non-OpenGL backends we skip the
+        // bake and return 0 — Voxy's chunk renderer will see "no model captured" and
+        // its draws will sample blank textures, but the boot sequence proceeds.
+        if (me.cortex.voxy.client.core.gpu.RenderBackendFactory.get().getType()
+                != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+            return 0;
+        }
         this.capture.clear();
         boolean isBlock = true;
         ChunkSectionLayer layer;
