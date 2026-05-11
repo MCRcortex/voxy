@@ -10,7 +10,7 @@
 
 Goal: make Voxy (Minecraft Java mod, requires GL 4.3+ compute) run on Mac Apple Silicon by adding Metal direct + Vulkan/MoltenVK backends.
 
-Current state: **infrastructure complete, M9 Phase 1 (GL backend abstraction) DONE; Phase 4 (per-file migration) in progress — 3/7 files migrated**. 16 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green. Migrated files: `NodeCleaner`, `HierarchicalOcclusionTraverser`, `HiZBuffer`. Outstanding (tightly coupled with each other — likely a single multi-file PR): `FullscreenBlit` + its 3 callers (`AbstractRenderPipeline.transformBlitDepth/initDepthStencil`, `NormalRenderPipeline.finish`, `IrisVoxyRenderPipeline`), `VoxyRenderSystem`, `MDICSectionRenderer` (also needs `drawIndexedIndirectCount` API + Metal ICB). Bakery (`BudgetBufferRenderer`, `ModelTextureBakery`) is a separate cluster.
+Current state: **infrastructure complete, M9 Phase 1 (GL backend abstraction) DONE; Phase 4 (per-file migration) in progress — 4/7 file groups migrated**. 17 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green; shader smoke test grew from 9 to 13 cases, all SPIRV green. Migrated: `NodeCleaner`, `HierarchicalOcclusionTraverser`, `HiZBuffer`, **Cluster A** (`FullscreenBlit` + `AbstractRenderPipeline.{initDepthStencil,transformBlitDepth}` + `NormalRenderPipeline.finish`). Outstanding: Cluster B (`BudgetBufferRenderer` + `ModelTextureBakery` bakery FBO cluster), `VoxyRenderSystem`, `ChunkBoundRenderer`, `MDICSectionRenderer` (needs `drawIndexedIndirectCount` API + Metal ICB), `IrisVoxyRenderPipeline` (GL-gate per plan).
 
 The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration of Voxy's render code, blocked primarily by ICB (`MTLIndirectCommandBuffer`) for `MDICSectionRenderer`. The GL-backend-stubbing blocker is cleared as of commit `3dc0ae4c` — the encoder API is now real on every backend, so per-file migration can proceed without breaking Win/Linux GL users.
 
@@ -46,6 +46,7 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 
 | SHA | Title | Validates |
 |---|---|---|
+| `dd3ef385` | M9 Phase 4 Cluster A — migrate FullscreenBlit + AbstractRenderPipeline + NormalRenderPipeline | FullscreenBlit pipeline now via createGraphicsPipeline (compiles on Metal/Vulkan); raw bind/blit retained for GL-only runtime; setBytes API replaces glUniform2f/glUniform4f/nglUniformMatrix4fv across 4 call sites; 2 shader UBO push blocks (depth_copy.frag + blit_texture_depth_cutout.frag); gl_DepthRange.diff/.near gated behind VOXY_VULKAN macro to fix shaderc gap. Smoke test grows to 13 cases — SPIRV 13/13. |
 | `a887facb` | M9 Phase 4 — migrate HiZBuffer onto RenderBackend abstraction | First graphics-pipeline migration in Voxy proper; per-mip beginRenderPass + draw 4 verts as TRIANGLE_STRIP (blit.vsh re-ordered from fan); custom PipelineState DepthState(test=true, write=true, ALWAYS); raw glBindTextureUnit kept for external source depth (raw int id, no IGpuTexture); GL_TEXTURE_BASE_LEVEL/MAX_LEVEL mutation for source-mip selection (GL-only until createView lands) |
 | `05b5b740` | M9 Phase 4 — migrate HierarchicalOcclusionTraverser + split setTexture/setStorageImage | Single beginComputePass with one direct + MAX-1 indirect dispatches; SceneUniform converted to readonly SSBO; queueIdx uniform → UBO push at PUSH_BINDING. Encoder API now has setStorageImage(binding, tex, level) for image bindings; setTexture is now sampled-only |
 | `ebf4eb70` | M9 Phase 4 — migrate NodeCleaner (pilot) | tick() fully on encoder API; updateIds() still raw glBindBufferRange for UploadStream's raw GL id. Shader uniforms → UBO push blocks at PUSH_BINDING. |
@@ -194,15 +195,16 @@ Voxy uses fan-order corners in `hiz/blit.vsh`. Metal has no fan primitive; calls
 
 ### Source patches still pending (from M1 sweep)
 
-Five shaders fail SPIRV compilation as-is and weren't yet patched because their compute paths haven't been migrated:
+Five shaders fail SPIRV compilation as-is. Cluster A's migration already
+patched two of them; three remain:
 
-| Shader | Issue | Fix |
-|---|---|---|
-| `chunkoutline/outline.vsh` | `mix(int, int)` requires extension | `#extension GL_EXT_shader_integer_mix : enable` |
-| `lod/gl46/quads.frag` | `gl_HelperInvocation` undeclared | `#extension GL_ARB_shader_helper_invocation : enable` |
-| `post/depth_copy.frag` | `binding=` not supported in this version | bump `#version` or add `GL_ARB_shading_language_420pack` |
-| `post/blit_texture_depth_cutout.frag` | `gl_DepthRange` undeclared in newer profile | replace with uniform OR version bump |
-| `lod/gl46/test/raw.vert` | syntax error around line 190 | likely needs runtime define injection |
+| Shader | Issue | Fix | Status |
+|---|---|---|---|
+| `chunkoutline/outline.vsh` | `mix(int, int)` requires extension | `#extension GL_EXT_shader_integer_mix : enable` | pending |
+| `lod/gl46/quads.frag` | `gl_HelperInvocation` undeclared | `#extension GL_ARB_shader_helper_invocation : enable` | pending |
+| `post/depth_copy.frag` | `binding=` not supported in this version | bump `#version` | ✅ done — `dd3ef385` bumped to 430 core |
+| `post/blit_texture_depth_cutout.frag` | `gl_DepthRange` undeclared in newer profile | replace with uniform OR version bump | ✅ done — `dd3ef385` gates on `VOXY_VULKAN` macro |
+| `lod/gl46/test/raw.vert` | syntax error around line 190 | likely needs runtime define injection | pending |
 
 ### M9 Phase 4 — file migration order (Blocker 2 now cleared)
 
@@ -313,19 +315,18 @@ Recommended migration order (simplest first):
    pending `IGpuTexture.createView(level, count)` API for
    Metal/Vulkan. `HiZBuffer2.java` (the unused variant) is similar
    shape — migrate when the compute mip-chain path actually gets used.
-4. **`FullscreenBlit.java` + its 3 callers** — must migrate together.
-   `bind()/blit()` public API doesn't fit the encoder model.
-   Recommended: redesign as
-   `pipeline()` + `draw(RenderEncoder)` so callers own the render
-   pass. Callers:
-   - `AbstractRenderPipeline.initDepthStencil` (3 blits:
-     depthMaskBlit/depthSetBlit/depthCopy via fullscreen2.vert),
-   - `AbstractRenderPipeline.transformBlitDepth` (location-based
-     mat4 uniforms at slots 1,2 — wrap in UBO push),
-   - `NormalRenderPipeline.finish` (4 location-based uniforms in
-     blit_texture_depth_cutout.frag — wrap in UBO push),
-   - `IrisVoxyRenderPipeline` — gate behind `getType() == OPENGL`,
-     skip on Mac.
+4. ✅ **Cluster A — `FullscreenBlit` + `AbstractRenderPipeline` +
+   `NormalRenderPipeline`** — DONE in commit `dd3ef385`. Pipeline
+   creation now backend-agnostic (createGraphicsPipeline); bind/blit
+   stay raw GL because the whole runPipeline path early-returns on
+   non-GL until IOSurface bridge lands. setBytes(binding, addr, size)
+   replaced all four glUniform* call sites (depth_copy scaleFactor,
+   transformBlitDepth invProj/proj, finalBlit fog endParams/colour).
+   Shaders: depth_copy.frag and blit_texture_depth_cutout.frag grew
+   UBO push blocks; the latter also patches gl_DepthRange via the
+   `VOXY_VULKAN` macro. `IrisVoxyRenderPipeline` still uses
+   FullscreenBlit but only via the no-arg constructor path (still
+   works); its full migration waits on the GL-gate sweep.
 5. **`VoxyRenderSystem.java`** — global GL state reads (viewport,
    blend) → `RenderSystem` / `getMainRenderTarget()`. Mostly state
    queries; not heavy GL itself.
