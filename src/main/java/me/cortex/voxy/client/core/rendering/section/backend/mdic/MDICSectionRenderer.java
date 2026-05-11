@@ -29,6 +29,7 @@ import java.util.List;
 import static org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB;
 import static org.lwjgl.opengl.ARBIndirectParameters.glMultiDrawElementsIndirectCountARB;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL11C.GL_RGBA8;
 import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
 import static org.lwjgl.opengl.GL15C.GL_ELEMENT_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15C.glBindBuffer;
@@ -55,40 +56,85 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     private final Shader terrainShader;
     private final Shader translucentTerrainShader;
 
-    private final Shader commandGenShader = Shader.make()
-            .define("TRANSLUCENT_WRITE_BASE", 1024)
-            .define("TEMPORAL_OFFSET", TEMPORAL_OFFSET)
+    // M9 migration: MDIC's 5 non-Iris-patched shaders (4 compute + 1 graphics)
+    // now flow through RenderBackend.create*Pipeline so they compile cleanly on
+    // Metal/Vulkan. terrainShader + translucentTerrainShader stay on the legacy
+    // Shader.Builder path because they thread Iris's patchOpaqueShader /
+    // patchTranslucentShader callbacks; that path is GL-only after the
+    // RenderPipelineFactory gate (commit d9627907). Bind/draw stays raw GL —
+    // MDIC operates inside AbstractRenderPipeline's FBO context, not a
+    // RenderEncoder.
 
-            .define("TRANSLUCENT_DISTANCE_BUFFER_BINDING", 7)
+    private final me.cortex.voxy.client.core.gpu.RenderBackend backend = RenderBackendFactory.get();
 
-            .defineIf("HAS_STATISTICS", RenderStatistics.enabled)
-            .defineIf("STATISTICS_BUFFER_BINDING", RenderStatistics.enabled, STATISTICS_BUFFER_BINDING)
+    private final me.cortex.voxy.client.core.gpu.IGpuPipeline commandGenPipeline = this.backend.createComputePipeline(
+            new me.cortex.voxy.client.core.gpu.ComputePipelineDesc(
+                    ShaderLoader.parse("voxy:lod/gl46/cmdgen.comp"),
+                    cmdgenDefines(),
+                    null, null,
+                    32, 1, 1,
+                    "MDICSectionRenderer.cmdgen"));
+    private final int commandGenProgram = mdicProgramId(this.commandGenPipeline);
 
-            .add(ShaderType.COMPUTE, "voxy:lod/gl46/cmdgen.comp")
-            .compile();
+    private final me.cortex.voxy.client.core.gpu.IGpuPipeline prepPipeline = this.backend.createComputePipeline(
+            new me.cortex.voxy.client.core.gpu.ComputePipelineDesc(
+                    ShaderLoader.parse("voxy:lod/gl46/prep.comp"),
+                    java.util.Map.of(),
+                    null, null,
+                    1, 1, 1,
+                    "MDICSectionRenderer.prep"));
+    private final int prepProgram = mdicProgramId(this.prepPipeline);
 
-    private final Shader prepShader = Shader.make()
-            .add(ShaderType.COMPUTE, "voxy:lod/gl46/prep.comp")
-            .compile();
+    private final me.cortex.voxy.client.core.gpu.IGpuPipeline cullPipeline = this.backend.createGraphicsPipeline(
+            new me.cortex.voxy.client.core.gpu.GraphicsPipelineDesc(
+                    ShaderLoader.parse("voxy:lod/gl46/cull/raster.vert"),
+                    ShaderLoader.parse("voxy:lod/gl46/cull/raster.frag"),
+                    java.util.Map.of(),
+                    null, null, null, null,
+                    GL_RGBA8,
+                    me.cortex.voxy.client.core.gpu.VertexLayout.EMPTY,
+                    me.cortex.voxy.client.core.gpu.PipelineState.DEFAULT,
+                    "MDICSectionRenderer.cull"));
+    private final int cullProgram = mdicProgramId(this.cullPipeline);
 
-    private final Shader cullShader = Shader.make()
-            .add(ShaderType.VERTEX, "voxy:lod/gl46/cull/raster.vert")
-            .add(ShaderType.FRAGMENT, "voxy:lod/gl46/cull/raster.frag")
-            .compile();
+    private final me.cortex.voxy.client.core.gpu.IGpuPipeline prefixSumPipeline = this.backend.createComputePipeline(
+            new me.cortex.voxy.client.core.gpu.ComputePipelineDesc(
+                    ShaderLoader.parse(Capabilities.INSTANCE.subgroup ? "voxy:util/prefixsum/inital3.comp" : "voxy:util/prefixsum/simple.comp"),
+                    java.util.Map.of("IO_BUFFER", "0"),
+                    null, null,
+                    32, 1, 1,
+                    "MDICSectionRenderer.prefixSum"));
+    private final int prefixSumProgram = mdicProgramId(this.prefixSumPipeline);
 
-    private final Shader prefixSumShader = Shader.make()
-            //Use subgroup prefix sum if possible otherwise use dodgy... slow prefix sum
-            .add(ShaderType.COMPUTE, Capabilities.INSTANCE.subgroup?"voxy:util/prefixsum/inital3.comp":"voxy:util/prefixsum/simple.comp")
-            .define("IO_BUFFER", 0)
-            .compile();
+    private final me.cortex.voxy.client.core.gpu.IGpuPipeline translucentGenPipeline = this.backend.createComputePipeline(
+            new me.cortex.voxy.client.core.gpu.ComputePipelineDesc(
+                    ShaderLoader.parse("voxy:lod/gl46/buildtranslucents.comp"),
+                    java.util.Map.of(
+                            "TRANSLUCENT_WRITE_BASE", "1024",
+                            "TRANSLUCENT_DISTANCE_BUFFER_BINDING", "5",
+                            "TRANSLUCENT_OFFSET", Integer.toString(TRANSLUCENT_OFFSET)),
+                    null, null,
+                    32, 1, 1,
+                    "MDICSectionRenderer.translucentGen"));
+    private final int translucentGenProgram = mdicProgramId(this.translucentGenPipeline);
 
-    private final Shader translucentGenShader = Shader.make()
-            .add(ShaderType.COMPUTE, "voxy:lod/gl46/buildtranslucents.comp")
-            .define("TRANSLUCENT_WRITE_BASE", 1024)//The size of the prefix sum array
-            .define("TRANSLUCENT_DISTANCE_BUFFER_BINDING", 5)
-            .define("TRANSLUCENT_OFFSET", TRANSLUCENT_OFFSET)
+    private static java.util.Map<String, String> cmdgenDefines() {
+        var m = new java.util.LinkedHashMap<String, String>();
+        m.put("TRANSLUCENT_WRITE_BASE", "1024");
+        m.put("TEMPORAL_OFFSET", Integer.toString(TEMPORAL_OFFSET));
+        m.put("TRANSLUCENT_DISTANCE_BUFFER_BINDING", "7");
+        if (RenderStatistics.enabled) {
+            m.put("HAS_STATISTICS", "");
+            m.put("STATISTICS_BUFFER_BINDING", Integer.toString(STATISTICS_BUFFER_BINDING));
+        }
+        return m;
+    }
 
-            .compile();
+    private static int mdicProgramId(me.cortex.voxy.client.core.gpu.IGpuPipeline p) {
+        if (p instanceof me.cortex.voxy.client.core.gl.GlGraphicsPipeline gg) return gg.program();
+        if (p instanceof me.cortex.voxy.client.core.gl.GlComputePipeline gc) return gc.program();
+        return 0;
+    }
 
     private final IGpuBuffer uniform = RenderBackendFactory.get().createBuffer(1024).zero();//TODO move to viewport?
 
@@ -257,7 +303,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
 
         {//Dispatch prep
-            this.prepShader.bind();
+            if (this.prepProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.prepProgram);
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCountCallBuffer.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.getRenderList().id());
@@ -267,7 +313,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         }
 
         {//Test occlusion
-            this.cullShader.bind();
+            if (this.cullProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.cullProgram);
             if (Capabilities.INSTANCE.repFragTest) {
                 glEnable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
             }
@@ -294,7 +340,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         {//Generate the commands
             this.distanceCountBuffer.zeroRange(0, 1024*4);
-            this.commandGenShader.bind();
+            if (this.commandGenProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.commandGenProgram);
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCallBuffer.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.drawCountCallBuffer.id());
@@ -329,13 +375,13 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         }
 
         {//Do translucency sorting
-            this.prefixSumShader.bind();
+            if (this.prefixSumProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.prefixSumProgram);
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.distanceCountBuffer.id());
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);//Am unsure if is needed
             glDispatchCompute(1,1,1);
             glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
-            this.translucentGenShader.bind();
+            if (this.translucentGenProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.translucentGenProgram);
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCallBuffer.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.drawCountCallBuffer.id());
@@ -385,11 +431,11 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.distanceCountBuffer.free();
         this.translucentTerrainShader.free();
         this.terrainShader.free();
-        this.commandGenShader.free();
-        this.cullShader.free();
-        this.prepShader.free();
-        this.translucentGenShader.free();
-        this.prefixSumShader.free();
+        this.commandGenPipeline.close();
+        this.cullPipeline.close();
+        this.prepPipeline.close();
+        this.translucentGenPipeline.close();
+        this.prefixSumPipeline.close();
         this.statisticsBuffer.free();
     }
 }

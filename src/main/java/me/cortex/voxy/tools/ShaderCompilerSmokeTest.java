@@ -71,6 +71,23 @@ public final class ShaderCompilerSmokeTest {
                         "bakery/position_tex.vsh (M9 — UBO push)"),
                 new ShaderCase("bakery/position_tex.fsh", RuntimeShaderCompiler.Stage.FRAGMENT, empty,
                         "bakery/position_tex.fsh (M9 — binding-based sampler)"),
+                // M9 — MDIC's compute pipelines (cmdgen already covered above).
+                new ShaderCase("util/prefixsum/simple.comp", RuntimeShaderCompiler.Stage.COMPUTE,
+                        Map.of("IO_BUFFER", "0"),
+                        "util/prefixsum/simple.comp (MDIC prefix-sum fallback)"),
+                new ShaderCase("util/prefixsum/inital3.comp", RuntimeShaderCompiler.Stage.COMPUTE,
+                        Map.of("IO_BUFFER", "0"),
+                        "util/prefixsum/inital3.comp (MDIC prefix-sum subgroup)"),
+                new ShaderCase("lod/gl46/buildtranslucents.comp", RuntimeShaderCompiler.Stage.COMPUTE,
+                        Map.of(
+                                "TRANSLUCENT_WRITE_BASE", "1024",
+                                "TRANSLUCENT_DISTANCE_BUFFER_BINDING", "5",
+                                "TRANSLUCENT_OFFSET", "500000"),
+                        "lod/gl46/buildtranslucents.comp"),
+                new ShaderCase("lod/gl46/cull/raster.vert", RuntimeShaderCompiler.Stage.VERTEX, empty,
+                        "lod/gl46/cull/raster.vert"),
+                new ShaderCase("lod/gl46/cull/raster.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty,
+                        "lod/gl46/cull/raster.frag"),
         };
 
         int passSpv = 0, failSpv = 0, passMsl = 0, failMsl = 0;
