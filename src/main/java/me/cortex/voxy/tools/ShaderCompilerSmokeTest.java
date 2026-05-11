@@ -82,10 +82,8 @@ public final class ShaderCompilerSmokeTest {
                                 "Z_AXIS_FACE_TINT", "0.8",
                                 "X_AXIS_FACE_TINT", "0.6"),
                         "lod/gl46/quads3.vert (MDIC terrain — non-Iris baseline)"),
-                new ShaderCase("lod/gl46/quads.frag", RuntimeShaderCompiler.Stage.FRAGMENT,
-                        Map.of(
-                                "MODEL_BUFFER_BINDING", "3"),
-                        "lod/gl46/quads.frag (MDIC terrain — non-Iris baseline)"),
+                new ShaderCase("lod/gl46/quads.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty,
+                        "lod/gl46/quads.frag (MDIC terrain — non-Iris baseline; PATCHED_SHADER undef)"),
                 // M9 — MDIC's compute pipelines (cmdgen already covered above).
                 new ShaderCase("util/prefixsum/simple.comp", RuntimeShaderCompiler.Stage.COMPUTE,
                         Map.of("IO_BUFFER", "0"),

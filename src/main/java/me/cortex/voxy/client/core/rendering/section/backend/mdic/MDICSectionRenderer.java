@@ -53,8 +53,21 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     private static final int TRANSLUCENT_OFFSET = 400_000;//in draw calls
     private static final int TEMPORAL_OFFSET = 500_000;//in draw calls
     private static final int STATISTICS_BUFFER_BINDING = 8;
+    /**
+     * Terrain shaders. Two paths:
+     *   - Iris-patched (legacy {@link Shader.Builder}, GL-only by definition since
+     *     the Iris pipeline is GL-gated in RenderPipelineFactory).
+     *   - Unpatched ({@link me.cortex.voxy.client.core.gpu.IGpuPipeline} via
+     *     createGraphicsPipeline). On Metal this is the only path that ever
+     *     runs; on GL it's used when no Iris pack is active.
+     * Exactly one of each pair is non-null per opaque/translucent slot.
+     */
     private final Shader terrainShader;
     private final Shader translucentTerrainShader;
+    private final me.cortex.voxy.client.core.gpu.IGpuPipeline terrainPipeline;
+    private final me.cortex.voxy.client.core.gpu.IGpuPipeline translucentTerrainPipeline;
+    private final int terrainProgram;
+    private final int translucentTerrainProgram;
 
     // M9 migration: MDIC's 5 non-Iris-patched shaders (4 compute + 1 graphics)
     // now flow through RenderBackend.create*Pipeline so they compile cleanly on
@@ -169,15 +182,70 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         String frag = ShaderLoader.parse("voxy:lod/gl46/quads.frag");
 
         String opaqueFrag = pipeline.patchOpaqueShader(this, frag);
-        opaqueFrag = opaqueFrag==null?frag:opaqueFrag;
-
-        //TODO: find a more robust/nicer way todo this
-        this.terrainShader = tryCompilePatchedOrNormal(builder, opaqueFrag, frag);
+        boolean opaquePatched = opaqueFrag != null;
+        if (!opaquePatched) opaqueFrag = frag;
 
         String translucentFrag = pipeline.patchTranslucentShader(this, frag);
-        translucentFrag = translucentFrag==null?frag:translucentFrag;
+        boolean translucentPatched = translucentFrag != null;
+        if (!translucentPatched) translucentFrag = frag;
 
-        this.translucentTerrainShader = tryCompilePatchedOrNormal(builder.define("TRANSLUCENT"), translucentFrag, frag);
+        if (opaquePatched || translucentPatched) {
+            // Iris-patched path stays on the legacy Shader.Builder. It's GL-only
+            // because the Iris pipeline itself is now gated to OpenGL in
+            // RenderPipelineFactory (commit d9627907).
+            this.terrainShader = tryCompilePatchedOrNormal(builder, opaqueFrag, frag);
+            this.translucentTerrainShader = tryCompilePatchedOrNormal(
+                    builder.define("TRANSLUCENT"), translucentFrag, frag);
+            this.terrainPipeline = null;
+            this.translucentTerrainPipeline = null;
+            this.terrainProgram = 0;
+            this.translucentTerrainProgram = 0;
+        } else {
+            // Unpatched path — runs on every backend including Metal. Build the
+            // two pipelines via the cross-backend abstraction. Defines mirror
+            // what Shader.Builder collected above (face-tint floats from
+            // addDirectionalFaceTint + TAA_PATCH if a TAA function exists).
+            this.terrainShader = null;
+            this.translucentTerrainShader = null;
+            java.util.Map<String, String> commonDefines = buildTerrainDefines(taa);
+            java.util.Map<String, String> opaqueDefines = new java.util.LinkedHashMap<>(commonDefines);
+            java.util.Map<String, String> translucentDefines = new java.util.LinkedHashMap<>(commonDefines);
+            translucentDefines.put("TRANSLUCENT", "");
+
+            this.terrainPipeline = this.backend.createGraphicsPipeline(
+                    new me.cortex.voxy.client.core.gpu.GraphicsPipelineDesc(
+                            vertex, frag, opaqueDefines,
+                            null, null, null, null,
+                            GL_RGBA8,
+                            me.cortex.voxy.client.core.gpu.VertexLayout.EMPTY,
+                            me.cortex.voxy.client.core.gpu.PipelineState.OPAQUE_MESH,
+                            "MDIC.terrain"));
+            this.translucentTerrainPipeline = this.backend.createGraphicsPipeline(
+                    new me.cortex.voxy.client.core.gpu.GraphicsPipelineDesc(
+                            vertex, frag, translucentDefines,
+                            null, null, null, null,
+                            GL_RGBA8,
+                            me.cortex.voxy.client.core.gpu.VertexLayout.EMPTY,
+                            me.cortex.voxy.client.core.gpu.PipelineState.TRANSLUCENT_MESH,
+                            "MDIC.translucentTerrain"));
+            this.terrainProgram = mdicProgramId(this.terrainPipeline);
+            this.translucentTerrainProgram = mdicProgramId(this.translucentTerrainPipeline);
+        }
+    }
+
+    /** Mirror addDirectionalFaceTint + the TAA flag so the cross-backend pipeline desc gets the same defines. */
+    private static java.util.Map<String, String> buildTerrainDefines(String taa) {
+        var m = new java.util.LinkedHashMap<String, String>();
+        net.minecraft.client.multiplayer.ClientLevel level = Minecraft.getInstance().level;
+        if (level != null) {
+            m.put("NO_SHADE_FACE_TINT", Float.toString(level.getShade(Direction.UP, false)) + "f");
+            m.put("UP_FACE_TINT",       Float.toString(level.getShade(Direction.UP, true))  + "f");
+            m.put("DOWN_FACE_TINT",     Float.toString(level.getShade(Direction.DOWN, true))+ "f");
+            m.put("Z_AXIS_FACE_TINT",   Float.toString(level.getShade(Direction.NORTH, true))+ "f");
+            m.put("X_AXIS_FACE_TINT",   Float.toString(level.getShade(Direction.EAST, true)) + "f");
+        }
+        if (taa != null) m.put("TAA_PATCH", "");
+        return m;
     }
 
     private void uploadUniformBuffer(MDICViewport viewport) {
@@ -220,7 +288,11 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
-        this.terrainShader.bind();
+        if (this.terrainShader != null) {
+            this.terrainShader.bind();
+        } else if (this.terrainProgram != 0) {
+            org.lwjgl.opengl.GL20C.glUseProgram(this.terrainProgram);
+        }
         glBindVertexArray(RenderBackendFactory.get().getStaticVAO());//Needs to be before binding
         this.pipeline.setupAndBindOpaque(viewport);
         this.bindRenderingBuffers(viewport);
@@ -269,7 +341,11 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         glDisable(GL_CULL_FACE);
         glEnable(GL_DEPTH_TEST);
-        this.translucentTerrainShader.bind();
+        if (this.translucentTerrainShader != null) {
+            this.translucentTerrainShader.bind();
+        } else if (this.translucentTerrainProgram != 0) {
+            org.lwjgl.opengl.GL20C.glUseProgram(this.translucentTerrainProgram);
+        }
         glBindVertexArray(RenderBackendFactory.get().getStaticVAO());//Needs to be before binding
         this.pipeline.setupAndBindTranslucent(viewport);
         this.bindRenderingBuffers(viewport);
@@ -429,8 +505,10 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     public void free() {
         this.uniform.free();
         this.distanceCountBuffer.free();
-        this.translucentTerrainShader.free();
-        this.terrainShader.free();
+        if (this.translucentTerrainShader != null) this.translucentTerrainShader.free();
+        if (this.terrainShader != null) this.terrainShader.free();
+        if (this.translucentTerrainPipeline != null) this.translucentTerrainPipeline.close();
+        if (this.terrainPipeline != null) this.terrainPipeline.close();
         this.commandGenPipeline.close();
         this.cullPipeline.close();
         this.prepPipeline.close();
