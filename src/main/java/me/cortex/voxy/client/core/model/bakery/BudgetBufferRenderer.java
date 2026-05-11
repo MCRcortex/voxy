@@ -4,26 +4,67 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import me.cortex.voxy.client.core.gl.shader.Shader;
-import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.gl.GlGraphicsPipeline;
+import me.cortex.voxy.client.core.gl.shader.ShaderLoader;
+import me.cortex.voxy.client.core.gpu.GraphicsPipelineDesc;
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.IGpuPipeline;
 import me.cortex.voxy.client.core.gpu.IGpuVertexArray;
+import me.cortex.voxy.client.core.gpu.PipelineState;
 import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
+import me.cortex.voxy.client.core.gpu.VertexLayout;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import org.joml.Matrix4f;
+import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
-import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
+import static org.lwjgl.opengl.GL11C.GL_RGBA8;
+import static org.lwjgl.opengl.GL15C.GL_DYNAMIC_DRAW;
+import static org.lwjgl.opengl.GL15C.glDeleteBuffers;
+import static org.lwjgl.opengl.GL20C.glUseProgram;
+import static org.lwjgl.opengl.GL30C.glBindBufferRange;
+import static org.lwjgl.opengl.GL31C.GL_UNIFORM_BUFFER;
 import static org.lwjgl.opengl.GL33.glBindSampler;
 import static org.lwjgl.opengl.GL45.*;
 
+/**
+ * Static helper that streams a quad mesh + texture into the bakery framebuffer.
+ *
+ * M9 status: the shader pipeline now flows through
+ * {@link me.cortex.voxy.client.core.gpu.RenderBackend#createGraphicsPipeline},
+ * so the bakery shaders compile cleanly on Metal/Vulkan even though the
+ * runtime bind/draw path stays raw GL — {@link ModelTextureBakery} (this
+ * helper's caller) owns the framebuffer and viewport setup, and itself
+ * sits on the GL-only bakery codepath. The matrix uniform that used to be
+ * a location-based {@code glUniformMatrix4fv} now lands in a UBO push
+ * block at {@code PUSH_BINDING} via the new {@link #render} flow.
+ */
 public class BudgetBufferRenderer {
     public static final int VERTEX_FORMAT_SIZE = 24;
 
-    private static final Shader bakeryShader = Shader.make()
-            .add(ShaderType.VERTEX, "voxy:bakery/position_tex.vsh")
-            .add(ShaderType.FRAGMENT, "voxy:bakery/position_tex.fsh")
-            .compile();
+    /** UBO binding for position_tex.vsh's `Push { mat4 transform; }`. */
+    private static final int PUSH_BINDING = 14;
+
+    private static final IGpuPipeline bakeryPipeline;
+    /** Cached GL program id for the raw glUseProgram path. 0 on non-GL. */
+    private static final int bakeryGlProgram;
+    /** Lazy UBO used to push the per-draw matrix. */
+    private static int pushUbo;
+    private static long pushUboCapacity;
+
+    static {
+        bakeryPipeline = RenderBackendFactory.get().createGraphicsPipeline(new GraphicsPipelineDesc(
+                ShaderLoader.parse("voxy:bakery/position_tex.vsh"),
+                ShaderLoader.parse("voxy:bakery/position_tex.fsh"),
+                java.util.Map.of("PUSH_BINDING", Integer.toString(PUSH_BINDING)),
+                null, null,           // no MSL — runtime compiler produces on Metal
+                null, null,           // no SPIRV — runtime compiler produces on Vulkan
+                GL_RGBA8,             // color format — actual FBO is owned by ModelTextureBakery
+                VertexLayout.EMPTY,   // vertex layout managed by the legacy IGpuVertexArray below
+                PipelineState.DEFAULT,
+                "BudgetBufferRenderer.bakery"));
+        bakeryGlProgram = (bakeryPipeline instanceof GlGraphicsPipeline gp) ? gp.program() : 0;
+    }
 
 
     public static void init(){}
@@ -92,7 +133,11 @@ public class BudgetBufferRenderer {
         MemoryUtil.memCopy(dataPtr, ptr, size);
         UploadStream.INSTANCE.commit();
 
-        bakeryShader.bind();
+        // M9 transitional: bakeryPipeline drives shader compilation cross-backend
+        // but bind/draw stays raw GL because ModelTextureBakery owns the
+        // framebuffer/viewport setup outside any RenderEncoder. The pipeline-cached
+        // program id is 0 on non-GL backends (so the bind is a no-op there).
+        if (bakeryGlProgram != 0) glUseProgram(bakeryGlProgram);
         VA.bind();
         glMemoryBarrier(GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
         glBindSampler(0, 0);
@@ -100,7 +145,34 @@ public class BudgetBufferRenderer {
     }
 
     public static void render(Matrix4f matrix) {
-        glUniformMatrix4fv(1, false, matrix.get(new float[16]));
+        // Push the transform matrix (64 bytes) into the Push UBO at PUSH_BINDING.
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            long addr = stack.nmalloc(64);
+            matrix.getToAddress(addr);
+            pushMatrix(addr, 64);
+        }
         glDrawElements(GL_TRIANGLES, quadCount * 2 * 3, GL_UNSIGNED_SHORT, 0);
+    }
+
+    private static void pushMatrix(long addr, int size) {
+        long needed = (size + 255) & ~255L;
+        if (pushUbo == 0) {
+            pushUbo = glCreateBuffers();
+            pushUboCapacity = Math.max(needed, 256);
+            glNamedBufferData(pushUbo, pushUboCapacity, GL_DYNAMIC_DRAW);
+        } else if (needed > pushUboCapacity) {
+            pushUboCapacity = needed;
+            glNamedBufferData(pushUbo, pushUboCapacity, GL_DYNAMIC_DRAW);
+        }
+        nglNamedBufferSubData(pushUbo, 0, size, addr);
+        glBindBufferRange(GL_UNIFORM_BUFFER, PUSH_BINDING, pushUbo, 0, size);
+    }
+
+    public static void shutdown() {
+        if (pushUbo != 0) {
+            glDeleteBuffers(pushUbo);
+            pushUbo = 0;
+        }
+        bakeryPipeline.close();
     }
 }

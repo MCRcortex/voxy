@@ -66,6 +66,11 @@ public final class ShaderCompilerSmokeTest {
                 new ShaderCase("util/memcpy.comp", RuntimeShaderCompiler.Stage.COMPUTE,
                         Map.of("INPUT_HEADER_BUFFER_BINDING", "0", "INPUT_DATA_BUFFER_BINDING", "1", "OUTPUT_BUFFER_BINDING", "2"),
                         "util/memcpy.comp"),
+                new ShaderCase("bakery/position_tex.vsh", RuntimeShaderCompiler.Stage.VERTEX,
+                        Map.of("PUSH_BINDING", "14"),
+                        "bakery/position_tex.vsh (M9 — UBO push)"),
+                new ShaderCase("bakery/position_tex.fsh", RuntimeShaderCompiler.Stage.FRAGMENT, empty,
+                        "bakery/position_tex.fsh (M9 — binding-based sampler)"),
         };
 
         int passSpv = 0, failSpv = 0, passMsl = 0, failMsl = 0;

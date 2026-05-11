@@ -1,6 +1,10 @@
 #version 430
 
-layout(location=0) uniform sampler2D tex;
+// M9 migration: sampler must be at `binding=N` rather than `location=N` so
+// the shader compiles on Vulkan (glslang rejects location-bound samplers
+// in the Vulkan profile). Default binding 0 matches what BudgetBufferRenderer
+// already feeds via bindTextureUnit(0, texId).
+layout(binding=0) uniform sampler2D tex;
 in vec2 texCoord;
 in flat uint metadata;
 layout(location=0) out vec4 colour;
