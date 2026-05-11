@@ -127,6 +127,31 @@ public interface RenderEncoder extends AutoCloseable {
     void drawIndexedIndirect(int primitiveType, IGpuBuffer buffer, long offset,
                               int drawCount, int stride);
 
+    /**
+     * Indexed multi-draw indirect with a GPU-resident draw count. Reads a
+     * {@code uint32} from {@code countBuffer} at byte {@code countOffset}
+     * giving the actual draw count {@code N}, then reads {@code N}
+     * {@code VkDrawIndexedIndirectCommand}-shaped structs from
+     * {@code drawBuffer} starting at {@code drawOffset}. {@code maxDrawCount}
+     * is the upper bound enforced by the driver if the count buffer
+     * yields a larger value.
+     *
+     * Used by {@code MDICSectionRenderer} so the GPU's compute-side
+     * traversal decides how many sections to draw without a CPU round-trip.
+     * On OpenGL this lowers to
+     * {@code glMultiDrawElementsIndirectCountARB} (requires
+     * {@code GL_ARB_indirect_parameters}). On Vulkan this lowers to
+     * {@code vkCmdDrawIndexedIndirectCount} (core 1.2). On Metal this is
+     * emulated via {@code MTLIndirectCommandBuffer} +
+     * {@code executeCommandsInBuffer:indirectBuffer:indirectBufferOffset:}
+     * (Blocker 1 — not yet implemented; the JNI lands alongside
+     * MDICSectionRenderer's full migration).
+     */
+    void drawIndexedIndirectCount(int primitiveType,
+                                  IGpuBuffer drawBuffer, long drawOffset,
+                                  IGpuBuffer countBuffer, long countOffset,
+                                  int maxDrawCount, int stride);
+
     @Override
     void close();
 }

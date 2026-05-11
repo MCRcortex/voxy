@@ -488,6 +488,29 @@ public class GlRenderBackend implements RenderBackend {
         }
 
         @Override
+        public void drawIndexedIndirectCount(int primitiveType,
+                                              IGpuBuffer drawBuffer, long drawOffset,
+                                              IGpuBuffer countBuffer, long countOffset,
+                                              int maxDrawCount, int stride) {
+            ensureVao();
+            int mode = mapPrimitive(primitiveType);
+            int prevDraw = org.lwjgl.opengl.GL15C.glGetInteger(
+                    org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER_BINDING);
+            int prevParam = org.lwjgl.opengl.GL15C.glGetInteger(
+                    org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_BINDING_ARB);
+            org.lwjgl.opengl.GL15C.glBindBuffer(
+                    org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER, drawBuffer.id());
+            org.lwjgl.opengl.GL15C.glBindBuffer(
+                    org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB, countBuffer.id());
+            org.lwjgl.opengl.ARBIndirectParameters.glMultiDrawElementsIndirectCountARB(
+                    mode, this.indexGlType, drawOffset, countOffset, maxDrawCount, stride);
+            org.lwjgl.opengl.GL15C.glBindBuffer(
+                    org.lwjgl.opengl.ARBIndirectParameters.GL_PARAMETER_BUFFER_ARB, prevParam);
+            org.lwjgl.opengl.GL15C.glBindBuffer(
+                    org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER, prevDraw);
+        }
+
+        @Override
         public void close() {
             if (this.closed) return;
             this.closed = true;

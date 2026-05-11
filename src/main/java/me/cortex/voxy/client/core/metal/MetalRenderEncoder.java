@@ -171,6 +171,22 @@ public final class MetalRenderEncoder implements RenderEncoder {
     }
 
     @Override
+    public void drawIndexedIndirectCount(int primitiveType,
+                                          IGpuBuffer drawBuffer, long drawOffset,
+                                          IGpuBuffer countBuffer, long countOffset,
+                                          int maxDrawCount, int stride) {
+        // M9 Blocker 1: requires MTLIndirectCommandBuffer + executeCommandsInBuffer:
+        // indirectBuffer:indirectBufferOffset: to read the GPU-resident count.
+        // The JNI for that lands alongside MDICSectionRenderer's full migration
+        // (cmdgen.comp would also need rewriting to populate the ICB instead of
+        // a plain DrawElementsIndirectCommand struct). Until then the call only
+        // works on backends that natively support GPU draw count.
+        throw new UnsupportedOperationException(
+                "MetalRenderEncoder.drawIndexedIndirectCount: needs MTLIndirectCommandBuffer "
+                        + "(M9 Blocker 1) — not yet implemented. maxDrawCount=" + maxDrawCount);
+    }
+
+    @Override
     public void close() {
         if (this.encoderHandle == 0) return;
         MetalNative.mtlEncoderEndEncoding(this.encoderHandle);
