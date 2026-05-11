@@ -40,7 +40,7 @@ public final class MetalGraphicsPipeline implements IGpuPipeline {
         this.fillMode = fillMode;
     }
 
-    long pipelineStateHandle() {
+    public long pipelineStateHandle() {
         return this.pipelineState;
     }
 

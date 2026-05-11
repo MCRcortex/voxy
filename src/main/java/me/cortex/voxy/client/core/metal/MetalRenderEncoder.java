@@ -22,6 +22,11 @@ public final class MetalRenderEncoder implements RenderEncoder {
     private long boundIndexBufferOffset;
     private int boundIndexType = MetalNative.MTLIndexTypeUInt32;
 
+    /** Native MTLRenderCommandEncoder handle. Exposed for ICB callers that need to declare useResource. */
+    public long handle() {
+        return this.encoderHandle;
+    }
+
     MetalRenderEncoder(long encoderHandle) {
         this.encoderHandle = encoderHandle;
     }
@@ -175,15 +180,33 @@ public final class MetalRenderEncoder implements RenderEncoder {
                                           IGpuBuffer drawBuffer, long drawOffset,
                                           IGpuBuffer countBuffer, long countOffset,
                                           int maxDrawCount, int stride) {
-        // M9 Blocker 1: requires MTLIndirectCommandBuffer + executeCommandsInBuffer:
-        // indirectBuffer:indirectBufferOffset: to read the GPU-resident count.
-        // The JNI for that lands alongside MDICSectionRenderer's full migration
-        // (cmdgen.comp would also need rewriting to populate the ICB instead of
-        // a plain DrawElementsIndirectCommand struct). Until then the call only
-        // works on backends that natively support GPU draw count.
+        // Direct count-aware draw on Metal still requires the ICB indirection:
+        // a compute prepass must translate the flat (drawBuf, countBuf) pair
+        // into an MTLIndirectCommandBuffer + range. The encoder API exposes
+        // executeCommandsInBuffer for that workflow; callers that need
+        // count-aware draws on Metal go through there. Direct lowering of
+        // this signature would need a runtime CPU readback of countBuffer,
+        // which defeats the purpose (the whole point is GPU-resident count).
         throw new UnsupportedOperationException(
-                "MetalRenderEncoder.drawIndexedIndirectCount: needs MTLIndirectCommandBuffer "
-                        + "(M9 Blocker 1) — not yet implemented. maxDrawCount=" + maxDrawCount);
+                "MetalRenderEncoder.drawIndexedIndirectCount: Metal has no direct count-aware MDI. "
+                        + "Use createIndirectCommandBuffer + executeCommandsInBuffer instead "
+                        + "(populate the ICB via a compute prepass). maxDrawCount=" + maxDrawCount);
+    }
+
+    @Override
+    public void executeCommandsInBuffer(me.cortex.voxy.client.core.gpu.IGpuIndirectCommandBuffer icb,
+                                         IGpuBuffer rangeBuffer, long rangeOffset) {
+        if (!(icb instanceof MetalIndirectCommandBuffer m)) {
+            throw new IllegalArgumentException(
+                    "MetalRenderEncoder.executeCommandsInBuffer requires MetalIndirectCommandBuffer, got "
+                            + (icb == null ? "null" : icb.getClass().getName()));
+        }
+        long rangeBufHandle = bufferHandle(rangeBuffer);
+        if (rangeBufHandle == 0) {
+            throw new IllegalArgumentException("executeCommandsInBuffer: range buffer is null");
+        }
+        MetalNative.mtlRenderEncoderExecuteCommandsInBuffer(
+                this.encoderHandle, m.handle(), rangeBufHandle, rangeOffset);
     }
 
     @Override

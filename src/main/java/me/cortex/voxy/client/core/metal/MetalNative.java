@@ -596,6 +596,102 @@ public final class MetalNative {
     /** Fills a memory region with a 32-bit repeated value. */
     public static native void memsetInt(long addr, int value, long count);
 
+    /**
+     * Set {@code supportIndirectCommandBuffers} on a render pipeline
+     * descriptor. Required when the resulting PSO will be referenced
+     * from inside an MTLIndirectCommandBuffer command (see Blocker 1).
+     */
+    public static native void mtlRenderPipelineDescriptorSetSupportIndirectCommandBuffers(
+            long descHandle, boolean enabled);
+
+    // ========== MTLIndirectCommandBuffer (Blocker 1) ==========
+    // Used by MDICSectionRenderer's count-aware indirect draws on Metal.
+    // GL has glMultiDrawElementsIndirectCountARB natively; Metal needs an
+    // ICB pre-populated by a compute prepass + executeCommandsInBuffer.
+
+    /**
+     * Allocate an MTLIndirectCommandBuffer with the given max command count.
+     * commandTypes: bitmask of {@link #MTLIndirectCommandTypeDrawIndexed}
+     * and friends. options: see {@code MTLIndirectCommandBufferOptions}
+     * (inheritPipelineState, inheritBuffers). Returns a +1 retained handle.
+     */
+    public static native long mtlDeviceNewIndirectCommandBuffer(
+            long device, int commandTypes, int maxCommandCount, int options);
+
+    /**
+     * Touch the slot at {@code commandIndex} so any ICB lazy init runs.
+     * Returns 1 on success, 0 on failure — the slot handle itself never
+     * leaves Objective-C++ because the autorelease semantics around
+     * {@code [icb indirectRenderCommandAtIndex:]} make it unsafe to pin
+     * across JNI calls. Population JNIs below take (icbHandle, commandIndex)
+     * directly.
+     */
+    public static native long mtlIndirectCommandBufferGetCommand(long icb, int commandIndex);
+
+    /** Bake a render PSO into ICB command {@code commandIndex}. */
+    public static native void mtlIndirectRenderCommandSetPipelineState(long icb, int commandIndex, long pso);
+
+    /** Bind a vertex buffer slot inside ICB command {@code commandIndex}. */
+    public static native void mtlIndirectRenderCommandSetVertexBuffer(
+            long icb, int commandIndex, long buffer, long offset, int atIndex);
+
+    /** Bind a fragment buffer slot inside ICB command {@code commandIndex}. */
+    public static native void mtlIndirectRenderCommandSetFragmentBuffer(
+            long icb, int commandIndex, long buffer, long offset, int atIndex);
+
+    /**
+     * Bake an indexed draw into ICB command {@code commandIndex}. Indexed
+     * counterpart of {@code mtlRenderEncoderDrawIndexedPrimitives}.
+     */
+    public static native void mtlIndirectRenderCommandDrawIndexedPrimitives(
+            long icb, int commandIndex,
+            int primitiveType, int indexCount, int indexType,
+            long indexBuffer, long indexBufferOffset,
+            int instanceCount, int baseVertex, int baseInstance);
+
+    /** Reset commands [rangeStart, rangeStart+rangeLength) in an ICB. */
+    public static native void mtlIndirectCommandBufferReset(long icb, int rangeStart, int rangeLength);
+
+    /**
+     * Encode {@code executeCommandsInBuffer:indirectBuffer:indirectBufferOffset:}
+     * on a render encoder — runs the ICB's draws using the (location, length)
+     * pair read from {@code rangeBuffer} at {@code rangeOffset}.
+     */
+    public static native void mtlRenderEncoderExecuteCommandsInBuffer(
+            long encoder, long icb, long rangeBuffer, long rangeOffset);
+
+    /**
+     * Declare an MTLResource as used by the encoder — needed for any
+     * buffer/texture an ICB's commands reference indirectly (Metal can't
+     * statically track those). usage: MTLResourceUsageRead|Write|Sample.
+     * stages: MTLRenderStageVertex|Fragment.
+     */
+    public static native void mtlRenderEncoderUseResource(
+            long encoder, long resource, int usage, int stages);
+
+    // MTLResourceUsage flags — raw values from <Metal/MTLRenderCommandEncoder.h>.
+    public static final int MTLResourceUsageRead   = 1 << 0;
+    public static final int MTLResourceUsageWrite  = 1 << 1;
+    public static final int MTLResourceUsageSample = 1 << 2;
+
+    // MTLRenderStages flags.
+    public static final int MTLRenderStageVertex   = 1 << 0;
+    public static final int MTLRenderStageFragment = 1 << 1;
+
+    /** Optimize an ICB after CPU-side population (Metal best-practice hint). */
+    public static native void mtlBlitEncoderOptimizeIndirectCommandBuffer(
+            long blitEncoder, long icb, int rangeStart, int rangeLength);
+
+    // MTLIndirectCommandType bitmask values (raw enum values from <Metal/MTLIndirectCommandBuffer.h>).
+    public static final int MTLIndirectCommandTypeDraw                              = 1 << 0;
+    public static final int MTLIndirectCommandTypeDrawIndexed                       = 1 << 1;
+    public static final int MTLIndirectCommandTypeDrawPatches                       = 1 << 2;
+    public static final int MTLIndirectCommandTypeDrawIndexedPatches                = 1 << 3;
+
+    // MTLIndirectCommandBufferOptions — match the SDK enum exactly.
+    public static final int MTLIndirectCommandBufferOptionInheritPipelineState     = 1 << 0;
+    public static final int MTLIndirectCommandBufferOptionInheritBuffers            = 1 << 1;
+
     // ========== Metal Constants ==========
 
     // Storage Modes

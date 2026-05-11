@@ -152,6 +152,23 @@ public interface RenderEncoder extends AutoCloseable {
                                   IGpuBuffer countBuffer, long countOffset,
                                   int maxDrawCount, int stride);
 
+    /**
+     * Execute the pre-encoded draws in an indirect command buffer. The
+     * range of commands to execute is read from {@code rangeBuffer} at byte
+     * {@code rangeOffset} — Metal expects a 16-byte {@code MTLIndirectCommandBufferExecutionRange}
+     * ({@code uint32 location; uint32 length;} padded to 16). Other backends
+     * use the equivalent shape.
+     *
+     * Used by MDIC's central render path on Metal once the cmdgen.comp
+     * compute prepass writes the ICB rather than a plain
+     * {@code DrawElementsIndirectCommand} array. On the OpenGL backend
+     * this lowers to the existing
+     * {@code glMultiDrawElementsIndirectCountARB} call against the ICB's
+     * underlying buffer.
+     */
+    void executeCommandsInBuffer(IGpuIndirectCommandBuffer icb,
+                                 IGpuBuffer rangeBuffer, long rangeOffset);
+
     @Override
     void close();
 }

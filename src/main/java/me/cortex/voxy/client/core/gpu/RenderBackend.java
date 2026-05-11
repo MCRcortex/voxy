@@ -160,6 +160,20 @@ public interface RenderBackend {
     IGpuSampler createSampler(SamplerDesc desc);
 
     /**
+     * Allocate an indirect command buffer holding up to {@code maxCommands}
+     * draws. Used by MDIC-style render paths where the GPU itself decides
+     * how many sections to draw — see {@link IGpuIndirectCommandBuffer}.
+     *
+     * Metal: {@code MTLDevice newIndirectCommandBufferWithDescriptor:maxCommandCount:options:}.
+     * Vulkan: emulated via a buffer of {@code VkDrawIndexedIndirectCommand}
+     * structs (vkCmdDrawIndexedIndirectCount consumes them natively).
+     * OpenGL: thin wrapper holding the max-count metadata — the encoder's
+     * GL-side draw path keeps using glMultiDrawElementsIndirectCountARB
+     * against the caller's existing buffers.
+     */
+    IGpuIndirectCommandBuffer createIndirectCommandBuffer(int maxCommands);
+
+    /**
      * Begin a compute pass. The returned encoder is the only handle for
      * issuing compute work until {@link ComputeEncoder#close()}.
      *

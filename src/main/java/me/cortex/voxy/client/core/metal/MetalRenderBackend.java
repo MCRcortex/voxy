@@ -25,6 +25,11 @@ import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
 public class MetalRenderBackend implements RenderBackend {
 
     private final long device;
+
+    /** Native MTLDevice handle. Exposed for ICB/IOSurface callers that bypass the backend's resource creators. */
+    public long device() {
+        return this.device;
+    }
     private final long commandQueue;
     private final long sharedEvent;
     private final AtomicLong fenceCounter = new AtomicLong(1);
@@ -439,6 +444,12 @@ public class MetalRenderBackend implements RenderBackend {
             MetalNative.mtlRenderPipelineDescriptorSetVertexFunction(pipelineDesc, vertexFn);
             MetalNative.mtlRenderPipelineDescriptorSetFragmentFunction(pipelineDesc, fragmentFn);
             MetalNative.mtlRenderPipelineDescriptorSetColorAttachmentFormat(pipelineDesc, 0, metalPixelFormat);
+            // Blocker 1: enable ICB usage on every pipeline. The only Metal
+            // features that conflict (vertex amplification, function constants
+            // on stage-input) aren't used anywhere in Voxy. The runtime cost
+            // is the validation overhead Metal adds at draw time; benchmarks
+            // (M14) can re-evaluate gating this if it shows up as overhead.
+            MetalNative.mtlRenderPipelineDescriptorSetSupportIndirectCommandBuffers(pipelineDesc, true);
 
             // Bake blend state into the pipeline (Metal stores it on the pipeline,
             // not on the encoder).
@@ -708,6 +719,14 @@ public class MetalRenderBackend implements RenderBackend {
             throw new RuntimeException("mtlCommandBufferNewComputeEncoder returned NULL");
         }
         return new MetalComputeEncoder(encoder);
+    }
+
+    @Override
+    public me.cortex.voxy.client.core.gpu.IGpuIndirectCommandBuffer createIndirectCommandBuffer(int maxCommands) {
+        if (maxCommands <= 0) {
+            throw new IllegalArgumentException("maxCommands must be > 0, got " + maxCommands);
+        }
+        return new MetalIndirectCommandBuffer(this.device, maxCommands);
     }
 
     /**

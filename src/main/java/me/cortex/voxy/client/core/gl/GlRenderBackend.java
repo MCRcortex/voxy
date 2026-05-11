@@ -321,6 +321,11 @@ public class GlRenderBackend implements RenderBackend {
         return new GlSampler(desc);
     }
 
+    @Override
+    public IGpuIndirectCommandBuffer createIndirectCommandBuffer(int maxCommands) {
+        return new GlIndirectCommandBuffer(maxCommands);
+    }
+
     /**
      * Concrete encoder for the GL backend. Each pass owns a transient VAO so
      * vertex attribute formats from {@link GlGraphicsPipeline#vertexLayout}
@@ -485,6 +490,22 @@ public class GlRenderBackend implements RenderBackend {
                     mode, this.indexGlType, offset, drawCount, stride);
             org.lwjgl.opengl.GL15C.glBindBuffer(
                     org.lwjgl.opengl.GL40C.GL_DRAW_INDIRECT_BUFFER, prev);
+        }
+
+        @Override
+        public void executeCommandsInBuffer(me.cortex.voxy.client.core.gpu.IGpuIndirectCommandBuffer icb,
+                                             IGpuBuffer rangeBuffer, long rangeOffset) {
+            // GL has no ICB resource — the encoder operates directly on buffer
+            // bindings. The migration plan keeps this method as a no-op on GL
+            // for the cross-backend interface symmetry; MDIC's GL path keeps
+            // calling drawIndexedIndirectCount with its own draw+count buffers.
+            // If MDIC migrates fully to the ICB model, this becomes the entry
+            // point and we'd lower it to glMultiDrawElementsIndirectCountARB
+            // using rangeBuffer as the count source (uint32 at rangeOffset+0
+            // for length; location is implicit in the existing draw offset).
+            throw new UnsupportedOperationException(
+                    "GlRenderEncoder.executeCommandsInBuffer: GL path uses drawIndexedIndirectCount directly. "
+                            + "ICB execution is Metal-specific until MDIC migrates to the ICB model.");
         }
 
         @Override
