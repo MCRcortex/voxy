@@ -25,6 +25,7 @@
     "minecraft.MixinFogRenderer",
     "minecraft.MixinGlDebug",
     "minecraft.MixinLevelRenderer",
+    "minecraft.MixinLevelRendererBridgeDemo",
     "minecraft.MixinMinecraft",
     "minecraft.MixinRenderSystem",
     "minecraft.MixinWindow",
