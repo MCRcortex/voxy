@@ -60,6 +60,12 @@ public final class ShaderCompilerSmokeTest {
                 new ShaderCase("hiz/hiz.comp", RuntimeShaderCompiler.Stage.COMPUTE, empty, "hiz/hiz.comp (subgroups)"),
                 new ShaderCase("lod/gl46/cmdgen.comp", RuntimeShaderCompiler.Stage.COMPUTE, cmdgenA, "lod/gl46/cmdgen.comp + injected defines"),
                 new ShaderCase("lod/hierarchical/debug/setup.comp", RuntimeShaderCompiler.Stage.COMPUTE, empty, "lod/hierarchical/debug/setup.comp"),
+                new ShaderCase("util/scatter.comp", RuntimeShaderCompiler.Stage.COMPUTE,
+                        Map.of("INPUT_BUFFER_BINDING", "0", "OUTPUT_BUFFER1_BINDING", "1", "OUTPUT_BUFFER2_BINDING", "2", "PUSH_BINDING", "14"),
+                        "util/scatter.comp (M9 — UBO push)"),
+                new ShaderCase("util/memcpy.comp", RuntimeShaderCompiler.Stage.COMPUTE,
+                        Map.of("INPUT_HEADER_BUFFER_BINDING", "0", "INPUT_DATA_BUFFER_BINDING", "1", "OUTPUT_BUFFER_BINDING", "2"),
+                        "util/memcpy.comp"),
         };
 
         int passSpv = 0, failSpv = 0, passMsl = 0, failMsl = 0;

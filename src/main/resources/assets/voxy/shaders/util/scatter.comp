@@ -16,7 +16,15 @@ layout(binding = OUTPUT_BUFFER2_BINDING, std430) restrict writeonly buffer Outpu
     uvec4[] output2;
 };
 
-layout(location=0) uniform uint count;
+// M9 migration: location-based uniform wrapped in a UBO push block so
+// the shader compiles on Metal/Vulkan. GL backend pushes via setBytes →
+// glBindBufferRange(GL_UNIFORM_BUFFER, PUSH_BINDING, ...).
+#ifndef PUSH_BINDING
+#define PUSH_BINDING 14
+#endif
+layout(binding = PUSH_BINDING, std140) uniform Push {
+    uint count;
+};
 
 void main() {
     uint id = gl_GlobalInvocationID.x;
