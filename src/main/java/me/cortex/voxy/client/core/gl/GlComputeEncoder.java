@@ -57,13 +57,19 @@ public final class GlComputeEncoder implements ComputeEncoder {
 
     @Override
     public void setTexture(int binding, IGpuTexture texture) {
-        // Voxy compute uses textures as storage images (image2D / image3D).
-        // Format comes from the texture's stored internal format.
+        // Sampled-texture binding: lives on texture unit `binding`, paired
+        // with the sampler from setSampler(binding, ...). Use setStorageImage
+        // for image2D / image3D writers.
+        org.lwjgl.opengl.GL45C.glBindTextureUnit(binding, texture == null ? 0 : texture.id());
+    }
+
+    @Override
+    public void setStorageImage(int binding, IGpuTexture texture, int level) {
         int format = texture.getFormat();
         boolean layered = texture.getType() == GL30C.GL_TEXTURE_2D_ARRAY
                 || texture.getType() == GL30C.GL_TEXTURE_3D
                 || texture.getType() == GL30C.GL_TEXTURE_CUBE_MAP;
-        GL42C.glBindImageTexture(binding, texture.id(), 0, layered, 0,
+        GL42C.glBindImageTexture(binding, texture.id(), level, layered, 0,
                 GL15C.GL_READ_WRITE, format);
     }
 

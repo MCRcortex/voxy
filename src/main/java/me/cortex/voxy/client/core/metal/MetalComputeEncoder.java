@@ -49,6 +49,23 @@ public final class MetalComputeEncoder implements ComputeEncoder {
     }
 
     @Override
+    public void setStorageImage(int binding, IGpuTexture texture, int level) {
+        // Metal's setTexture:atIndex: handles sampled and storage uniformly;
+        // both shader-side `texture2d<...>` and `texture2d<..., access::write>`
+        // pull from the same MTLTexture slot. Per-mip views require a new
+        // `newTextureViewWithPixelFormat:textureType:levels:slices:` JNI; for
+        // now mip 0 is the only supported level. (HiZBuffer migration in M9
+        // adds the per-mip JNI as a separate change.)
+        if (level != 0) {
+            throw new UnsupportedOperationException(
+                    "MetalComputeEncoder.setStorageImage: level != 0 needs the per-mip "
+                            + "texture-view JNI from M9 Phase 2; got level=" + level);
+        }
+        long handle = texture == null ? 0 : MetalHandleMap.getHandle(texture.id());
+        MetalNative.mtlComputeEncoderSetTexture(this.encoderHandle, handle, binding);
+    }
+
+    @Override
     public void setSampler(int binding, IGpuSampler sampler) {
         long handle = 0;
         if (sampler != null) {

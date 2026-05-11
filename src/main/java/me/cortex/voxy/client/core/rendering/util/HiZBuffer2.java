@@ -142,6 +142,11 @@ public class HiZBuffer2 {
         return this.texture.id();
     }
 
+    /** Backend-agnostic accessor used by callers migrated onto the encoder API. */
+    public IGpuTexture getHizTexture() {
+        return this.texture;
+    }
+
     public int getPackedLevels() {
         return ((Integer.numberOfTrailingZeros(this.width))<<16)|(Integer.numberOfTrailingZeros(this.height));//+1
     }

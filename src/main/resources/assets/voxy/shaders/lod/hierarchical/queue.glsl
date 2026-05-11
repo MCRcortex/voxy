@@ -1,6 +1,14 @@
 #define SENTINAL_OUT_OF_BOUNDS uint(-1)
 
-layout(location = NODE_QUEUE_INDEX_BINDING) uniform uint queueIdx;
+// M9 migration: location-based uniform wrapped in a UBO push block so the
+// shader compiles on Metal/Vulkan. GL backend pushes via setBytes →
+// glBindBufferRange(GL_UNIFORM_BUFFER, PUSH_BINDING, ...).
+#ifndef PUSH_BINDING
+#define PUSH_BINDING 14
+#endif
+layout(binding = PUSH_BINDING, std140) uniform QueueIdxPush {
+    uint queueIdx;
+};
 
 layout(binding = NODE_QUEUE_META_BINDING, std430) restrict buffer NodeQueueMeta {
     uvec4 nodeQueueMetadata[MAX_ITERATIONS];

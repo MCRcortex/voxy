@@ -38,12 +38,32 @@ public interface ComputeEncoder extends AutoCloseable {
     void setBuffer(int binding, IGpuBuffer buffer, long offset);
 
     /**
-     * Bind a texture as a storage image at the given binding index. Used by
-     * Voxy's HiZ pass and similar compute writers. Metal binds via
-     * {@code setTexture:atIndex:}; Vulkan emits a descriptor write of type
-     * STORAGE_IMAGE.
+     * Bind a <b>sampled</b> texture at the given binding index. The shader
+     * accesses it via {@code sampler2D} / {@code sampler3D} / {@code samplerCube}
+     * (paired with {@link #setSampler}). For shader-writable
+     * {@code image2D}/{@code image3D} bindings, use {@link #setStorageImage}.
+     *
+     * Metal binds via {@code setTexture:atIndex:} (unified texture slot).
+     * Vulkan emits a SAMPLED_IMAGE descriptor write. OpenGL binds to the
+     * texture unit at index {@code binding}, so the paired sampler from
+     * {@link #setSampler} lands on the same unit.
      */
     void setTexture(int binding, IGpuTexture texture);
+
+    /**
+     * Bind a single texture mip level as a shader-writable storage image at
+     * the given binding index. Shader accesses it via
+     * {@code image2D}/{@code image3D}. Format is read from the texture's
+     * stored internal format.
+     *
+     * On OpenGL this lowers to
+     * {@code glBindImageTexture(binding, tex.id, level, layered, 0,
+     * GL_READ_WRITE, format)}. Metal currently ignores {@code level} —
+     * per-mip texture views land alongside the HiZBuffer2 migration
+     * (M9 Phase 2 follow-up). Vulkan writes a per-mip
+     * {@code VkImageView} via a STORAGE_IMAGE descriptor.
+     */
+    void setStorageImage(int binding, IGpuTexture texture, int level);
 
     /**
      * Bind a sampler state object at the given binding index. Pairs with

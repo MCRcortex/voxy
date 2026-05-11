@@ -7,7 +7,12 @@ layout(local_size_x=LOCAL_SIZE) in;//, local_size_y=1
 
 #import <voxy:lod/frustum.glsl>
 
-layout(binding = SCENE_UNIFORM_BINDING, std140) uniform SceneUniform {
+// M9 migration: was a `uniform` UBO. Converted to `readonly buffer` so the
+// encoder API's setBuffer (which binds SSBO target) works across backends.
+// std140 and std430 produce identical offsets for this struct (no arrays of
+// small types; vec4[6] in Frustum is the same in both), so the CPU-side
+// writes in uploadUniform() stay byte-for-byte compatible.
+layout(binding = SCENE_UNIFORM_BINDING, std430) restrict readonly buffer SceneUniform {
     mat4 VP;
     ivec3 camSecPos;
     uint packedHizSize;
