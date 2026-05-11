@@ -625,6 +625,34 @@ public final class MetalNative {
     public static native long mtlDeviceNewTextureWithIOSurface(
             long device, long iosurface, int pixelFormat, int width, int height, int usage);
 
+    /**
+     * Bind an IOSurface to an existing GL texture name via
+     * {@code CGLTexImageIOSurface2D}. Requires an active CGL context on
+     * the calling thread (typically MC's render thread). Returns
+     * {@code true} on success.
+     *
+     * Typical caller pattern from MC's compositing pass:
+     * <pre>
+     *   int glTex = glGenTextures();
+     *   glBindTexture(GL_TEXTURE_RECTANGLE, glTex);
+     *   // glTextureParameteri sampling state...
+     *   MetalNative.cglTexImageIOSurface2D(glTex, GL_TEXTURE_RECTANGLE,
+     *           GL_RGBA, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV,
+     *           bridge.ioSurfaceHandle(), 0);
+     * </pre>
+     *
+     * GL_TEXTURE_RECTANGLE is the supported binding target; GL_TEXTURE_2D
+     * works in some configurations but is not the documented path.
+     */
+    public static native boolean cglTexImageIOSurface2D(
+            int glTextureName, int glTarget,
+            int internalFormat, int width, int height,
+            int format, int type,
+            long iosurface, int plane);
+
+    /** Returns the current CGLContextObj as a jlong (0 if none current). */
+    public static native long cglGetCurrentContext();
+
     // IOSurface pixel format four-char codes (raw values from <IOSurface/IOSurfaceTypes.h>).
     /** 32-bit BGRA, 8 bits per channel ('BGRA'). */
     public static final int IOSurfacePixelFormat_BGRA8 = 0x42475241;

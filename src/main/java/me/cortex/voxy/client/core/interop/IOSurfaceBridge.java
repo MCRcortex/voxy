@@ -94,11 +94,46 @@ public final class IOSurfaceBridge implements AutoCloseable {
     public int height()  { return this.height; }
     public IOSurfaceFormat format() { return this.format; }
 
-    /** Raw IOSurfaceRef handle. The GL-side bind (future) consumes this. */
+    /** Raw IOSurfaceRef handle. The GL-side bind consumes this. */
     public long ioSurfaceHandle() { return this.ioSurfaceHandle; }
 
     /** Raw MTLTexture handle — the Metal-side render target. */
     public long metalTextureHandle() { return this.metalTextureHandle; }
+
+    // GL constants we need without pulling in LWJGL's GL classes (this class
+    // is reachable from non-GL backends where the LWJGL GL package may be
+    // sandboxed). Same numeric values as the OpenGL spec.
+    private static final int GL_TEXTURE_RECTANGLE      = 0x84F5;
+    private static final int GL_RGBA                   = 0x1908;
+    private static final int GL_BGRA                   = 0x80E1;
+    private static final int GL_UNSIGNED_INT_8_8_8_8_REV = 0x8367;
+
+    /**
+     * Bind this IOSurface to an existing GL texture name so MC's GL context
+     * can sample the Metal-rendered contents. Requires:
+     *  - An active CGL context on the calling thread (caller's responsibility —
+     *    inside MC this is the render thread's GL context).
+     *  - The GL texture was created via {@code glGenTextures} and is currently
+     *    unbound (the JNI rebinds to {@link #GL_TEXTURE_RECTANGLE}).
+     *
+     * Returns true on success. For BGRA8 IOSurfaces, internalFormat=GL_RGBA,
+     * format=GL_BGRA, type=GL_UNSIGNED_INT_8_8_8_8_REV — the spec-mandated
+     * tuple for {@code CGLTexImageIOSurface2D}.
+     */
+    public boolean bindToGlTexture(int glTextureName) {
+        if (this.ioSurfaceHandle == 0) {
+            throw new IllegalStateException("IOSurfaceBridge closed");
+        }
+        if (this.format != IOSurfaceFormat.BGRA8) {
+            throw new UnsupportedOperationException(
+                    "bindToGlTexture: only BGRA8 wired up; got " + this.format);
+        }
+        return MetalNative.cglTexImageIOSurface2D(
+                glTextureName, GL_TEXTURE_RECTANGLE,
+                GL_RGBA, this.width, this.height,
+                GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV,
+                this.ioSurfaceHandle, 0);
+    }
 
     @Override
     public void close() {
