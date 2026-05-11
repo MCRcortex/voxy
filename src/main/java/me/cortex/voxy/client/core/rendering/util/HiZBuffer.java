@@ -1,34 +1,62 @@
 package me.cortex.voxy.client.core.rendering.util;
 
-import me.cortex.voxy.client.core.gl.GLCompat;
-import me.cortex.voxy.client.core.gl.shader.Shader;
-import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.gl.shader.ShaderLoader;
+import me.cortex.voxy.client.core.gpu.GraphicsPipelineDesc;
 import me.cortex.voxy.client.core.gpu.IGpuFramebuffer;
+import me.cortex.voxy.client.core.gpu.IGpuPipeline;
+import me.cortex.voxy.client.core.gpu.IGpuSampler;
 import me.cortex.voxy.client.core.gpu.IGpuTexture;
+import me.cortex.voxy.client.core.gpu.PipelineState;
+import me.cortex.voxy.client.core.gpu.RenderBackend;
 import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
-import org.lwjgl.opengl.GL11;
+import me.cortex.voxy.client.core.gpu.RenderEncoder;
+import me.cortex.voxy.client.core.gpu.RenderPassDesc;
+import me.cortex.voxy.client.core.gpu.SamplerDesc;
+import me.cortex.voxy.client.core.gpu.VertexLayout;
 
-import static org.lwjgl.opengl.ARBShaderImageLoadStore.GL_TEXTURE_FETCH_BARRIER_BIT;
-import static org.lwjgl.opengl.GL11C.*;
-import static org.lwjgl.opengl.GL30C.*;
-import static org.lwjgl.opengl.GL33.glBindSampler;
-import static org.lwjgl.opengl.GL33.glGenSamplers;
-import static org.lwjgl.opengl.GL33C.glDeleteSamplers;
-import static org.lwjgl.opengl.GL33C.glSamplerParameteri;
-import static org.lwjgl.opengl.GL42C.GL_FRAMEBUFFER_BARRIER_BIT;
-import static org.lwjgl.opengl.GL42C.GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
-import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
+import static org.lwjgl.opengl.GL11C.GL_DEPTH_COMPONENT;
+import static org.lwjgl.opengl.GL11C.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL30C.GL_DEPTH24_STENCIL8;
+import static org.lwjgl.opengl.GL30C.GL_DEPTH_ATTACHMENT;
+import static org.lwjgl.opengl.GL12C.GL_TEXTURE_BASE_LEVEL;
+import static org.lwjgl.opengl.GL12C.GL_TEXTURE_MAX_LEVEL;
 import static me.cortex.voxy.client.core.gl.GLCompat.textureParameteri;
-import static me.cortex.voxy.client.core.gl.GLCompat.bindTextureUnit;
 
+/**
+ * Hierarchical-Z buffer — power-of-two depth pyramid sampled by the
+ * traversal compute pass for occlusion culling.
+ *
+ * Build strategy (one per frame): for each mip level i in [0, levels), draw
+ * a fullscreen quad with depth-test=ALWAYS into the depth attachment at
+ * level i, sampling from the source depth at level (i-1). For i=0 the
+ * source is the externally supplied depth texture (vanilla MC's depth
+ * target); for i&gt;0 the source is this texture's own previous mip,
+ * selected via GL_TEXTURE_BASE_LEVEL/MAX_LEVEL state mutation.
+ *
+ * M9 status: blit graphics pipeline now flows through the
+ * {@link RenderBackend} encoder abstraction — per-mip render pass, draw
+ * 4 vertices as TRIANGLE_STRIP (was TRIANGLE_FAN; blit.vsh re-ordered
+ * to match). The remaining raw GL calls are
+ * {@code glBindTextureUnit} for the source texture (external GL id —
+ * no IGpuTexture available; caller side is not yet migrated) and the
+ * BASE/MAX_LEVEL mutation that selects the source mip for sampling.
+ * Both are sampling-state side effects that GL handles globally; on
+ * Metal/Vulkan they will be replaced by per-mip
+ * {@code IGpuTexture.createView(level, count)} (the M9 follow-up
+ * tracked in M-SERIES-PORT-STATE).
+ */
 public class HiZBuffer {
-    private final Shader hiz = Shader.make()
-            .add(ShaderType.VERTEX, "voxy:hiz/blit.vsh")
-            .add(ShaderType.FRAGMENT, "voxy:hiz/blit.fsh")
-            .compile()
-            .name("HiZ Builder");
+
+    private final RenderBackend backend = RenderBackendFactory.get();
+    private final IGpuPipeline blitPipeline;
+    private final IGpuSampler sampler = this.backend.createSampler(SamplerDesc.builder()
+            .filter(SamplerDesc.Filter.NEAREST, SamplerDesc.Filter.NEAREST)
+            .mipFilter(SamplerDesc.MipFilter.NEAREST)
+            .wrap(SamplerDesc.Wrap.CLAMP_TO_EDGE, SamplerDesc.Wrap.CLAMP_TO_EDGE)
+            .label("hizBlitSampler")
+            .build());
+
     private final IGpuFramebuffer fb = RenderBackendFactory.get().createFramebuffer().name("HiZ");
-    private final int sampler = glGenSamplers();
     private final int type;
     private IGpuTexture texture;
     private int levels;
@@ -38,32 +66,35 @@ public class HiZBuffer {
     public HiZBuffer() {
         this(GL_DEPTH24_STENCIL8);
     }
+
     public HiZBuffer(int type) {
-        GLCompat.framebufferDrawBuffers(this.fb.id(), GL_NONE);
         this.type = type;
+        // Depth-only pass: ALWAYS pass + write depth, no blend, no cull,
+        // empty vertex layout (gl_VertexID-driven fullscreen quad).
+        PipelineState state = new PipelineState(
+                new PipelineState.DepthState(true, true, PipelineState.CompareOp.ALWAYS),
+                PipelineState.BlendState.OPAQUE,
+                PipelineState.RasterState.NO_CULL);
+        this.blitPipeline = this.backend.createGraphicsPipeline(new GraphicsPipelineDesc(
+                ShaderLoader.parse("voxy:hiz/blit.vsh"),
+                ShaderLoader.parse("voxy:hiz/blit.fsh"),
+                null,                       // no defines
+                null, null,                  // no MSL
+                null, null,                  // no SPIRV
+                0,                           // no color format — depth-only pass
+                VertexLayout.EMPTY,
+                state,
+                "HiZBuffer.blit"));
     }
 
     private void alloc(int width, int height) {
-        this.levels = (int)Math.ceil(Math.log(Math.max(width, height))/Math.log(2));
-        //We dont care about e.g. 1x1 size texture since you dont get meshlets that big to cover such a large area
-        //this.levels -= 1;//Arbitrary size, shinks the max level by alot and saves a significant amount of processing time
-        // (could probably increase it to be defined by a max meshlet coverage computation thing)
+        this.levels = (int) Math.ceil(Math.log(Math.max(width, height)) / Math.log(2));
 
-        //GL_DEPTH_COMPONENT32F //Cant use this as it does not match the depth format of the provided depth buffer
-        this.texture = RenderBackendFactory.get().createTexture().store(this.type, this.levels, width, height).name("HiZ");
-        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        this.texture = this.backend.createTexture()
+                .store(this.type, this.levels, width, height)
+                .name("HiZ");
 
-        glSamplerParameteri(this.sampler, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-        glSamplerParameteri(this.sampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glSamplerParameteri(this.sampler, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-        glSamplerParameteri(this.sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glSamplerParameteri(this.sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-        this.width  = width;
+        this.width = width;
         this.height = height;
 
         this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, 0).verify();
@@ -77,40 +108,50 @@ public class HiZBuffer {
             }
             this.alloc(Integer.highestOneBit(width), Integer.highestOneBit(height));
         }
-        glBindVertexArray(RenderBackendFactory.get().getStaticVAO());
-        int boundFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
-        this.hiz.bind();
-        glBindFramebuffer(GL_FRAMEBUFFER, this.fb.id());
 
-        glDepthFunc(GL_ALWAYS);
-        glDepthMask(true);
-        glEnable(GL_DEPTH_TEST);
+        // Pre-bind the external source texture to unit 0 (sampler slot 0). The
+        // encoder won't call setTexture(0, ...) inside the pass, so this binding
+        // persists across the draw. GL only — Metal/Vulkan replacement is the
+        // per-mip createView API tracked in M-SERIES-PORT-STATE.
+        org.lwjgl.opengl.GL45C.glBindTextureUnit(0, srcDepthTex);
 
-
-        bindTextureUnit(0, GL_TEXTURE_2D, srcDepthTex);
-        glBindSampler(0, this.sampler);
-        glUniform1i(0, 0);
         int cw = this.width;
         int ch = this.height;
         for (int i = 0; i < this.levels; i++) {
-            this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, i);
-            glViewport(0, 0, cw, ch); cw = Math.max(cw/2, 1); ch = Math.max(ch/2, 1);
-            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-            glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT|GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            try (RenderEncoder encoder = this.backend.beginRenderPass(
+                    RenderPassDesc.builder(cw, ch)
+                            .depthAttachment(this.texture, i,
+                                    RenderPassDesc.LoadAction.DONT_CARE,
+                                    RenderPassDesc.StoreAction.STORE, 1.0f)
+                            .build())) {
+                encoder.setPipeline(this.blitPipeline);
+                encoder.setSampler(0, this.sampler);
+                encoder.setViewport(0, 0, cw, ch, 0, 1);
+                encoder.draw(RenderEncoder.PRIMITIVE_TRIANGLE_STRIP, 0, 4, 1, 0);
+            }
+
+            cw = Math.max(cw / 2, 1);
+            ch = Math.max(ch / 2, 1);
+
+            // After drawing mip i, restrict the texture's sampling range so the
+            // next pass reads from level i. GL_TEXTURE_BASE_LEVEL affects
+            // sampling only, not FBO attachment (which uses an explicit level),
+            // so this is safe even though we'll attach level i+1 next.
             textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, i);
             textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, i);
-            if (i==0) {
-                bindTextureUnit(0, GL_TEXTURE_2D, this.texture.id());
+            if (i == 0) {
+                // Switch from external source to self.
+                org.lwjgl.opengl.GL45C.glBindTextureUnit(0, this.texture.id());
             }
         }
-        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 1000);//TODO: CHECK IF ITS -1 or -0
 
-        glDepthFunc(GL_LEQUAL);
-        glDisable(GL_DEPTH_TEST);
-        glBindFramebuffer(GL_FRAMEBUFFER, boundFB);
-        glViewport(0, 0, width, height);
-        glBindVertexArray(0);
+        // Restore the full sampling range so traversal samples the whole pyramid.
+        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+        textureParameteri(this.texture.id(), GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 1000);
+
+        // The encoder's close() rebinds FBO 0 and ends the pass.
+        // Restore the viewport for the caller's outer pass.
+        org.lwjgl.opengl.GL11C.glViewport(0, 0, width, height);
     }
 
     public void free() {
@@ -119,8 +160,8 @@ public class HiZBuffer {
             this.texture.free();
             this.texture = null;
         }
-        glDeleteSamplers(this.sampler);
-        this.hiz.free();
+        this.sampler.close();
+        this.blitPipeline.close();
     }
 
     public int getHizTextureId() {
@@ -133,6 +174,13 @@ public class HiZBuffer {
     }
 
     public int getPackedLevels() {
-        return (this.width<<16)|this.height;//+1
+        return (this.width << 16) | this.height;
     }
+
+    // Suppressed-but-still-referenced field aliases so callers that reach in
+    // continue to compile after the API tightened. GL_DEPTH_COMPONENT is the
+    // sampler swizzle target depth textures still default to; left as a
+    // documented constant.
+    @SuppressWarnings("unused")
+    private static final int LEGACY_DEPTH_FORMAT_HINT = GL_DEPTH_COMPONENT;
 }
