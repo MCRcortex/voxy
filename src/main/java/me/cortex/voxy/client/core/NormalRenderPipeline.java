@@ -51,8 +51,14 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
     protected NormalRenderPipeline(AsyncNodeManager nodeManager, NodeCleaner nodeCleaner, HierarchicalOcclusionTraverser traversal, BooleanSupplier frexSupplier) {
         super(nodeManager, nodeCleaner, traversal, frexSupplier, false);
         this.useEnvFog = VoxyConfig.CONFIG.useEnvironmentalFog;
-        this.finalBlit = new FullscreenBlit("voxy:post/blit_texture_depth_cutout.frag",
-                a->a.defineIf("USE_ENV_FOG", this.useEnvFog).define("EMIT_COLOUR"));
+        // M9 migration: defines now flow through a Map<String,String> so the
+        // backend-agnostic GraphicsPipelineDesc can forward them to GL,
+        // Metal, and Vulkan compile paths uniformly.
+        java.util.Map<String, String> defines = new java.util.LinkedHashMap<>();
+        defines.put("EMIT_COLOUR", "");
+        if (this.useEnvFog) defines.put("USE_ENV_FOG", "");
+        this.finalBlit = new FullscreenBlit("voxy:post/fullscreen.vert",
+                "voxy:post/blit_texture_depth_cutout.frag", defines);
     }
 
     @Override
@@ -104,22 +110,37 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
         glBindFramebuffer(GL_FRAMEBUFFER, this.fbSSAO.id());
     }
 
+    /** Matches PushFog layout in blit_texture_depth_cutout.frag — two vec4. */
+    private static final int PUSH_FOG_BINDING = 15;
+    private static final int FOG_PUSH_SIZE = 4 * 4 * 2;
+
     @Override
     protected void finish(Viewport<?> viewport, int sourceFrameBuffer, int srcWidth, int srcHeight) {
         this.finalBlit.bind();
         if (this.useEnvFog) {
             float start = viewport.fogParameters.environmentalStart();
             float end = viewport.fogParameters.environmentalEnd();
-            if (Math.abs(end-start)>1) {
-                float invEndFogDelta = 1f / (end - start);
-                float endDistance = Math.max(Minecraft.getInstance().gameRenderer.getRenderDistance(), 20*16);//TODO: make this constant a config option
-                endDistance *= (float)Math.sqrt(3);
-                float startDelta = -start * invEndFogDelta;
-                glUniform4f(4, invEndFogDelta, startDelta, Math.clamp(endDistance*invEndFogDelta+startDelta, 0, 1),0);//
-                glUniform4f(5, viewport.fogParameters.red(), viewport.fogParameters.green(), viewport.fogParameters.blue(), viewport.fogParameters.alpha());
-            } else {
-                glUniform4f(4, 0, 0, 0, 0);
-                glUniform4f(5, 0, 0, 0, 0);
+            try (var stack = MemoryStack.stackPush()) {
+                long addr = stack.nmalloc(FOG_PUSH_SIZE);
+                if (Math.abs(end - start) > 1) {
+                    float invEndFogDelta = 1f / (end - start);
+                    float endDistance = Math.max(Minecraft.getInstance().gameRenderer.getRenderDistance(), 20 * 16);//TODO: make this constant a config option
+                    endDistance *= (float) Math.sqrt(3);
+                    float startDelta = -start * invEndFogDelta;
+                    // endParams vec4
+                    org.lwjgl.system.MemoryUtil.memPutFloat(addr +  0, invEndFogDelta);
+                    org.lwjgl.system.MemoryUtil.memPutFloat(addr +  4, startDelta);
+                    org.lwjgl.system.MemoryUtil.memPutFloat(addr +  8, Math.clamp(endDistance * invEndFogDelta + startDelta, 0f, 1f));
+                    org.lwjgl.system.MemoryUtil.memPutFloat(addr + 12, 0f);
+                    // fogColour vec4
+                    org.lwjgl.system.MemoryUtil.memPutFloat(addr + 16, viewport.fogParameters.red());
+                    org.lwjgl.system.MemoryUtil.memPutFloat(addr + 20, viewport.fogParameters.green());
+                    org.lwjgl.system.MemoryUtil.memPutFloat(addr + 24, viewport.fogParameters.blue());
+                    org.lwjgl.system.MemoryUtil.memPutFloat(addr + 28, viewport.fogParameters.alpha());
+                } else {
+                    org.lwjgl.system.MemoryUtil.memSet(addr, 0, FOG_PUSH_SIZE);
+                }
+                this.finalBlit.setBytes(PUSH_FOG_BINDING, addr, FOG_PUSH_SIZE);
             }
         }
 

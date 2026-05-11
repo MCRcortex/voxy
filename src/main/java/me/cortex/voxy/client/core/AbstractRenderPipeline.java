@@ -130,6 +130,12 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);
     }
 
+    /** Push-block binding for depth_copy.frag's scaleFactor (see Push struct in the shader). */
+    private static final int DEPTH_COPY_PUSH_BINDING = 14;
+    /** Push-block binding for blit_texture_depth_cutout.frag's PushMats (invProj + proj). */
+    private static final int BLIT_DEPTH_MATS_PUSH_BINDING = 14;
+    private static final int BLIT_DEPTH_MATS_PUSH_SIZE = 4 * 4 * 4 * 2; // two mat4s
+
     protected void initDepthStencil(int sourceFrameBuffer, int targetFb, int srcWidth, int srcHeight, int width, int height) {
         glClearNamedFramebufferfi(targetFb, GL_DEPTH_STENCIL, 0, 1.0f, 1);
         // using blit to copy depth from mismatched depth formats is not portable so instead a full screen pass is performed for a depth copy
@@ -140,7 +146,13 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         int depthTexture = glGetNamedFramebufferAttachmentParameteri(sourceFrameBuffer, GL_DEPTH_ATTACHMENT, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME);
         bindTextureUnit(0, depthTexture);
         glBindSampler(0, DEPTH_SAMPLER);
-        glUniform2f(1,((float)width)/srcWidth, ((float)height)/srcHeight);
+        // Push scaleFactor (vec2) into the Push UBO declared at DEPTH_COPY_PUSH_BINDING.
+        try (var stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            long addr = stack.nmalloc(8);
+            MemoryUtil.memPutFloat(addr,     ((float) width) / srcWidth);
+            MemoryUtil.memPutFloat(addr + 4, ((float) height) / srcHeight);
+            this.depthCopy.setBytes(DEPTH_COPY_PUSH_BINDING, addr, 8);
+        }
         glColorMask(false,false,false,false);
         this.depthCopy.blit();
 
@@ -178,7 +190,6 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         glStencilFunc(GL_EQUAL, 1, 0xFF);
     }
 
-    private static final long SCRATCH = MemoryUtil.nmemAlloc(4*4*4);
     protected static void transformBlitDepth(FullscreenBlit blitShader, int srcDepthTex, int dstFB, Viewport<?> viewport, Matrix4f targetTransform) {
         // at this point the dst frame buffer doesn't have a stencil attachment so we don't need to keep the stencil test on for the blit
         // in the worst case the dstFB does have a stencil attachment causing this pass to become 'corrupted'
@@ -187,10 +198,14 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
         blitShader.bind();
         bindTextureUnit(0, srcDepthTex);
-        new Matrix4f(viewport.MVP).invert().getToAddress(SCRATCH);
-        nglUniformMatrix4fv(1, 1, false, SCRATCH);//inverse fromProjection
-        targetTransform.getToAddress(SCRATCH);//new Matrix4f(tooProjection).mul(vp.modelView).get(data);
-        nglUniformMatrix4fv(2, 1, false, SCRATCH);//tooProjection
+
+        // Push PushMats { mat4 invProjMat; mat4 projMat; } into the UBO at BLIT_DEPTH_MATS_PUSH_BINDING.
+        try (var stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            long addr = stack.nmalloc(BLIT_DEPTH_MATS_PUSH_SIZE);
+            new Matrix4f(viewport.MVP).invert().getToAddress(addr);                 // invProjMat
+            targetTransform.getToAddress(addr + 4 * 4 * 4);                          // projMat
+            blitShader.setBytes(BLIT_DEPTH_MATS_PUSH_BINDING, addr, BLIT_DEPTH_MATS_PUSH_SIZE);
+        }
 
         glEnable(GL_DEPTH_TEST);
         blitShader.blit();

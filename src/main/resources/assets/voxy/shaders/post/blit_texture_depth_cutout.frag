@@ -1,14 +1,29 @@
 #version 430 core
 
 layout(binding = 0) uniform sampler2D depthTex;
-layout(location = 1) uniform mat4 invProjMat;
-layout(location = 2) uniform mat4 projMat;
+
+// M9 migration: location-based uniforms wrapped in two UBO push blocks so
+// the shader compiles on Metal/Vulkan. Split into MATS + FOG so each
+// caller (transformBlitDepth vs. NormalRenderPipeline.finish) can write
+// its own struct independently without trampling the other's data on GL.
+#ifndef PUSH_MATS_BINDING
+#define PUSH_MATS_BINDING 14
+#endif
+layout(binding = PUSH_MATS_BINDING, std140) uniform PushMats {
+    mat4 invProjMat;
+    mat4 projMat;
+};
 
 #ifdef EMIT_COLOUR
 layout(binding = 3) uniform sampler2D colourTex;
 #ifdef USE_ENV_FOG
-layout(location = 4) uniform vec4 endParams;
-layout(location = 5) uniform vec4 fogColour;
+#ifndef PUSH_FOG_BINDING
+#define PUSH_FOG_BINDING 15
+#endif
+layout(binding = PUSH_FOG_BINDING, std140) uniform PushFog {
+    vec4 endParams;
+    vec4 fogColour;
+};
 #endif
 #endif
 
@@ -34,7 +49,17 @@ void main() {
     depth = projDepth(point);
     depth = min(1.0f-(2.0f/((1<<24)-1)), depth);
     depth = depth * 0.5f + 0.5f;
+    // M9 Phase 2 patch: gl_DepthRange isn't reliably exposed by glslang/shaderc
+    // in the fragment stage, which broke SPIRV/MSL compilation for this shader.
+    // Voxy never calls glDepthRange() to set a non-default range, so the
+    // original math (gl_DepthRange.diff * depth + gl_DepthRange.near) reduces
+    // to (1.0 * depth + 0.0) = depth. If a caller ever needs a custom depth
+    // range, plumb it through a UBO instead of relying on the built-in block.
+    #ifdef VOXY_VULKAN
+    // no-op — assume default depth range [0,1]
+    #else
     depth = gl_DepthRange.diff * depth + gl_DepthRange.near;
+    #endif
     gl_FragDepth = depth;
 
     #ifdef EMIT_COLOUR

@@ -40,12 +40,20 @@ public final class ShaderCompilerSmokeTest {
                 "HAS_STATISTICS", "1",
                 "STATISTICS_BUFFER_BINDING", "8");
 
+        // Defines for M9-migrated shaders — keep in sync with the Java callers
+        // (FullscreenBlit constructors in AbstractRenderPipeline / NormalRenderPipeline).
+        Map<String, String> blitDepthCutoutFog = Map.of("EMIT_COLOUR", "", "USE_ENV_FOG", "");
+
         ShaderCase[] cases = new ShaderCase[]{
                 new ShaderCase("post/noop.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "post/noop.frag (no defines)"),
                 new ShaderCase("post/blit_texture_cutout.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "post/blit_texture_cutout.frag"),
                 new ShaderCase("post/depth0.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "post/depth0.frag"),
+                new ShaderCase("post/depth_copy.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "post/depth_copy.frag (M9 — UBO push)"),
+                new ShaderCase("post/blit_texture_depth_cutout.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "post/blit_texture_depth_cutout.frag (Iris path — no EMIT_COLOUR)"),
+                new ShaderCase("post/blit_texture_depth_cutout.frag", RuntimeShaderCompiler.Stage.FRAGMENT, blitDepthCutoutFog, "post/blit_texture_depth_cutout.frag (NormalRenderPipeline — EMIT_COLOUR + USE_ENV_FOG)"),
                 new ShaderCase("hiz/blit.fsh", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "hiz/blit.fsh"),
                 new ShaderCase("post/fullscreen.vert", RuntimeShaderCompiler.Stage.VERTEX, empty, "post/fullscreen.vert"),
+                new ShaderCase("hiz/blit.vsh", RuntimeShaderCompiler.Stage.VERTEX, empty, "hiz/blit.vsh (M9 — TRIANGLE_STRIP corners)"),
                 new ShaderCase("lod/gl46/prep.comp", RuntimeShaderCompiler.Stage.COMPUTE, empty, "lod/gl46/prep.comp"),
                 new ShaderCase("hiz/hiz.comp", RuntimeShaderCompiler.Stage.COMPUTE, empty, "hiz/hiz.comp (subgroups)"),
                 new ShaderCase("lod/gl46/cmdgen.comp", RuntimeShaderCompiler.Stage.COMPUTE, cmdgenA, "lod/gl46/cmdgen.comp + injected defines"),
