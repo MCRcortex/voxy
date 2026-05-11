@@ -54,6 +54,8 @@ public final class ShaderCompilerSmokeTest {
                 new ShaderCase("hiz/blit.fsh", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "hiz/blit.fsh"),
                 new ShaderCase("post/fullscreen.vert", RuntimeShaderCompiler.Stage.VERTEX, empty, "post/fullscreen.vert"),
                 new ShaderCase("hiz/blit.vsh", RuntimeShaderCompiler.Stage.VERTEX, empty, "hiz/blit.vsh (M9 — TRIANGLE_STRIP corners)"),
+                new ShaderCase("chunkoutline/outline.vsh", RuntimeShaderCompiler.Stage.VERTEX, empty, "chunkoutline/outline.vsh (M9 — integer-mix extension)"),
+                new ShaderCase("chunkoutline/outline.fsh", RuntimeShaderCompiler.Stage.FRAGMENT, empty, "chunkoutline/outline.fsh"),
                 new ShaderCase("lod/gl46/prep.comp", RuntimeShaderCompiler.Stage.COMPUTE, empty, "lod/gl46/prep.comp"),
                 new ShaderCase("hiz/hiz.comp", RuntimeShaderCompiler.Stage.COMPUTE, empty, "hiz/hiz.comp (subgroups)"),
                 new ShaderCase("lod/gl46/cmdgen.comp", RuntimeShaderCompiler.Stage.COMPUTE, cmdgenA, "lod/gl46/cmdgen.comp + injected defines"),

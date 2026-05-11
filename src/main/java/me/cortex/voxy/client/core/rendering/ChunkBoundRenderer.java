@@ -3,45 +3,83 @@ package me.cortex.voxy.client.core.rendering;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import me.cortex.voxy.client.core.AbstractRenderPipeline;
-import me.cortex.voxy.client.core.gpu.IGpuBuffer;
-import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
-import me.cortex.voxy.client.core.gl.shader.AutoBindingShader;
-import me.cortex.voxy.client.core.gl.shader.Shader;
+import me.cortex.voxy.client.core.gl.GlGraphicsPipeline;
 import me.cortex.voxy.client.core.gl.shader.ShaderLoader;
-import me.cortex.voxy.client.core.gl.shader.ShaderType;
+import me.cortex.voxy.client.core.gpu.GraphicsPipelineDesc;
+import me.cortex.voxy.client.core.gpu.IGpuBuffer;
+import me.cortex.voxy.client.core.gpu.IGpuPipeline;
+import me.cortex.voxy.client.core.gpu.PipelineState;
+import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
+import me.cortex.voxy.client.core.gpu.VertexLayout;
 import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
 import me.cortex.voxy.client.core.rendering.util.UploadStream;
 import me.cortex.voxy.common.Logger;
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
-import org.joml.Vector3i;
 import org.lwjgl.system.MemoryUtil;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import static org.lwjgl.opengl.ARBDirectStateAccess.glCopyNamedBufferSubData;
+import static org.lwjgl.opengl.GL11.GL_RGBA8;
 import static org.lwjgl.opengl.GL11.GL_TRIANGLES;
 import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+import static org.lwjgl.opengl.GL11C.GL_CCW;
+import static org.lwjgl.opengl.GL11C.GL_CULL_FACE;
+import static org.lwjgl.opengl.GL11C.GL_CW;
+import static org.lwjgl.opengl.GL11C.GL_DEPTH_TEST;
+import static org.lwjgl.opengl.GL11C.GL_GREATER;
+import static org.lwjgl.opengl.GL11C.GL_LEQUAL;
+import static org.lwjgl.opengl.GL11C.glDepthFunc;
+import static org.lwjgl.opengl.GL11C.glEnable;
+import static org.lwjgl.opengl.GL11C.glFrontFace;
 import static org.lwjgl.opengl.GL15.GL_ELEMENT_ARRAY_BUFFER;
 import static org.lwjgl.opengl.GL15.glBindBuffer;
+import static org.lwjgl.opengl.GL20C.glUseProgram;
 import static org.lwjgl.opengl.GL30.glBindVertexArray;
-import static org.lwjgl.opengl.GL30C.*;
+import static org.lwjgl.opengl.GL30.glBindBufferBase;
+import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
 import static org.lwjgl.opengl.GL31.glDrawElementsInstanced;
 import static org.lwjgl.opengl.GL42.glDrawElementsInstancedBaseInstance;
+import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
 
-//This is a render subsystem, its very simple in what it does
-// it renders an AABB around loaded chunks, thats it
+/**
+ * Renders an AABB wireframe around loaded chunks. Pure debug visualisation —
+ * one instanced indexed draw per batch of 32 chunks (each chunk emits 6×2×3
+ * indices for the 6 faces of its bounding cube via {@link SharedIndexBuffer#INSTANCE_BB_BYTE}).
+ *
+ * M9 status: pipeline now created via
+ * {@link me.cortex.voxy.client.core.gpu.RenderBackend#createGraphicsPipeline}
+ * so the GLSL compiles cleanly on Metal/Vulkan. Bind + draw still raw GL
+ * (glUseProgram + glDrawElementsInstanced) because
+ * AbstractRenderPipeline.runPipeline early-returns on non-GL backends — the
+ * code only executes on the OpenGL path until the IOSurface bridge lands.
+ * Per-call SSBO/UBO binding lives in {@link #render}.
+ */
 public class ChunkBoundRenderer {
-    private static final int INIT_MAX_CHUNK_COUNT = 1<<12;
-    private IGpuBuffer chunkPosBuffer = RenderBackendFactory.get().createBuffer(INIT_MAX_CHUNK_COUNT*8);//Stored as ivec2
+    private static final int INIT_MAX_CHUNK_COUNT = 1 << 12;
+
+    /** UBO binding for SceneUniform — matches `layout(binding=0)` in outline.vsh. */
+    private static final int SCENE_UNIFORM_BINDING = 0;
+    /** SSBO binding for the chunk-position array. */
+    private static final int CHUNK_POS_BINDING = 1;
+
+    private IGpuBuffer chunkPosBuffer = RenderBackendFactory.get().createBuffer(INIT_MAX_CHUNK_COUNT * 8); // ivec2 per entry
     private final IGpuBuffer uniformBuffer = RenderBackendFactory.get().createBuffer(128);
     private final Long2IntOpenHashMap chunk2idx = new Long2IntOpenHashMap(INIT_MAX_CHUNK_COUNT);
     private long[] idx2chunk = new long[INIT_MAX_CHUNK_COUNT];
-    private final Shader rasterShader;
+
+    private final IGpuPipeline rasterPipeline;
+    /** Cached GL program id for the raw glUseProgram path; 0 on non-GL backends. */
+    private final int glProgram;
 
     private final LongOpenHashSet addQueue = new LongOpenHashSet();
     private final LongOpenHashSet remQueue = new LongOpenHashSet();
 
     private final AbstractRenderPipeline pipeline;
+
     public ChunkBoundRenderer(AbstractRenderPipeline pipeline) {
         this.chunk2idx.defaultReturnValue(-1);
         this.pipeline = pipeline;
@@ -49,15 +87,22 @@ public class ChunkBoundRenderer {
         String vert = ShaderLoader.parse("voxy:chunkoutline/outline.vsh");
         String taa = pipeline.taaFunction("getTAA");
         if (taa != null) {
-            vert = vert+"\n\n\n"+taa;
+            vert = vert + "\n\n\n" + taa;
         }
-        this.rasterShader = Shader.makeAuto()
-                .addSource(ShaderType.VERTEX, vert)
-                .defineIf("TAA", taa != null)
-                .add(ShaderType.FRAGMENT, "voxy:chunkoutline/outline.fsh")
-                .compile()
-                .ubo(0, this.uniformBuffer)
-                .ssbo(1, this.chunkPosBuffer);
+        String frag = ShaderLoader.parse("voxy:chunkoutline/outline.fsh");
+
+        Map<String, String> defines = new LinkedHashMap<>();
+        if (taa != null) defines.put("TAA", "");
+
+        this.rasterPipeline = RenderBackendFactory.get().createGraphicsPipeline(new GraphicsPipelineDesc(
+                vert, frag, defines,
+                null, null,           // no MSL — runtime compiler produces on Metal
+                null, null,           // no SPIRV — runtime compiler produces on Vulkan
+                GL_RGBA8,             // color format — unused; render path uses the depth bounding FBO directly
+                VertexLayout.EMPTY,   // gl_VertexID + gl_InstanceID + gl_BaseInstance drive the math
+                PipelineState.DEFAULT,// caller manages depth/cull/winding via raw GL around the draw
+                "ChunkBoundRenderer.raster"));
+        this.glProgram = (this.rasterPipeline instanceof GlGraphicsPipeline gp) ? gp.program() : 0;
     }
 
     public void addSection(long pos) {
@@ -76,35 +121,31 @@ public class ChunkBoundRenderer {
     public void render(Viewport<?> viewport) {
         if (!this.remQueue.isEmpty()) {
             boolean wasEmpty = this.chunk2idx.isEmpty();
-            this.remQueue.forEach(this::_remPos);//TODO: REPLACE WITH SCATTER COMPUTE
+            this.remQueue.forEach(this::_remPos);
             this.remQueue.clear();
-            if (this.chunk2idx.isEmpty()&&!wasEmpty) {//When going from stuff to nothing need to clear the depth buffer
-                viewport.depthBoundingBuffer.clear(0);
-            }
+            if (!wasEmpty) UploadStream.INSTANCE.commit();
         }
 
-        if (this.chunk2idx.isEmpty() && this.addQueue.isEmpty()) return;
+        {
+            //Uniform buffer push
+            long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 128);
+            long matPtr = ptr;
+            new Matrix4f(viewport.projection).mul(viewport.modelView).getToAddress(ptr); ptr += 4 * 4 * 4;
 
-        viewport.depthBoundingBuffer.clear(0);
-
-        long ptr = UploadStream.INSTANCE.upload(this.uniformBuffer, 0, 128);
-        long matPtr = ptr; ptr += 4*4*4;
-
-        final float renderDistance = Minecraft.getInstance().options.getEffectiveRenderDistance()*16;//In blocks
-
-        {//This is recomputed to be in chunk section space not worldsection
-            int sx = (int)(viewport.cameraX);
-            int sy = (int)(viewport.cameraY);
-            int sz = (int)(viewport.cameraZ);
-            new Vector3i(sx, sy, sz).getToAddress(ptr); ptr += 4*4;
+            int sx = net.minecraft.util.Mth.floor(viewport.cameraX) & ~31;
+            int sy = net.minecraft.util.Mth.floor(viewport.cameraY) & ~31;
+            int sz = net.minecraft.util.Mth.floor(viewport.cameraZ) & ~31;
+            MemoryUtil.memPutInt(ptr, sx); ptr += 4;
+            MemoryUtil.memPutInt(ptr, sy); ptr += 4;
+            MemoryUtil.memPutInt(ptr, sz); ptr += 4;
+            float renderDistance = Math.max(Minecraft.getInstance().gameRenderer.getRenderDistance(), 20 * 16);
 
             var negInnerSec = new Vector3f(
                     (float) (viewport.cameraX - sx),
                     (float) (viewport.cameraY - sy),
                     (float) (viewport.cameraZ - sz));
 
-
-            negInnerSec.getToAddress(ptr); ptr += 4*3;
+            negInnerSec.getToAddress(ptr); ptr += 4 * 3;
             viewport.MVP.translate(negInnerSec.negate(), new Matrix4f()).getToAddress(matPtr);
             MemoryUtil.memPutFloat(ptr, renderDistance); ptr += 4;
         }
@@ -124,17 +165,22 @@ public class ChunkBoundRenderer {
 
         glBindVertexArray(RenderBackendFactory.get().getStaticVAO());
         viewport.depthBoundingBuffer.bind();
-        this.rasterShader.bind();
+        // M9 transitional: bind/draw stay raw GL because the surrounding
+        // runPipeline path is GL-only until IOSurface bridge lands. The shader
+        // pipeline itself is now backend-agnostic via createGraphicsPipeline.
+        if (this.glProgram != 0) glUseProgram(this.glProgram);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE_BB_BYTE.id());
+        glBindBufferBase(GL_UNIFORM_BUFFER, SCENE_UNIFORM_BINDING, this.uniformBuffer.id());
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, CHUNK_POS_BINDING, this.chunkPosBuffer.id());
         this.pipeline.bindUniforms();
 
         //Batch the draws into groups of size 32
         int count = this.chunk2idx.size();
         if (count >= 32) {
-            glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3 * 32, GL_UNSIGNED_BYTE, 0, count/32);
+            glDrawElementsInstanced(GL_TRIANGLES, 6 * 2 * 3 * 32, GL_UNSIGNED_BYTE, 0, count / 32);
         }
-        if (count%32 != 0) {
-            glDrawElementsInstancedBaseInstance(GL_TRIANGLES, 6 * 2 * 3 * (count%32), GL_UNSIGNED_BYTE, 0, 1, (count/32)*32);
+        if (count % 32 != 0) {
+            glDrawElementsInstancedBaseInstance(GL_TRIANGLES, 6 * 2 * 3 * (count % 32), GL_UNSIGNED_BYTE, 0, 1, (count / 32) * 32);
         }
 
         {
@@ -149,7 +195,7 @@ public class ChunkBoundRenderer {
 
 
         if (!this.addQueue.isEmpty()) {
-            this.addQueue.forEach(this::_addPos);//TODO: REPLACE WITH SCATTER COMPUTE
+            this.addQueue.forEach(this::_addPos);
             this.addQueue.clear();
             UploadStream.INSTANCE.commit();
         }
@@ -199,9 +245,8 @@ public class ChunkBoundRenderer {
         //Commit any copies, ensures is synced to new buffer
         UploadStream.INSTANCE.commit();
 
-        int size = (int) (this.idx2chunk.length*1.5);
+        int size = (int) (this.idx2chunk.length * 1.5);
         Logger.info("Resizing chunk position buffer to: " + size);
-        //Need to resize
         var old = this.chunkPosBuffer;
         this.chunkPosBuffer = RenderBackendFactory.get().createBuffer(size * 8L);
         glCopyNamedBufferSubData(old.id(), this.chunkPosBuffer.id(), 0, 0, old.size());
@@ -209,15 +254,15 @@ public class ChunkBoundRenderer {
         var old2 = this.idx2chunk;
         this.idx2chunk = new long[size];
         System.arraycopy(old2, 0, this.idx2chunk, 0, old2.length);
-        //Replace the old buffer with the new one
-        ((AutoBindingShader)this.rasterShader).ssbo(1, this.chunkPosBuffer);
+        // New buffer will be picked up by the next render()'s glBindBufferBase
+        // call — no persistent shader-side binding to update anymore.
     }
 
     private void put(int idx, long pos) {
-        long ptr2 = UploadStream.INSTANCE.upload(this.chunkPosBuffer, 8L*idx, 8);
+        long ptr2 = UploadStream.INSTANCE.upload(this.chunkPosBuffer, 8L * idx, 8);
         //Need to do it in 2 parts because ivec2 is 2 parts
-        MemoryUtil.memPutInt(ptr2, (int)(pos&0xFFFFFFFFL)); ptr2 += 4;
-        MemoryUtil.memPutInt(ptr2, (int)((pos>>>32)&0xFFFFFFFFL));
+        MemoryUtil.memPutInt(ptr2, (int) (pos & 0xFFFFFFFFL)); ptr2 += 4;
+        MemoryUtil.memPutInt(ptr2, (int) ((pos >>> 32) & 0xFFFFFFFFL));
     }
 
     public void reset() {
@@ -225,7 +270,7 @@ public class ChunkBoundRenderer {
     }
 
     public void free() {
-        this.rasterShader.free();
+        this.rasterPipeline.close();
         this.uniformBuffer.free();
         this.chunkPosBuffer.free();
     }

@@ -1,4 +1,9 @@
-#version 430
+// M9 Phase 2 patch: bumped from #version 430 to 460 — gives us
+// `mix(ivec3, ivec3, bvec3)` and `gl_BaseInstance` as core built-ins
+// (both were missing at 430). Voxy's existing GL backend already runs
+// on drivers that advertise 4.6, and shaderc/glslang's Vulkan profile
+// only exposes these built-ins at 4.6.
+#version 460
 
 layout(binding = 0, std140) uniform SceneUniform {
     mat4 MVP;
