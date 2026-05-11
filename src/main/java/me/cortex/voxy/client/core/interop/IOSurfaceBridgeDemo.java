@@ -27,9 +27,13 @@ public final class IOSurfaceBridgeDemo {
 
     /** System property toggle. */
     public static final String ENABLE_PROP = "voxy.bridgeDemo";
+    /** Environment variable toggle (preferred — `-D` doesn't always reach the child MC JVM via Gradle/Loom). */
+    public static final String ENABLE_ENV  = "VOXY_BRIDGE_DEMO";
 
     public static final boolean ENABLED =
-            System.getProperty(ENABLE_PROP, "false").equals("true");
+            "true".equals(System.getProperty(ENABLE_PROP, "false"))
+                    || "1".equals(System.getenv(ENABLE_ENV))
+                    || "true".equals(System.getenv(ENABLE_ENV));
 
     private static final int DEMO_WIDTH  = 256;
     private static final int DEMO_HEIGHT = 256;

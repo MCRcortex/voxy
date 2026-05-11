@@ -1,4 +1,7 @@
-#version 430 core
+#version 460 core
+// M9 Phase 2 patch: bumped from 430 to 460 so gl_BaseInstance is a core
+// built-in. shaderc/glslang's Vulkan profile rejects
+// GL_ARB_shader_draw_parameters as an extension at earlier versions.
 #extension GL_ARB_gpu_shader_int64 : enable
 
 #define QUAD_BUFFER_BINDING 1

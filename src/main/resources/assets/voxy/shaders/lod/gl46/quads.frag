@@ -1,11 +1,9 @@
-#version 430 core
+#version 460 core
 //Use quad shuffling to compute fragment mip
 //#extension GL_KHR_shader_subgroup_quad: enable
-// M9 Phase 2 patch: gl_HelperInvocation isn't declared at GLSL 430 without
-// the ARB extension. Available as a core built-in at 450+; enable the
-// extension so 430 callers (including glslang/shaderc in Vulkan profile)
-// can compile this shader.
-#extension GL_ARB_shader_helper_invocation : enable
+// M9 Phase 2 patch: bumped to #version 460 so gl_HelperInvocation is a
+// core built-in. shaderc/glslang's Vulkan profile doesn't accept
+// GL_ARB_shader_helper_invocation as an extension; 4.50+ has it built-in.
 #ifdef USE_SINGLE_TRI
 #define USE_NV_BARRY
 #endif

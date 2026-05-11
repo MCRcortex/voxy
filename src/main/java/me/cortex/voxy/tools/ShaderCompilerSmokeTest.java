@@ -71,6 +71,21 @@ public final class ShaderCompilerSmokeTest {
                         "bakery/position_tex.vsh (M9 — UBO push)"),
                 new ShaderCase("bakery/position_tex.fsh", RuntimeShaderCompiler.Stage.FRAGMENT, empty,
                         "bakery/position_tex.fsh (M9 — binding-based sampler)"),
+                // MDIC's terrain shaders — realistic defines for the non-Iris,
+                // non-debug, no-NV-barrycoords path (the configuration Voxy on
+                // Mac will run with first).
+                new ShaderCase("lod/gl46/quads3.vert", RuntimeShaderCompiler.Stage.VERTEX,
+                        Map.of(
+                                "NO_SHADE_FACE_TINT", "1.0",
+                                "UP_FACE_TINT", "1.0",
+                                "DOWN_FACE_TINT", "0.5",
+                                "Z_AXIS_FACE_TINT", "0.8",
+                                "X_AXIS_FACE_TINT", "0.6"),
+                        "lod/gl46/quads3.vert (MDIC terrain — non-Iris baseline)"),
+                new ShaderCase("lod/gl46/quads.frag", RuntimeShaderCompiler.Stage.FRAGMENT,
+                        Map.of(
+                                "MODEL_BUFFER_BINDING", "3"),
+                        "lod/gl46/quads.frag (MDIC terrain — non-Iris baseline)"),
                 // M9 — MDIC's compute pipelines (cmdgen already covered above).
                 new ShaderCase("util/prefixsum/simple.comp", RuntimeShaderCompiler.Stage.COMPUTE,
                         Map.of("IO_BUFFER", "0"),
