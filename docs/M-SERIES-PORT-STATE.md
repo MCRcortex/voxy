@@ -10,7 +10,7 @@
 
 Goal: make Voxy (Minecraft Java mod, requires GL 4.3+ compute) run on Mac Apple Silicon by adding Metal direct + Vulkan/MoltenVK backends.
 
-Current state: **infrastructure complete, M9 Phase 1 (GL backend abstraction) DONE; Phase 4 (per-file migration) not started**. 13 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green.
+Current state: **infrastructure complete, M9 Phase 1 (GL backend abstraction) DONE; Phase 4 (per-file migration) in progress — 2/7 files migrated**. 15 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green. Migrated files: `NodeCleaner`, `HierarchicalOcclusionTraverser`. Outstanding: HiZBuffer, FullscreenBlit, NormalRenderPipeline, AbstractRenderPipeline, VoxyRenderSystem, MDICSectionRenderer.
 
 The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration of Voxy's render code, blocked primarily by ICB (`MTLIndirectCommandBuffer`) for `MDICSectionRenderer`. The GL-backend-stubbing blocker is cleared as of commit `3dc0ae4c` — the encoder API is now real on every backend, so per-file migration can proceed without breaking Win/Linux GL users.
 
@@ -46,6 +46,9 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 
 | SHA | Title | Validates |
 |---|---|---|
+| `05b5b740` | M9 Phase 4 — migrate HierarchicalOcclusionTraverser + split setTexture/setStorageImage | Single beginComputePass with one direct + MAX-1 indirect dispatches; SceneUniform converted to readonly SSBO; queueIdx uniform → UBO push at PUSH_BINDING. Encoder API now has setStorageImage(binding, tex, level) for image bindings; setTexture is now sampled-only |
+| `ebf4eb70` | M9 Phase 4 — migrate NodeCleaner (pilot) | tick() fully on encoder API; updateIds() still raw glBindBufferRange for UploadStream's raw GL id. Shader uniforms → UBO push blocks at PUSH_BINDING. |
+| `7f3327d7` | Update M-SERIES-PORT-STATE for M9 Phase 1 completion | Doc-only — Blocker 2 cleared, Phase 4 recipe + uniform-block pattern, OpenGL backend section |
 | `3dc0ae4c` | M9 Phase 1 — implement GL backend behind RenderBackend abstraction | GlGraphicsPipeline/GlComputePipeline/GlSampler/GlComputeEncoder + full GlRenderEncoder + GLSL fields on (Graphics\|Compute)PipelineDesc |
 | `b50109e5` | Add IGpuSampler + setBytes to encoders (M9 prep finishing batch) | Sampler API, push-constant equivalent |
 | `4e5131d0` | Add depth/blend/raster state to graphics pipeline | PipelineState (depth, blend, raster) end-to-end on Metal |
@@ -272,32 +275,57 @@ path.
 These extensions weren't needed to validate Phase 1 but are required by
 specific Voxy callers:
 
-- `ComputeEncoder.setStorageImage(binding, texture, level, access)` —
-  HiZBuffer2 binds mip levels 1..6 as separate storage images. GL
-  implementation: `glBindImageTexture(binding, tex.id, level, false, 0,
-  GL_WRITE_ONLY, format)`. Metal: `MTLTexture newTextureViewWithMipLevel:`.
-  Vulkan: `VkImageView` per mip (already supported in
-  `VkImageViewCreateInfo.subresourceRange.baseMipLevel`).
+- ✅ `ComputeEncoder.setStorageImage(binding, texture, level)` — added
+  in commit `05b5b740`. GL impl uses `glBindImageTexture` with the
+  requested level; Metal currently throws on level != 0 until the
+  per-mip texture-view JNI lands; Vulkan path will allocate a per-mip
+  `VkImageView` when the backend is wired up.
+- `IGpuTexture.createView(int level, int levelCount)` — needed for HiZ
+  blit pass (source mip selection). GL: `glTextureView` (immutable
+  view of a subset). Metal:
+  `newTextureViewWithPixelFormat:textureType:levels:slices:`.
+  Vulkan: `VkImageView` with subresource range.
 - `RenderEncoder.drawIndexedIndirectCount(...)` — for
   `MDICSectionRenderer`. GL: `glMultiDrawElementsIndirectCountARB`.
   Vulkan: `vkCmdDrawIndexedIndirectCount` (core 1.2). Metal: emulated
   via ICB (Blocker 1 above).
+- `RenderEncoder` extension for `GL_TRIANGLE_FAN` — used by HiZ blit
+  and a few full-quad shaders. Easiest fix is to rewrite affected
+  shaders to emit strip-order vertices and drop fan support; that path
+  avoids needing fan emulation on Metal.
+- `RenderBackend.copyToBuffer(buf, offset, dataAddr, size)` —
+  CPU→GPU single-int upload used by
+  `HierarchicalOcclusionTraverser.addTLN/remTLN` and renderList-counter
+  zero. Both are left as raw `glBindBuffer` + `nglBufferSubData` in
+  the migrated version; the helper would close that gap.
 
 Recommended migration order (simplest first):
-1. **`NodeCleaner.java`** — pure compute, three small shaders. The
-   pilot for the uniform-block pattern; once one shader is converted
-   the rest are mechanical.
-2. **`HierarchicalOcclusionTraverser.java`** — compute + indirect
-   dispatch + memory barriers. Exercises `dispatchIndirect`.
-3. **`HiZBuffer2.java`** — needs `setStorageImage(level)` API (above)
-   + Blocker 4 + Blocker 5 patches. Mixed compute + graphics.
-4. **`NormalRenderPipeline.java`**, **`VoxyRenderSystem.java`**,
+1. ✅ **`NodeCleaner.java`** — DONE in commit `ebf4eb70`. Pilot for the
+   uniform-block pattern; pure compute, three small shaders.
+2. ✅ **`HierarchicalOcclusionTraverser.java`** — DONE in commit
+   `05b5b740`. Compute + indirect dispatch + barrier translation +
+   sampled-texture binding. Also drove the
+   `setTexture`/`setStorageImage` split on `ComputeEncoder`.
+3. **`HiZBuffer.java` / `HiZBuffer2.java`** — needs three more pieces:
+   (a) GL_TRIANGLE_FAN→TRIANGLE_STRIP shader vertex re-order in
+   blit.vsh; (b) per-mip texture view API
+   (`IGpuTexture.createView(int level, int levelCount)`) so source mip
+   selection works on Metal/Vulkan; (c) for HiZBuffer2 specifically,
+   per-mip storage-image binds via the new `setStorageImage(binding,
+   tex, level)` API on Metal needs the JNI from Phase 2 follow-up.
+4. **`FullscreenBlit.java`** — public bind/blit/uniform API doesn't fit
+   the encoder model. Either migrate callers off the helper and inline
+   the per-pass setup, or grow the class to take a RenderEncoder
+   parameter on `blit()`.
+5. **`NormalRenderPipeline.java`**, **`VoxyRenderSystem.java`**,
    **`AbstractRenderPipeline.java`** — global GL state reads
    (viewport, blend) → `RenderSystem` / `getMainRenderTarget()`.
-5. **`MDICSectionRenderer.java`** — needs Blocker 1 + the
+   SSAO compute can move onto the encoder once FullscreenBlit is
+   sorted (NormalRenderPipeline calls into both).
+6. **`MDICSectionRenderer.java`** — needs Blocker 1 + the
    `drawIndexedIndirectCount` API surface. Central render path, also
    needs `cmdgen.comp` rewrite for ICB writes if Metal-bound.
-6. **Iris* paths** — gate behind
+7. **Iris* paths** — gate behind
    `RenderBackendFactory.get().getType() == OPENGL`; skip on Mac.
 
 ---
