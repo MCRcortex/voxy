@@ -10,7 +10,7 @@
 
 Goal: make Voxy (Minecraft Java mod, requires GL 4.3+ compute) run on Mac Apple Silicon by adding Metal direct + Vulkan/MoltenVK backends.
 
-Current state: **infrastructure complete, M9 Phase 1 (GL backend abstraction) DONE; Phase 4 (per-file migration) in progress — 6/8 file groups migrated**. 19 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green; shader smoke test grew from 9 to 17 cases, all SPIRV green. Migrated: `NodeCleaner`, `HierarchicalOcclusionTraverser`, `HiZBuffer`, **Cluster A** (`FullscreenBlit` + `AbstractRenderPipeline.{initDepthStencil,transformBlitDepth}` + `NormalRenderPipeline.finish`), `ChunkBoundRenderer`, `AsyncNodeManager`. Outstanding: Cluster B (`BudgetBufferRenderer` + `ModelTextureBakery` bakery FBO cluster — large), `VoxyRenderSystem` (mostly state queries on a GL-only early-return path), `MDICSectionRenderer` (needs `drawIndexedIndirectCount` API + Metal ICB), `GlViewCapture` (GL-only by design, parallel `MetalViewCapture` is the future fix), `IrisVoxyRenderPipeline` (GL-gate per plan).
+Current state: **infrastructure complete, M9 Phase 1 (GL backend abstraction) DONE; Phase 4 (per-file migration) in progress — 7/8 file groups migrated**. 22 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green; shader smoke test grew from 9 to 19 cases, all SPIRV green. Migrated: `NodeCleaner`, `HierarchicalOcclusionTraverser`, `HiZBuffer`, **Cluster A** (`FullscreenBlit` + `AbstractRenderPipeline.{initDepthStencil,transformBlitDepth}` + `NormalRenderPipeline.finish`), `ChunkBoundRenderer`, `AsyncNodeManager`, `BudgetBufferRenderer` (shader pipeline only — caller `ModelTextureBakery` still GL-only). Iris pipeline now gated behind GL backend in `RenderPipelineFactory` (NormalRenderPipeline fallback on Mac). Encoder API gained `drawIndexedIndirectCount` (GL impl ready, Metal pending ICB Blocker 1). Outstanding: `ModelTextureBakery` (~350 lines of raw GL FBO/viewport state — heavy), `VoxyRenderSystem` (state queries on early-return path), `MDICSectionRenderer` (needs Metal ICB), `GlViewCapture` (GL-only by design, parallel `MetalViewCapture` is the future fix).
 
 The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration of Voxy's render code, blocked primarily by ICB (`MTLIndirectCommandBuffer`) for `MDICSectionRenderer`. The GL-backend-stubbing blocker is cleared as of commit `3dc0ae4c` — the encoder API is now real on every backend, so per-file migration can proceed without breaking Win/Linux GL users.
 
@@ -46,6 +46,9 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 
 | SHA | Title | Validates |
 |---|---|---|
+| `ed128563` | M9 Phase 2 — patch lod/gl46/quads.frag gl_HelperInvocation gap | Add `GL_ARB_shader_helper_invocation : enable` so glslang/shaderc compiles the shader at 430. |
+| `5c631465` | M9 Phase 4 — migrate BudgetBufferRenderer shader pipeline | Bakery's vert+frag pair now via createGraphicsPipeline; matrix uniform → UBO push at PUSH_BINDING; sampler in position_tex.fsh moved from location to binding. Smoke test grows to 19 cases — SPIRV 19/19. Caller ModelTextureBakery stays GL-only for now (FBO + viewport ownership). |
+| `d9627907` | M9 Phase 4 — gate IrisVoxyRenderPipeline on GL + add drawIndexedIndirectCount API | RenderPipelineFactory refuses to construct Iris pipeline on non-GL backends; NormalRenderPipeline fallback runs. Encoder API gets drawIndexedIndirectCount(prim, drawBuf, drawOff, countBuf, countOff, maxDraw, stride) — GL lowers to glMultiDrawElementsIndirectCountARB, Metal throws pending ICB (Blocker 1). |
 | `739a14db` | M9 Phase 4 — migrate AsyncNodeManager onto the compute encoder | Two compute pipelines (scatterWrite/multiMemcpy) flow through createComputePipeline + beginComputePass; scatter.comp's `count` uniform wrapped in UBO push; UploadStream raw-id glBindBufferRange persists as the existing M9-TODO. Smoke test grows to 17 cases — SPIRV 17/17. |
 | `0c706654` | M9 Phase 4 — migrate ChunkBoundRenderer + outline.vsh #version bump | AABB-wireframe instanced indexed draws; pipeline created via createGraphicsPipeline (glProgram cached for raw bind); outline.vsh bumped to #version 460 core to get mix(ivec3,...) + gl_BaseInstance as built-ins (ARB extensions weren't accepted by shaderc's Vulkan profile). Smoke test grows to 15 cases. |
 | `dd3ef385` | M9 Phase 4 Cluster A — migrate FullscreenBlit + AbstractRenderPipeline + NormalRenderPipeline | FullscreenBlit pipeline now via createGraphicsPipeline (compiles on Metal/Vulkan); raw bind/blit retained for GL-only runtime; setBytes API replaces glUniform2f/glUniform4f/nglUniformMatrix4fv across 4 call sites; 2 shader UBO push blocks (depth_copy.frag + blit_texture_depth_cutout.frag); gl_DepthRange.diff/.near gated behind VOXY_VULKAN macro to fix shaderc gap. Smoke test grows to 13 cases — SPIRV 13/13. |
@@ -197,16 +200,15 @@ Voxy uses fan-order corners in `hiz/blit.vsh`. Metal has no fan primitive; calls
 
 ### Source patches still pending (from M1 sweep)
 
-Five shaders fail SPIRV compilation as-is. Cluster A's migration already
-patched two of them; three remain:
+Five shaders flagged in the M1 sweep. 4 of 5 patched, 1 remains:
 
 | Shader | Issue | Fix | Status |
 |---|---|---|---|
-| `chunkoutline/outline.vsh` | `mix(int, int)` requires extension | `#extension GL_EXT_shader_integer_mix : enable` | pending |
-| `lod/gl46/quads.frag` | `gl_HelperInvocation` undeclared | `#extension GL_ARB_shader_helper_invocation : enable` | pending |
+| `chunkoutline/outline.vsh` | `mix(int, int)` requires extension | bump `#version` to 460 (gets it + `gl_BaseInstance` as core built-ins) | ✅ done — `0c706654` |
+| `lod/gl46/quads.frag` | `gl_HelperInvocation` undeclared | `#extension GL_ARB_shader_helper_invocation : enable` | ✅ done — `ed128563` |
 | `post/depth_copy.frag` | `binding=` not supported in this version | bump `#version` | ✅ done — `dd3ef385` bumped to 430 core |
 | `post/blit_texture_depth_cutout.frag` | `gl_DepthRange` undeclared in newer profile | replace with uniform OR version bump | ✅ done — `dd3ef385` gates on `VOXY_VULKAN` macro |
-| `lod/gl46/test/raw.vert` | syntax error around line 190 | likely needs runtime define injection | pending |
+| `lod/gl46/test/raw.vert` | syntax error around line 190 | likely needs runtime define injection | pending — investigate alongside MDICSectionRenderer's migration |
 
 ### M9 Phase 4 — file migration order (Blocker 2 now cleared)
 
