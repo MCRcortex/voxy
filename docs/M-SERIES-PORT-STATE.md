@@ -10,7 +10,7 @@
 
 Goal: make Voxy (Minecraft Java mod, requires GL 4.3+ compute) run on Mac Apple Silicon by adding Metal direct + Vulkan/MoltenVK backends.
 
-Current state: **infrastructure complete, M9 Phase 1 (GL backend abstraction) DONE; Phase 4 (per-file migration) in progress — 4/7 file groups migrated**. 17 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green; shader smoke test grew from 9 to 13 cases, all SPIRV green. Migrated: `NodeCleaner`, `HierarchicalOcclusionTraverser`, `HiZBuffer`, **Cluster A** (`FullscreenBlit` + `AbstractRenderPipeline.{initDepthStencil,transformBlitDepth}` + `NormalRenderPipeline.finish`). Outstanding: Cluster B (`BudgetBufferRenderer` + `ModelTextureBakery` bakery FBO cluster), `VoxyRenderSystem`, `ChunkBoundRenderer`, `MDICSectionRenderer` (needs `drawIndexedIndirectCount` API + Metal ICB), `IrisVoxyRenderPipeline` (GL-gate per plan).
+Current state: **infrastructure complete, M9 Phase 1 (GL backend abstraction) DONE; Phase 4 (per-file migration) in progress — 6/8 file groups migrated**. 19 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green; shader smoke test grew from 9 to 17 cases, all SPIRV green. Migrated: `NodeCleaner`, `HierarchicalOcclusionTraverser`, `HiZBuffer`, **Cluster A** (`FullscreenBlit` + `AbstractRenderPipeline.{initDepthStencil,transformBlitDepth}` + `NormalRenderPipeline.finish`), `ChunkBoundRenderer`, `AsyncNodeManager`. Outstanding: Cluster B (`BudgetBufferRenderer` + `ModelTextureBakery` bakery FBO cluster — large), `VoxyRenderSystem` (mostly state queries on a GL-only early-return path), `MDICSectionRenderer` (needs `drawIndexedIndirectCount` API + Metal ICB), `GlViewCapture` (GL-only by design, parallel `MetalViewCapture` is the future fix), `IrisVoxyRenderPipeline` (GL-gate per plan).
 
 The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration of Voxy's render code, blocked primarily by ICB (`MTLIndirectCommandBuffer`) for `MDICSectionRenderer`. The GL-backend-stubbing blocker is cleared as of commit `3dc0ae4c` — the encoder API is now real on every backend, so per-file migration can proceed without breaking Win/Linux GL users.
 
@@ -46,6 +46,8 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 
 | SHA | Title | Validates |
 |---|---|---|
+| `739a14db` | M9 Phase 4 — migrate AsyncNodeManager onto the compute encoder | Two compute pipelines (scatterWrite/multiMemcpy) flow through createComputePipeline + beginComputePass; scatter.comp's `count` uniform wrapped in UBO push; UploadStream raw-id glBindBufferRange persists as the existing M9-TODO. Smoke test grows to 17 cases — SPIRV 17/17. |
+| `0c706654` | M9 Phase 4 — migrate ChunkBoundRenderer + outline.vsh #version bump | AABB-wireframe instanced indexed draws; pipeline created via createGraphicsPipeline (glProgram cached for raw bind); outline.vsh bumped to #version 460 core to get mix(ivec3,...) + gl_BaseInstance as built-ins (ARB extensions weren't accepted by shaderc's Vulkan profile). Smoke test grows to 15 cases. |
 | `dd3ef385` | M9 Phase 4 Cluster A — migrate FullscreenBlit + AbstractRenderPipeline + NormalRenderPipeline | FullscreenBlit pipeline now via createGraphicsPipeline (compiles on Metal/Vulkan); raw bind/blit retained for GL-only runtime; setBytes API replaces glUniform2f/glUniform4f/nglUniformMatrix4fv across 4 call sites; 2 shader UBO push blocks (depth_copy.frag + blit_texture_depth_cutout.frag); gl_DepthRange.diff/.near gated behind VOXY_VULKAN macro to fix shaderc gap. Smoke test grows to 13 cases — SPIRV 13/13. |
 | `a887facb` | M9 Phase 4 — migrate HiZBuffer onto RenderBackend abstraction | First graphics-pipeline migration in Voxy proper; per-mip beginRenderPass + draw 4 verts as TRIANGLE_STRIP (blit.vsh re-ordered from fan); custom PipelineState DepthState(test=true, write=true, ALWAYS); raw glBindTextureUnit kept for external source depth (raw int id, no IGpuTexture); GL_TEXTURE_BASE_LEVEL/MAX_LEVEL mutation for source-mip selection (GL-only until createView lands) |
 | `05b5b740` | M9 Phase 4 — migrate HierarchicalOcclusionTraverser + split setTexture/setStorageImage | Single beginComputePass with one direct + MAX-1 indirect dispatches; SceneUniform converted to readonly SSBO; queueIdx uniform → UBO push at PUSH_BINDING. Encoder API now has setStorageImage(binding, tex, level) for image bindings; setTexture is now sampled-only |
@@ -327,22 +329,35 @@ Recommended migration order (simplest first):
    `VOXY_VULKAN` macro. `IrisVoxyRenderPipeline` still uses
    FullscreenBlit but only via the no-arg constructor path (still
    works); its full migration waits on the GL-gate sweep.
-5. **`VoxyRenderSystem.java`** — global GL state reads (viewport,
-   blend) → `RenderSystem` / `getMainRenderTarget()`. Mostly state
-   queries; not heavy GL itself.
-6. **`MDICSectionRenderer.java`** — central render path. Needs
+5. ✅ **`ChunkBoundRenderer.java`** — DONE in commit `0c706654`. AABB
+   wireframe instanced draws; pipeline now via createGraphicsPipeline;
+   raw bind/draw retained for GL-only runtime. Required #version 460
+   bump on outline.vsh because shaderc's Vulkan profile only exposes
+   `mix(ivec3, ivec3, bvec3)` + `gl_BaseInstance` at 4.6.
+6. ✅ **`AsyncNodeManager.java`** (compute paths) — DONE in commit
+   `739a14db`. Two compute pipelines now flow through the encoder;
+   scatter.comp's `count` uniform wrapped in UBO push.
+7. **`VoxyRenderSystem.java`** — global GL state reads
+   (`glGetIntegerv(GL_VIEWPORT, ...)`, `glGetIntegeri(GL_SHADER_STORAGE_BUFFER_BINDING)`)
+   used for save/restore around Voxy's run. The whole method already
+   early-returns on non-GL backends, so this stays GL-only until the
+   IOSurface bridge changes the cross-context model. Migration would
+   mostly mean replacing query+restore with the encoder/pass model
+   on day Voxy starts running on Metal.
+8. **`MDICSectionRenderer.java`** — central render path. Needs
    Blocker 1 (Metal ICB), the `drawIndexedIndirectCount` API surface,
    and `cmdgen.comp` rewrite for ICB writes if Metal-bound. The GL
    path could migrate first using `glMultiDrawElementsIndirectCountARB`.
-7. **`BudgetBufferRenderer` + `ModelTextureBakery`** — separate
-   cluster, bakery codepath. Caller `ModelTextureBakery` owns the
-   FBO and viewport setup; would migrate together.
-8. **`ChunkBoundRenderer`** — depends on `AbstractRenderPipeline`
-   migration (calls `this.pipeline.bindUniforms()`); migrate after
-   step 4.
-9. **`GlViewCapture`**, **`AsyncNodeManager`** (compute-side) — small
-   tail; do last.
-10. **Iris* paths** — gate behind `getType() == OPENGL`; skip on Mac.
+9. **Cluster B — `BudgetBufferRenderer` + `ModelTextureBakery`** —
+   bakery codepath. Caller `ModelTextureBakery` owns the FBO and
+   viewport setup with ~150 lines of raw GL state management. Must
+   migrate together. Large.
+10. **`GlViewCapture`** — explicitly GL-only by design (class name
+    documents it). Replacement is a parallel `MetalViewCapture` once
+    IOSurface/MTLBlitCommandEncoder JNI lands; until then the
+    M9-transitional `if (backend != GL) return` keeps the bakery
+    silent on Mac without crashing.
+11. **Iris* paths** — gate behind `getType() == OPENGL`; skip on Mac.
 
 ---
 
