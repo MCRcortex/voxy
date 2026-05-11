@@ -596,6 +596,48 @@ public final class MetalNative {
     /** Fills a memory region with a 32-bit repeated value. */
     public static native void memsetInt(long addr, int value, long count);
 
+    // ========== IOSurface bridge (M10) ==========
+    // Foundation for MC GL ↔ Voxy Metal compositing. Allocate once on Metal,
+    // wrap as MTLTexture for the render pass, then the GL side (CGL JNI in a
+    // separate file) binds the same IOSurface to a GL texture that MC samples.
+
+    /**
+     * Allocate an IOSurface. {@code pixelFormat} uses the
+     * {@code IOSurfacePixelFormat} four-char codes (e.g. {@code 'BGRA'} for
+     * 8888 BGRA). {@code bytesPerElement} is the size of one pixel
+     * (e.g. 4 for RGBA8). Returns 0 on failure.
+     */
+    public static native long iosurfaceCreate(int width, int height, int pixelFormat, int bytesPerElement);
+
+    /** Decrement the IOSurface's CFRetain count. */
+    public static native void iosurfaceRelease(long handle);
+
+    public static native int iosurfaceGetWidth(long handle);
+    public static native int iosurfaceGetHeight(long handle);
+    public static native int iosurfaceGetBytesPerRow(long handle);
+
+    /**
+     * Wrap an IOSurface as an MTLTexture. The texture's storage mode is
+     * forced to Private (IOSurface owns the memory). {@code usage} is the
+     * {@code MTLTextureUsage} bitmask — typically RenderTarget|ShaderRead
+     * for color attachments visible to GL. Returns a +1 retained handle.
+     */
+    public static native long mtlDeviceNewTextureWithIOSurface(
+            long device, long iosurface, int pixelFormat, int width, int height, int usage);
+
+    // IOSurface pixel format four-char codes (raw values from <IOSurface/IOSurfaceTypes.h>).
+    /** 32-bit BGRA, 8 bits per channel ('BGRA'). */
+    public static final int IOSurfacePixelFormat_BGRA8 = 0x42475241;
+    /** 32-bit RGBA, 8 bits per channel ('RGBA'). */
+    public static final int IOSurfacePixelFormat_RGBA8 = 0x52474241;
+    /** 32-bit depth (float). */
+    public static final int IOSurfacePixelFormat_D32   = 0x4C303038; // 'L008' — placeholder; see IOSurfaceTypes.h
+    /** 32-bit BGRA with sRGB. */
+    public static final int IOSurfacePixelFormat_BGRA8_sRGB = 0x73424752; // 'sBGR' — illustrative; verify per-use
+
+    // MTLTextureUsage bits live alongside other MTL constants further down in
+    // this class — see MTLTextureUsageRenderTarget / MTLTextureUsageShaderRead.
+
     /**
      * Set {@code supportIndirectCommandBuffers} on a render pipeline
      * descriptor. Required when the resulting PSO will be referenced

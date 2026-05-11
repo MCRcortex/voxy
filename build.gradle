@@ -424,6 +424,21 @@ tasks.register('testMetalIcb', JavaExec) {
     errorOutput = System.err
 }
 
+// M10 verification: allocate an IOSurface, wrap it as an MTLTexture, and
+// confirm the JNI/lifetime plumbing is right. The GL-roundtrip half lives
+// in a future smoke test that runs inside an active GL context (this one
+// doesn't have one available); the Metal-side allocation is the structural
+// prerequisite for the full MC↔Voxy compositing the bridge enables.
+tasks.register('testIOSurfaceBridge', JavaExec) {
+    group = 'verification'
+    description = 'Smoke-test IOSurface-backed MTLTexture allocation on Metal.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'me.cortex.voxy.tools.IOSurfaceBridgeSmokeTest'
+    workingDir = rootProject.projectDir
+    standardOutput = System.out
+    errorOutput = System.err
+}
+
 // M5 verification: render a 3-vertex triangle through the new graphics
 // pipeline + render encoder API, read the pixels back, and confirm the
 // background corners remain clear while the triangle interior was drawn.
