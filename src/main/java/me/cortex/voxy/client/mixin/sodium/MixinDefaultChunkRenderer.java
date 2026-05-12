@@ -58,6 +58,18 @@ public abstract class MixinDefaultChunkRenderer extends ShaderChunkRenderer {
                     viewport = renderer.setupViewport(matrices, fogParameters, camera.x, camera.y, camera.z);
                 }
                 renderer.renderOpaque(viewport);
+
+                // M11: if Voxy rendered into a Metal-side IOSurface bridge,
+                // composite it into MC's framebuffer NOW (while MC's main RT
+                // is still bound by Sodium). Doing this at LevelRenderer
+                // renderLevel RETURN doesn't work — by then MC has unbound to
+                // FBO 0 and the blit lands in the window backbuffer that MC
+                // subsequently overwrites with its own RT→window blit.
+                var pipeline = renderer.getPipeline();
+                if (pipeline != null && pipeline.metalBridge() != null) {
+                    me.cortex.voxy.client.core.interop.IOSurfaceBridgeCompositor
+                            .composite(pipeline.metalBridge());
+                }
             }
         }
     }

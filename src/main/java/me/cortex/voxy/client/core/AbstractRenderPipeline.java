@@ -105,12 +105,12 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         if (me.cortex.voxy.client.core.gpu.RenderBackendFactory.get().getType()
                 != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
             // Metal path stub — renders a placeholder clear color into the
-            // IOSurface bridge. The composite mixin (see MixinLevelRenderer
-            // BridgeDemo's sibling) blends the bridge over MC's framebuffer
-            // so the user can confirm Voxy is reaching this code on Metal.
-            // The real terrain rendering migration (MDIC encoder + buildDrawCalls
-            // encoder + AbstractSectionRenderer's draws through RenderEncoder)
-            // replaces the clear with actual geometry incrementally.
+            // IOSurface bridge. IOSurfaceBridgeCompositor (invoked from
+            // MixinDefaultChunkRenderer.render after Sodium's renderOpaque)
+            // blits the bridge over MC's main RT so the user can confirm
+            // Voxy is reaching this code on Metal. M12 replaces the clear
+            // with real MDIC encoder draws (buildDrawCalls + renderTerrain
+            // + renderTranslucent through RenderEncoder/ComputeEncoder).
             this.runPipelineMetalStub(viewport);
             return;
         }
@@ -291,13 +291,15 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
         this.metalFrame++;
         float t = (this.metalFrame % 240) / 240.0f;
-        // Magenta-ish sweep so the bridge output is unmistakably Voxy's and not MC's.
-        float r = 0.40f + 0.30f * (float) Math.cos(t * 2 * Math.PI);
-        float g = 0.05f;
-        float b = 0.50f + 0.30f * (float) Math.cos((t + 0.5f) * 2 * Math.PI);
+        // Bright unmistakable yellow/magenta sweep at FULL alpha so the
+        // composite can't be missed — diagnostics for M11 visual verification.
+        // Once MDIC render migration lands, this clear becomes the LOD render.
+        float r = 0.90f + 0.10f * (float) Math.cos(t * 2 * Math.PI);
+        float g = 0.20f + 0.20f * (float) Math.cos((t + 0.5f) * 2 * Math.PI);
+        float b = 0.95f;
 
         var pass = me.cortex.voxy.client.core.gpu.RenderPassDesc.builder(fbw, fbh)
-                .clearColor(this.metalBridge.asGpuTexture(), r, g, b, 0.40f)
+                .clearColor(this.metalBridge.asGpuTexture(), r, g, b, 1.0f)
                 .build();
         try (var enc = backend.beginRenderPass(pass)) {
             // No draws yet — clear-only stub until MDIC.renderTerrain/Translucent

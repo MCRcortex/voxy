@@ -252,6 +252,12 @@ dependencies {
     include(runtimeOnly "org.lwjgl:lwjgl-zstd:$lwjglVersion:natives-windows")
     include(runtimeOnly "org.lwjgl:lwjgl-lmdb:$lwjglVersion:natives-linux")
     include(runtimeOnly "org.lwjgl:lwjgl-zstd:$lwjglVersion:natives-linux")
+    // macOS arm64 natives — required for Voxy's chunk-serialization workers
+    // (and Sodium's chunk render task executors that transitively trigger
+    // ZSTDCompressor static init). Without these, "Failed to locate library:
+    // liblwjgl_zstd.dylib" fires from worker threads and chunks never render.
+    include(runtimeOnly "org.lwjgl:lwjgl-lmdb:$lwjglVersion:natives-macos-arm64")
+    include(runtimeOnly "org.lwjgl:lwjgl-zstd:$lwjglVersion:natives-macos-arm64")
 
     // Runtime shader translation (Metal/Vulkan backends only).
     // GL backend on Win/Linux uses the driver compiler and never touches these

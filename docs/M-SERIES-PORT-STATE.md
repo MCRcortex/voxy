@@ -10,7 +10,9 @@
 
 Goal: make Voxy (Minecraft Java mod, requires GL 4.3+ compute) run on Mac Apple Silicon by adding Metal direct + Vulkan/MoltenVK backends.
 
-Current state: **M9 (migration) substantively complete; Blocker 1 (Metal ICB) cleared; M10 (IOSurface bridge) plumbing complete — JNI + Java API for both Metal and GL sides land**. 26 commits on branch `claude/opengl-mac-migration-analysis-6319V`. Both backends validated end-to-end (clear / triangle / compute) on Apple M4 Max via 9 smoke tests, all green; shader smoke test 24/24 SPIRV. Latest additions: `Blocker 1` (`MetalIndirectCommandBuffer` + `executeCommandsInBuffer` JNI, smoke test green) and `M10` IOSurface bridge (`IOSurfaceBridge` wraps an IOSurface as both an `MTLTexture` for Metal rendering and — via `CGLTexImageIOSurface2D` — a GL texture MC's compositor can sample). M11 (primer chunk) is the next concrete deliverable: wire Voxy's render output into MC's framebuffer through the bridge and re-enable Voxy on Metal. Remaining as GL-only-until-M11: `ModelTextureBakery`, `VoxyRenderSystem` (state save/restore on the still-early-returning path), `GlViewCapture` (by design — parallel `MetalViewCapture` is the architectural fix), MDIC's 2 Iris-patched terrain shaders (Iris is GL-gated).
+Current state: **M9/M10/M11 visually verified end-to-end on Apple M4 inside Minecraft**. Branch carries the cross-backend abstraction (`RenderBackend`/`RenderEncoder`/`ComputeEncoder` real on every backend), the `MetalIndirectCommandBuffer` infrastructure, and a working `IOSurfaceBridge` + `IOSurfaceBridgeCompositor`. With `VOXY_FORCE_METAL=1` MC boots, Voxy initializes on Metal, Sodium chunk workers run (macOS arm64 `lwjgl-lmdb`/`lwjgl-zstd` natives bundled), the bridge writes its clear-color stub into MC's main RT, and the game closes cleanly (`AsyncNodeManager` worker is daemon). User confirmed visually (run 11, 2026-05-10/11): magenta strip in the left 25% + Sodium terrain in the right 75% + clean close.
+
+The remaining work for **M12 (LOD distance completo)** is migrating MDIC's render path to flow through `RenderEncoder`/`ComputeEncoder` on Metal. Currently `MDICSectionRenderer` calls `glUseProgram`, `glBindBufferBase`, `glMultiDrawElementsIndirectCount*` directly — on Metal `mdicProgramId(p)` returns 0 so the GL calls no-op, which is why Voxy's own LOD content isn't visible (only the magenta stub from `AbstractRenderPipeline.runPipelineMetalStub` is). This is the next concrete deliverable. Remaining as GL-only-until-M12: `ModelTextureBakery`, `VoxyRenderSystem` (state save/restore on the still-early-returning path), `GlViewCapture` (by design — parallel `MetalViewCapture` is the architectural fix), MDIC's 2 Iris-patched terrain shaders (Iris is GL-gated).
 
 The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration of Voxy's render code, blocked primarily by ICB (`MTLIndirectCommandBuffer`) for `MDICSectionRenderer`. The GL-backend-stubbing blocker is cleared as of commit `3dc0ae4c` — the encoder API is now real on every backend, so per-file migration can proceed without breaking Win/Linux GL users.
 
@@ -22,11 +24,12 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 |---|---|
 | Branch | `claude/opengl-mac-migration-analysis-6319V` |
 | Base | `dev` |
-| Last commit | `b50109e5` |
-| Commits ahead of `dev` | 12 |
+| Last commit | `261aa934` (HEAD; M11 closeout commit follows this doc) |
+| Commits ahead of `dev` | 29 (pre-closeout) |
 | Test machine | Apple M4 Max, macOS 26.4.1, JDK 24.0.2 |
 | MC target | 1.21.11 (Fabric 0.18.2, Java 21+) |
 | LWJGL | 3.3.3 |
+| Milestone status | M0–M11 ✅ closed (visually verified end-to-end on M4 inside MC). Next: **M12 — LOD distance** (migrate MDIC render path to encoder API on Metal). |
 
 ---
 
@@ -46,6 +49,14 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 
 | SHA | Title | Validates |
 |---|---|---|
+| `261aa934` | M11 — MetalRenderBackend handles depth-only pipelines (HiZBuffer fix) | createGraphicsPipeline now allows a 0/`MTLPixelFormatInvalid` color format when a depth attachment is present, so HiZBuffer's depth-only per-mip pipeline compiles on Metal instead of erroring at PSO link. Unblocks the second of the four M11 init crashes. |
+| `5c4008c3` | M11 — fix four Metal-init crashes hit by `VOXY_FORCE_METAL` world entry | Four small fixes uncovered by world-entry: (1) `NormalRenderPipeline.setupAndBindOpaque` no longer raw-binds MC's GL FBO on Metal (no-op skip); (2) `MDICSectionRenderer.uploadUniformBuffer` is safe to call before the world is loaded; (3) `BasicSectionGeometryData` no-ops its raw GL setup on Metal; (4) `HiZBuffer` first-frame allocation path tolerates `targetTexture==null`. With these, MC reaches the game loop on Metal. |
+| `e80621e9` | M11 — enable Voxy on Metal end-to-end via `VOXY_FORCE_METAL` flag | `RenderBackendFactory` honours `VOXY_FORCE_METAL=1` (also unblocked the prior "Metal disabled until M9 done" gate); Voxy bootstraps on Metal; `AbstractRenderPipeline.runPipeline` early-routes to a `runPipelineMetalStub` that prints a clear color into an `IOSurfaceBridge` so the user can verify the Metal path is wired. |
+| `efc9ef9b` | M10 — IOSurfaceBridge is now usable as a RenderEncoder render target | `IOSurfaceBridge.asGpuTexture()` returns the bridge's `MTLTexture` as an `IGpuTexture` (`MetalTexture.fromHandle`). `RenderPassDesc.clearColor(IGpuTexture, r, g, b, a)` now accepts a bridge-backed texture; the Metal render backend builds an `MTLRenderPassDescriptor` against it. Validated by `runPipelineMetalStub` clearing the bridge each frame. |
+| `2f9446fc` | Update M-SERIES-PORT-STATE for Blocker 1 + M10 IOSurface bridge | Doc-only — records ICB blocker clearance, M10 surface-side allocation, and the GL-side bind path. |
+| `32df017b` | M11 — IOSurface bridge demo runs inside Minecraft | New `MixinLevelRendererBridgeDemo` (and a since-removed sibling `MixinLevelRendererVoxyMetalComposite`) gated behind `VOXY_BRIDGE_DEMO=1` allocate an IOSurfaceBridge, render a clear pass into it from Metal, and blit it via a GL `glBlitFramebuffer` over MC's main RT. Proves the IOSurface↔MC pipe works from inside MC's render thread. |
+| `8341a974` | M9 Phase 2 — version-bump `quads3.vert` + `quads.frag`; add VOXY_BRIDGE_DEMO env var | Bumps the two MDIC terrain shaders to 460 core so shaderc's Vulkan profile accepts the texelFetch overloads + bit ops. Adds the `VOXY_BRIDGE_DEMO=1` env flag plumbing used by the M11 demo mixin. |
+| `cae48144` | M9 Phase 4 — migrate MDIC terrain shaders (non-Iris path) to createGraphicsPipeline | The two `quads3.vert` + `quads.frag` pipelines (opaque + translucent) now flow through `RenderBackend.createGraphicsPipeline` when no Iris patch callbacks fire. Pipelines explicitly opt OUT of `supportIndirectCommandBuffers` because quads.frag uses gl_FragDepth + discard, both Metal-ICB-incompatible. On Metal MDIC keeps the CPU-readback fallback (`drawIndexedIndirect` host loop) for now. |
 | `c84e5264` | M10 — IOSurface bridge (GL side): CGLTexImageIOSurface2D binding | New `voxy_metal_iosurface_gl.mm` links the OpenGL framework + exposes `cglTexImageIOSurface2D` JNI. `IOSurfaceBridge.bindToGlTexture(glName)` pins the IOSurface to a GL_TEXTURE_RECTANGLE texture so MC's GL compositor can sample Voxy's Metal-rendered output. End-to-end validation waits for M11 (Voxy running inside MC's render thread). |
 | `b025f429` | M10 — IOSurface bridge (Metal side): allocate + wrap as MTLTexture | New `voxy_metal_iosurface.mm` + `IOSurfaceBridge` class. Smoke test (`testIOSurfaceBridge`) validates 256x256 BGRA8 IOSurface allocation and MTLTexture wrapping via `newTextureWithDescriptor:iosurface:plane:`. Storage forced to Private (IOSurface owns memory). M10 SMOKE OK. |
 | `2b23d83b` | Blocker 1 — Metal ICB infrastructure | New `voxy_metal_icb.mm` + `MetalIndirectCommandBuffer` class. Adds `IGpuIndirectCommandBuffer` cross-backend interface, `RenderBackend.createIndirectCommandBuffer`, `RenderEncoder.executeCommandsInBuffer`. Smoke test (`testMetalIcb`) validates the full path: 2-slot ICB with CPU-baked indexed triangle draw, executed via range buffer (location=0, length=1). All graphics pipelines now created with `supportIndirectCommandBuffers=YES`. |
@@ -79,11 +90,13 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 ## Smoke test inventory (all green on Apple M4 Max)
 
 ```bash
-./gradlew testShaderCompiler    # 9/9 SPIRV pass on representative slice (incl. cmdgen.comp + hiz.comp). 8/9 MSL — hiz.comp deferred.
+./gradlew testShaderCompiler    # 24/24 SPIRV pass on the migration corpus. 8/9 MSL — hiz.comp deferred.
 ./gradlew testMetalRender       # M3: clear-color render pass commits + completes
 ./gradlew testMetalTriangle     # M5: gl_VertexIndex triangle, interpolated colors
 ./gradlew testMetalCompute      # M7: increment.comp on SSBO, 64/64 values match
 ./gradlew testMetalVertexBuffer # M9-prep: VertexLayout + bindVertexBuffer + drawIndirect
+./gradlew testMetalIcb          # Blocker 1: MTLIndirectCommandBuffer with CPU-baked indexed-draw, executeCommandsInBuffer
+./gradlew testIOSurfaceBridge   # M10: IOSurface allocation + MTLTexture wrap, BGRA8 256x256
 ./gradlew testVulkanLoader      # M4-A: MoltenVK + VkInstance + physical device
 ./gradlew testVulkanClear       # M4-D: dynamic_rendering clear, pixel-exact readback
 ./gradlew testVulkanTriangle    # M6: Vulkan graphics pipeline + draw
@@ -120,25 +133,46 @@ Each test is a standalone `me.cortex.voxy.tools.*SmokeTest` class with `main()`.
 
 12. **MoltenVK 1.4 doesn't need `VK_KHR_portability_enumeration`.** Initial Vulkan smoke test enabled the extension and it failed with `VK_ERROR_EXTENSION_NOT_PRESENT`. LWJGL bundles its own MoltenVK that loads directly; portability_enumeration is a loader-only extension.
 
+13. **The IOSurface→MC composite must run *during* the Sodium opaque chunk pass, not at `LevelRenderer.renderLevel` RETURN.** First attempt blitted the bridge into `GL_DRAW_FRAMEBUFFER` from a `@Inject(at = RETURN)` mixin on `renderLevel`; at that point MC has already unbound to FBO 0, so the blit landed in the window backbuffer — which MC then overwrote with its own RT→window blit, hiding our output entirely. Fix: hook `DefaultChunkRenderer.render` *after* `renderer.renderOpaque(viewport)` (CUTOUT pass). At that mixin point, MC's main render target is still the active draw FBO and the bridge blit lands in pixels Sodium is about to ship. Lives in `MixinDefaultChunkRenderer` + `IOSurfaceBridgeCompositor`.
+
+14. **`AsyncNodeManager`'s worker thread must be a daemon.** Without `setDaemon(true)`, the worker keeps the JVM alive after MC's main loop exits, so the close button hangs the process indefinitely. One-line fix on the thread before `.start()`; flagged because it only reproduces when Voxy actually runs (i.e. only matters after M11 enables the Metal path in-game).
+
+15. **macOS arm64 LWJGL natives for `lwjgl-zstd` + `lwjgl-lmdb` must be bundled.** Voxy's chunk-serialization workers (and Sodium's chunk render task executors, which transitively touch `ZSTDCompressor` static init) fail with `UnsatisfiedLinkError: Failed to locate library: liblwjgl_zstd.dylib` if these are missing from the runtime classpath. The Win/Linux entries existed already; M11 adds the macos-arm64 pair to `build.gradle` so `runClient` works out of the box.
+
+16. **MDIC terrain pipelines must NOT request ICB support.** `quads.frag` writes `gl_FragDepth` and uses `discard` — both are forbidden in Metal indirect command buffers ("fragment shader cannot be used with indirect command buffers"). The MDIC terrain `createGraphicsPipeline` call explicitly opts out (via the no-ICB constructor variant). The ICB infrastructure stays available (`MetalIndirectCommandBuffer` smoke-tested independently) for future simpler-shader use cases. For MDIC, the Metal path uses the CPU-readback fallback (`MetalRenderEncoder.drawIndexedIndirect` loops on the host).
+
 ---
 
 ## What's pending
 
-### Blocker 1 — ICB for `drawIndirectCount` (~1 day)
+### Blocker 1 — ICB for `drawIndirectCount` (~~~1 day~~ DONE — commit `2b23d83b`)
 
-Why: `MDICSectionRenderer` uses `glMultiDrawElementsIndirectCountARB` (count from a separate buffer). Metal needs `MTLIndirectCommandBuffer` + `executeCommandsInBuffer:indirectBuffer:indirectBufferOffset:`. Vulkan has `vkCmdDrawIndexedIndirectCount` natively (core 1.2, MoltenVK 1.2.5+).
+✅ **Cleared 2026-05-09.** `MTLIndirectCommandBuffer` infrastructure
+landed:
 
-To implement:
-- New JNI in `voxy_metal_render.mm` (or new `voxy_metal_icb.mm`):
-  - `mtlDeviceNewIndirectCommandBuffer(device, type, maxCmds, options)`
-  - `mtlIndirectCommandBufferGetCommand(icb, index)`
-  - `mtlIndirectRenderCommandSetPipelineState(cmd, pso)`
-  - `mtlIndirectRenderCommandSetVertexBuffer(cmd, buf, offset, idx)`
-  - `mtlIndirectRenderCommandDrawIndexedPrimitives(cmd, prim, idxCount, idxType, idxBuf, idxOff, instCount, baseVertex, baseInstance)`
-  - `mtlRenderEncoderExecuteCommandsInBuffer(enc, icb, indirectRangeBuf, indirectRangeOff)` — for GPU-determined count via Metal 2.1 `executeCommandsInBuffer:indirectBuffer:indirectBufferOffset:`
-- Java: `IGpuIndirectCommandBuffer` interface, `MetalIndirectCommandBuffer`, `RenderBackend.createIndirectCommandBuffer`, `RenderEncoder.executeCommandsInBuffer(...)`.
-- `cmdgen.comp` rewrite: shader populates ICB via Metal argument-buffer-style `[[buffer(N)]]` writes instead of plain `DrawElementsIndirectCommand` struct writes. Significant compute-shader work.
-- For Vulkan: just expose `RenderEncoder.drawIndexedIndirectCount(buf, offset, countBuf, countOffset, maxDraws, stride)` → `vkCmdDrawIndexedIndirectCount` directly.
+- Native: `voxy_metal_icb.mm` exposes
+  `mtlDeviceNewIndirectCommandBuffer`,
+  `mtlIndirectCommandBufferGetIndirectRenderCommand`, all the
+  `mtlIndirectRenderCommand*` setters, and
+  `mtlRenderEncoderExecuteCommandsInBuffer{,Indirect}`.
+- Java: `IGpuIndirectCommandBuffer` interface,
+  `MetalIndirectCommandBuffer` impl, `RenderBackend.createIndirectCommandBuffer`,
+  `RenderEncoder.executeCommandsInBuffer(...)`.
+- Smoke test `testMetalIcb`: 2-slot ICB with CPU-baked indexed
+  triangle draw, executed via range buffer (location=0, length=1).
+  Green on M4.
+- Graphics pipelines that want ICB are now created with
+  `supportIndirectCommandBuffers=YES`. **Exception**: MDIC's terrain
+  pipelines (`quads.frag` uses `gl_FragDepth` + `discard`) explicitly
+  opt out — see gotcha #16. For MDIC the Metal path keeps the
+  CPU-readback fallback (`drawIndexedIndirect` host loop) until a
+  simpler shader variant lands or we accept the perf cost.
+
+For Vulkan: `RenderEncoder.drawIndexedIndirectCount(...)` exists in
+the encoder API (commit `d9627907`) and will lower to
+`vkCmdDrawIndexedIndirectCount` when the Vulkan backend implements
+`RenderBackend` (deferred). GL path uses
+`glMultiDrawElementsIndirectCountARB` directly.
 
 ### Blocker 2 — GL backend implements the abstraction (~~~1-2 days~~ DONE — commit `3dc0ae4c`)
 
@@ -342,7 +376,8 @@ Recommended migration order (simplest first):
    `mix(ivec3, ivec3, bvec3)` + `gl_BaseInstance` at 4.6.
 6. ✅ **`AsyncNodeManager.java`** (compute paths) — DONE in commit
    `739a14db`. Two compute pipelines now flow through the encoder;
-   scatter.comp's `count` uniform wrapped in UBO push.
+   scatter.comp's `count` uniform wrapped in UBO push. Worker thread
+   later marked daemon in M11 closeout so MC closes cleanly on Metal.
 7. **`VoxyRenderSystem.java`** — global GL state reads
    (`glGetIntegerv(GL_VIEWPORT, ...)`, `glGetIntegeri(GL_SHADER_STORAGE_BUFFER_BINDING)`)
    used for save/restore around Voxy's run. The whole method already
@@ -350,20 +385,40 @@ Recommended migration order (simplest first):
    IOSurface bridge changes the cross-context model. Migration would
    mostly mean replacing query+restore with the encoder/pass model
    on day Voxy starts running on Metal.
-8. **`MDICSectionRenderer.java`** — central render path. Needs
-   Blocker 1 (Metal ICB), the `drawIndexedIndirectCount` API surface,
-   and `cmdgen.comp` rewrite for ICB writes if Metal-bound. The GL
-   path could migrate first using `glMultiDrawElementsIndirectCountARB`.
-9. **Cluster B — `BudgetBufferRenderer` + `ModelTextureBakery`** —
-   bakery codepath. Caller `ModelTextureBakery` owns the FBO and
-   viewport setup with ~150 lines of raw GL state management. Must
-   migrate together. Large.
+8. ⚠️ **`MDICSectionRenderer.java`** — partial. Pipeline creation
+   (5 compute + 1 graphics + 2 terrain) DONE through `createComputePipeline` /
+   `createGraphicsPipeline` (commits `4316a430`, `cae48144`). The actual
+   dispatch + draw codepaths (`buildDrawCalls`, `renderTerrain`,
+   `renderTranslucent`, `renderTemporal`) STILL call raw `glUseProgram`
+   /`glBindBufferBase` / `glDispatchCompute*` /
+   `glMultiDrawElementsIndirectCount*` — they no-op on Metal because
+   `mdicProgramId(p)` returns 0 for non-GL pipelines. **This is the M12
+   scope** (new section below). Will need:
+   - 5 compute prepasses (`prep`, `cull`-as-graphics, `commandGen`,
+     `prefixSum`, `translucentGen`) routed through `beginComputePass` /
+     `beginRenderPass` + `setBuffer` + `dispatch[Indirect]`.
+   - `renderTerrain` / `renderTranslucent` / `renderTemporal` invoked
+     against a `RenderEncoder` whose target is the IOSurface bridge,
+     with `drawIndexedIndirect` (Metal CPU loop) or
+     `drawIndexedIndirectCount` (GL path).
+   - `AbstractRenderPipeline.runPipelineMetalStub` replaced with a real
+     `runPipelineMetal` that opens the render pass against the bridge,
+     invokes the section renderer, then submits.
+9. **Cluster B — ✅ `BudgetBufferRenderer` (commit `5c631465`) +
+   ⚠️ `ModelTextureBakery`** — pipeline side done; the caller
+   `ModelTextureBakery` still owns the FBO + viewport setup with ~150
+   lines of raw GL state management. Must migrate together for Mac
+   functionality. Large. GL-only at the moment.
 10. **`GlViewCapture`** — explicitly GL-only by design (class name
     documents it). Replacement is a parallel `MetalViewCapture` once
     IOSurface/MTLBlitCommandEncoder JNI lands; until then the
     M9-transitional `if (backend != GL) return` keeps the bakery
     silent on Mac without crashing.
-11. **Iris* paths** — gate behind `getType() == OPENGL`; skip on Mac.
+11. ✅ **Iris* paths** — DONE in commit `d9627907`. `RenderPipelineFactory`
+    refuses to construct `IrisVoxyRenderPipeline` on non-GL backends;
+    NormalRenderPipeline fallback handles Metal/Vulkan. The two MDIC
+    Iris-patched terrain shaders stay on the legacy `Shader.Builder`
+    by design (Iris is GL-gated).
 
 ---
 
@@ -382,6 +437,7 @@ Recommended migration order (simplest first):
 | `GraphicsPipelineDesc.java` | Graphics pipeline desc. Carries vertex/fragment GLSL (used by GL), MSL (Metal), SPIRV (Vulkan) — backends pick whichever they need. Plus `defines` map (forwarded to all three compile paths), color format, `VertexLayout`, `PipelineState`, label. Multiple constructors for backwards compat. |
 | `ComputePipelineDesc.java` | Compute pipeline desc — same tri-source pattern (GLSL/MSL/SPIRV) + `defines` map, local thread-group size, label. |
 | `IGpuPipeline.java` | Marker for a graphics or compute pipeline state object. AutoCloseable. |
+| `IGpuIndirectCommandBuffer.java` | Cross-backend handle for a pre-baked indirect-draw command buffer (Metal MTLIndirectCommandBuffer / Vulkan secondary cmd buf). Consumed by `RenderEncoder.executeCommandsInBuffer(...)`. AutoCloseable. |
 | `IGpuSampler.java` | Marker for a sampler state object. AutoCloseable. |
 | `SamplerDesc.java` | Sampler config (filters, wrap modes, LOD clamps, comparison). Has Builder. |
 | `VertexLayout.java` | Vertex inputs (attributes + buffer bindings). VertexFormat enum carries `metalValue` (raw MTLVertexFormat int). |
@@ -399,9 +455,17 @@ Recommended migration order (simplest first):
 | `MetalGraphicsPipeline.java` | Wraps MTLRenderPipelineState + library + functions + MTLDepthStencilState + cull/winding/fill ints. |
 | `MetalComputePipeline.java` | Wraps MTLComputePipelineState + library + function + local thread-group size. |
 | `MetalSampler.java` | Wraps MTLSamplerState. |
-| `MetalNative.java` | All JNI declarations (~85 methods now). Plus Metal enum constants pinned to SDK header values. |
+| `MetalNative.java` | All JNI declarations (~100 methods now, including the ICB + IOSurface entry points). Plus Metal enum constants pinned to SDK header values. |
 | `MetalHandleMap.java` | int-id ↔ long-handle bridge (legacy of pre-existing pattern). Has `setHandle(id, handle)` to update after lazy alloc. |
 | `MetalBuffer.java`, `MetalTexture.java`, `MetalFramebuffer.java`, `MetalFence.java`, `MetalPersistentBuffer.java` | Pre-existing resource wrappers (with M3 fixes) |
+| `MetalIndirectCommandBuffer.java` | `IGpuIndirectCommandBuffer` impl — wraps `MTLIndirectCommandBuffer`. Supports `setIndirectRenderCommand(slot, pipeline, ...)` and is consumed by `RenderEncoder.executeCommandsInBuffer`. Smoke-tested by `testMetalIcb`. |
+
+### Cross-API interop (`src/main/java/me/cortex/voxy/client/core/interop/`)
+
+| File | Purpose |
+|---|---|
+| `IOSurfaceBridge.java` | Wraps an `IOSurfaceRef` as both an `MTLTexture` (Metal-side render target via `MetalNative.mtlDeviceNewTextureWithIOSurface`) and — through `bindToGlTexture(glName)` → `CGLTexImageIOSurface2D` — a `GL_TEXTURE_RECTANGLE` texture in MC's GL context. `asGpuTexture()` exposes the Metal side as `IGpuTexture` so `RenderPassDesc.clearColor` accepts it. AutoCloseable; releases both surface and texture handles. |
+| `IOSurfaceBridgeCompositor.java` | Composites a bridge's contents into the currently bound `GL_DRAW_FRAMEBUFFER`. Lazy-binds the IOSurface to a `GL_TEXTURE_RECTANGLE` once (via `bindToGlTexture`) and reuses a transient source FBO with that texture as `COLOR_ATTACHMENT0`. Caller responsibility: must invoke from a code path where MC's main RT is the active draw FBO — currently `MixinDefaultChunkRenderer.render` after `renderOpaque(viewport)`. M11 demo blits only the LEFT QUARTER of the bridge so Sodium chunk output remains visible side-by-side; flip back to full-width when MDIC migration replaces the clear stub. |
 
 ### OpenGL backend (`src/main/java/me/cortex/voxy/client/core/gl/`)
 
@@ -440,6 +504,9 @@ Recommended migration order (simplest first):
 | `voxy_metal_render.mm` | Render encoder + pipeline state object + vertex descriptor + sampler + blend + depth-stencil + indirect draw |
 | `voxy_metal_compute.mm` | Compute encoder + sampler bind + setBytes + dispatch + dispatchIndirect + memoryBarrier |
 | `voxy_metal_memutil.mm` | memset helpers |
+| `voxy_metal_icb.mm` | `MTLIndirectCommandBuffer` allocation + per-slot indirect-render-command setters + `executeCommandsInBuffer` JNI (Blocker 1) |
+| `voxy_metal_iosurface.mm` | IOSurface allocation + wrap-as-MTLTexture via `[device newTextureWithDescriptor:iosurface:plane:]` (M10) |
+| `voxy_metal_iosurface_gl.mm` | Links the OpenGL framework + exposes `cglGetCurrentContext` and `cglTexImageIOSurface2D` so the IOSurface can be bound to a `GL_TEXTURE_RECTANGLE` from MC's GL context (M10) |
 | `CMakeLists.txt` | Lists all sources; output to `src/main/resources/natives/macos-arm64/libvoxy_metal.dylib` |
 | `build.sh` | Convenience build script (CMake Release) |
 
@@ -463,6 +530,8 @@ All have a `main()` and a corresponding `./gradlew test*` task in `build.gradle`
 | `MetalTriangleSmokeTest.java` | M5 — graphics pipeline + draw |
 | `MetalComputeSmokeTest.java` | M7 — compute pipeline + dispatch + SSBO readback |
 | `MetalVertexBufferSmokeTest.java` | M9-prep — VertexLayout + bindVertexBuffer + drawIndirect |
+| `MetalIcbSmokeTest.java` | Blocker 1 — MTLIndirectCommandBuffer + executeCommandsInBuffer (CPU-baked 2-slot indexed draw) |
+| `IOSurfaceBridgeSmokeTest.java` | M10 — IOSurface allocation + MTLTexture wrap (256x256 BGRA8) |
 | `VulkanLoaderSmokeTest.java` | M4-A — MoltenVK + VkInstance + physical device |
 | `VulkanClearSmokeTest.java` | M4-D — full clear-color render pass |
 | `VulkanTriangleSmokeTest.java` | M6 — graphics pipeline + draw |

@@ -103,6 +103,7 @@ public class AsyncNodeManager {
             }
         });
         this.thread.setName("Async Node Manager");
+        this.thread.setDaemon(true);// don't block JVM shutdown if this thread is stuck
 
         this.geometryManager = new BasicAsyncGeometryManager(((BasicSectionGeometryData)geometryData).getMaxSectionCount(), this.geometryCapacity);
 

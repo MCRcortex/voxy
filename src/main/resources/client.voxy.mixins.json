@@ -26,7 +26,6 @@
     "minecraft.MixinGlDebug",
     "minecraft.MixinLevelRenderer",
     "minecraft.MixinLevelRendererBridgeDemo",
-    "minecraft.MixinLevelRendererVoxyMetalComposite",
     "minecraft.MixinMinecraft",
     "minecraft.MixinRenderSystem",
     "minecraft.MixinWindow",
