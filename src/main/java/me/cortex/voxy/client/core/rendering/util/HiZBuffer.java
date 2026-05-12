@@ -100,14 +100,29 @@ public class HiZBuffer {
         this.fb.bind(GL_DEPTH_ATTACHMENT, this.texture, 0).verify();
     }
 
-    public void buildMipChain(int srcDepthTex, int width, int height) {
-        if (this.width != Integer.highestOneBit(width) || this.height != Integer.highestOneBit(height)) {
+    /**
+     * Ensure the HiZ texture is allocated for the given viewport size, but
+     * do not populate it. Lets callers that can't (yet) build the mip chain
+     * still bind the HiZ slot in HOT without dereferencing a null texture.
+     * Used by the Metal path until cross-context depth-source binding lands;
+     * a zero-initialized HiZ texture trivially passes the traversal's
+     * "is occluded?" test for every section (no early reject — slower than
+     * real occlusion, but functionally correct).
+     */
+    public void ensureAllocated(int width, int height) {
+        int targetW = Integer.highestOneBit(width);
+        int targetH = Integer.highestOneBit(height);
+        if (this.texture == null || this.width != targetW || this.height != targetH) {
             if (this.texture != null) {
                 this.texture.free();
                 this.texture = null;
             }
-            this.alloc(Integer.highestOneBit(width), Integer.highestOneBit(height));
+            this.alloc(targetW, targetH);
         }
+    }
+
+    public void buildMipChain(int srcDepthTex, int width, int height) {
+        this.ensureAllocated(width, height);
 
         // Pre-bind the external source texture to unit 0 (sampler slot 0). The
         // encoder won't call setTexture(0, ...) inside the pass, so this binding

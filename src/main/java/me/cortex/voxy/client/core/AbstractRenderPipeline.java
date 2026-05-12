@@ -104,14 +104,14 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     public void runPipeline(Viewport<?> viewport, int sourceFrameBuffer, int srcWidth, int srcHeight) {
         if (me.cortex.voxy.client.core.gpu.RenderBackendFactory.get().getType()
                 != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
-            // Metal path stub — renders a placeholder clear color into the
-            // IOSurface bridge. IOSurfaceBridgeCompositor (invoked from
-            // MixinDefaultChunkRenderer.render after Sodium's renderOpaque)
-            // blits the bridge over MC's main RT so the user can confirm
-            // Voxy is reaching this code on Metal. M12 replaces the clear
-            // with real MDIC encoder draws (buildDrawCalls + renderTerrain
-            // + renderTranslucent through RenderEncoder/ComputeEncoder).
-            this.runPipelineMetalStub(viewport);
+            // Metal path — M12 chunk 6 step 1 runs the migrated compute side
+            // of the pipeline (DownloadStream + AsyncNodeManager.tick +
+            // NodeCleaner.tick + HOT.doTraversal + MDIC.buildDrawCalls) but
+            // still clears the bridge for visual feedback instead of issuing
+            // real LOD draws. Subsequent steps migrate renderTerrain /
+            // renderTranslucent and replace the clear with encoder draws so
+            // Voxy's actual LOD content reaches the IOSurface bridge.
+            this.runPipelineMetal(viewport);
             return;
         }
         int depthTexture = this.setup(viewport, sourceFrameBuffer, srcWidth, srcHeight);
@@ -265,21 +265,32 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     }
 
     /**
-     * Placeholder Metal-path render: ensure an IOSurfaceBridge sized to MC's
-     * framebuffer exists, begin a render pass against it, clear to an animated
-     * gradient so the user can verify Voxy's code is running on Metal. The
-     * full MDIC migration replaces the clear body with real LOD draws.
+     * Metal-path runPipeline (M12 chunk 6, evolving). Today runs the migrated
+     * compute side end-to-end on Metal — every stage in this method is either
+     * already encoder-backed or skipped with a Metal-aware substitute — and
+     * still clears the IOSurface bridge as visual confirmation that the
+     * pipeline executed. Real LOD draws land in subsequent chunk 6 steps when
+     * renderTerrain / renderTranslucent migrate to RenderEncoder.
      * <p>
-     * Returns the bridge so a compositing mixin can pull the GL texture name
-     * and blit it over MC's framebuffer.
+     * Compared to the GL {@link #runPipeline}, the Metal path currently
+     * skips: {@link #setup} (depth-stencil FBO copy uses raw GL),
+     * {@link me.cortex.voxy.client.core.rendering.util.HiZBuffer#buildMipChain}
+     * (partial GL — see chunk 6 step 2), the FrEx work loop wrapper, the
+     * raw {@code glMemoryBarrier} inside {@link #innerPrimaryWork}, the
+     * post-opaque SSAO compute, and {@link #finish}. The compute pipeline
+     * (HOT traversal + buildDrawCalls' 5 prepasses) runs in full.
      */
-    private void runPipelineMetalStub(Viewport<?> viewport) {
+    private void runPipelineMetal(Viewport<?> viewport) {
         int fbw = viewport.width;
         int fbh = viewport.height;
         if (fbw <= 0 || fbh <= 0) return;
         var backend = me.cortex.voxy.client.core.gpu.RenderBackendFactory.get();
         if (!(backend instanceof me.cortex.voxy.client.core.metal.MetalRenderBackend mrb)) return;
 
+        // 1) Allocate the IOSurface bridge sized to MC's framebuffer. The
+        //    bridge is the cross-context handle: Metal renders into the
+        //    backing MTLTexture, IOSurfaceBridgeCompositor blits it into MC's
+        //    main RT via a CGL-bound GL_TEXTURE_RECTANGLE source FBO.
         if (this.metalBridge == null || this.metalBridgeWidth != fbw || this.metalBridgeHeight != fbh) {
             if (this.metalBridge != null) this.metalBridge.close();
             this.metalBridge = me.cortex.voxy.client.core.interop.IOSurfaceBridge.create(
@@ -289,22 +300,49 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
             this.metalBridgeHeight = fbh;
         }
 
+        // 2) Ensure the HiZ texture is allocated so HOT can bind it. We skip
+        //    the per-mip blit pass on Metal (its source-depth handoff is GL-only
+        //    until cross-context depth surfacing lands in chunk 6 step 2); the
+        //    zero-initialized texture trivially passes HiZ's "is occluded?"
+        //    test for every section — slower than real occlusion but
+        //    functionally correct.
+        viewport.hiZBuffer.ensureAllocated(viewport.width, viewport.height);
+
+        // 3) Compute side — copy of innerPrimaryWork's body minus the GL bits
+        //    (HiZBuffer.buildMipChain, raw glMemoryBarrier, FrEx loop). Each
+        //    sub-stage is already encoder-backed (commits ebf4eb70, 739a14db,
+        //    05b5b740, 8d37619f for HOT's last raw-GL gaps).
+        me.cortex.voxy.client.core.rendering.util.DownloadStream.INSTANCE.tick();
+        this.nodeManager.tick(this.traversal.getNodeBuffer(), this.nodeCleaner);
+        this.nodeCleaner.tick(this.traversal.getNodeBuffer());
+        this.traversal.doTraversal(viewport);
+
+        // 4) Per-frame draw-command generation — all 5 MDIC compute prepasses
+        //    (prep / cull-stub / commandGen / prefixSum / translucentGen) now
+        //    flow through ComputeEncoder (chunks 1–5). Raw cast matches the
+        //    GL path (line 119) — the renderer's viewport generic is set at
+        //    construction by RenderPipelineFactory and we trust the pairing.
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        AbstractSectionRenderer rs = (AbstractSectionRenderer) this.sectionRenderer;
+        rs.buildDrawCalls(viewport);
+
+        // 5) Render-pass stub — still clears the bridge so the
+        //    IOSurfaceBridgeCompositor has something to blit, but the actual
+        //    LOD draws are not yet wired. Chunk 6 step 3 (renderTerrain
+        //    migration) replaces the body of this pass with encoder draws.
         this.metalFrame++;
         float t = (this.metalFrame % 240) / 240.0f;
-        // Bright unmistakable yellow/magenta sweep at FULL alpha so the
-        // composite can't be missed — diagnostics for M11 visual verification.
-        // Once MDIC render migration lands, this clear becomes the LOD render.
-        float r = 0.90f + 0.10f * (float) Math.cos(t * 2 * Math.PI);
-        float g = 0.20f + 0.20f * (float) Math.cos((t + 0.5f) * 2 * Math.PI);
-        float b = 0.95f;
+        // Cyan/teal sweep — visually distinct from the M11 magenta/yellow stub
+        // so the user can verify chunk 6 step 1 is in effect.
+        float r = 0.10f + 0.10f * (float) Math.cos(t * 2 * Math.PI);
+        float g = 0.70f + 0.30f * (float) Math.cos((t + 0.5f) * 2 * Math.PI);
+        float b = 0.85f;
 
         var pass = me.cortex.voxy.client.core.gpu.RenderPassDesc.builder(fbw, fbh)
                 .clearColor(this.metalBridge.asGpuTexture(), r, g, b, 1.0f)
                 .build();
         try (var enc = backend.beginRenderPass(pass)) {
-            // No draws yet — clear-only stub until MDIC.renderTerrain/Translucent
-            // migrate to the RenderEncoder API. Each future migration step
-            // adds encoder.setPipeline + encoder.draw* calls here.
+            // No draws yet — renderTerrain migration is chunk 6 step 3.
         }
         backend.submit();
     }
