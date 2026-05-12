@@ -24,8 +24,8 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 |---|---|
 | Branch | `claude/opengl-mac-migration-analysis-6319V` |
 | Base | `dev` |
-| Last commit | `4c57ddaf` (M11 closeout — IOSurfaceBridgeCompositor + daemon worker + arm64 natives) |
-| Commits ahead of `dev` | 30 |
+| Last commit | `088776c2` (M12 chunk 4 — migrate translucentGen compute prepass to ComputeEncoder) |
+| Commits ahead of `dev` | 33 |
 | Test machine | Apple M4 Max, macOS 26.4.1, JDK 24.0.2 |
 | MC target | 1.21.11 (Fabric 0.18.2, Java 21+) |
 | LWJGL | 3.3.3 |
@@ -49,6 +49,10 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 
 | SHA | Title | Validates |
 |---|---|---|
+| `088776c2` | M12 chunk 4 — migrate translucentGen compute prepass to ComputeEncoder | Last of the 4 simple compute prepasses. 6 SSBO bindings (SceneUniform at 0 via the post-chunk-3 SSBO flip) + `dispatchIndirect` against `drawCountCallBuffer` offset 0; `BARRIER_SHADER \| BARRIER_INDIRECT` both sides. `translucentGenProgram` cached id removed. |
+| `ada2723c` | M12 chunk 3 — flip SceneUniform to SSBO + migrate commandGen pass | Atomic refactor + migration. `lod/gl46/bindings.glsl` flips `SceneUniform` from `uniform` (UBO) to `readonly buffer` (SSBO) at binding 0 with std140 preserved (on-disk byte layout identical, matches HOT's commit `05b5b740` pattern). All 4 raw-GL bind sites in MDIC (bindRenderingBuffers, cull block, commandGen block, translucentGen block) retargeted to `GL_SHADER_STORAGE_BUFFER`. commandGen migrated to `beginComputePass`+ 8 SSBOs + dispatchIndirect; conditional statistics SSBO at binding 8. testShaderCompiler: SPV 26/26, MSL 25/26 (hiz.comp pre-existing). |
+| `d37f74b2` | M12 chunk 2 — migrate prep compute prepass to ComputeEncoder | `prep.comp` doesn't reference SceneUniform fields so the encoder skips binding 0 entirely — that defers the UBO↔SSBO decision to chunk 3. Just `setBuffer(1, drawCountCallBuffer)` + `setBuffer(2, renderList)` + barriers + dispatch. `prepProgram` cached id removed; `ComputeEncoder` imported so chunk 1's barrier calls drop the fully-qualified prefix. |
+| `6bd42559` | M12 kickoff — plan + migrate prefixSum compute pass to ComputeEncoder | Adds the M12 plan to docs (6 chunks + decision queue). First migration: `prefixSum` (single SSBO binding 0, no UBO, 1 thread group) — proves the encoder pattern works inside MDIC's buildDrawCalls. `prefixSumProgram` cached id removed. |
 | `4c57ddaf` | M11 closeout — visually verified end-to-end on M4 inside Minecraft | Working tree consolidation: `IOSurfaceBridgeCompositor` lands as the canonical bridge→MC blit (called from `MixinDefaultChunkRenderer.render` after Sodium's `renderOpaque`); the obsolete `MixinLevelRendererVoxyMetalComposite` is removed; `AsyncNodeManager` worker is daemon so MC's close button doesn't hang the JVM; `build.gradle` bundles macOS arm64 `lwjgl-zstd` + `lwjgl-lmdb` natives for Sodium's chunk render task workers; magenta stub in `AbstractRenderPipeline.runPipelineMetalStub` is bumped to full alpha for unmistakable visual confirmation. Doc reflects M11 ✅ closed and outlines the M12 scope. |
 | `261aa934` | M11 — MetalRenderBackend handles depth-only pipelines (HiZBuffer fix) | createGraphicsPipeline now allows a 0/`MTLPixelFormatInvalid` color format when a depth attachment is present, so HiZBuffer's depth-only per-mip pipeline compiles on Metal instead of erroring at PSO link. Unblocks the second of the four M11 init crashes. |
 | `5c4008c3` | M11 — fix four Metal-init crashes hit by `VOXY_FORCE_METAL` world entry | Four small fixes uncovered by world-entry: (1) `NormalRenderPipeline.setupAndBindOpaque` no longer raw-binds MC's GL FBO on Metal (no-op skip); (2) `MDICSectionRenderer.uploadUniformBuffer` is safe to call before the world is loaded; (3) `BasicSectionGeometryData` no-ops its raw GL setup on Metal; (4) `HiZBuffer` first-frame allocation path tolerates `targetTexture==null`. With these, MC reaches the game loop on Metal. |
@@ -458,76 +462,92 @@ program and have no effect. Hence: nothing renders.
 
 ### Migration scope (six chunks)
 
-1. **`prefixSum`** (smallest — single SSBO at binding 0, no UBO,
-   1 thread group). Pattern: `beginComputePass` → `setPipeline` →
-   `setBuffer(0, distanceCountBuffer, 0)` → `barrier(SHADER, SHADER)` →
-   `dispatch(1, 1, 1)` → `barrier(SHADER, SHADER)` → close. ✅ Pilot
-   migration in this commit; demonstrates the pattern for the
-   remaining four compute passes.
-2. **`prep`** — adds the SceneUniform binding at 0 (UBO in the
-   current shader). Two options: (a) declare a new
-   `setUniformBuffer` on `ComputeEncoder` and lower to
-   `glBindBufferBase(GL_UNIFORM_BUFFER, …)` on GL; (b) flip the
-   `SceneUniform` declaration in `lod/gl46/bindings.glsl` from
-   `uniform` to `readonly buffer` (SSBO) — matches what
-   `HierarchicalOcclusionTraverser` already does for its scene
-   uniform. (b) is the simpler path because every MDIC shader uses
-   the same `bindings.glsl`, so one declaration change moves all
-   four affected shaders at once.
-3. **`commandGen`** — same SceneUniform conversion as `prep`; adds
-   the optional statistics SSBO at binding 8 (only when
-   `RenderStatistics.enabled`).
-4. **`translucentGen`** — same SceneUniform conversion; uses
-   `dispatchIndirect` (with offset 0 in `drawCountCallBuffer`)
-   instead of `dispatch(x, y, z)`.
-5. **`cull`** — this is the odd one. It's a **graphics** pipeline
-   (`createGraphicsPipeline` + `glDrawElementsIndirect`) that runs
-   with color + depth masks off, purely to populate
-   `visibilityBuffer` from the rasterizer (and optionally exploit
-   `NV_representative_fragment_test`). On Metal we need a render
-   pass against a dummy 1×1 target (no color, no depth) or an
-   image-less rasterization pass. Defer until the four compute
-   passes are migrated and we have a working Metal compute path.
-6. **Render passes** — `renderTerrain` / `renderTranslucent` /
-   `renderTemporal` need a `beginRenderPass` against the IOSurface
-   bridge with depth + stencil state borrowed from
-   `AbstractRenderPipeline.fb`. `MDICSectionRenderer` keeps `setupAndBind*`
-   coming from the pipeline so it can pivot per-backend; on Metal
+1. ✅ **`prefixSum`** (commit `6bd42559`) — single SSBO at binding 0,
+   no UBO, 1 thread group. Pattern: `beginComputePass` →
+   `setPipeline` → `setBuffer(0, distanceCountBuffer, 0)` →
+   `barrier(SHADER, SHADER)` → `dispatch(1, 1, 1)` →
+   `barrier(SHADER, SHADER)` → close. Pilot migration; pattern now
+   proven inside MDIC's buildDrawCalls.
+2. ✅ **`prep`** (commit `d37f74b2`) — does not actually reference
+   SceneUniform fields, so the encoder skips binding 0 entirely.
+   Just SSBO bindings 1 (DrawCommandCountBuffer) and 2
+   (IndirectSectionLookupBuffer). Defers the SceneUniform
+   decision to chunk 3.
+3. ✅ **SceneUniform flip + `commandGen`** (commit `ada2723c`) —
+   atomic two-part change:
+   - `bindings.glsl` flips `SceneUniform` from `uniform` to
+     `readonly buffer` (SSBO) at binding 0, std140 preserved.
+     Matches HOT pattern (commit `05b5b740`). Affects every shader
+     importing bindings.glsl; all 26 smoke-test cases stayed green
+     (SPV 26/26, MSL 25/26 — hiz.comp pre-existing).
+   - The 3 still-raw-GL bind sites (bindRenderingBuffers, cull
+     block, translucentGen block) retargeted to
+     `GL_SHADER_STORAGE_BUFFER`.
+   - `commandGen` migrated to `beginComputePass` + 8 SSBOs (incl.
+     SceneUniform at 0 + optional statistics at
+     `STATISTICS_BUFFER_BINDING=8`) + `dispatchIndirect` against
+     `drawCountCallBuffer` offset 0 + barriers.
+4. ✅ **`translucentGen`** (commit `088776c2`) — SceneUniform now
+   already SSBO. 6 SSBO bindings + dispatchIndirect from the same
+   `drawCountCallBuffer` (which doubles as the indirect arg AND
+   one of the shader's SSBO inputs at binding 2 — pre-existing
+   read-then-dispatch pattern preserved).
+5. ⏳ **`cull`** (open). Graphics pipeline rasterized into a
+   depth-only target with `colorMask(false)` + `depthMask(false)`
+   + early-fragment-tests. The fragment shader writes to
+   `visibilityBuffer` via SSBO; the rasterizer + depth-test is the
+   occlusion filter (rasterizer kills depth-failed fragments, only
+   surviving fragments write visibility). On Metal we need a
+   `beginRenderPass` against a depth-only target (no color
+   attachment) — the depth source is MC's depth buffer (or a copy)
+   from `AbstractRenderPipeline.initDepthStencil`. Open subquestions:
+   - Does `MetalRenderBackend.createGraphicsPipeline` accept
+     color-less / depth-only configs? (Commit `261aa934` added the
+     "depth-only color format = 0" path for HiZBuffer; need to
+     verify it covers this case too.)
+   - Where does MC's depth FBO surface as an `IGpuTexture` so the
+     render pass can attach it?
+   - The `NV_representative_fragment_test` GL extension has no
+     Metal equivalent — without it the cull pass still works, just
+     slower. Acceptable for M12.
+6. ⏳ **Render passes + `runPipelineMetal`** (open, biggest chunk).
+   `renderTerrain` / `renderTranslucent` / `renderTemporal` need
+   `beginRenderPass` against the IOSurface bridge with depth +
+   stencil state borrowed from `AbstractRenderPipeline.fb`.
    `runPipelineMetalStub` evolves into `runPipelineMetal` that
-   threads the bridge through the section renderer. The
-   `drawIndexedIndirectCount` call lowers to a CPU loop on Metal
-   (already implemented; ICB is the future optimization but not
-   required for M12 acceptance — see gotcha #16).
+   opens the pass and threads the bridge through the section
+   renderer. `drawIndexedIndirectCount` lowers to a CPU loop on
+   Metal (already implemented). Open subquestions:
+   - How does `setupAndBindOpaque` / `setupAndBindTranslucent`
+     pivot per-backend? Current GL implementation binds a raw FBO
+     id; Metal probably wants the section renderer to receive an
+     `IGpuTexture` color target and an `IGpuTexture` depth target.
+     May require a thin `IGpuRenderTarget`-style wrapper.
+   - Stencil-buffer dance from `initDepthStencil` uses
+     `glClearNamedFramebufferfi` + `glStencilFunc/Op/Mask` — needs
+     translation to render-pass clear values + per-draw
+     `MTLDepthStencilState` (mostly already supported by
+     `PipelineState`).
 
-### First step landed in this commit
+### Decision queue (open)
 
-- New `MDICSectionRenderer.runPrefixSumPass(...)` helper invoked from
-  `buildDrawCalls`'s translucency-sorting block. Calls
-  `beginComputePass` + `setPipeline(this.prefixSumPipeline)` +
-  `setBuffer(0, this.distanceCountBuffer, 0)` + barriers + dispatch.
-  Still no visible effect on Metal (the upstream `cmdgen` pass that
-  populates `distanceCountBuffer` hasn't been migrated yet, so the
-  prefix sum runs over zeros) — but the encoder pattern is now
-  proven for MDIC and the next commits can apply it mechanically
-  to the remaining three compute passes.
+- **`cull` Metal target shape** (chunk 5): depth-only render pass
+  against MC's depth tex via a `MetalRenderBackend` extension, OR
+  image-less rasterization (M4 hardware supports it). Probably the
+  first — reuses the HiZBuffer pattern.
+- **`runPipelineMetal` architecture** (chunk 6): the cross-backend
+  shape of `setupAndBindOpaque/Translucent`. Likely an
+  `IGpuRenderTarget` interface that wraps either a GL FBO id or an
+  IOSurfaceBridge handle.
 
-### Decision queue for M12
+### Status after this batch (commits `6bd42559` through `088776c2`)
 
-- **SceneUniform UBO vs SSBO**: lean SSBO (matches HOT pattern),
-  but worth confirming there's no shader that needs the std140
-  layout guarantees from UBO. Quick audit before chunk 2.
-- **`cull` Metal target**: image-less rasterization on Metal needs
-  iOS GPU Family 4+ / macOS GPU Family 2+ (`MTLDevice
-  rasterizationRateMapAttachmentMaxCount` etc.). M4 has it.
-  Worth confirming what the cull shader actually consumes from
-  the fragment outputs — `raster.frag` might be a pure side-effect
-  pass we can model with depth-only.
-- **`AbstractRenderPipeline.runPipelineMetal`**: how does the
-  encoder API thread the bridge through `setupAndBindOpaque` /
-  `setupAndBindTranslucent`? The current GL path binds a raw FBO
-  id; the Metal path probably wants the section renderer to receive
-  an `IGpuTexture` color target and an `IGpuTexture` depth target.
-  May require a thin `IGpuRenderTarget`-style wrapper.
+4 of 5 MDIC compute prepasses now flow through `ComputeEncoder`. The
+remaining `cull` graphics pass + the render passes are the only
+things between us and visible LOD geometry on Metal. Visible effect
+right now: still none — until chunks 5 and 6 land, the geometry
+path no-ops between `cull` and the draws, and Metal still only sees
+the magenta clear stub from `AbstractRenderPipeline.runPipelineMetalStub`.
 
 ---
 
