@@ -461,14 +461,21 @@ public class MetalRenderBackend implements RenderBackend {
                 }
             }
 
-            int metalPixelFormat = MetalFormatUtil.glFormatToMetal(desc.colorAttachmentFormat);
+            // colorAttachmentFormat == 0 means "depth-only render pass — no
+            // color target" (e.g. HiZBuffer's blit pipeline writes only
+            // gl_FragDepth). Skip the color attachment format entirely in
+            // that case; Metal accepts a pipeline with no color attachments
+            // as long as the fragment shader doesn't write any.
             pipelineDesc = MetalNative.mtlNewRenderPipelineDescriptor();
             if (pipelineDesc == 0) {
                 throw new RuntimeException("mtlNewRenderPipelineDescriptor returned NULL");
             }
             MetalNative.mtlRenderPipelineDescriptorSetVertexFunction(pipelineDesc, vertexFn);
             MetalNative.mtlRenderPipelineDescriptorSetFragmentFunction(pipelineDesc, fragmentFn);
-            MetalNative.mtlRenderPipelineDescriptorSetColorAttachmentFormat(pipelineDesc, 0, metalPixelFormat);
+            if (desc.colorAttachmentFormat != 0) {
+                int metalPixelFormat = MetalFormatUtil.glFormatToMetal(desc.colorAttachmentFormat);
+                MetalNative.mtlRenderPipelineDescriptorSetColorAttachmentFormat(pipelineDesc, 0, metalPixelFormat);
+            }
             // Blocker 1: enable ICB usage on every pipeline. The only Metal
             // features that conflict (vertex amplification, function constants
             // on stage-input) aren't used anywhere in Voxy. The runtime cost
@@ -494,13 +501,15 @@ public class MetalRenderBackend implements RenderBackend {
                     pipelineDesc, MetalFormatUtil.MTLPixelFormatDepth32Float);
 
             // Bake blend state into the pipeline (Metal stores it on the pipeline,
-            // not on the encoder).
-            PipelineState.BlendState blend = desc.state.blend;
-            MetalNative.mtlRenderPipelineDescriptorSetColorAttachmentBlending(pipelineDesc, 0,
-                    blend.enabled,
-                    mapBlendOp(blend.colorOp), mapBlendOp(blend.alphaOp),
-                    mapBlendFactor(blend.srcColor), mapBlendFactor(blend.dstColor),
-                    mapBlendFactor(blend.srcAlpha), mapBlendFactor(blend.dstAlpha));
+            // not on the encoder). Skip when there's no color attachment.
+            if (desc.colorAttachmentFormat != 0) {
+                PipelineState.BlendState blend = desc.state.blend;
+                MetalNative.mtlRenderPipelineDescriptorSetColorAttachmentBlending(pipelineDesc, 0,
+                        blend.enabled,
+                        mapBlendOp(blend.colorOp), mapBlendOp(blend.alphaOp),
+                        mapBlendFactor(blend.srcColor), mapBlendFactor(blend.dstColor),
+                        mapBlendFactor(blend.srcAlpha), mapBlendFactor(blend.dstAlpha));
+            }
 
             // Build + attach vertex descriptor if the pipeline declares vertex inputs.
             // Empty layout → no descriptor (gl_VertexIndex-driven shaders).
