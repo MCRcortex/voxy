@@ -181,6 +181,29 @@ void main() {
         float ndotl = dot(n, normalize(vec3(0.3, 1.0, 0.5)));
         float shade = clamp(ndotl * 0.35 + 0.65, 0.55, 1.0);
         colour.rgb *= shade;
+
+        // Procedural per-pixel pattern — gives each face a "textured"
+        // look instead of a solid colour. Combines a small-grid checker
+        // (4x4 cells per quad) with a value-noise speckle so flat block
+        // colours read as 3D-textured surfaces. The shaped pattern also
+        // anchors the per-quad hash colour against the global lighting,
+        // so cube structure remains obvious. Real model textures from
+        // ModelTextureBakery are still M13 chunk 1 — this is the
+        // VOXY_NO_ATLAS debug visualization until that lands.
+#ifndef USE_NV_BARRY
+        {
+            // 4x4 grid checker — gives subtle "tile" structure.
+            ivec2 cell = ivec2(floor(uv * 4.0));
+            float checker = ((cell.x ^ cell.y) & 1) == 0 ? 1.0 : 0.85;
+            // Value-noise speckle — high-frequency variation hiding the
+            // flat per-quad fill. Hash from (uv * 16, face) so the
+            // pattern is stable per-pixel but uncorrelated across faces.
+            vec2 noiseInput = uv * 16.0 + float(face) * 17.0;
+            float noise = fract(sin(dot(noiseInput, vec2(12.9898, 78.233))) * 43758.5453);
+            float speckle = 0.88 + 0.12 * noise;
+            colour.rgb *= checker * speckle;
+        }
+#endif
     }
 #else
 //This is deprecated, TODO: remove the non mip code path
