@@ -39,6 +39,14 @@ public final class GraphicsPipelineDesc {
     /** Static state baked into the pipeline (depth, blend, raster). */
     public final PipelineState state;
     public final String label;
+    /**
+     * If true, the pipeline will be referenced from inside an
+     * {@code MTLIndirectCommandBuffer} command. Metal's
+     * {@code supportIndirectCommandBuffers} flag rejects some
+     * shader features (notably certain fragment outputs), so it must be
+     * opt-in. Defaults to false; only MDIC's terrain pipelines opt in.
+     */
+    public final boolean usedInIndirectCommandBuffer;
 
     public GraphicsPipelineDesc(String vertexMsl, String fragmentMsl,
                                 byte[] vertexSpirv, byte[] fragmentSpirv,
@@ -71,6 +79,38 @@ public final class GraphicsPipelineDesc {
         this.vertexLayout = vertexLayout != null ? vertexLayout : VertexLayout.EMPTY;
         this.state = state != null ? state : PipelineState.DEFAULT;
         this.label = label;
+        this.usedInIndirectCommandBuffer = false;
+    }
+
+    /** Internal constructor for callers that need to opt the pipeline into ICB usage. */
+    GraphicsPipelineDesc(String vertexGlsl, String fragmentGlsl,
+                         java.util.Map<String, String> defines,
+                         String vertexMsl, String fragmentMsl,
+                         byte[] vertexSpirv, byte[] fragmentSpirv,
+                         int colorAttachmentFormat,
+                         VertexLayout vertexLayout,
+                         PipelineState state,
+                         String label,
+                         boolean usedInIndirectCommandBuffer) {
+        this.vertexGlsl = vertexGlsl;
+        this.fragmentGlsl = fragmentGlsl;
+        this.defines = defines != null ? defines : java.util.Map.of();
+        this.vertexMsl = vertexMsl;
+        this.fragmentMsl = fragmentMsl;
+        this.vertexSpirv = vertexSpirv;
+        this.fragmentSpirv = fragmentSpirv;
+        this.colorAttachmentFormat = colorAttachmentFormat;
+        this.vertexLayout = vertexLayout != null ? vertexLayout : VertexLayout.EMPTY;
+        this.state = state != null ? state : PipelineState.DEFAULT;
+        this.label = label;
+        this.usedInIndirectCommandBuffer = usedInIndirectCommandBuffer;
+    }
+
+    /** Returns a copy of this desc with usedInIndirectCommandBuffer set. */
+    public GraphicsPipelineDesc withIndirectCommandBufferUsage(boolean used) {
+        return new GraphicsPipelineDesc(this.vertexGlsl, this.fragmentGlsl, this.defines,
+                this.vertexMsl, this.fragmentMsl, this.vertexSpirv, this.fragmentSpirv,
+                this.colorAttachmentFormat, this.vertexLayout, this.state, this.label, used);
     }
 
     /** Backward-compat overload without explicit pipeline state (uses DEFAULT). */

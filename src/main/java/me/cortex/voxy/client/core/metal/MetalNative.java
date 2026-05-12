@@ -674,6 +674,16 @@ public final class MetalNative {
     public static native void mtlRenderPipelineDescriptorSetSupportIndirectCommandBuffers(
             long descHandle, boolean enabled);
 
+    /**
+     * Set {@code depthAttachmentPixelFormat} on a render pipeline descriptor.
+     * Required whenever the fragment shader writes to {@code gl_FragDepth};
+     * Metal otherwise rejects the pipeline with "depthAttachmentPixelFormat
+     * is not valid". Pass an {@code MTLPixelFormat} integer (e.g.
+     * {@link me.cortex.voxy.client.core.metal.MetalFormatUtil#MTLPixelFormatDepth32Float}).
+     */
+    public static native void mtlRenderPipelineDescriptorSetDepthAttachmentPixelFormat(
+            long descHandle, int pixelFormat);
+
     // ========== MTLIndirectCommandBuffer (Blocker 1) ==========
     // Used by MDICSectionRenderer's count-aware indirect draws on Metal.
     // GL has glMultiDrawElementsIndirectCountARB natively; Metal needs an

@@ -31,6 +31,14 @@ Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderPipelineDescriptorSet
     desc.supportIndirectCommandBuffers = enabled == JNI_TRUE;
 }
 
+extern "C" JNIEXPORT void JNICALL
+Java_me_cortex_voxy_client_core_metal_MetalNative_mtlRenderPipelineDescriptorSetDepthAttachmentPixelFormat(
+        JNIEnv *, jclass, jlong descHandle, jint pixelFormat) {
+    if (descHandle == 0) return;
+    MTLRenderPipelineDescriptor *desc = voxy_handle_cast<MTLRenderPipelineDescriptor *>(descHandle);
+    desc.depthAttachmentPixelFormat = (MTLPixelFormat)pixelFormat;
+}
+
 // ---------- ICB creation ----------
 
 extern "C" JNIEXPORT jlong JNICALL

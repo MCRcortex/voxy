@@ -212,6 +212,14 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             java.util.Map<String, String> translucentDefines = new java.util.LinkedHashMap<>(commonDefines);
             translucentDefines.put("TRANSLUCENT", "");
 
+            // NOTE: MDIC terrain pipelines do NOT opt into supportIndirectCommandBuffers.
+            // quads.frag uses gl_FragDepth writes + discard, both incompatible
+            // with Metal's ICB linking ("Fragment shader cannot be used with
+            // indirect command buffers"). For now MDIC uses the CPU-readback
+            // path on Metal (read drawCountCallBuffer back, issue per-draw
+            // glMultiDrawElementsIndirect — which MetalRenderEncoder.drawIndexedIndirect
+            // implements as a CPU loop). The ICB infrastructure stays available
+            // (smoke-tested independently) for future simpler-shader use cases.
             this.terrainPipeline = this.backend.createGraphicsPipeline(
                     new me.cortex.voxy.client.core.gpu.GraphicsPipelineDesc(
                             vertex, frag, opaqueDefines,

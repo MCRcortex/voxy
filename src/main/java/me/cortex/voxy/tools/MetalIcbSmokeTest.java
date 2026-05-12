@@ -119,7 +119,8 @@ public final class MetalIcbSmokeTest {
             pipeline = backend.createGraphicsPipeline(new GraphicsPipelineDesc(
                     vert.mslSource(), frag.mslSource(),
                     vert.spirv(), frag.spirv(),
-                    GL_RGBA8, layout, "voxy:tools/triangle-icb"));
+                    GL_RGBA8, layout, "voxy:tools/triangle-icb")
+                    .withIndirectCommandBufferUsage(true));
 
             // ICB inheritPipelineState=true requires the MTLRenderPipelineState
             // to have been created with supportIndirectCommandBuffers=YES,

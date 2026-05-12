@@ -474,7 +474,24 @@ public class MetalRenderBackend implements RenderBackend {
             // on stage-input) aren't used anywhere in Voxy. The runtime cost
             // is the validation overhead Metal adds at draw time; benchmarks
             // (M14) can re-evaluate gating this if it shows up as overhead.
-            MetalNative.mtlRenderPipelineDescriptorSetSupportIndirectCommandBuffers(pipelineDesc, true);
+            // ICB-incompatible shaders (notably fragment shaders that write
+            // gl_FragDepth or use certain outputs) reject the flag with
+            // "Fragment shader cannot be used with indirect command buffers".
+            // Only the MDIC terrain pipelines actually need ICB execution, so
+            // the flag is opt-in via the desc.
+            if (desc.usedInIndirectCommandBuffer) {
+                MetalNative.mtlRenderPipelineDescriptorSetSupportIndirectCommandBuffers(pipelineDesc, true);
+            }
+            // Always declare a depth attachment format. Some Voxy fragment
+            // shaders (depth0.frag, depth_copy.frag, blit.fsh, hiz/blit.fsh,
+            // and the patched terrain frags) write to gl_FragDepth — Metal
+            // rejects the pipeline with "depthAttachmentPixelFormat is not
+            // valid" unless the descriptor has a depth format set. Use
+            // MTLPixelFormatDepth32Float (universally supported on Apple
+            // Silicon; the equivalent of Voxy's most common depth target).
+            // Pipelines that don't actually write depth pay no penalty here.
+            MetalNative.mtlRenderPipelineDescriptorSetDepthAttachmentPixelFormat(
+                    pipelineDesc, MetalFormatUtil.MTLPixelFormatDepth32Float);
 
             // Bake blend state into the pipeline (Metal stores it on the pipeline,
             // not on the encoder).
