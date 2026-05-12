@@ -5,6 +5,7 @@ import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.core.AbstractRenderPipeline;
 import me.cortex.voxy.client.core.gl.Capabilities;
+import me.cortex.voxy.client.core.gpu.ComputeEncoder;
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
 import me.cortex.voxy.client.core.gl.shader.Shader;
@@ -96,7 +97,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                     null, null,
                     1, 1, 1,
                     "MDICSectionRenderer.prep"));
-    private final int prepProgram = mdicProgramId(this.prepPipeline);
+    // M12 chunk 2: prep prepass is dispatched via ComputeEncoder; no cached
+    // glProgram id needed (encoder pulls it from GlComputePipeline on GL,
+    // MTLComputePipelineState on Metal).
 
     private final me.cortex.voxy.client.core.gpu.IGpuPipeline cullPipeline = this.backend.createGraphicsPipeline(
             new me.cortex.voxy.client.core.gpu.GraphicsPipelineDesc(
@@ -389,13 +392,20 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
 
         {//Dispatch prep
-            if (this.prepProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.prepProgram);
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCountCallBuffer.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.getRenderList().id());
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-            glDispatchCompute(1,1,1);
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+            // M12 chunk 2: prep prepass migrated to ComputeEncoder. prep.comp
+            // does not reference SceneUniform fields (only writes to the
+            // DrawCommandCountBuffer at binding 1 from sectionCount at
+            // binding 2), so the encoder skips binding 0 entirely — that
+            // keeps the SceneUniform UBO→SSBO decision deferred to chunks
+            // 3 and 4 (which DO use SceneUniform).
+            try (var encoder = this.backend.beginComputePass()) {
+                encoder.setPipeline(this.prepPipeline);
+                encoder.setBuffer(1, viewport.drawCountCallBuffer, 0);
+                encoder.setBuffer(2, viewport.getRenderList(), 0);
+                encoder.barrier(ComputeEncoder.BARRIER_SHADER, ComputeEncoder.BARRIER_SHADER);
+                encoder.dispatch(1, 1, 1);
+                encoder.barrier(ComputeEncoder.BARRIER_SHADER, ComputeEncoder.BARRIER_SHADER);
+            }
         }
 
         {//Test occlusion
@@ -469,11 +479,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             try (var encoder = this.backend.beginComputePass()) {
                 encoder.setPipeline(this.prefixSumPipeline);
                 encoder.setBuffer(0, this.distanceCountBuffer, 0);
-                encoder.barrier(me.cortex.voxy.client.core.gpu.ComputeEncoder.BARRIER_SHADER,
-                                me.cortex.voxy.client.core.gpu.ComputeEncoder.BARRIER_SHADER);
+                encoder.barrier(ComputeEncoder.BARRIER_SHADER, ComputeEncoder.BARRIER_SHADER);
                 encoder.dispatch(1, 1, 1);
-                encoder.barrier(me.cortex.voxy.client.core.gpu.ComputeEncoder.BARRIER_SHADER,
-                                me.cortex.voxy.client.core.gpu.ComputeEncoder.BARRIER_SHADER);
+                encoder.barrier(ComputeEncoder.BARRIER_SHADER, ComputeEncoder.BARRIER_SHADER);
             }
 
             if (this.translucentGenProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.translucentGenProgram);
