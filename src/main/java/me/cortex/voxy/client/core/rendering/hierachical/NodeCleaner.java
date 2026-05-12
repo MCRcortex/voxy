@@ -17,8 +17,6 @@ import org.lwjgl.system.MemoryUtil;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.lwjgl.opengl.GL30C.glBindBufferRange;
-import static org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER;
 
 /**
  * Hierarchical-traversal sub-pass that keeps Voxy's GPU node tables tidy:
@@ -193,10 +191,11 @@ public class NodeCleaner {
             encoder.setPipeline(this.batchClear);
             encoder.setBuffer(CLEAR_VISIBILITY_BINDING, this.visibilityBuffer, 0);
 
-            // M9 TODO: UploadStream still exposes a raw GL buffer id only. Bind it
-            // directly until UploadStream is migrated to an IGpuBuffer-backed view.
-            glBindBufferRange(GL_SHADER_STORAGE_BUFFER, CLEAR_LIST_BINDING,
-                    UploadStream.INSTANCE.getRawBufferId(), addr, count * 4L);
+            // M12: UploadStream's persistent buffer flows through the encoder's
+            // IGpuPersistentBuffer overload now (was a raw glBindBufferRange
+            // that broke on Metal because the buffer id isn't a GL name).
+            encoder.setBuffer(CLEAR_LIST_BINDING, UploadStream.INSTANCE.getUploadBuffer(),
+                    addr, count * 4L);
 
             try (MemoryStack stack = MemoryStack.stackPush()) {
                 long pushAddr = stack.nmalloc(8);

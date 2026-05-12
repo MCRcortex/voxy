@@ -32,10 +32,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.StampedLock;
 
-import static org.lwjgl.opengl.ARBUniformBufferObject.glBindBufferBase;
-import static org.lwjgl.opengl.GL30C.glUniform1ui;
-import static org.lwjgl.opengl.GL42C.GL_UNIFORM_BARRIER_BIT;
-import static org.lwjgl.opengl.GL42C.glMemoryBarrier;
 import static org.lwjgl.opengl.GL43C.*;
 
 //TODO: create an "async upload stream", that is, the upload stream is a raw mapped buffer pointer that can be written to
@@ -548,11 +544,12 @@ public class AsyncNodeManager {
 
                 try (var encoder = this.backend.beginComputePass()) {
                     encoder.setPipeline(this.multiMemcpy);
-                    // M9 TODO: UploadStream still exposes a raw GL buffer id. Bind directly
-                    // until UploadStream gains an IGpuBuffer-backed view (mirrors
-                    // NodeCleaner.updateIds + HierarchicalOcclusionTraverser.uploadUniform).
-                    glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, UploadStream.INSTANCE.getRawBufferId(), ptr, copies * 16L);
-                    glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 1, UploadStream.INSTANCE.getRawBufferId(), ptr + copies * 16L, scratchSize);
+                    // M12: UploadStream's persistent buffer flows through the
+                    // encoder's IGpuPersistentBuffer overload now (was a raw
+                    // glBindBufferRange against UploadStream.getRawBufferId()
+                    // that broke on Metal because the buffer id isn't a GL name).
+                    encoder.setBuffer(0, UploadStream.INSTANCE.getUploadBuffer(), ptr, copies * 16L);
+                    encoder.setBuffer(1, UploadStream.INSTANCE.getUploadBuffer(), ptr + copies * 16L, scratchSize);
                     encoder.setBuffer(2, ((BasicSectionGeometryData) this.geometryData).getGeometryBuffer(), 0);
 
                     encoder.barrier(me.cortex.voxy.client.core.gpu.ComputeEncoder.BARRIER_SHADER, me.cortex.voxy.client.core.gpu.ComputeEncoder.BARRIER_SHADER);
@@ -577,8 +574,8 @@ public class AsyncNodeManager {
             try (var encoder = this.backend.beginComputePass();
                  var stack = org.lwjgl.system.MemoryStack.stackPush()) {
                 encoder.setPipeline(this.scatterWrite);
-                // M9 TODO: UploadStream raw GL id — see multiMemcpy above.
-                glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, UploadStream.INSTANCE.getRawBufferId(), ptr, streamSize);
+                // M12: cross-backend persistent-buffer bind — see multiMemcpy above.
+                encoder.setBuffer(0, UploadStream.INSTANCE.getUploadBuffer(), ptr, streamSize);
                 encoder.setBuffer(1, nodeBuffer, 0);
                 encoder.setBuffer(2, ((BasicSectionGeometryData) this.geometryData).getMetadataBuffer(), 0);
 

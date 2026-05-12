@@ -38,6 +38,19 @@ public interface ComputeEncoder extends AutoCloseable {
     void setBuffer(int binding, IGpuBuffer buffer, long offset);
 
     /**
+     * Bind a sub-range of a persistent (CPU-mapped) buffer at the given
+     * binding index. Used by {@code UploadStream}-fed compute paths
+     * (AsyncNodeManager.tick, NodeCleaner.updateIds) where the data was just
+     * memcpy'd into the persistent buffer and needs to be visible to the
+     * compute shader. On OpenGL lowers to
+     * {@code glBindBufferRange(GL_SHADER_STORAGE_BUFFER, ...)}; on Metal
+     * binds the underlying MTLBuffer at the given offset (Metal doesn't carry
+     * an explicit "size" — the shader determines the read range from its
+     * binding type).
+     */
+    void setBuffer(int binding, IGpuPersistentBuffer buffer, long offset, long size);
+
+    /**
      * Bind a <b>sampled</b> texture at the given binding index. The shader
      * accesses it via {@code sampler2D} / {@code sampler3D} / {@code samplerCube}
      * (paired with {@link #setSampler}). For shader-writable

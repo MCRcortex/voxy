@@ -43,6 +43,20 @@ public final class MetalComputeEncoder implements ComputeEncoder {
     }
 
     @Override
+    public void setBuffer(int binding, me.cortex.voxy.client.core.gpu.IGpuPersistentBuffer buffer, long offset, long size) {
+        if (!(buffer instanceof MetalPersistentBuffer mpb)) {
+            throw new IllegalArgumentException(
+                    "MetalComputeEncoder.setBuffer(IGpuPersistentBuffer) expected MetalPersistentBuffer, got "
+                            + (buffer == null ? "null" : buffer.getClass().getName()));
+        }
+        // Metal's setBuffer:offset:atIndex: doesn't carry a "size" — the
+        // shader's binding type determines the read range. `size` is GL's
+        // glBindBufferRange parameter; we accept it here for cross-backend
+        // signature parity but only the offset is meaningful on Metal.
+        MetalNative.mtlComputeEncoderSetBuffer(this.encoderHandle, mpb.getHandle(), offset, binding);
+    }
+
+    @Override
     public void setTexture(int binding, IGpuTexture texture) {
         long handle = texture == null ? 0 : MetalHandleMap.getHandle(texture.id());
         MetalNative.mtlComputeEncoderSetTexture(this.encoderHandle, handle, binding);

@@ -161,6 +161,18 @@ public class UploadStream {
         return this.uploadBuffer.id();
     }
 
+    /**
+     * Expose the underlying persistent buffer so encoders can bind a sub-range
+     * of it directly. M9-TODO closure: previously callers had to use raw
+     * {@code glBindBufferRange(...uploadBuffer.id()...)} because the encoder
+     * API only accepted {@link IGpuBuffer}; with the persistent-buffer overload
+     * on {@link me.cortex.voxy.client.core.gpu.ComputeEncoder#setBuffer(int, IGpuPersistentBuffer, long, long)}
+     * that gap closes.
+     */
+    public IGpuPersistentBuffer getUploadBuffer() {
+        return this.uploadBuffer;
+    }
+
     private record UploadFrame(IGpuFence fence, LongArrayList allocations) {}
     private record UploadData(IGpuBuffer target, long uploadOffset, long targetOffset, long size) {}
 

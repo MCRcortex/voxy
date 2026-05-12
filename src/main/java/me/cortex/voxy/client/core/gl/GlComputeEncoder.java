@@ -56,6 +56,12 @@ public final class GlComputeEncoder implements ComputeEncoder {
     }
 
     @Override
+    public void setBuffer(int binding, me.cortex.voxy.client.core.gpu.IGpuPersistentBuffer buffer, long offset, long size) {
+        GL43C.glBindBufferRange(GL43C.GL_SHADER_STORAGE_BUFFER, binding,
+                buffer.id(), offset, size);
+    }
+
+    @Override
     public void setTexture(int binding, IGpuTexture texture) {
         // Sampled-texture binding: lives on texture unit `binding`, paired
         // with the sampler from setSampler(binding, ...). Use setStorageImage
