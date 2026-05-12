@@ -41,14 +41,23 @@ public abstract class MixinDefaultChunkRenderer extends ShaderChunkRenderer {
         }
     }
 
-    @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/ShaderChunkRenderer;end(Lnet/caffeinemc/mods/sodium/client/render/chunk/terrain/TerrainRenderPass;)V", shift = At.Shift.BEFORE))
+    // M12 close: moved the Voxy hook from BEFORE-Sodium-end on the CUTOUT
+    // pass to HEAD of the SOLID pass. With the IOSurfaceBridgeCompositor now
+    // blitting full-screen, doing this BEFORE Sodium SOLID lets MC's depth
+    // buffer accumulate Sodium's near terrain ON TOP of Voxy's distant LOD
+    // — so the user sees Voxy LOD behind Sodium chunks rather than as a
+    // diagnostic strip. MC's main RT is bound throughout Sodium's render
+    // call, so HEAD is a fine inject point (the original "FBO 0 after
+    // LevelRenderer return" gotcha that drove the BEFORE-end position is
+    // about LevelRenderer's RETURN, not Sodium's).
+    @Inject(method = "render", at = @At(value = "HEAD"))
     private void injectRender(ChunkRenderMatrices matrices, CommandList commandList, ChunkRenderListIterable renderLists, TerrainRenderPass renderPass, CameraTransform camera, FogParameters fogParameters, boolean indexedRenderingEnabled, GpuSampler terrainSampler, CallbackInfo ci) {
         this.doRender(matrices, renderPass, camera, fogParameters);
     }
 
     @Unique
     private void doRender(ChunkRenderMatrices matrices, TerrainRenderPass renderPass, CameraTransform camera, FogParameters fogParameters) {
-        if (renderPass == DefaultTerrainRenderPasses.CUTOUT) {
+        if (renderPass == DefaultTerrainRenderPasses.SOLID) {
             var renderer = ((IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer).getVoxyRenderSystem();
             if (renderer != null) {
                 Viewport<?> viewport = null;
@@ -59,12 +68,11 @@ public abstract class MixinDefaultChunkRenderer extends ShaderChunkRenderer {
                 }
                 renderer.renderOpaque(viewport);
 
-                // M11: if Voxy rendered into a Metal-side IOSurface bridge,
-                // composite it into MC's framebuffer NOW (while MC's main RT
-                // is still bound by Sodium). Doing this at LevelRenderer
-                // renderLevel RETURN doesn't work — by then MC has unbound to
-                // FBO 0 and the blit lands in the window backbuffer that MC
-                // subsequently overwrites with its own RT→window blit.
+                // M12 close: if Voxy rendered into a Metal-side IOSurface
+                // bridge, composite it into MC's main RT NOW — at HEAD of
+                // Sodium's SOLID pass — so the full-screen blit lands first
+                // and Sodium's subsequent solid/cutout/translucent draws
+                // overdraw the near terrain on top via depth.
                 var pipeline = renderer.getPipeline();
                 if (pipeline != null && pipeline.metalBridge() != null) {
                     me.cortex.voxy.client.core.interop.IOSurfaceBridgeCompositor

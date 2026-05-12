@@ -445,12 +445,49 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             return;
         }
         int maxDrawCount = Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), 400_000);
-        this.renderTerrainMetal(encoder, viewport, 0L, maxDrawCount);
+        this.renderTerrainMetal(encoder, this.terrainPipeline, viewport, 0L, maxDrawCount);
+    }
+
+    /**
+     * M12 Metal-side temporal render — reuses the opaque terrain pipeline but
+     * draws from the temporal slice of {@code drawCallBuffer}
+     * ({@code TEMPORAL_OFFSET}+ slots, populated by commandGen.comp for sections
+     * that were visible-this-frame-but-not-last). On GL the equivalent path
+     * is {@link #renderTemporal}, which forwards to {@link #renderTerrain}
+     * with the temporal offsets.
+     */
+    public void renderTemporalMetal(me.cortex.voxy.client.core.gpu.RenderEncoder encoder, MDICViewport viewport) {
+        if (this.geometryManager.getSectionCount() == 0) return;
+        if (this.terrainPipeline == null) return;
+        int maxDrawCount = Math.min(this.geometryManager.getSectionCount(), 100_000);
+        this.renderTerrainMetal(encoder, this.terrainPipeline, viewport,
+                /*indirectOffset bytes*/ (long) TEMPORAL_OFFSET * 5L * 4L,
+                maxDrawCount);
+    }
+
+    /**
+     * M12 Metal-side translucent render — uses the dedicated translucent
+     * pipeline ({@code TRANSLUCENT_MESH}-style state with depth-test-no-write
+     * + premultiplied-alpha blend, both baked in at pipeline creation) and
+     * draws from the translucent slice of {@code drawCallBuffer}
+     * ({@code TRANSLUCENT_OFFSET}+ slots, populated by buildtranslucents.comp).
+     * Same SSBO bindings as opaque since both share quads3.vert + quads.frag;
+     * blend + depth state come from the pipeline state, no per-draw GL state
+     * changes needed.
+     */
+    public void renderTranslucentMetal(me.cortex.voxy.client.core.gpu.RenderEncoder encoder, MDICViewport viewport) {
+        if (this.geometryManager.getSectionCount() == 0) return;
+        if (this.translucentTerrainPipeline == null) return;
+        int translucentMax = Math.min(this.geometryManager.getSectionCount(), 100_000);
+        this.renderTerrainMetal(encoder, this.translucentTerrainPipeline, viewport,
+                /*indirectOffset bytes*/ (long) TRANSLUCENT_OFFSET * 5L * 4L,
+                translucentMax);
     }
 
     private void renderTerrainMetal(me.cortex.voxy.client.core.gpu.RenderEncoder encoder,
+                                    me.cortex.voxy.client.core.gpu.IGpuPipeline pipeline,
                                     MDICViewport viewport, long indirectOffset, int maxDrawCount) {
-        encoder.setPipeline(this.terrainPipeline);
+        encoder.setPipeline(pipeline);
         // SSBO bindings 0..5 — mirror bindRenderingBuffers; SceneUniform is an
         // SSBO post-chunk-3 SceneUniform flip.
         encoder.setBuffer(0, this.uniform, 0);

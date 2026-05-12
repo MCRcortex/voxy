@@ -365,14 +365,20 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
                 .build();
         try (var enc = backend.beginRenderPass(pass)) {
             enc.setViewport(0, 0, fbw, fbh, 0.0f, 1.0f);
-            // M12 chunk 6 step 3: invoke MDIC's Metal-aware opaque draw.
-            // Iris is GL-gated upstream, so on non-GL backends the section
-            // renderer is guaranteed to be an MDICSectionRenderer (and its
-            // viewport an MDICViewport — the typing follows from the
-            // RenderPipelineFactory pairing).
+            // M12 close — invoke MDIC's Metal-aware draws in the same order
+            // GL runPipeline uses (opaque → temporal → translucent). Iris is
+            // GL-gated upstream so on non-GL the section renderer is always
+            // an MDICSectionRenderer (and its viewport an MDICViewport —
+            // typing follows from the RenderPipelineFactory pairing).
+            // postOpaquePreTranslucent (SSAO) is skipped on Metal — SSAO
+            // is M13 polish; the LOD result is intelligible without it.
             if (this.sectionRenderer instanceof me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICSectionRenderer mdic
                     && viewport instanceof me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport mv) {
                 mdic.renderOpaqueMetal(enc, mv);
+                mdic.renderTemporalMetal(enc, mv);
+                if (!this.deferTranslucency) {
+                    mdic.renderTranslucentMetal(enc, mv);
+                }
             }
         }
         backend.submit();

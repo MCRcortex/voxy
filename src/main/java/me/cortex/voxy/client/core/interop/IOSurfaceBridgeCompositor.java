@@ -75,20 +75,22 @@ public final class IOSurfaceBridgeCompositor {
         int currentDrawFb = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
 
         glBindFramebuffer(GL_READ_FRAMEBUFFER, compositeFbo);
-        // M11 diagnostic: blit only the LEFT QUARTER of the bridge into the
-        // left quarter of MC's RT, leaving the rest of MC's image (Sodium
-        // chunk terrain) untouched. This proves the bridge→MC pipe works
-        // while keeping Sodium's output visible for verification.
+        // M12 close: blit the FULL bridge into MC's main RT (was diagnostic
+        // left-25% during M11/early-M12). With the mixin moved to before
+        // Sodium's SOLID pass, the LOD content goes down first and Sodium
+        // overdraws its near chunks on top via depth — so the full-screen
+        // blit lands behind the near terrain without needing cross-context
+        // depth import (M13's IOSurface-bridged MC-depth is the proper fix
+        // but works around the M12-acceptance gap fine).
         // Y-flip: Metal textures are top-left origin, GL framebuffers bottom-left.
-        int dstW = fbw / 4;
-        glBlitFramebuffer(0, 0, dstW, fbh,
-                          0, fbh, dstW, 0,
+        glBlitFramebuffer(0, 0, fbw, fbh,
+                          0, fbh, fbw, 0,
                           GL_COLOR_BUFFER_BIT, GL_LINEAR);
         glBindFramebuffer(GL_READ_FRAMEBUFFER, prevReadFb);
 
         blitFrameCounter++;
         if ((blitFrameCounter % 600) == 1) {
-            Logger.info("IOSurfaceBridgeCompositor: blit fired (left " + dstW + "px), DRAW_FBO="
+            Logger.info("IOSurfaceBridgeCompositor: full-screen blit fired, DRAW_FBO="
                     + currentDrawFb + " size " + fbw + "x" + fbh + " frame=" + blitFrameCounter);
         }
     }
