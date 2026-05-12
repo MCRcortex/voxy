@@ -150,15 +150,22 @@ void main() {
         hash ^= hash >> 13;
         hash *= 1274126177u;
         hash ^= hash >> 16;
+        // Map the hash channels into [0.55, 1.0] so every block reads as
+        // a saturated bright colour. The plain `(hash & 0xFF) / 255` from
+        // earlier let random channels collapse near zero — when combined
+        // with the Lambertian shade below the result averaged ~0.32,
+        // which read as "almost as dark as the background" for many
+        // blocks. Bias the range so the visual contrast is always strong.
         colour = vec4(
-            float((hash >>  0) & 0xFFu) / 255.0,
-            float((hash >>  8) & 0xFFu) / 255.0,
-            float((hash >> 16) & 0xFFu) / 255.0,
+            float((hash >>  0) & 0xFFu) / 255.0 * 0.45 + 0.55,
+            float((hash >>  8) & 0xFFu) / 255.0 * 0.45 + 0.55,
+            float((hash >> 16) & 0xFFu) / 255.0 * 0.45 + 0.55,
             1.0
         );
         // Face indices 0..5 = DOWN, UP, NORTH, SOUTH, WEST, EAST (mirrors
         // ModelTextureBakery.VIEWS order). Sky-direction Lambertian factor:
-        // top faces approach 1.0, bottom faces approach 0.3.
+        // top faces approach 1.0, bottom faces approach 0.55 (floor raised
+        // from 0.30 so the down-faces still read clearly).
         const vec3 FACE_NORMALS[6] = vec3[6](
             vec3( 0, -1,  0),
             vec3( 0,  1,  0),
@@ -172,7 +179,7 @@ void main() {
         // out-of-range face indices fall back to the UP entry.
         vec3 n = FACE_NORMALS[face < 6u ? face : 1u];
         float ndotl = dot(n, normalize(vec3(0.3, 1.0, 0.5)));
-        float shade = clamp(ndotl * 0.45 + 0.55, 0.30, 1.0);
+        float shade = clamp(ndotl * 0.35 + 0.65, 0.55, 1.0);
         colour.rgb *= shade;
     }
 #else
