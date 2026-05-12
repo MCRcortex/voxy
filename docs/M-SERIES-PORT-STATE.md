@@ -24,12 +24,12 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 |---|---|
 | Branch | `claude/opengl-mac-migration-analysis-6319V` |
 | Base | `dev` |
-| Last commit | `dd007eae` (M12 chunk 6 step 1 — runPipelineMetal runs the migrated compute side) |
-| Commits ahead of `dev` | 37 |
+| Last commit | `75277c42` (M12 close — translucent + temporal + full-screen composite) |
+| Commits ahead of `dev` | 79 |
 | Test machine | Apple M4 Max, macOS 26.4.1, JDK 24.0.2 |
 | MC target | 1.21.11 (Fabric 0.18.2, Java 21+) |
 | LWJGL | 3.3.3 |
-| Milestone status | M0–M11 ✅ closed (visually verified end-to-end on M4 inside MC). **M12 in progress** — migrate MDIC render path to encoder API on Metal. |
+| Milestone status | M0–M12 ✅ closed — Voxy LOD chunks render full-screen behind Sodium's near terrain on Apple M4 with `VOXY_FORCE_METAL=1`, user-confirmed 2026-05-12 (no diagnostic strip; full LOD pyramid visible across the horizon with face-shaded debug colours). **M13 in progress** — texture / lighting / depth-import polish so the LOD samples real model textures + MC lightmap instead of `VOXY_NO_ATLAS`. |
 
 ---
 
@@ -49,6 +49,14 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 
 | SHA | Title | Validates |
 |---|---|---|
+| `75277c42` | M12 close — translucent + temporal render + full-screen composite | M12 acceptance closure. Adds `MDICSectionRenderer.renderTemporalMetal` + `renderTranslucentMetal` (refactors `renderTerrainMetal` to take a pipeline param); `AbstractRenderPipeline.runPipelineMetal` invokes all three (opaque → temporal → translucent) inside its render pass. `IOSurfaceBridgeCompositor` switches from the LEFT-25% diagnostic blit to a full-screen blit. `MixinDefaultChunkRenderer` moves the inject from `BEFORE-Sodium.end` on CUTOUT to `HEAD` of Sodium SOLID — Voxy runs its full pipeline + composite BEFORE Sodium draws so Sodium's near terrain overdraws Voxy LOD via depth. User-confirmed 2026-05-12: full-screen LOD pyramid visible behind Sodium chunks. |
+| `9d31a759` | quads.frag — bias VOXY_NO_ATLAS hash colour into [0.55, 1.0] | After 89c4d947 user reported only ice blocks visible. The random hash mapped channels to `[0.0, 1.0]`; the bottom half collapsed to near-black after Lambertian shading. Bias to `[0.55, 1.0]` (mul 0.45, add 0.55) and raise the shade floor from 0.30 to 0.55. Every block now reads as a saturated bright colour with visible face-direction shading. |
+| `89c4d947` | M12 polish — face-shaded LOD chunks + NO_CULL on Metal terrain | Two fixes after step 3 (chunks visible but dark / sparse). (a) The Metal terrain pipeline now uses `RasterState.NO_CULL` (GL's renderTerrain explicitly calls `glDisable(GL_CULL_FACE)` at draw-time — that override doesn't reach Metal where cull mode is baked into the pipeline state). (b) `VOXY_NO_ATLAS` adds fake Lambertian shading from face normal so the cube structure of each LOD chunk is visible (top bright, bottom dark, sides graded). |
+| `fd05a9fa` | M12 chunk 6 step 3 follow-up — VOXY_NO_ATLAS debug colour on Metal | After step 3 the chunks were nearly-as-dark-as-the-clear background because `quads.frag` discards on unbound `depthTex` + unbound `blockModelAtlas` alpha. New `VOXY_NO_ATLAS` shader define (injected on non-GL backends) skips those discards entirely and emits a per-quad debug colour hashed from `interData.x`. Smoke test SPV 28/28, MSL 27/28. |
+| `9ef28478` | M12 chunk 6 step 3 — renderOpaque draws LOD chunks on Metal | First real LOD draws on Metal. New `metalDepthTex` (D24S8) sized to bridge; `runPipelineMetal`'s render pass attaches bridge colour + depth, clears both each frame, then dispatches `MDICSectionRenderer.renderOpaqueMetal` via instanceof guard. New encoder-based renderTerrainMetal (6 SSBOs + SharedIndexBuffer UINT16 + drawIndexedIndirect). `buildDrawCalls` zeros `drawCallBuffer` on non-GL so beyond-count slots have instanceCount=0 (no-op). `ModelStore.bindBuffers(encoder, ...)` + `SharedIndexBuffer.getBuffer()` accessors added. Lightmap / atlas / depth-bounding texture binds skipped (untextured visuals until M13). |
+| `676f0c09` | Close M9-TODO — encoder.setBuffer(IGpuPersistentBuffer, offset, size) | AsyncNodeManager + NodeCleaner had 3 remaining raw `glBindBufferRange(GL_SHADER_STORAGE_BUFFER, ..., UploadStream.INSTANCE.getRawBufferId(), ...)` calls inside compute encoder passes; on Metal those raw GL binds scribbled into MC's context. New `ComputeEncoder.setBuffer(int, IGpuPersistentBuffer, long, long)` overload + `UploadStream.getUploadBuffer()` accessor close the M9 "UploadStream raw GL id" TODO. ANM + NC fully encoder-clean. |
+| `e71decf8` | Fix M12 chunk 6 step 1 crash — DownloadStream.commit through backend | `DownloadStream.commit()` was crashing in `runPipelineMetal` with "No context is current or a function not available in the current context" because it called `glMemoryBarrier` (GL 4.2) on Apple's GL 4.1 context. Fix: route through `backend.memoryBarrier(...)` + a new `RenderBackend.copyBufferSubData(IGpuBuffer src, IGpuPersistentBuffer dst, ...)` overload (mirrors the existing upload-direction signature). Unblocks chunk 6 step 1. |
+| `4f066eb8` | Update M-SERIES-PORT-STATE for M12 chunk 5 + chunk 6 prep + step 1 | Doc-only — captures chunks 5 / 6-prep / 6-step-1 in the commit-history table; M12 section rewritten with per-chunk status and the three remaining open decisions (cross-context MC-depth, depth-target ownership for runPipelineMetal, ModelStore + LightMapHelper migration vs stub). |
 | `dd007eae` | M12 chunk 6 step 1 — runPipelineMetal runs the migrated compute side | Replaces `runPipelineMetalStub` (clear-only) with a real `runPipelineMetal`: allocates the bridge, calls `viewport.hiZBuffer.ensureAllocated`, runs DownloadStream.tick + AsyncNodeManager.tick + NodeCleaner.tick + HOT.doTraversal + buildDrawCalls in full on Metal, then clears the bridge to cyan/teal as visual feedback. Adds `HiZBuffer.ensureAllocated(w,h)` so HOT can bind a valid (zero-initialized) HiZ texture without the GL-only mip blit. Renders no actual LOD geometry yet — that's step 3. |
 | `89b35814` | M12 chunk 6 prep — close HOT's 4 raw-GL gaps for cross-backend safety | `addTLN` / `remTLN` now upload via `UploadStream` instead of raw `glBindBuffer` + `nglBufferSubData(SCRATCH)`; the doTraversal renderList-counter zero and downloadResetRequestQueue request-counter zero use `IGpuBuffer.zeroRange` (already implemented on both backends). The static `SCRATCH` direct-buffer alloc and the `GL_COPY_READ_BUFFER` / `glBindBuffer` static imports are gone. `HierarchicalOcclusionTraverser` is now fully backend-agnostic. |
 | `3fa07c44` | M12 chunk 5 — Metal cull stub via force-all-visible compute | Adds `lod/gl46/force_all_visible.comp` (writes `visibilityData[sid] = (frameId & 0x7fffffff) \| (1<<31)` for every section in `indirectLookup`). MDIC's "Test occlusion" block now branches on `backend.getType()`: GL keeps the raster cull, every other backend runs the force-all-visible compute via `dispatchIndirect` (reusing `prep`'s dispatch sizing in `drawCountCallBuffer`). Smoke test grows to 27 cases — SPV 27/27, MSL 26/27. Real Metal cull (depth-test rasterized) deferred until cross-context MC-depth access lands. |
@@ -431,7 +439,7 @@ Recommended migration order (simplest first):
 
 ---
 
-## M12 — LOD distance migration (in progress)
+## M12 — LOD distance migration ✅ CLOSED (2026-05-12)
 
 **Goal:** Voxy's actual LOD content (terrain quads from
 `MDICSectionRenderer`) renders into the IOSurface bridge on Metal,
@@ -504,69 +512,167 @@ program and have no effect. Hence: nothing renders.
    No real occlusion on Metal yet — that's perf optimization
    deferred until cross-context MC-depth access lands (see
    chunk 6 step 2 below).
-6. **Render passes + `runPipelineMetal`** — broken into 3 steps:
+6. ✅ **Render passes + `runPipelineMetal`** — landed in 3 steps:
    - ✅ **step 1** (commit `dd007eae`) — `runPipelineMetal`
      replaces the clear-only stub and runs the full migrated
      compute pipeline on Metal: `viewport.hiZBuffer.ensureAllocated`
      (new helper; allocates HiZ tex without per-mip blit so HOT
      can bind it) + `DownloadStream.tick` + `AsyncNodeManager.tick`
      + `NodeCleaner.tick` + `HOT.doTraversal` + `buildDrawCalls`.
-     Plus a teal clear of the bridge as visual feedback. Still
-     no LOD geometry; the render-side stages stay raw GL.
-   - ⏳ **step 2** (open) — cross-context depth surfacing. Today
-     the Metal path's HiZ texture is zero-initialized (which
-     trivially passes "is occluded?" for every section), and the
-     real `cull` pass is replaced by `force_all_visible`. Either:
-     (a) IOSurface-bridge MC's GL depth attachment into a Metal
-     IGpuTexture so HiZBuffer.buildMipChain can populate the
-     HiZ pyramid and `cull` can run depth-test rasterization; or
-     (b) drop occlusion on Metal entirely and accept the perf
-     cost. The doc decision queue trims this to step 2.
-   - ⏳ **step 3** (open, the user-visible payoff) — migrate
-     `renderTerrain` / `renderTranslucent` / `renderTemporal`
-     to `RenderEncoder`. Inside `runPipelineMetal`, open a render
-     pass against the bridge (color) + a Voxy-owned depth texture
-     (allocated lazily, sized to MC's framebuffer), then
-     `setPipeline(terrainPipeline)` + bind 7+ SSBOs + bind
-     SharedIndexBuffer as index + `drawIndexedIndirectCount` from
-     `drawCallBuffer` / `drawCountCallBuffer`. Also needs
-     `setupAndBindOpaque` / `setupAndBindTranslucent` to no-op
-     on Metal (the encoder owns the FBO via the render pass),
-     and `ModelStore.bind` + `LightMapHelper.bind` to route
-     through the encoder (or be skipped on Metal with the
-     accepted cost of no model textures / wrong lightmap).
+     Plus a teal clear of the bridge as visual feedback. Two
+     follow-up fixes (`e71decf8` `DownloadStream.commit` raw GL,
+     `676f0c09` AsyncNodeManager/NodeCleaner raw `glBindBufferRange`)
+     made the compute path actually run on Apple's GL 4.1 context
+     without crashing.
+   - ✅ **step 3** (commit `9ef28478`, polished by `fd05a9fa`,
+     `89c4d947`, `9d31a759`, and closed by `75277c42`) — full
+     render-side migration. `metalDepthTex` (D24S8, lazy, bridge-
+     sized) attached as depth in `runPipelineMetal`'s render pass.
+     `MDICSectionRenderer.renderOpaqueMetal` / `renderTemporalMetal`
+     / `renderTranslucentMetal` issue `drawIndexedIndirect` against
+     `drawCallBuffer` at the respective slot offsets, with all 6
+     SSBO bindings flowing through `encoder.setBuffer`. Texture
+     bindings (modelAtlas / lightmap / depthBoundingBuffer)
+     remain unbound (M13 territory); `VOXY_NO_ATLAS` shader
+     define + a per-quad hash-colour + sky-direction face
+     Lambertian shade gives a clearly visible cube-shaded debug
+     output. `NO_CULL` rasterizer state on Metal so the GL path's
+     draw-time `glDisable(GL_CULL_FACE)` semantic is preserved.
+     `buildDrawCalls` zeros `drawCallBuffer` on non-GL backends
+     so beyond-count slots no-op.
+   - **step 2 deferred to M13** — cross-context MC-depth (real
+     HiZ + real cull on Metal). M12 ships with the
+     `force_all_visible` stub instead, which is functionally
+     correct (slower than depth occlusion, no observable issue
+     for the M4 test runs).
 
-### Decision queue (open)
+### Composite (M12 close)
 
-- **Chunk 6 step 2 — cross-context MC-depth access**: do we
-  IOSurface-bridge MC's GL depth attachment so HiZBuffer can build
-  the real mip pyramid on Metal (and `cull` can run real
-  depth-test rasterization)? Or accept "no occlusion on Metal"
-  permanently and just keep the `force_all_visible` stub? The
-  perf cost of "no occlusion" with high LOD-distance settings
-  is unmeasured but probably substantial — worth profiling once
-  step 3 lands and we can actually see/render geometry.
-- **Chunk 6 step 3 — depth target ownership**: where does the
-  Voxy-owned depth texture for `runPipelineMetal`'s render pass
-  live? Options: a new field on `AbstractRenderPipeline` (parallel
-  to `metalBridge`), or extend `IGpuFramebuffer` so `this.fb`
-  works cross-backend with the bridge as color. The latter is
-  cleaner but more invasive.
-- **`ModelStore.bind` / `LightMapHelper.bind`**: do we migrate
-  them to take a `ComputeEncoder` / `RenderEncoder`, or just stub
-  them on Metal and accept untextured / wrong-lit LOD until M13?
-  Migration is mechanical (~30 min each); stubbing is faster but
-  pushes the visual gap to a later milestone.
+After step 3 the LOD draws landed in the bridge but
+`IOSurfaceBridgeCompositor` was still in its M11 dev-time mode of
+blitting only the **left 25%** of the bridge into MC's main RT.
+Commit `75277c42` flips this to a **full-screen** blit AND moves
+the Sodium-render mixin from `BEFORE-Sodium.end CUTOUT` to `HEAD
+Sodium.SOLID` so Voxy's full pipeline + composite runs *before*
+Sodium starts drawing. Result: Sodium's near terrain overdraws
+Voxy LOD via depth-test on top of the bridge's blit, exactly the
+"LOD behind near terrain" stacking M12 acceptance requires.
 
-### Status after this batch (commits `2e8e302d` through `dd007eae`)
+### M12 acceptance (2026-05-12)
 
-All 5 MDIC compute prepasses (incl. the Metal `cull` substitute)
-now flow through `ComputeEncoder`. `runPipelineMetal` runs the
-entire compute side on Metal (HOT traversal + buildDrawCalls).
-The bridge composites as cyan/teal instead of magenta/yellow —
-that's the visual cue that chunk 6 step 1 is in effect. No actual
-LOD geometry yet; step 3 (renderTerrain encoder migration) is the
-final piece for visible distance chunks on Metal.
+User-confirmed visually on Apple M4 with `VOXY_FORCE_METAL=1`: no
+diagnostic strip, full LOD pyramid visible behind Sodium's near
+chunks, all blocks with distinct face-shaded debug colours.
+M12 ✅ closed.
+
+---
+
+## M13 — texture / lighting / depth-import polish (in progress)
+
+**Goal:** the Metal LOD samples real model textures + MC lightmap
+instead of `VOXY_NO_ATLAS`'s hash colours; per-fragment occlusion
+against MC's depth attachment (replacing the M12
+`force_all_visible` cull stub); SSAO + final-blit on Metal so the
+visuals match the GL path.
+
+**Acceptance:** Voxy LOD on Metal is visually indistinguishable from
+the GL backend at the same distance settings (modulo Iris features,
+which stay GL-gated).
+
+### Open chunks (roughly ordered by user-visible impact)
+
+1. ⏳ **Model texture atlas on Metal** — biggest visual jump.
+   `ModelStore.textures` is an `IGpuTexture` that's a `MetalTexture`
+   on Metal, but `ModelTextureBakery` populates it via raw GL FBO
+   rendering using MC's block atlas (which is fundamentally a
+   `((com.mojang.blaze3d.opengl.GlTexture)tex).glId()` — GL-only
+   in MC's design). Three approaches in increasing order of work:
+   - (a) **CPU readback bridge** (~1 day): Keep ModelTextureBakery
+     running on GL (renders into a temporary GL atlas texture).
+     After init, `glGetTexImage` → CPU buffer → upload to
+     ModelStore.textures' MetalTexture (Shared memory →
+     `memcpy` to `contentsPtr` + `didModifyRange`). Atlas size
+     is ~12k × 8k RGBA8 ≈ 400 MB; one-time init cost.
+   - (b) **IOSurface atlas bridge** (~1.5 days): Allocate an
+     IOSurface sized to the atlas, wrap as GL_TEXTURE_RECTANGLE
+     on GL and `MTLTexture` on Metal, bake into it from GL,
+     sample from Metal. Zero-copy after init. Complication:
+     `GL_TEXTURE_RECTANGLE` doesn't support mipmaps and uses
+     unnormalized UVs; the terrain shader uses normalized UVs +
+     `textureGrad` (mip-aware). Either: drop mipmaps on Metal
+     (visible quality hit on distant LOD), or use a different
+     binding shape.
+   - (c) **Full bakery encoder migration** (~2-3 days): port
+     `ModelTextureBakery` + `GlViewCapture` + the residual raw
+     GL in `BudgetBufferRenderer` to the `RenderEncoder`
+     abstraction; cross-context MC-atlas read via IOSurface
+     bridge for the source side. Cleanest long-term but biggest
+     scope.
+
+   Recommended: **(a)** first to unlock the visuals; revisit (b)
+   or (c) once perf is measured.
+
+2. ⏳ **MC lightmap on Metal** — `LightMapHelper.bind` currently
+   reads MC's lightmap via `((GlTexture)Minecraft...lightTexture()
+   .getTextureView().texture()).glId()`. Same shape as the atlas
+   bridge but MUCH smaller (lightmap is 16×16 RGBA). CPU readback
+   per frame is negligible (~1 KB); IOSurface bridge is also
+   trivial. Either works. Unblocks proper lighting (the
+   `getLighting()` calls in `quads.frag` currently return zeros
+   on Metal because the binding is unbound).
+
+3. ⏳ **MC depth import (real HiZ + real cull on Metal)** —
+   `force_all_visible` stub from M12 chunk 5 means every
+   frustum-visible section is considered visible, even occluded
+   ones. With `VOXY_NO_ATLAS` going away (chunk 1) we'd also
+   want the `texelFetch(depthTex, ...)` discard inside
+   `quads.frag` to work, which needs MC's depth. Bridge MC's
+   depth attachment via IOSurface (different format from atlas
+   — `MTLPixelFormatDepth24Unorm_Stencil8` or
+   `MTLPixelFormatDepth32Float`); add the source-side bind to
+   `HiZBuffer.buildMipChain`'s sampler. Once depth is available
+   on Metal, the `cull` raster pass can also migrate (open
+   render pass against MC's depth + Voxy's visibility SSBO).
+
+4. ⏳ **`finish()` + SSAO on Metal** — `NormalRenderPipeline.finish`
+   is the depth-aware blit that lays Voxy's color over MC's RT on
+   GL; on Metal we use the full-screen blit from
+   `IOSurfaceBridgeCompositor` instead, which loses the
+   per-pixel depth-test against MC's foreground. Once chunk 3
+   lands (MC depth on Metal), the compositor can become
+   depth-aware too — using `MTLBlitCommandEncoder` or a
+   render-pass+sample-depth approach. SSAO
+   (`postOpaquePreTranslucent`) is a pure compute on Voxy's
+   color+depth textures — straightforward encoder migration
+   once depth is reachable.
+
+5. ⏳ **Fog + atmosphere parity** — `finalBlit`'s `blit_texture_
+   depth_cutout.frag` has fog math gated behind
+   `useEnvironmentalFog`. The shader is already compiled via
+   `RuntimeShaderCompiler` for Metal (it's part of the
+   `FullscreenBlit` pipeline migrated earlier); only the *call
+   site* (`finish()`) is GL-only. Lands together with chunk 4.
+
+### Decision queue (M13 open)
+
+- **Atlas approach** (chunk 1): (a) CPU readback vs (b) IOSurface
+  bridge. CPU readback is simpler but adds ~seconds to MC's init;
+  IOSurface needs mipmap workaround. Recommendation: do (a) first,
+  measure init time, decide if (b) is worth the engineering work.
+- **Lightmap freshness** (chunk 2): MC's lightmap updates every
+  frame (sky/torch light changes). Per-frame readback or per-frame
+  IOSurface re-sync. IOSurface is the natural choice since the
+  bridge is already there for the main RT.
+- **Depth format** (chunk 3): MC's main RT uses
+  `GL_DEPTH24_STENCIL8` (matches Voxy's `fb`). IOSurface supports
+  D24S8 on macOS, so direct bridging should work.
+
+### Status after M12 close
+
+Voxy on Metal renders LOD chunks end-to-end, behind Sodium's near
+terrain, with face-shaded debug colours. M13 is purely visual
+polish — none of it is on the critical path for "Voxy runs on
+Mac", which M12 closed.
 
 ---
 

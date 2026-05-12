@@ -32,45 +32,48 @@ The plan, in milestones:
 7. **M12 / M13:** Validate full LOD distance rendering inside Minecraft.
 8. **M14:** Benchmark Metal vs Vulkan and decide.
 
-**M0 through M11 are closed.** We're starting M12 (LOD distance migration) today.
+**M0 through M12 are closed.** We're starting M13 (texture + lighting + depth-import polish) on 2026-05-12.
 
 ---
 
 ## Where we are now
 
-**~30 commits on the branch. 11 smoke tests pass on this Apple M4 Max. Voxy boots, initializes on Metal, and a clear-color stub renders into MC's framebuffer end-to-end inside Minecraft.**
+**~80 commits on the branch. 12 smoke tests pass on this Apple M4 Max. Voxy renders LOD chunks end-to-end on Metal inside Minecraft, behind Sodium's near terrain, full-screen — user-confirmed 2026-05-12.**
 
 - ✅ Dev env (JDK 24, Xcode CLT, CMake) verified.
-- ✅ Runtime shader compiler — translates Voxy's GLSL to SPIRV (for Vulkan) and to MSL (for Metal) on the fly. Disk cache. 24/24 representative shaders compile to SPIRV (8/9 to MSL — `hiz.comp` deferred).
+- ✅ Runtime shader compiler — translates Voxy's GLSL to SPIRV (for Vulkan) and to MSL (for Metal) on the fly. Disk cache. 28 representative shaders compile to SPIRV (27 to MSL — `hiz.comp` deferred).
 - ✅ Encoder API — Voxy describes render or compute passes through a backend-agnostic API instead of raw GL, with real implementations on Metal **and** GL (so Win/Linux users keep working).
-- ✅ **Metal**: clear color, triangle, compute dispatch + SSBO write, vertex layout + indirect draw, indirect command buffers (ICB) all working end-to-end on the GPU.
+- ✅ **Metal**: clear color, triangle, compute dispatch + SSBO write, vertex layout + indirect draw, indirect command buffers (ICB), render passes against IOSurface bridges with depth attachments, encoder-based drawIndexedIndirect — all working end-to-end.
 - ✅ **Vulkan via MoltenVK**: clear color, triangle, compute dispatch with descriptor sets all working.
 - ✅ Pipeline state config (depth, blend, cull, polygon mode), samplers, push-constant-equivalent uniforms — all wired up.
-- ✅ **M9 file migration**: `NodeCleaner`, `HierarchicalOcclusionTraverser`, `HiZBuffer`, `FullscreenBlit`, `AbstractRenderPipeline`, `NormalRenderPipeline`, `ChunkBoundRenderer`, `AsyncNodeManager`, `BudgetBufferRenderer`, the 5 MDIC non-Iris pipelines, and the 2 MDIC terrain pipelines all create their pipelines through the abstraction. Iris pipelines gated to GL-only by design.
+- ✅ **M9 file migration**: every Voxy file that builds a pipeline now goes through the cross-backend abstraction. `AsyncNodeManager`, `NodeCleaner`, `HierarchicalOcclusionTraverser`, `MDICSectionRenderer` (5 compute prepasses + 2 terrain graphics pipelines) are all fully encoder-clean — no raw GL on the hot path. Iris pipelines gated to GL-only by design.
 - ✅ **M10 IOSurface bridge**: an IOSurface is wrapped as both an `MTLTexture` (Metal render target) and a `GL_TEXTURE_RECTANGLE` (sampleable from MC's GL compositor), with the GL-side bind path through `CGLTexImageIOSurface2D`.
-- ✅ **M11 end-to-end visual verification (run 2026-05-10/11)**: with `VOXY_FORCE_METAL=1`, MC boots, Voxy initializes on Metal, Sodium chunk workers run (macOS arm64 `lwjgl-zstd`/`lwjgl-lmdb` natives bundled), `IOSurfaceBridgeCompositor` blits the bridge into MC's main RT during Sodium's CUTOUT pass, and MC closes cleanly (`AsyncNodeManager` worker is daemon). User confirmed visually: magenta strip in the left 25% + Sodium terrain in the right 75% + clean close.
+- ✅ **M11 end-to-end visual verification (run 2026-05-10/11)**: with `VOXY_FORCE_METAL=1`, MC boots, Voxy initializes on Metal, Sodium chunk workers run, the IOSurface bridge composites cleanly. MC closes without hanging.
+- ✅ **M12 LOD distance migration (closed 2026-05-12)**: `runPipelineMetal` runs the full pipeline (DownloadStream + AsyncNodeManager + NodeCleaner + HOT + MDIC's 5 compute prepasses + 3 render passes — opaque, temporal, translucent). `IOSurfaceBridgeCompositor` blits the bridge full-screen at HEAD of Sodium SOLID so MC's near terrain overdraws Voxy LOD via depth. User-confirmed: no diagnostic strip, LOD pyramid visible across the horizon, all chunks distinct face-shaded blocks.
 
-The native library (`libvoxy_metal.dylib`) exposes ~100 JNI entry points (ICB + IOSurface bridge added in M10/M11).
+The native library (`libvoxy_metal.dylib`) exposes ~100 JNI entry points.
 
-**Each smoke test has caught at least one real bug.** The `VertexLayout` test caught an off-by-9 in our `MTLVertexFormat` enum mapping that the SDK header would have flagged. The ICB test caught a per-slot pipeline binding requirement.
+**Each smoke test has caught at least one real bug.** The `VertexLayout` test caught an off-by-9 in our `MTLVertexFormat` enum mapping that the SDK header would have flagged. The ICB test caught a per-slot pipeline binding requirement. The runtime tested catches included GL 4.2 `glMemoryBarrier` slipping into `DownloadStream.commit` (caught on Apple's GL 4.1 context) and `MetalBuffer.id()` masquerading as a GL buffer name in `AsyncNodeManager`'s `glBindBufferRange` — both fixed via encoder-routing.
 
 ---
 
 ## What's still missing
 
-M12 (LOD distance migration) is the next concrete deliverable. Today the Metal path only renders a clear-color stub into the IOSurface bridge because Voxy's actual rendering code (`MDICSectionRenderer.renderTerrain` / `renderTranslucent` / `renderTemporal` and the 5 compute prepasses in `buildDrawCalls`) still calls raw `glUseProgram` / `glBindBufferBase` / `glMultiDrawElementsIndirectCount*` / `glDispatchCompute*` — on Metal `mdicProgramId(p)` returns 0 so those calls no-op.
+M12 closed with one major gap: **no real model textures and no MC lightmap on Metal yet**, so LOD chunks render in a `VOXY_NO_ATLAS` debug mode (per-quad hash colour + sky-direction Lambertian shade). M13 fills that gap.
 
-To finish M12 we need:
+To finish M13 we need (roughly ordered by user-visible impact):
 
-1. **MDIC compute prepasses through `ComputeEncoder`** — the 4 simple compute passes (`prep`, `commandGen`, `prefixSum`, `translucentGen`) need `beginComputePass` + `setBuffer` + `dispatch[Indirect]` + `barrier`. The `cull` pass is a graphics pass (rasterized into a discard-only target) and needs more care.
+1. **Model texture atlas on Metal** (~1 day): `ModelTextureBakery` populates `ModelStore.textures` via raw GL FBO rendering using MC's block atlas (a `((GlTexture)tex).glId()` cross-cast that's GL-only by MC's design). Pragmatic path: keep the bakery on GL, then `glGetTexImage` → CPU buffer → upload to the MetalTexture at init. Atlas size ~400 MB; one-time cost. Or IOSurface-bridge the atlas (~1.5 days) for zero-copy + per-frame refresh ability.
 
-2. **MDIC render passes through `RenderEncoder`** — `renderTerrain` / `renderTranslucent` / `renderTemporal` need `beginRenderPass` against the IOSurface bridge, plus `setPipeline` + `setBuffer` + `bindIndexBuffer` + `drawIndexedIndirect` (Metal CPU loop) or `drawIndexedIndirectCount` (GL).
+2. **MC lightmap on Metal** (~0.5 day): same shape as the atlas but tiny (16×16 RGBA, ~1 KB). CPU readback per frame is negligible. Unblocks the `getLighting()` path in `quads.frag` so terrain lighting reads MC's actual time-of-day + torch state.
 
-3. **`AbstractRenderPipeline.runPipelineMetalStub` replaced** with a real `runPipelineMetal` that opens a render pass against the bridge, invokes the section renderer, then submits.
+3. **MC depth import** (~1 day): bridge MC's depth attachment so `HiZBuffer.buildMipChain` can run for real, and the `force_all_visible` cull stub from M12 can be replaced by depth-test rasterized cull (the GL path's behaviour). Performance impact: occlusion-based culling probably cuts 50–90% of LOD draws in dense scenes.
 
-Plus the remaining shader topology + JSON gaps (per-mip texture views for HiZBuffer2; `hiz.comp` MSL workaround) — both unblock more advanced render passes but aren't on the critical path for M12 acceptance.
+4. **`finish()` blit + SSAO on Metal** (~0.5 day): once MC's depth is reachable on Metal, the compositor can become depth-aware (per-pixel test against MC's foreground instead of the M12 stacking workaround), and the post-opaque SSAO compute pass migrates trivially.
 
-Total estimate for M12: **~2–3 days**.
+5. **Fog + atmosphere parity** (~0.5 day): the shader is already migrated; only the GL-only call site in `finish()` is missing.
+
+Total estimate for M13: **~3-4 days** focused work.
 
 ---
 
