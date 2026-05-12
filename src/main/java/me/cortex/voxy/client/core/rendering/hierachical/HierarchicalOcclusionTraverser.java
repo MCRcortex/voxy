@@ -32,8 +32,6 @@ import static org.lwjgl.opengl.GL11.GL_UNPACK_SKIP_ROWS;
 import static org.lwjgl.opengl.GL11.glPixelStorei;
 import static org.lwjgl.opengl.GL12.GL_UNPACK_IMAGE_HEIGHT;
 import static org.lwjgl.opengl.GL12.GL_UNPACK_SKIP_IMAGES;
-import static org.lwjgl.opengl.GL31C.GL_COPY_READ_BUFFER;
-import static org.lwjgl.opengl.GL31C.glBindBuffer;
 
 /**
  * Hierarchical occlusion traverser. Walks the LOD octree on the GPU via a
@@ -43,12 +41,10 @@ import static org.lwjgl.opengl.GL31C.glBindBuffer;
  * M9 status: fully migrated onto the {@link RenderBackend} encoder
  * abstraction. Bind once per pass, dispatch indirect from
  * {@link #queueMetaBuffer}, flip-flop source/sink between iterations. The
- * remaining raw OpenGL calls are CPU→GPU upload helpers
- * ({@link #addTLN}/{@link #remTLN} write a single int via
- * {@code nglBufferSubData}, {@link #doTraversal} zeroes the render-list
- * counter the same way) — these don't fit the encoder model and will move
- * onto a future {@code copyToBuffer(IGpuBuffer, offset, addr, size)} backend
- * call when one is added.
+ * single-int CPU→GPU writes ({@link #addTLN}/{@link #remTLN}) flow through
+ * {@link UploadStream}, and counter resets ({@link #doTraversal},
+ * {@link #downloadResetRequestQueue}) use {@code IGpuBuffer.zeroRange} —
+ * so the class is fully backend-agnostic (M12 chunk 6 prep).
  */
 public class HierarchicalOcclusionTraverser {
     public static final boolean HIERARCHICAL_SHADER_DEBUG = System.getProperty("voxy.hierarchicalShaderDebug", "false").equals("true");
@@ -157,12 +153,13 @@ public class HierarchicalOcclusionTraverser {
             throw new IllegalStateException("Top level node count greater than capacity");
         }
 
-        // CPU→GPU single-int upload. Doesn't fit the encoder model;
-        // stays as raw GL until a copyToBuffer helper exists on RenderBackend.
-        MemoryUtil.memPutInt(SCRATCH, id);
-        glBindBuffer(GL_COPY_READ_BUFFER, this.topNodeIds.id());
-        org.lwjgl.opengl.GL15C.nglBufferSubData(GL_COPY_READ_BUFFER, aid * 4L, 4, SCRATCH);
-        glBindBuffer(GL_COPY_READ_BUFFER, 0);
+        // M12 chunk 6 prep: route through UploadStream (cross-backend) instead
+        // of raw glBindBuffer + nglBufferSubData. On Metal the previous raw GL
+        // pattern would have written into MC's GL context against a meaningless
+        // ID (MetalBuffer.id() is a Metal-internal handle, not a GL buffer name).
+        long ptr = UploadStream.INSTANCE.upload(this.topNodeIds, aid * 4L, 4);
+        MemoryUtil.memPutInt(ptr, id);
+        UploadStream.INSTANCE.commit();
 
         if (this.topNode2idxMapping.put(id, aid) != -1) {
             throw new IllegalStateException();
@@ -183,10 +180,9 @@ public class HierarchicalOcclusionTraverser {
         if (this.topNode2idxMapping.put(endTLNId, idx) == -1)
             throw new IllegalStateException();
 
-        MemoryUtil.memPutInt(SCRATCH, endTLNId);
-        glBindBuffer(GL_COPY_READ_BUFFER, this.topNodeIds.id());
-        org.lwjgl.opengl.GL15C.nglBufferSubData(GL_COPY_READ_BUFFER, idx * 4L, 4, SCRATCH);
-        glBindBuffer(GL_COPY_READ_BUFFER, 0);
+        long ptr = UploadStream.INSTANCE.upload(this.topNodeIds, idx * 4L, 4);
+        MemoryUtil.memPutInt(ptr, endTLNId);
+        UploadStream.INSTANCE.commit();
     }
 
     private static void setFrustum(Viewport<?> viewport, long ptr) {
@@ -232,9 +228,7 @@ public class HierarchicalOcclusionTraverser {
         }
 
         //Clear the render output counter
-        glBindBuffer(GL_COPY_READ_BUFFER, viewport.getRenderList().id());
-        org.lwjgl.opengl.GL15C.nglBufferSubData(GL_COPY_READ_BUFFER, 0, 4, 0);
-        glBindBuffer(GL_COPY_READ_BUFFER, 0);
+        viewport.getRenderList().zeroRange(0, 4);
 
         this.traverseInternal(viewport);
         this.downloadResetRequestQueue();
@@ -337,9 +331,10 @@ public class HierarchicalOcclusionTraverser {
 
     private void downloadResetRequestQueue() {
         DownloadStream.INSTANCE.download(this.requestBuffer, this::forwardDownloadResult);
-        glBindBuffer(GL_COPY_READ_BUFFER, this.requestBuffer.id());
-        org.lwjgl.opengl.GL15C.nglBufferSubData(GL_COPY_READ_BUFFER, 0, 4, 0);
-        glBindBuffer(GL_COPY_READ_BUFFER, 0);
+        // M12 chunk 6 prep: cross-backend zero (was raw glBindBuffer +
+        // nglBufferSubData(null) which is UB-on-strict-drivers and outright
+        // broken on Metal where the buffer id isn't a GL name).
+        this.requestBuffer.zeroRange(0, 4);
     }
 
     private void forwardDownloadResult(long ptr, long size) {
@@ -373,6 +368,4 @@ public class HierarchicalOcclusionTraverser {
         this.scratchQueueB.free();
         this.hizSampler.close();
     }
-
-    private static final long SCRATCH = MemoryUtil.nmemAlloc(32);
 }
