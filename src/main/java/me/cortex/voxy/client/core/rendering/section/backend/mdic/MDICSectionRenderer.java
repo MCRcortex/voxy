@@ -88,7 +88,8 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                     null, null,
                     32, 1, 1,
                     "MDICSectionRenderer.cmdgen"));
-    private final int commandGenProgram = mdicProgramId(this.commandGenPipeline);
+    // M12 chunk 3: commandGen prepass is dispatched via ComputeEncoder; no
+    // cached glProgram id needed.
 
     private final me.cortex.voxy.client.core.gpu.IGpuPipeline prepPipeline = this.backend.createComputePipeline(
             new me.cortex.voxy.client.core.gpu.ComputePipelineDesc(
@@ -282,7 +283,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
 
     private void bindRenderingBuffers(MDICViewport viewport) {
-        glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
+        // SceneUniform is now an SSBO (see bindings.glsl); bind it to the
+        // GL_SHADER_STORAGE_BUFFER target so the in-shader binding=0 matches.
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.uniform.id());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getGeometryBuffer().id());
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, this.geometryManager.getMetadataBuffer().id());
         this.modelStore.bind(3, 4, 0);
@@ -414,7 +417,8 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                 glEnable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
             }
             glBindVertexArray(RenderBackendFactory.get().getStaticVAO());
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
+            // SceneUniform is an SSBO now (see bindings.glsl).
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.uniform.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getMetadataBuffer().id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.visibilityBuffer.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, viewport.indirectLookupBuffer.id());
@@ -436,25 +440,31 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
 
         {//Generate the commands
             this.distanceCountBuffer.zeroRange(0, 1024*4);
-            if (this.commandGenProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.commandGenProgram);
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCallBuffer.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.drawCountCallBuffer.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBuffer().id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.visibilityBuffer.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, viewport.indirectLookupBuffer.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, viewport.positionScratchBuffer.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, this.distanceCountBuffer.id());
-
+            // M12 chunk 3: commandGen migrated to ComputeEncoder. SceneUniform
+            // is now an SSBO (see bindings.glsl), so binding 0 flows through
+            // setBuffer just like the other SSBOs. Read count comes from
+            // drawCountCallBuffer at offset 0 via dispatchIndirect.
             if (RenderStatistics.enabled) {
                 this.statisticsBuffer.zero();
-                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, STATISTICS_BUFFER_BINDING, this.statisticsBuffer.id());
             }
-
-            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, viewport.drawCountCallBuffer.id());
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-            glDispatchComputeIndirect(0);
-            glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
+            try (var encoder = this.backend.beginComputePass()) {
+                encoder.setPipeline(this.commandGenPipeline);
+                encoder.setBuffer(0, this.uniform, 0);
+                encoder.setBuffer(1, viewport.drawCallBuffer, 0);
+                encoder.setBuffer(2, viewport.drawCountCallBuffer, 0);
+                encoder.setBuffer(3, this.geometryManager.getMetadataBuffer(), 0);
+                encoder.setBuffer(4, viewport.visibilityBuffer, 0);
+                encoder.setBuffer(5, viewport.indirectLookupBuffer, 0);
+                encoder.setBuffer(6, viewport.positionScratchBuffer, 0);
+                encoder.setBuffer(7, this.distanceCountBuffer, 0);
+                if (RenderStatistics.enabled) {
+                    encoder.setBuffer(STATISTICS_BUFFER_BINDING, this.statisticsBuffer, 0);
+                }
+                encoder.barrier(ComputeEncoder.BARRIER_SHADER, ComputeEncoder.BARRIER_SHADER);
+                encoder.dispatchIndirect(viewport.drawCountCallBuffer, 0);
+                encoder.barrier(ComputeEncoder.BARRIER_SHADER | ComputeEncoder.BARRIER_INDIRECT,
+                                ComputeEncoder.BARRIER_SHADER | ComputeEncoder.BARRIER_INDIRECT);
+            }
 
             if (RenderStatistics.enabled) {
                 DownloadStream.INSTANCE.download(this.statisticsBuffer, down->{
@@ -485,7 +495,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             }
 
             if (this.translucentGenProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.translucentGenProgram);
-            glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
+            // SceneUniform is an SSBO now (see bindings.glsl); chunk 4 will
+            // migrate this whole block to ComputeEncoder.
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.uniform.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCallBuffer.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.drawCountCallBuffer.id());
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBuffer().id());

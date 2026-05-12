@@ -1,4 +1,12 @@
-layout(binding = 0, std140) uniform SceneUniform {
+// SceneUniform is declared as a readonly SSBO (not a UBO) so it can flow
+// through the cross-backend ComputeEncoder.setBuffer / RenderEncoder.setBuffer
+// path — those lower to glBindBufferBase(GL_SHADER_STORAGE_BUFFER, ...) on
+// GL and to [[buffer(N)]] on Metal. std140 layout is preserved so the on-disk
+// byte layout is identical to the previous UBO version (mat4 + ivec3+uint
+// fits in 80 bytes; vec3 cameraSubPos starts at offset 96 in both std140 and
+// std430 because of vec3's 16-byte alignment). Same pattern as
+// HierarchicalOcclusionTraverser's SceneUniform conversion (commit 05b5b740).
+layout(binding = 0, std140) readonly buffer SceneUniform {
     mat4 MVP;
     ivec3 baseSectionPos;
     uint frameId;
