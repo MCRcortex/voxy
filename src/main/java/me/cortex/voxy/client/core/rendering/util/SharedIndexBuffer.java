@@ -224,4 +224,14 @@ public class SharedIndexBuffer {
     public int id() {
         return this.indexBuffer.id();
     }
+
+    /**
+     * Expose the underlying {@link IGpuBuffer} so encoder-based render paths
+     * (M12 Metal terrain migration) can bind it via
+     * {@code RenderEncoder.bindIndexBuffer}; the int {@link #id()} accessor is
+     * only meaningful for raw GL callers.
+     */
+    public IGpuBuffer getBuffer() {
+        return this.indexBuffer;
+    }
 }

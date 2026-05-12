@@ -369,6 +369,73 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         this.renderTerrain(viewport, 0, 4*3, Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), 400_000));
     }
 
+    /**
+     * M12 chunk 6 step 3 — Metal-only opaque draw via {@link RenderEncoder}.
+     * Called from {@code AbstractRenderPipeline.runPipelineMetal} inside a
+     * render pass that targets the IOSurface bridge color + Voxy's
+     * Metal-side depth texture.
+     *
+     * Differences from the GL {@link #renderTerrain}:
+     * <ul>
+     *   <li>No raw {@code glUseProgram} / {@code glBindBufferBase} / vertex
+     *       array binding — all flows through {@link RenderEncoder.setPipeline}
+     *       / {@code setBuffer}.</li>
+     *   <li>No {@code setupAndBindOpaque} — the render pass already targets
+     *       the bridge; there's no separate FBO bind step.</li>
+     *   <li>Lightmap (binding 1 sampler) and depth-bounding texture (binding 2
+     *       sampler) are NOT bound — both source from MC's GL context and have
+     *       no cross-context handle yet. Terrain renders with default-sampled
+     *       textures (likely zeros), so lighting/cutout look wrong but
+     *       geometry is visible.</li>
+     *   <li>Model atlas texture + sampler (binding 0) also skipped —
+     *       {@code ModelTextureBakery} is GL-only so the atlas is blank on
+     *       Metal anyway; only the model + colour SSBOs feed shape data.</li>
+     *   <li>{@code drawIndexedIndirect} with CPU-side {@code maxDrawCount}
+     *       instead of {@code drawIndexedIndirectCount} — Metal has no
+     *       count-aware MDI compatible with quads.frag (see gotcha #16);
+     *       the cmdBuffer zero pass in {@link #buildDrawCalls} makes
+     *       beyond-the-count slots no-op.</li>
+     * </ul>
+     */
+    public void renderOpaqueMetal(me.cortex.voxy.client.core.gpu.RenderEncoder encoder, MDICViewport viewport) {
+        if (this.geometryManager.getSectionCount() == 0) return;
+        // The uniform was already uploaded inside buildDrawCalls; uploading
+        // again here would clobber the SceneUniform with a new pointer in the
+        // same frame. Only re-upload if the call path skipped buildDrawCalls.
+        // Conservative: re-upload — UploadStream coalesces and this matches
+        // the GL renderOpaque pattern.
+        this.uploadUniformBuffer(viewport);
+        if (this.terrainPipeline == null) {
+            // Iris-patched path — GL-only by construction (see d9627907). Should
+            // never hit on Metal because RenderPipelineFactory gates Iris pipeline.
+            return;
+        }
+        int maxDrawCount = Math.min((int)(this.geometryManager.getSectionCount()*4.4+128), 400_000);
+        this.renderTerrainMetal(encoder, viewport, 0L, maxDrawCount);
+    }
+
+    private void renderTerrainMetal(me.cortex.voxy.client.core.gpu.RenderEncoder encoder,
+                                    MDICViewport viewport, long indirectOffset, int maxDrawCount) {
+        encoder.setPipeline(this.terrainPipeline);
+        // SSBO bindings 0..5 — mirror bindRenderingBuffers; SceneUniform is an
+        // SSBO post-chunk-3 SceneUniform flip.
+        encoder.setBuffer(0, this.uniform, 0);
+        encoder.setBuffer(1, this.geometryManager.getGeometryBuffer(), 0);
+        encoder.setBuffer(2, this.geometryManager.getMetadataBuffer(), 0);
+        this.modelStore.bindBuffers(encoder, 3, 4);
+        encoder.setBuffer(5, viewport.positionScratchBuffer, 0);
+        // Texture / sampler bindings 0 (modelAtlas), 1 (lightmap), 2
+        // (depthBoundingBuffer) intentionally skipped — see method javadoc.
+
+        encoder.bindIndexBuffer(me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer.INSTANCE.getBuffer(),
+                me.cortex.voxy.client.core.gpu.RenderEncoder.INDEX_TYPE_UINT16, 0);
+        encoder.drawIndexedIndirect(
+                me.cortex.voxy.client.core.gpu.RenderEncoder.PRIMITIVE_TRIANGLES,
+                viewport.drawCallBuffer, indirectOffset,
+                maxDrawCount,
+                /*stride*/ 5 * 4); // DrawElementsIndirectCommand = 5 uint32
+    }
+
     @Override
     public void renderTranslucent(MDICViewport viewport) {
         if (this.geometryManager.getSectionCount() == 0) return;
@@ -411,6 +478,18 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     public void buildDrawCalls(MDICViewport viewport) {
         if (this.geometryManager.getSectionCount() == 0) return;
         this.uploadUniformBuffer(viewport);
+
+        // On non-GL backends the renderer issues `drawIndexedIndirect` against
+        // viewport.drawCallBuffer with a CPU-side `maxDrawCount` upper bound
+        // (Metal has no count-aware MDI without an ICB, and MDIC's terrain
+        // pipeline opts out of ICB — see gotcha #16). Zeroing the cmdBuffer
+        // first means slots beyond what commandGen fills hold instanceCount=0,
+        // so those iterations no-op instead of replaying stale draws from
+        // the previous frame.
+        if (this.backend.getType() != BackendType.OPENGL) {
+            viewport.drawCallBuffer.zero();
+        }
+
         //Can do a sneeky trick, since the sectionRenderList is a list to things to render, it invokes the culler
         // which only marks visible sections
 

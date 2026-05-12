@@ -57,4 +57,18 @@ public class ModelStore {
         bindTextureUnit(textureBindingIndex, this.textures.id());
         glBindSampler(textureBindingIndex, this.blockSampler);
     }
+
+    /**
+     * Encoder-aware overload — binds only the model + colour SSBOs. Used by
+     * M12's Metal render path; the model-texture atlas + sampler are skipped
+     * because (a) the sampler is raw GL ({@code glGenSamplers}) and (b)
+     * ModelTextureBakery (which populates the atlas) is still GL-only, so on
+     * Metal the atlas is blank anyway. LOD chunks render with uniform white
+     * sampling at the moment, but the geometry is visible.
+     */
+    public void bindBuffers(me.cortex.voxy.client.core.gpu.RenderEncoder encoder,
+                            int modelBindingIndex, int colourBindingIndex) {
+        encoder.setBuffer(modelBindingIndex, this.modelBuffer, 0);
+        encoder.setBuffer(colourBindingIndex, this.modelColourBuffer, 0);
+    }
 }
