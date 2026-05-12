@@ -101,6 +101,9 @@ public final class ShaderCompilerSmokeTest {
                         "lod/gl46/cull/raster.vert"),
                 new ShaderCase("lod/gl46/cull/raster.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty,
                         "lod/gl46/cull/raster.frag"),
+                // M12 chunk 5 Metal cull stub — force-all-visible compute.
+                new ShaderCase("lod/gl46/force_all_visible.comp", RuntimeShaderCompiler.Stage.COMPUTE, empty,
+                        "lod/gl46/force_all_visible.comp (M12 Metal cull stub)"),
         };
 
         int passSpv = 0, failSpv = 0, passMsl = 0, failMsl = 0;

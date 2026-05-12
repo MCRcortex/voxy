@@ -5,6 +5,7 @@ import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.VoxyClient;
 import me.cortex.voxy.client.core.AbstractRenderPipeline;
 import me.cortex.voxy.client.core.gl.Capabilities;
+import me.cortex.voxy.client.core.gpu.BackendType;
 import me.cortex.voxy.client.core.gpu.ComputeEncoder;
 import me.cortex.voxy.client.core.gpu.IGpuBuffer;
 import me.cortex.voxy.client.core.gpu.RenderBackendFactory;
@@ -113,6 +114,25 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                     me.cortex.voxy.client.core.gpu.PipelineState.DEFAULT,
                     "MDICSectionRenderer.cull"));
     private final int cullProgram = mdicProgramId(this.cullPipeline);
+
+    /**
+     * M12 chunk 5 Metal stub: substitutes for the depth-test-based cull pass
+     * on backends that can't currently open a depth-only render pass against
+     * MC's depth buffer. Writes `visibilityData[sid] = frameId | (1<<31)` for
+     * every section in `indirectLookup`, so cmdgen queues all frustum-visible
+     * sections for rendering (slower than real depth occlusion but
+     * functionally correct). Allocated unconditionally — only dispatched
+     * when the backend isn't OpenGL. Negligible memory cost; the alternative
+     * (gating allocation behind a backend check) makes the class harder to
+     * read for no real benefit.
+     */
+    private final me.cortex.voxy.client.core.gpu.IGpuPipeline forceAllVisiblePipeline = this.backend.createComputePipeline(
+            new me.cortex.voxy.client.core.gpu.ComputePipelineDesc(
+                    ShaderLoader.parse("voxy:lod/gl46/force_all_visible.comp"),
+                    java.util.Map.of(),
+                    null, null,
+                    128, 1, 1,
+                    "MDICSectionRenderer.forceAllVisible"));
 
     private final me.cortex.voxy.client.core.gpu.IGpuPipeline prefixSumPipeline = this.backend.createComputePipeline(
             new me.cortex.voxy.client.core.gpu.ComputePipelineDesc(
@@ -413,28 +433,55 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         }
 
         {//Test occlusion
-            if (this.cullProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.cullProgram);
-            if (Capabilities.INSTANCE.repFragTest) {
-                glEnable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
-            }
-            glBindVertexArray(RenderBackendFactory.get().getStaticVAO());
-            // SceneUniform is an SSBO now (see bindings.glsl).
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.uniform.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getMetadataBuffer().id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.visibilityBuffer.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, viewport.indirectLookupBuffer.id());
-            glBindBuffer(GL_DRAW_INDIRECT_BUFFER, viewport.drawCountCallBuffer.id());
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
-            glEnable(GL_DEPTH_TEST);
-            glColorMask(false, false, false, false);
-            glDepthMask(false);
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT|GL_COMMAND_BARRIER_BIT);
-            glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_BYTE, 6*4);
-            glDepthMask(true);
-            glColorMask(true, true, true, true);
-            glDisable(GL_DEPTH_TEST);
-            if (Capabilities.INSTANCE.repFragTest) {
-                glDisable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
+            if (this.backend.getType() == BackendType.OPENGL) {
+                // GL path — depth-test-based occlusion cull. Rasterizes each
+                // section's AABB against MC's depth buffer with color/depth
+                // masks off; raster.frag writes visibilityData for sections
+                // whose AABBs survive depth test (with optional
+                // NV_representative_fragment_test for perf).
+                if (this.cullProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.cullProgram);
+                if (Capabilities.INSTANCE.repFragTest) {
+                    glEnable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
+                }
+                glBindVertexArray(RenderBackendFactory.get().getStaticVAO());
+                // SceneUniform is an SSBO now (see bindings.glsl).
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.uniform.id());
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, this.geometryManager.getMetadataBuffer().id());
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.visibilityBuffer.id());
+                glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, viewport.indirectLookupBuffer.id());
+                glBindBuffer(GL_DRAW_INDIRECT_BUFFER, viewport.drawCountCallBuffer.id());
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
+                glEnable(GL_DEPTH_TEST);
+                glColorMask(false, false, false, false);
+                glDepthMask(false);
+                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT|GL_COMMAND_BARRIER_BIT);
+                glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_BYTE, 6*4);
+                glDepthMask(true);
+                glColorMask(true, true, true, true);
+                glDisable(GL_DEPTH_TEST);
+                if (Capabilities.INSTANCE.repFragTest) {
+                    glDisable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
+                }
+            } else {
+                // Non-GL path (Metal today) — compute stub that skips
+                // occlusion and marks every frustum-visible section as
+                // visible-this-frame + visible-last-frame. Slower than real
+                // depth occlusion but functionally correct; the real cull
+                // depends on cross-context MC-depth access which is part of
+                // chunk 6's IGpuRenderTarget work.
+                try (var encoder = this.backend.beginComputePass()) {
+                    encoder.setPipeline(this.forceAllVisiblePipeline);
+                    encoder.setBuffer(0, this.uniform, 0);
+                    encoder.setBuffer(2, viewport.visibilityBuffer, 0);
+                    encoder.setBuffer(3, viewport.indirectLookupBuffer, 0);
+                    encoder.barrier(ComputeEncoder.BARRIER_SHADER | ComputeEncoder.BARRIER_INDIRECT,
+                                    ComputeEncoder.BARRIER_SHADER | ComputeEncoder.BARRIER_INDIRECT);
+                    // Reuses prep's dispatch sizing — cmdGenDispatchX/Y/Z at
+                    // offset 0 of drawCountCallBuffer holds ceil(sectionCount/128),
+                    // matching this shader's local_size_x=128.
+                    encoder.dispatchIndirect(viewport.drawCountCallBuffer, 0);
+                    encoder.barrier(ComputeEncoder.BARRIER_SHADER, ComputeEncoder.BARRIER_SHADER);
+                }
             }
         }
 
@@ -557,6 +604,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         if (this.terrainPipeline != null) this.terrainPipeline.close();
         this.commandGenPipeline.close();
         this.cullPipeline.close();
+        this.forceAllVisiblePipeline.close();
         this.prepPipeline.close();
         this.translucentGenPipeline.close();
         this.prefixSumPipeline.close();

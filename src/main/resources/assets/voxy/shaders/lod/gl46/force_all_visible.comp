@@ -1,0 +1,40 @@
+#version 430
+
+// M12 chunk 5 Metal stub: substitutes for the depth-test-based cull pass
+// (`lod/gl46/cull/raster.vert`+`.frag`) on backends that can't currently
+// open a depth-only render pass against MC's depth buffer.
+//
+// The original cull rasterizes section AABBs against MC's depth FBO with
+// color/depth masks off; visible (depth-test-passing) fragments invoke
+// raster.frag which marks `visibilityData[sid]` with the current frame +
+// a "was visible last frame" bit. cmdgen.comp then uses that to gate
+// per-section draw emission.
+//
+// This stub skips actual occlusion: every section currently in the frustum-
+// culled `indirectLookup` is marked visible-this-frame + visible-last-frame
+// (bit 31 set), which suppresses cmdgen's temporal-render path. The result
+// is functionally correct but slower than real depth occlusion — the GPU
+// processes draws that real cull would have rejected.
+//
+// Real Metal cull requires a depth-only render pass against MC's depth as
+// an IGpuTexture; that's part of the planned chunk 6 / IGpuRenderTarget
+// work where MC's GL depth attachment gets exposed cross-context. Until
+// then this stub keeps the pipeline correct on Metal at a perf cost.
+
+layout(local_size_x = 128) in;
+
+#define VISIBILITY_BUFFER_BINDING 2
+#define VISIBILITY_ACCESS writeonly
+#define INDIRECT_SECTION_LOOKUP_BINDING 3
+
+#import <voxy:lod/gl46/bindings.glsl>
+
+void main() {
+    uint gid = gl_GlobalInvocationID.x;
+    if (gid >= sectionCount) return;
+    uint sid = indirectLookup[gid];
+    // (frameId & 0x7fffffffu)        — "visible this frame" marker
+    // (1u << 31)                     — "was visible last frame" bit, suppresses
+    //                                  cmdgen's renderTemporal path
+    visibilityData[sid] = (frameId & 0x7fffffffu) | (1u << 31);
+}
