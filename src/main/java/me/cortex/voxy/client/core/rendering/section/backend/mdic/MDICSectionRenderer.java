@@ -135,7 +135,8 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                     null, null,
                     32, 1, 1,
                     "MDICSectionRenderer.translucentGen"));
-    private final int translucentGenProgram = mdicProgramId(this.translucentGenPipeline);
+    // M12 chunk 4: translucentGen prepass is dispatched via ComputeEncoder;
+    // no cached glProgram id needed.
 
     private static java.util.Map<String, String> cmdgenDefines() {
         var m = new java.util.LinkedHashMap<String, String>();
@@ -494,20 +495,26 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                 encoder.barrier(ComputeEncoder.BARRIER_SHADER, ComputeEncoder.BARRIER_SHADER);
             }
 
-            if (this.translucentGenProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.translucentGenProgram);
-            // SceneUniform is an SSBO now (see bindings.glsl); chunk 4 will
-            // migrate this whole block to ComputeEncoder.
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.uniform.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, viewport.drawCallBuffer.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, viewport.drawCountCallBuffer.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, this.geometryManager.getMetadataBuffer().id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, viewport.indirectLookupBuffer.id());
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, this.distanceCountBuffer.id());
-
-            glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, viewport.drawCountCallBuffer.id());//This isnt great but its a nice trick to bound it, even if its inefficent ;-;
-            glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT|GL_UNIFORM_BARRIER_BIT);
-            glDispatchComputeIndirect(0);
-            glMemoryBarrier(GL_COMMAND_BARRIER_BIT|GL_SHADER_STORAGE_BARRIER_BIT);
+            // M12 chunk 4: translucentGen migrated to ComputeEncoder. SceneUniform
+            // is bound as an SSBO at binding 0 (post-flip in chunk 3); the
+            // dispatch count comes from drawCountCallBuffer at offset 0 via
+            // dispatchIndirect — the same buffer doubles as the indirect arg
+            // and as one of the shader's SSBO inputs at binding 2 (an unusual
+            // but pre-existing read-then-dispatch pattern).
+            try (var encoder = this.backend.beginComputePass()) {
+                encoder.setPipeline(this.translucentGenPipeline);
+                encoder.setBuffer(0, this.uniform, 0);
+                encoder.setBuffer(1, viewport.drawCallBuffer, 0);
+                encoder.setBuffer(2, viewport.drawCountCallBuffer, 0);
+                encoder.setBuffer(3, this.geometryManager.getMetadataBuffer(), 0);
+                encoder.setBuffer(4, viewport.indirectLookupBuffer, 0);
+                encoder.setBuffer(5, this.distanceCountBuffer, 0);
+                encoder.barrier(ComputeEncoder.BARRIER_SHADER | ComputeEncoder.BARRIER_INDIRECT,
+                                ComputeEncoder.BARRIER_SHADER | ComputeEncoder.BARRIER_INDIRECT);
+                encoder.dispatchIndirect(viewport.drawCountCallBuffer, 0);
+                encoder.barrier(ComputeEncoder.BARRIER_SHADER | ComputeEncoder.BARRIER_INDIRECT,
+                                ComputeEncoder.BARRIER_SHADER | ComputeEncoder.BARRIER_INDIRECT);
+            }
         }
 
     }
