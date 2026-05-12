@@ -132,6 +132,29 @@ void main() {
     vec2 uv2 = modf(uv, tile)*(1.0/(vec2(3.0,2.0)*256.0));
     vec4 colour;
     vec2 texPos = uv2 + getBaseUV();
+
+#ifdef VOXY_NO_ATLAS
+    // M12 Metal path: ModelTextureBakery is still GL-only, so the
+    // blockModelAtlas + depthBoundingBuffer textures aren't populated /
+    // bound. Skip atlas sampling and emit a deterministic per-quad
+    // debug color hashed from `interData.x` (a flat varying carrying the
+    // model id + face + flags — varies per quad / section). Drops the
+    // depth-bounding and alpha-discard checks that depend on those
+    // textures. `gl_InstanceID` lives only in the vertex stage so we
+    // can't use it here; interData.x gives sufficient variation.
+    {
+        uint hash = interData.x * 2654435761u;
+        hash ^= hash >> 13;
+        hash *= 1274126177u;
+        hash ^= hash >> 16;
+        colour = vec4(
+            float((hash >>  0) & 0xFFu) / 255.0,
+            float((hash >>  8) & 0xFFu) / 255.0,
+            float((hash >> 16) & 0xFFu) / 255.0,
+            1.0
+        );
+    }
+#else
 //This is deprecated, TODO: remove the non mip code path
     //if (useMipmaps())
     {
@@ -142,6 +165,7 @@ void main() {
     }// else {
     //    colour = textureLod(blockModelAtlas, texPos, 0);
     //}
+#endif
 
     //If we are in shaders and are a helper invocation, just exit, as it enables extra performance gains for small sized
     // fragments, we do this here after derivative computation
@@ -159,6 +183,7 @@ void main() {
         return;
     }
 
+#ifndef VOXY_NO_ATLAS
     //Check the minimum bounding texture and ensure we are greater than it
     if (gl_FragCoord.z < texelFetch(depthTex, ivec2(gl_FragCoord.xy), 0).r) {
         discard;
@@ -180,6 +205,7 @@ void main() {
         return;
         #endif
     }
+#endif // VOXY_NO_ATLAS — closes the depth-bounding + alpha-discard block above
 
     #ifndef PATCHED_SHADER_ALLOW_DERIVATIVES
     if (gl_HelperInvocation) {
@@ -188,8 +214,14 @@ void main() {
     #endif
 
     #ifndef PATCHED_SHADER
+#ifdef VOXY_NO_ATLAS
+    // Already computed a debug colour up top; skip computeColour (which
+    // re-samples blockModelAtlas via textureLod). Emit straight to outColour.
+    outColour = colour;
+#else
     colour = computeColour(texPos, colour);
     outColour = colour;
+#endif
 
     #ifdef DEBUG_RENDER
     uint hash = quadDebug*1231421+123141;

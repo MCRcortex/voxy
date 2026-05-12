@@ -84,6 +84,12 @@ public final class ShaderCompilerSmokeTest {
                         "lod/gl46/quads3.vert (MDIC terrain — non-Iris baseline)"),
                 new ShaderCase("lod/gl46/quads.frag", RuntimeShaderCompiler.Stage.FRAGMENT, empty,
                         "lod/gl46/quads.frag (MDIC terrain — non-Iris baseline; PATCHED_SHADER undef)"),
+                // M12 chunk 6 follow-up: non-GL backends define VOXY_NO_ATLAS so
+                // quads.frag emits a debug per-instance colour instead of
+                // sampling the (still-GL-only) ModelTextureBakery atlas.
+                new ShaderCase("lod/gl46/quads.frag", RuntimeShaderCompiler.Stage.FRAGMENT,
+                        Map.of("VOXY_NO_ATLAS", ""),
+                        "lod/gl46/quads.frag (Metal — VOXY_NO_ATLAS debug colour path)"),
                 // M9 — MDIC's compute pipelines (cmdgen already covered above).
                 new ShaderCase("util/prefixsum/simple.comp", RuntimeShaderCompiler.Stage.COMPUTE,
                         Map.of("IO_BUFFER", "0"),

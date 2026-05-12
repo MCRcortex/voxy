@@ -238,6 +238,19 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             java.util.Map<String, String> opaqueDefines = new java.util.LinkedHashMap<>(commonDefines);
             java.util.Map<String, String> translucentDefines = new java.util.LinkedHashMap<>(commonDefines);
             translucentDefines.put("TRANSLUCENT", "");
+            // M12 chunk 6 step 3 follow-up: on non-GL backends the model
+            // texture atlas (ModelTextureBakery) and the depth-bounding
+            // texture aren't bound yet (their callers stay raw GL — see the
+            // M9 file migration order). Inject `VOXY_NO_ATLAS` so quads.frag
+            // skips the atlas-driven sampling + alpha discard + depth-bounds
+            // check and instead emits a deterministic per-instance debug
+            // color. Lets us see Voxy's LOD chunks on Metal as
+            // distinct-coloured blocks while the real texture path is still
+            // pending.
+            if (this.backend.getType() != BackendType.OPENGL) {
+                opaqueDefines.put("VOXY_NO_ATLAS", "");
+                translucentDefines.put("VOXY_NO_ATLAS", "");
+            }
 
             // NOTE: MDIC terrain pipelines do NOT opt into supportIndirectCommandBuffers.
             // quads.frag uses gl_FragDepth writes + discard, both incompatible
