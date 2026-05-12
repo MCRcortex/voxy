@@ -117,7 +117,9 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                     null, null,
                     32, 1, 1,
                     "MDICSectionRenderer.prefixSum"));
-    private final int prefixSumProgram = mdicProgramId(this.prefixSumPipeline);
+    // M12 chunk 1: prefixSum prepass is dispatched via ComputeEncoder, so it
+    // does not need a cached glProgram id (the encoder pulls it from the
+    // GlComputePipeline directly on GL; Metal uses the MTLComputePipelineState).
 
     private final me.cortex.voxy.client.core.gpu.IGpuPipeline translucentGenPipeline = this.backend.createComputePipeline(
             new me.cortex.voxy.client.core.gpu.ComputePipelineDesc(
@@ -459,11 +461,20 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         }
 
         {//Do translucency sorting
-            if (this.prefixSumProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.prefixSumProgram);
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, this.distanceCountBuffer.id());
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);//Am unsure if is needed
-            glDispatchCompute(1,1,1);
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+            // M12 chunk 1: prefixSum migrated to ComputeEncoder. Runs on every
+            // backend (GL lowers to glUseProgram + glBindBufferBase +
+            // glDispatchCompute; Metal opens an MTLComputeCommandEncoder). The
+            // previous raw-GL pattern no-opped on Metal because
+            // mdicProgramId(prefixSumPipeline) returns 0.
+            try (var encoder = this.backend.beginComputePass()) {
+                encoder.setPipeline(this.prefixSumPipeline);
+                encoder.setBuffer(0, this.distanceCountBuffer, 0);
+                encoder.barrier(me.cortex.voxy.client.core.gpu.ComputeEncoder.BARRIER_SHADER,
+                                me.cortex.voxy.client.core.gpu.ComputeEncoder.BARRIER_SHADER);
+                encoder.dispatch(1, 1, 1);
+                encoder.barrier(me.cortex.voxy.client.core.gpu.ComputeEncoder.BARRIER_SHADER,
+                                me.cortex.voxy.client.core.gpu.ComputeEncoder.BARRIER_SHADER);
+            }
 
             if (this.translucentGenProgram != 0) org.lwjgl.opengl.GL20C.glUseProgram(this.translucentGenProgram);
             glBindBufferBase(GL_UNIFORM_BUFFER, 0, this.uniform.id());
