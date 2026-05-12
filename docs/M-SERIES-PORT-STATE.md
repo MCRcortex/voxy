@@ -14,7 +14,7 @@ Current state: **M9/M10/M11 visually verified end-to-end on Apple M4 inside Mine
 
 The remaining work for **M12 (LOD distance completo)** is migrating MDIC's render path to flow through `RenderEncoder`/`ComputeEncoder` on Metal. Currently `MDICSectionRenderer` calls `glUseProgram`, `glBindBufferBase`, `glMultiDrawElementsIndirectCount*` directly — on Metal `mdicProgramId(p)` returns 0 so the GL calls no-op, which is why Voxy's own LOD content isn't visible (only the magenta stub from `AbstractRenderPipeline.runPipelineMetalStub` is). This is the next concrete deliverable. Remaining as GL-only-until-M12: `ModelTextureBakery`, `VoxyRenderSystem` (state save/restore on the still-early-returning path), `GlViewCapture` (by design — parallel `MetalViewCapture` is the architectural fix), MDIC's 2 Iris-patched terrain shaders (Iris is GL-gated).
 
-The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration of Voxy's render code, blocked primarily by ICB (`MTLIndirectCommandBuffer`) for `MDICSectionRenderer`. The GL-backend-stubbing blocker is cleared as of commit `3dc0ae4c` — the encoder API is now real on every backend, so per-file migration can proceed without breaking Win/Linux GL users.
+The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration of Voxy's render code, blocked primarily by ICB (`MTLIndirectCommandBuffer`) for `MDICSectionRenderer`. The GL-backend-stubbing blocker is cleared as of commit `88a2c926` — the encoder API is now real on every backend, so per-file migration can proceed without breaking Win/Linux GL users.
 
 ---
 
@@ -24,7 +24,7 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 |---|---|
 | Branch | `claude/opengl-mac-migration-analysis-6319V` |
 | Base | `dev` |
-| Last commit | `3b48033d` (M12 chunk 6 step 1 — runPipelineMetal runs the migrated compute side) |
+| Last commit | `dd007eae` (M12 chunk 6 step 1 — runPipelineMetal runs the migrated compute side) |
 | Commits ahead of `dev` | 37 |
 | Test machine | Apple M4 Max, macOS 26.4.1, JDK 24.0.2 |
 | MC target | 1.21.11 (Fabric 0.18.2, Java 21+) |
@@ -49,38 +49,38 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 
 | SHA | Title | Validates |
 |---|---|---|
-| `3b48033d` | M12 chunk 6 step 1 — runPipelineMetal runs the migrated compute side | Replaces `runPipelineMetalStub` (clear-only) with a real `runPipelineMetal`: allocates the bridge, calls `viewport.hiZBuffer.ensureAllocated`, runs DownloadStream.tick + AsyncNodeManager.tick + NodeCleaner.tick + HOT.doTraversal + buildDrawCalls in full on Metal, then clears the bridge to cyan/teal as visual feedback. Adds `HiZBuffer.ensureAllocated(w,h)` so HOT can bind a valid (zero-initialized) HiZ texture without the GL-only mip blit. Renders no actual LOD geometry yet — that's step 3. |
-| `8d37619f` | M12 chunk 6 prep — close HOT's 4 raw-GL gaps for cross-backend safety | `addTLN` / `remTLN` now upload via `UploadStream` instead of raw `glBindBuffer` + `nglBufferSubData(SCRATCH)`; the doTraversal renderList-counter zero and downloadResetRequestQueue request-counter zero use `IGpuBuffer.zeroRange` (already implemented on both backends). The static `SCRATCH` direct-buffer alloc and the `GL_COPY_READ_BUFFER` / `glBindBuffer` static imports are gone. `HierarchicalOcclusionTraverser` is now fully backend-agnostic. |
-| `ce197e7b` | M12 chunk 5 — Metal cull stub via force-all-visible compute | Adds `lod/gl46/force_all_visible.comp` (writes `visibilityData[sid] = (frameId & 0x7fffffff) \| (1<<31)` for every section in `indirectLookup`). MDIC's "Test occlusion" block now branches on `backend.getType()`: GL keeps the raster cull, every other backend runs the force-all-visible compute via `dispatchIndirect` (reusing `prep`'s dispatch sizing in `drawCountCallBuffer`). Smoke test grows to 27 cases — SPV 27/27, MSL 26/27. Real Metal cull (depth-test rasterized) deferred until cross-context MC-depth access lands. |
-| `f269e87e` | Update M-SERIES-PORT-STATE for M12 chunks 2-4 completion | Doc-only — adds the chunk-1–4 commit history rows, M12-section per-chunk status, decision queue trimmed to the two architectural questions (cull Metal target shape; runPipelineMetal/IGpuRenderTarget). |
-| `088776c2` | M12 chunk 4 — migrate translucentGen compute prepass to ComputeEncoder | Last of the 4 simple compute prepasses. 6 SSBO bindings (SceneUniform at 0 via the post-chunk-3 SSBO flip) + `dispatchIndirect` against `drawCountCallBuffer` offset 0; `BARRIER_SHADER \| BARRIER_INDIRECT` both sides. `translucentGenProgram` cached id removed. |
-| `ada2723c` | M12 chunk 3 — flip SceneUniform to SSBO + migrate commandGen pass | Atomic refactor + migration. `lod/gl46/bindings.glsl` flips `SceneUniform` from `uniform` (UBO) to `readonly buffer` (SSBO) at binding 0 with std140 preserved (on-disk byte layout identical, matches HOT's commit `05b5b740` pattern). All 4 raw-GL bind sites in MDIC (bindRenderingBuffers, cull block, commandGen block, translucentGen block) retargeted to `GL_SHADER_STORAGE_BUFFER`. commandGen migrated to `beginComputePass`+ 8 SSBOs + dispatchIndirect; conditional statistics SSBO at binding 8. testShaderCompiler: SPV 26/26, MSL 25/26 (hiz.comp pre-existing). |
-| `d37f74b2` | M12 chunk 2 — migrate prep compute prepass to ComputeEncoder | `prep.comp` doesn't reference SceneUniform fields so the encoder skips binding 0 entirely — that defers the UBO↔SSBO decision to chunk 3. Just `setBuffer(1, drawCountCallBuffer)` + `setBuffer(2, renderList)` + barriers + dispatch. `prepProgram` cached id removed; `ComputeEncoder` imported so chunk 1's barrier calls drop the fully-qualified prefix. |
-| `6bd42559` | M12 kickoff — plan + migrate prefixSum compute pass to ComputeEncoder | Adds the M12 plan to docs (6 chunks + decision queue). First migration: `prefixSum` (single SSBO binding 0, no UBO, 1 thread group) — proves the encoder pattern works inside MDIC's buildDrawCalls. `prefixSumProgram` cached id removed. |
-| `4c57ddaf` | M11 closeout — visually verified end-to-end on M4 inside Minecraft | Working tree consolidation: `IOSurfaceBridgeCompositor` lands as the canonical bridge→MC blit (called from `MixinDefaultChunkRenderer.render` after Sodium's `renderOpaque`); the obsolete `MixinLevelRendererVoxyMetalComposite` is removed; `AsyncNodeManager` worker is daemon so MC's close button doesn't hang the JVM; `build.gradle` bundles macOS arm64 `lwjgl-zstd` + `lwjgl-lmdb` natives for Sodium's chunk render task workers; magenta stub in `AbstractRenderPipeline.runPipelineMetalStub` is bumped to full alpha for unmistakable visual confirmation. Doc reflects M11 ✅ closed and outlines the M12 scope. |
-| `261aa934` | M11 — MetalRenderBackend handles depth-only pipelines (HiZBuffer fix) | createGraphicsPipeline now allows a 0/`MTLPixelFormatInvalid` color format when a depth attachment is present, so HiZBuffer's depth-only per-mip pipeline compiles on Metal instead of erroring at PSO link. Unblocks the second of the four M11 init crashes. |
-| `5c4008c3` | M11 — fix four Metal-init crashes hit by `VOXY_FORCE_METAL` world entry | Four small fixes uncovered by world-entry: (1) `NormalRenderPipeline.setupAndBindOpaque` no longer raw-binds MC's GL FBO on Metal (no-op skip); (2) `MDICSectionRenderer.uploadUniformBuffer` is safe to call before the world is loaded; (3) `BasicSectionGeometryData` no-ops its raw GL setup on Metal; (4) `HiZBuffer` first-frame allocation path tolerates `targetTexture==null`. With these, MC reaches the game loop on Metal. |
-| `e80621e9` | M11 — enable Voxy on Metal end-to-end via `VOXY_FORCE_METAL` flag | `RenderBackendFactory` honours `VOXY_FORCE_METAL=1` (also unblocked the prior "Metal disabled until M9 done" gate); Voxy bootstraps on Metal; `AbstractRenderPipeline.runPipeline` early-routes to a `runPipelineMetalStub` that prints a clear color into an `IOSurfaceBridge` so the user can verify the Metal path is wired. |
-| `efc9ef9b` | M10 — IOSurfaceBridge is now usable as a RenderEncoder render target | `IOSurfaceBridge.asGpuTexture()` returns the bridge's `MTLTexture` as an `IGpuTexture` (`MetalTexture.fromHandle`). `RenderPassDesc.clearColor(IGpuTexture, r, g, b, a)` now accepts a bridge-backed texture; the Metal render backend builds an `MTLRenderPassDescriptor` against it. Validated by `runPipelineMetalStub` clearing the bridge each frame. |
-| `2f9446fc` | Update M-SERIES-PORT-STATE for Blocker 1 + M10 IOSurface bridge | Doc-only — records ICB blocker clearance, M10 surface-side allocation, and the GL-side bind path. |
-| `32df017b` | M11 — IOSurface bridge demo runs inside Minecraft | New `MixinLevelRendererBridgeDemo` (and a since-removed sibling `MixinLevelRendererVoxyMetalComposite`) gated behind `VOXY_BRIDGE_DEMO=1` allocate an IOSurfaceBridge, render a clear pass into it from Metal, and blit it via a GL `glBlitFramebuffer` over MC's main RT. Proves the IOSurface↔MC pipe works from inside MC's render thread. |
-| `8341a974` | M9 Phase 2 — version-bump `quads3.vert` + `quads.frag`; add VOXY_BRIDGE_DEMO env var | Bumps the two MDIC terrain shaders to 460 core so shaderc's Vulkan profile accepts the texelFetch overloads + bit ops. Adds the `VOXY_BRIDGE_DEMO=1` env flag plumbing used by the M11 demo mixin. |
-| `cae48144` | M9 Phase 4 — migrate MDIC terrain shaders (non-Iris path) to createGraphicsPipeline | The two `quads3.vert` + `quads.frag` pipelines (opaque + translucent) now flow through `RenderBackend.createGraphicsPipeline` when no Iris patch callbacks fire. Pipelines explicitly opt OUT of `supportIndirectCommandBuffers` because quads.frag uses gl_FragDepth + discard, both Metal-ICB-incompatible. On Metal MDIC keeps the CPU-readback fallback (`drawIndexedIndirect` host loop) for now. |
-| `c84e5264` | M10 — IOSurface bridge (GL side): CGLTexImageIOSurface2D binding | New `voxy_metal_iosurface_gl.mm` links the OpenGL framework + exposes `cglTexImageIOSurface2D` JNI. `IOSurfaceBridge.bindToGlTexture(glName)` pins the IOSurface to a GL_TEXTURE_RECTANGLE texture so MC's GL compositor can sample Voxy's Metal-rendered output. End-to-end validation waits for M11 (Voxy running inside MC's render thread). |
-| `b025f429` | M10 — IOSurface bridge (Metal side): allocate + wrap as MTLTexture | New `voxy_metal_iosurface.mm` + `IOSurfaceBridge` class. Smoke test (`testIOSurfaceBridge`) validates 256x256 BGRA8 IOSurface allocation and MTLTexture wrapping via `newTextureWithDescriptor:iosurface:plane:`. Storage forced to Private (IOSurface owns memory). M10 SMOKE OK. |
-| `2b23d83b` | Blocker 1 — Metal ICB infrastructure | New `voxy_metal_icb.mm` + `MetalIndirectCommandBuffer` class. Adds `IGpuIndirectCommandBuffer` cross-backend interface, `RenderBackend.createIndirectCommandBuffer`, `RenderEncoder.executeCommandsInBuffer`. Smoke test (`testMetalIcb`) validates the full path: 2-slot ICB with CPU-baked indexed triangle draw, executed via range buffer (location=0, length=1). All graphics pipelines now created with `supportIndirectCommandBuffers=YES`. |
-| `4316a430` | M9 Phase 4 — migrate MDICSectionRenderer non-Iris shader pipelines | 5 of 7 shaders (prep/cmdgen/cull/prefixSum/translucentGen) now via createComputePipeline+createGraphicsPipeline; cached glProgram per pipeline; `.bind()` → `glUseProgram(glProgramX)`. The two terrain shaders stay legacy (Iris patch callbacks; Iris is GL-gated). Smoke test grows to 24 cases — SPIRV 24/24. |
-| `ed128563` | M9 Phase 2 — patch lod/gl46/quads.frag gl_HelperInvocation gap | Add `GL_ARB_shader_helper_invocation : enable` so glslang/shaderc compiles the shader at 430. |
-| `5c631465` | M9 Phase 4 — migrate BudgetBufferRenderer shader pipeline | Bakery's vert+frag pair now via createGraphicsPipeline; matrix uniform → UBO push at PUSH_BINDING; sampler in position_tex.fsh moved from location to binding. Smoke test grows to 19 cases — SPIRV 19/19. Caller ModelTextureBakery stays GL-only for now (FBO + viewport ownership). |
-| `d9627907` | M9 Phase 4 — gate IrisVoxyRenderPipeline on GL + add drawIndexedIndirectCount API | RenderPipelineFactory refuses to construct Iris pipeline on non-GL backends; NormalRenderPipeline fallback runs. Encoder API gets drawIndexedIndirectCount(prim, drawBuf, drawOff, countBuf, countOff, maxDraw, stride) — GL lowers to glMultiDrawElementsIndirectCountARB, Metal throws pending ICB (Blocker 1). |
-| `739a14db` | M9 Phase 4 — migrate AsyncNodeManager onto the compute encoder | Two compute pipelines (scatterWrite/multiMemcpy) flow through createComputePipeline + beginComputePass; scatter.comp's `count` uniform wrapped in UBO push; UploadStream raw-id glBindBufferRange persists as the existing M9-TODO. Smoke test grows to 17 cases — SPIRV 17/17. |
-| `0c706654` | M9 Phase 4 — migrate ChunkBoundRenderer + outline.vsh #version bump | AABB-wireframe instanced indexed draws; pipeline created via createGraphicsPipeline (glProgram cached for raw bind); outline.vsh bumped to #version 460 core to get mix(ivec3,...) + gl_BaseInstance as built-ins (ARB extensions weren't accepted by shaderc's Vulkan profile). Smoke test grows to 15 cases. |
-| `dd3ef385` | M9 Phase 4 Cluster A — migrate FullscreenBlit + AbstractRenderPipeline + NormalRenderPipeline | FullscreenBlit pipeline now via createGraphicsPipeline (compiles on Metal/Vulkan); raw bind/blit retained for GL-only runtime; setBytes API replaces glUniform2f/glUniform4f/nglUniformMatrix4fv across 4 call sites; 2 shader UBO push blocks (depth_copy.frag + blit_texture_depth_cutout.frag); gl_DepthRange.diff/.near gated behind VOXY_VULKAN macro to fix shaderc gap. Smoke test grows to 13 cases — SPIRV 13/13. |
-| `a887facb` | M9 Phase 4 — migrate HiZBuffer onto RenderBackend abstraction | First graphics-pipeline migration in Voxy proper; per-mip beginRenderPass + draw 4 verts as TRIANGLE_STRIP (blit.vsh re-ordered from fan); custom PipelineState DepthState(test=true, write=true, ALWAYS); raw glBindTextureUnit kept for external source depth (raw int id, no IGpuTexture); GL_TEXTURE_BASE_LEVEL/MAX_LEVEL mutation for source-mip selection (GL-only until createView lands) |
-| `05b5b740` | M9 Phase 4 — migrate HierarchicalOcclusionTraverser + split setTexture/setStorageImage | Single beginComputePass with one direct + MAX-1 indirect dispatches; SceneUniform converted to readonly SSBO; queueIdx uniform → UBO push at PUSH_BINDING. Encoder API now has setStorageImage(binding, tex, level) for image bindings; setTexture is now sampled-only |
-| `ebf4eb70` | M9 Phase 4 — migrate NodeCleaner (pilot) | tick() fully on encoder API; updateIds() still raw glBindBufferRange for UploadStream's raw GL id. Shader uniforms → UBO push blocks at PUSH_BINDING. |
-| `7f3327d7` | Update M-SERIES-PORT-STATE for M9 Phase 1 completion | Doc-only — Blocker 2 cleared, Phase 4 recipe + uniform-block pattern, OpenGL backend section |
-| `3dc0ae4c` | M9 Phase 1 — implement GL backend behind RenderBackend abstraction | GlGraphicsPipeline/GlComputePipeline/GlSampler/GlComputeEncoder + full GlRenderEncoder + GLSL fields on (Graphics\|Compute)PipelineDesc |
+| `dd007eae` | M12 chunk 6 step 1 — runPipelineMetal runs the migrated compute side | Replaces `runPipelineMetalStub` (clear-only) with a real `runPipelineMetal`: allocates the bridge, calls `viewport.hiZBuffer.ensureAllocated`, runs DownloadStream.tick + AsyncNodeManager.tick + NodeCleaner.tick + HOT.doTraversal + buildDrawCalls in full on Metal, then clears the bridge to cyan/teal as visual feedback. Adds `HiZBuffer.ensureAllocated(w,h)` so HOT can bind a valid (zero-initialized) HiZ texture without the GL-only mip blit. Renders no actual LOD geometry yet — that's step 3. |
+| `89b35814` | M12 chunk 6 prep — close HOT's 4 raw-GL gaps for cross-backend safety | `addTLN` / `remTLN` now upload via `UploadStream` instead of raw `glBindBuffer` + `nglBufferSubData(SCRATCH)`; the doTraversal renderList-counter zero and downloadResetRequestQueue request-counter zero use `IGpuBuffer.zeroRange` (already implemented on both backends). The static `SCRATCH` direct-buffer alloc and the `GL_COPY_READ_BUFFER` / `glBindBuffer` static imports are gone. `HierarchicalOcclusionTraverser` is now fully backend-agnostic. |
+| `3fa07c44` | M12 chunk 5 — Metal cull stub via force-all-visible compute | Adds `lod/gl46/force_all_visible.comp` (writes `visibilityData[sid] = (frameId & 0x7fffffff) \| (1<<31)` for every section in `indirectLookup`). MDIC's "Test occlusion" block now branches on `backend.getType()`: GL keeps the raster cull, every other backend runs the force-all-visible compute via `dispatchIndirect` (reusing `prep`'s dispatch sizing in `drawCountCallBuffer`). Smoke test grows to 27 cases — SPV 27/27, MSL 26/27. Real Metal cull (depth-test rasterized) deferred until cross-context MC-depth access lands. |
+| `08d01ddb` | Update M-SERIES-PORT-STATE for M12 chunks 2-4 completion | Doc-only — adds the chunk-1–4 commit history rows, M12-section per-chunk status, decision queue trimmed to the two architectural questions (cull Metal target shape; runPipelineMetal/IGpuRenderTarget). |
+| `f4d4c4ab` | M12 chunk 4 — migrate translucentGen compute prepass to ComputeEncoder | Last of the 4 simple compute prepasses. 6 SSBO bindings (SceneUniform at 0 via the post-chunk-3 SSBO flip) + `dispatchIndirect` against `drawCountCallBuffer` offset 0; `BARRIER_SHADER \| BARRIER_INDIRECT` both sides. `translucentGenProgram` cached id removed. |
+| `a50e53e1` | M12 chunk 3 — flip SceneUniform to SSBO + migrate commandGen pass | Atomic refactor + migration. `lod/gl46/bindings.glsl` flips `SceneUniform` from `uniform` (UBO) to `readonly buffer` (SSBO) at binding 0 with std140 preserved (on-disk byte layout identical, matches HOT's commit `5dcbc645` pattern). All 4 raw-GL bind sites in MDIC (bindRenderingBuffers, cull block, commandGen block, translucentGen block) retargeted to `GL_SHADER_STORAGE_BUFFER`. commandGen migrated to `beginComputePass`+ 8 SSBOs + dispatchIndirect; conditional statistics SSBO at binding 8. testShaderCompiler: SPV 26/26, MSL 25/26 (hiz.comp pre-existing). |
+| `f0e7a3de` | M12 chunk 2 — migrate prep compute prepass to ComputeEncoder | `prep.comp` doesn't reference SceneUniform fields so the encoder skips binding 0 entirely — that defers the UBO↔SSBO decision to chunk 3. Just `setBuffer(1, drawCountCallBuffer)` + `setBuffer(2, renderList)` + barriers + dispatch. `prepProgram` cached id removed; `ComputeEncoder` imported so chunk 1's barrier calls drop the fully-qualified prefix. |
+| `2e8e302d` | M12 kickoff — plan + migrate prefixSum compute pass to ComputeEncoder | Adds the M12 plan to docs (6 chunks + decision queue). First migration: `prefixSum` (single SSBO binding 0, no UBO, 1 thread group) — proves the encoder pattern works inside MDIC's buildDrawCalls. `prefixSumProgram` cached id removed. |
+| `70d94002` | M11 closeout — visually verified end-to-end on M4 inside Minecraft | Working tree consolidation: `IOSurfaceBridgeCompositor` lands as the canonical bridge→MC blit (called from `MixinDefaultChunkRenderer.render` after Sodium's `renderOpaque`); the obsolete `MixinLevelRendererVoxyMetalComposite` is removed; `AsyncNodeManager` worker is daemon so MC's close button doesn't hang the JVM; `build.gradle` bundles macOS arm64 `lwjgl-zstd` + `lwjgl-lmdb` natives for Sodium's chunk render task workers; magenta stub in `AbstractRenderPipeline.runPipelineMetalStub` is bumped to full alpha for unmistakable visual confirmation. Doc reflects M11 ✅ closed and outlines the M12 scope. |
+| `290bb11f` | M11 — MetalRenderBackend handles depth-only pipelines (HiZBuffer fix) | createGraphicsPipeline now allows a 0/`MTLPixelFormatInvalid` color format when a depth attachment is present, so HiZBuffer's depth-only per-mip pipeline compiles on Metal instead of erroring at PSO link. Unblocks the second of the four M11 init crashes. |
+| `bd3242d3` | M11 — fix four Metal-init crashes hit by `VOXY_FORCE_METAL` world entry | Four small fixes uncovered by world-entry: (1) `NormalRenderPipeline.setupAndBindOpaque` no longer raw-binds MC's GL FBO on Metal (no-op skip); (2) `MDICSectionRenderer.uploadUniformBuffer` is safe to call before the world is loaded; (3) `BasicSectionGeometryData` no-ops its raw GL setup on Metal; (4) `HiZBuffer` first-frame allocation path tolerates `targetTexture==null`. With these, MC reaches the game loop on Metal. |
+| `c64d1801` | M11 — enable Voxy on Metal end-to-end via `VOXY_FORCE_METAL` flag | `RenderBackendFactory` honours `VOXY_FORCE_METAL=1` (also unblocked the prior "Metal disabled until M9 done" gate); Voxy bootstraps on Metal; `AbstractRenderPipeline.runPipeline` early-routes to a `runPipelineMetalStub` that prints a clear color into an `IOSurfaceBridge` so the user can verify the Metal path is wired. |
+| `f1e975ab` | M10 — IOSurfaceBridge is now usable as a RenderEncoder render target | `IOSurfaceBridge.asGpuTexture()` returns the bridge's `MTLTexture` as an `IGpuTexture` (`MetalTexture.fromHandle`). `RenderPassDesc.clearColor(IGpuTexture, r, g, b, a)` now accepts a bridge-backed texture; the Metal render backend builds an `MTLRenderPassDescriptor` against it. Validated by `runPipelineMetalStub` clearing the bridge each frame. |
+| `fc64badc` | Update M-SERIES-PORT-STATE for Blocker 1 + M10 IOSurface bridge | Doc-only — records ICB blocker clearance, M10 surface-side allocation, and the GL-side bind path. |
+| `7db450af` | M11 — IOSurface bridge demo runs inside Minecraft | New `MixinLevelRendererBridgeDemo` (and a since-removed sibling `MixinLevelRendererVoxyMetalComposite`) gated behind `VOXY_BRIDGE_DEMO=1` allocate an IOSurfaceBridge, render a clear pass into it from Metal, and blit it via a GL `glBlitFramebuffer` over MC's main RT. Proves the IOSurface↔MC pipe works from inside MC's render thread. |
+| `19f76320` | M9 Phase 2 — version-bump `quads3.vert` + `quads.frag`; add VOXY_BRIDGE_DEMO env var | Bumps the two MDIC terrain shaders to 460 core so shaderc's Vulkan profile accepts the texelFetch overloads + bit ops. Adds the `VOXY_BRIDGE_DEMO=1` env flag plumbing used by the M11 demo mixin. |
+| `cc8957f3` | M9 Phase 4 — migrate MDIC terrain shaders (non-Iris path) to createGraphicsPipeline | The two `quads3.vert` + `quads.frag` pipelines (opaque + translucent) now flow through `RenderBackend.createGraphicsPipeline` when no Iris patch callbacks fire. Pipelines explicitly opt OUT of `supportIndirectCommandBuffers` because quads.frag uses gl_FragDepth + discard, both Metal-ICB-incompatible. On Metal MDIC keeps the CPU-readback fallback (`drawIndexedIndirect` host loop) for now. |
+| `238457f4` | M10 — IOSurface bridge (GL side): CGLTexImageIOSurface2D binding | New `voxy_metal_iosurface_gl.mm` links the OpenGL framework + exposes `cglTexImageIOSurface2D` JNI. `IOSurfaceBridge.bindToGlTexture(glName)` pins the IOSurface to a GL_TEXTURE_RECTANGLE texture so MC's GL compositor can sample Voxy's Metal-rendered output. End-to-end validation waits for M11 (Voxy running inside MC's render thread). |
+| `cab941c9` | M10 — IOSurface bridge (Metal side): allocate + wrap as MTLTexture | New `voxy_metal_iosurface.mm` + `IOSurfaceBridge` class. Smoke test (`testIOSurfaceBridge`) validates 256x256 BGRA8 IOSurface allocation and MTLTexture wrapping via `newTextureWithDescriptor:iosurface:plane:`. Storage forced to Private (IOSurface owns memory). M10 SMOKE OK. |
+| `9f504be1` | Blocker 1 — Metal ICB infrastructure | New `voxy_metal_icb.mm` + `MetalIndirectCommandBuffer` class. Adds `IGpuIndirectCommandBuffer` cross-backend interface, `RenderBackend.createIndirectCommandBuffer`, `RenderEncoder.executeCommandsInBuffer`. Smoke test (`testMetalIcb`) validates the full path: 2-slot ICB with CPU-baked indexed triangle draw, executed via range buffer (location=0, length=1). All graphics pipelines now created with `supportIndirectCommandBuffers=YES`. |
+| `bd89fcaf` | M9 Phase 4 — migrate MDICSectionRenderer non-Iris shader pipelines | 5 of 7 shaders (prep/cmdgen/cull/prefixSum/translucentGen) now via createComputePipeline+createGraphicsPipeline; cached glProgram per pipeline; `.bind()` → `glUseProgram(glProgramX)`. The two terrain shaders stay legacy (Iris patch callbacks; Iris is GL-gated). Smoke test grows to 24 cases — SPIRV 24/24. |
+| `73549c9e` | M9 Phase 2 — patch lod/gl46/quads.frag gl_HelperInvocation gap | Add `GL_ARB_shader_helper_invocation : enable` so glslang/shaderc compiles the shader at 430. |
+| `761f135b` | M9 Phase 4 — migrate BudgetBufferRenderer shader pipeline | Bakery's vert+frag pair now via createGraphicsPipeline; matrix uniform → UBO push at PUSH_BINDING; sampler in position_tex.fsh moved from location to binding. Smoke test grows to 19 cases — SPIRV 19/19. Caller ModelTextureBakery stays GL-only for now (FBO + viewport ownership). |
+| `1e2a1190` | M9 Phase 4 — gate IrisVoxyRenderPipeline on GL + add drawIndexedIndirectCount API | RenderPipelineFactory refuses to construct Iris pipeline on non-GL backends; NormalRenderPipeline fallback runs. Encoder API gets drawIndexedIndirectCount(prim, drawBuf, drawOff, countBuf, countOff, maxDraw, stride) — GL lowers to glMultiDrawElementsIndirectCountARB, Metal throws pending ICB (Blocker 1). |
+| `68734b78` | M9 Phase 4 — migrate AsyncNodeManager onto the compute encoder | Two compute pipelines (scatterWrite/multiMemcpy) flow through createComputePipeline + beginComputePass; scatter.comp's `count` uniform wrapped in UBO push; UploadStream raw-id glBindBufferRange persists as the existing M9-TODO. Smoke test grows to 17 cases — SPIRV 17/17. |
+| `71e26460` | M9 Phase 4 — migrate ChunkBoundRenderer + outline.vsh #version bump | AABB-wireframe instanced indexed draws; pipeline created via createGraphicsPipeline (glProgram cached for raw bind); outline.vsh bumped to #version 460 core to get mix(ivec3,...) + gl_BaseInstance as built-ins (ARB extensions weren't accepted by shaderc's Vulkan profile). Smoke test grows to 15 cases. |
+| `81c06456` | M9 Phase 4 Cluster A — migrate FullscreenBlit + AbstractRenderPipeline + NormalRenderPipeline | FullscreenBlit pipeline now via createGraphicsPipeline (compiles on Metal/Vulkan); raw bind/blit retained for GL-only runtime; setBytes API replaces glUniform2f/glUniform4f/nglUniformMatrix4fv across 4 call sites; 2 shader UBO push blocks (depth_copy.frag + blit_texture_depth_cutout.frag); gl_DepthRange.diff/.near gated behind VOXY_VULKAN macro to fix shaderc gap. Smoke test grows to 13 cases — SPIRV 13/13. |
+| `a9a599af` | M9 Phase 4 — migrate HiZBuffer onto RenderBackend abstraction | First graphics-pipeline migration in Voxy proper; per-mip beginRenderPass + draw 4 verts as TRIANGLE_STRIP (blit.vsh re-ordered from fan); custom PipelineState DepthState(test=true, write=true, ALWAYS); raw glBindTextureUnit kept for external source depth (raw int id, no IGpuTexture); GL_TEXTURE_BASE_LEVEL/MAX_LEVEL mutation for source-mip selection (GL-only until createView lands) |
+| `5dcbc645` | M9 Phase 4 — migrate HierarchicalOcclusionTraverser + split setTexture/setStorageImage | Single beginComputePass with one direct + MAX-1 indirect dispatches; SceneUniform converted to readonly SSBO; queueIdx uniform → UBO push at PUSH_BINDING. Encoder API now has setStorageImage(binding, tex, level) for image bindings; setTexture is now sampled-only |
+| `0b963825` | M9 Phase 4 — migrate NodeCleaner (pilot) | tick() fully on encoder API; updateIds() still raw glBindBufferRange for UploadStream's raw GL id. Shader uniforms → UBO push blocks at PUSH_BINDING. |
+| `3bb722df` | Update M-SERIES-PORT-STATE for M9 Phase 1 completion | Doc-only — Blocker 2 cleared, Phase 4 recipe + uniform-block pattern, OpenGL backend section |
+| `88a2c926` | M9 Phase 1 — implement GL backend behind RenderBackend abstraction | GlGraphicsPipeline/GlComputePipeline/GlSampler/GlComputeEncoder + full GlRenderEncoder + GLSL fields on (Graphics\|Compute)PipelineDesc |
 | `b50109e5` | Add IGpuSampler + setBytes to encoders (M9 prep finishing batch) | Sampler API, push-constant equivalent |
 | `4e5131d0` | Add depth/blend/raster state to graphics pipeline | PipelineState (depth, blend, raster) end-to-end on Metal |
 | `c47dfe82` | Fix MTLVertexFormat enum values + add M9-prep smoke test | testMetalVertexBuffer caught off-by-9 in MTLVertexFormat |
@@ -92,7 +92,7 @@ The remaining work to ship a functional Voxy on Mac is M9 file-by-file migration
 | `864b9a7c` | Bootstrap Vulkan/MoltenVK loader (M4 Stage A) | VulkanLoader → VkInstance → Apple M4 Max enumerated |
 | `6d4f0308` | Add Metal graphics pipeline + draw chain (M5 — first triangle) | MetalGraphicsPipeline + RenderEncoder.setPipeline/draw + readback |
 | `16fe5667` | Add Mac M-series rendering: shaderc/spvc + Metal clear-color pass | M0 (env), M1 (RuntimeShaderCompiler 9/9), M2 (encoder API), M3 (Metal clear) |
-| `5420ed03` | Route UploadStream.commit() through the render backend | (pre-existing — UploadStream uses RenderBackend.copyBufferSubData) |
+| `08fcae6d` | Route UploadStream.commit() through the render backend | (pre-existing — UploadStream uses RenderBackend.copyBufferSubData) |
 
 ---
 
@@ -154,7 +154,7 @@ Each test is a standalone `me.cortex.voxy.tools.*SmokeTest` class with `main()`.
 
 ## What's pending
 
-### Blocker 1 — ICB for `drawIndirectCount` (~~~1 day~~ DONE — commit `2b23d83b`)
+### Blocker 1 — ICB for `drawIndirectCount` (~~~1 day~~ DONE — commit `9f504be1`)
 
 ✅ **Cleared 2026-05-09.** `MTLIndirectCommandBuffer` infrastructure
 landed:
@@ -178,12 +178,12 @@ landed:
   simpler shader variant lands or we accept the perf cost.
 
 For Vulkan: `RenderEncoder.drawIndexedIndirectCount(...)` exists in
-the encoder API (commit `d9627907`) and will lower to
+the encoder API (commit `1e2a1190`) and will lower to
 `vkCmdDrawIndexedIndirectCount` when the Vulkan backend implements
 `RenderBackend` (deferred). GL path uses
 `glMultiDrawElementsIndirectCountARB` directly.
 
-### Blocker 2 — GL backend implements the abstraction (~~~1-2 days~~ DONE — commit `3dc0ae4c`)
+### Blocker 2 — GL backend implements the abstraction (~~~1-2 days~~ DONE — commit `88a2c926`)
 
 ✅ **Cleared 2026-05-10.** All four `GlRenderBackend` methods that previously
 threw `UnsupportedOperationException("see M9")` now have real
@@ -251,10 +251,10 @@ Five shaders flagged in the M1 sweep. 4 of 5 patched, 1 remains:
 
 | Shader | Issue | Fix | Status |
 |---|---|---|---|
-| `chunkoutline/outline.vsh` | `mix(int, int)` requires extension | bump `#version` to 460 (gets it + `gl_BaseInstance` as core built-ins) | ✅ done — `0c706654` |
-| `lod/gl46/quads.frag` | `gl_HelperInvocation` undeclared | `#extension GL_ARB_shader_helper_invocation : enable` | ✅ done — `ed128563` |
-| `post/depth_copy.frag` | `binding=` not supported in this version | bump `#version` | ✅ done — `dd3ef385` bumped to 430 core |
-| `post/blit_texture_depth_cutout.frag` | `gl_DepthRange` undeclared in newer profile | replace with uniform OR version bump | ✅ done — `dd3ef385` gates on `VOXY_VULKAN` macro |
+| `chunkoutline/outline.vsh` | `mix(int, int)` requires extension | bump `#version` to 460 (gets it + `gl_BaseInstance` as core built-ins) | ✅ done — `71e26460` |
+| `lod/gl46/quads.frag` | `gl_HelperInvocation` undeclared | `#extension GL_ARB_shader_helper_invocation : enable` | ✅ done — `73549c9e` |
+| `post/depth_copy.frag` | `binding=` not supported in this version | bump `#version` | ✅ done — `81c06456` bumped to 430 core |
+| `post/blit_texture_depth_cutout.frag` | `gl_DepthRange` undeclared in newer profile | replace with uniform OR version bump | ✅ done — `81c06456` gates on `VOXY_VULKAN` macro |
 | `lod/gl46/test/raw.vert` | syntax error around line 190 | likely needs runtime define injection | ⚠️ orphan — `grep -rn raw.vert src/main/java` returns nothing; this file is a test/experiment Voxy never compiles at runtime, so the M1 report's "fail" is non-blocking. Leave as-is. |
 
 ### M9 Phase 4 — file migration order (Blocker 2 now cleared)
@@ -330,7 +330,7 @@ These extensions weren't needed to validate Phase 1 but are required by
 specific Voxy callers:
 
 - ✅ `ComputeEncoder.setStorageImage(binding, texture, level)` — added
-  in commit `05b5b740`. GL impl uses `glBindImageTexture` with the
+  in commit `5dcbc645`. GL impl uses `glBindImageTexture` with the
   requested level; Metal currently throws on level != 0 until the
   per-mip texture-view JNI lands; Vulkan path will allocate a per-mip
   `VkImageView` when the backend is wired up.
@@ -354,20 +354,20 @@ specific Voxy callers:
   the migrated version; the helper would close that gap.
 
 Recommended migration order (simplest first):
-1. ✅ **`NodeCleaner.java`** — DONE in commit `ebf4eb70`. Pilot for the
+1. ✅ **`NodeCleaner.java`** — DONE in commit `0b963825`. Pilot for the
    uniform-block pattern; pure compute, three small shaders.
 2. ✅ **`HierarchicalOcclusionTraverser.java`** — DONE in commit
-   `05b5b740`. Compute + indirect dispatch + barrier translation +
+   `5dcbc645`. Compute + indirect dispatch + barrier translation +
    sampled-texture binding. Also drove the
    `setTexture`/`setStorageImage` split on `ComputeEncoder`.
-3. ✅ **`HiZBuffer.java`** — DONE in commit `a887facb`. First graphics
+3. ✅ **`HiZBuffer.java`** — DONE in commit `a9a599af`. First graphics
    migration. blit.vsh re-ordered fan→strip. Source-mip selection
    left as raw GL_TEXTURE_BASE_LEVEL/MAX_LEVEL mutation (GL-only)
    pending `IGpuTexture.createView(level, count)` API for
    Metal/Vulkan. `HiZBuffer2.java` (the unused variant) is similar
    shape — migrate when the compute mip-chain path actually gets used.
 4. ✅ **Cluster A — `FullscreenBlit` + `AbstractRenderPipeline` +
-   `NormalRenderPipeline`** — DONE in commit `dd3ef385`. Pipeline
+   `NormalRenderPipeline`** — DONE in commit `81c06456`. Pipeline
    creation now backend-agnostic (createGraphicsPipeline); bind/blit
    stay raw GL because the whole runPipeline path early-returns on
    non-GL until IOSurface bridge lands. setBytes(binding, addr, size)
@@ -378,13 +378,13 @@ Recommended migration order (simplest first):
    `VOXY_VULKAN` macro. `IrisVoxyRenderPipeline` still uses
    FullscreenBlit but only via the no-arg constructor path (still
    works); its full migration waits on the GL-gate sweep.
-5. ✅ **`ChunkBoundRenderer.java`** — DONE in commit `0c706654`. AABB
+5. ✅ **`ChunkBoundRenderer.java`** — DONE in commit `71e26460`. AABB
    wireframe instanced draws; pipeline now via createGraphicsPipeline;
    raw bind/draw retained for GL-only runtime. Required #version 460
    bump on outline.vsh because shaderc's Vulkan profile only exposes
    `mix(ivec3, ivec3, bvec3)` + `gl_BaseInstance` at 4.6.
 6. ✅ **`AsyncNodeManager.java`** (compute paths) — DONE in commit
-   `739a14db`. Two compute pipelines now flow through the encoder;
+   `68734b78`. Two compute pipelines now flow through the encoder;
    scatter.comp's `count` uniform wrapped in UBO push. Worker thread
    later marked daemon in M11 closeout so MC closes cleanly on Metal.
 7. **`VoxyRenderSystem.java`** — global GL state reads
@@ -396,7 +396,7 @@ Recommended migration order (simplest first):
    on day Voxy starts running on Metal.
 8. ⚠️ **`MDICSectionRenderer.java`** — partial. Pipeline creation
    (5 compute + 1 graphics + 2 terrain) DONE through `createComputePipeline` /
-   `createGraphicsPipeline` (commits `4316a430`, `cae48144`). The actual
+   `createGraphicsPipeline` (commits `bd89fcaf`, `cc8957f3`). The actual
    dispatch + draw codepaths (`buildDrawCalls`, `renderTerrain`,
    `renderTranslucent`, `renderTemporal`) STILL call raw `glUseProgram`
    /`glBindBufferBase` / `glDispatchCompute*` /
@@ -413,7 +413,7 @@ Recommended migration order (simplest first):
    - `AbstractRenderPipeline.runPipelineMetalStub` replaced with a real
      `runPipelineMetal` that opens the render pass against the bridge,
      invokes the section renderer, then submits.
-9. **Cluster B — ✅ `BudgetBufferRenderer` (commit `5c631465`) +
+9. **Cluster B — ✅ `BudgetBufferRenderer` (commit `761f135b`) +
    ⚠️ `ModelTextureBakery`** — pipeline side done; the caller
    `ModelTextureBakery` still owns the FBO + viewport setup with ~150
    lines of raw GL state management. Must migrate together for Mac
@@ -423,7 +423,7 @@ Recommended migration order (simplest first):
     IOSurface/MTLBlitCommandEncoder JNI lands; until then the
     M9-transitional `if (backend != GL) return` keeps the bakery
     silent on Mac without crashing.
-11. ✅ **Iris* paths** — DONE in commit `d9627907`. `RenderPipelineFactory`
+11. ✅ **Iris* paths** — DONE in commit `1e2a1190`. `RenderPipelineFactory`
     refuses to construct `IrisVoxyRenderPipeline` on non-GL backends;
     NormalRenderPipeline fallback handles Metal/Vulkan. The two MDIC
     Iris-patched terrain shaders stay on the legacy `Shader.Builder`
@@ -443,7 +443,7 @@ diagnostic strip).
 
 **Why M11's closeout left this open:** every `MDICSectionRenderer`
 *pipeline* now goes through `RenderBackend.create{Graphics,Compute}Pipeline`
-(commits `4316a430` for the 5 non-Iris pipelines, `cae48144` for the
+(commits `bd89fcaf` for the 5 non-Iris pipelines, `cc8957f3` for the
 2 terrain pipelines). But the *dispatch / draw* code in
 `MDICSectionRenderer.buildDrawCalls` + `renderTerrain` +
 `renderTranslucent` + `renderTemporal` still uses raw GL:
@@ -466,22 +466,22 @@ program and have no effect. Hence: nothing renders.
 
 ### Migration scope (six chunks)
 
-1. ✅ **`prefixSum`** (commit `6bd42559`) — single SSBO at binding 0,
+1. ✅ **`prefixSum`** (commit `2e8e302d`) — single SSBO at binding 0,
    no UBO, 1 thread group. Pattern: `beginComputePass` →
    `setPipeline` → `setBuffer(0, distanceCountBuffer, 0)` →
    `barrier(SHADER, SHADER)` → `dispatch(1, 1, 1)` →
    `barrier(SHADER, SHADER)` → close. Pilot migration; pattern now
    proven inside MDIC's buildDrawCalls.
-2. ✅ **`prep`** (commit `d37f74b2`) — does not actually reference
+2. ✅ **`prep`** (commit `f0e7a3de`) — does not actually reference
    SceneUniform fields, so the encoder skips binding 0 entirely.
    Just SSBO bindings 1 (DrawCommandCountBuffer) and 2
    (IndirectSectionLookupBuffer). Defers the SceneUniform
    decision to chunk 3.
-3. ✅ **SceneUniform flip + `commandGen`** (commit `ada2723c`) —
+3. ✅ **SceneUniform flip + `commandGen`** (commit `a50e53e1`) —
    atomic two-part change:
    - `bindings.glsl` flips `SceneUniform` from `uniform` to
      `readonly buffer` (SSBO) at binding 0, std140 preserved.
-     Matches HOT pattern (commit `05b5b740`). Affects every shader
+     Matches HOT pattern (commit `5dcbc645`). Affects every shader
      importing bindings.glsl; all 26 smoke-test cases stayed green
      (SPV 26/26, MSL 25/26 — hiz.comp pre-existing).
    - The 3 still-raw-GL bind sites (bindRenderingBuffers, cull
@@ -491,12 +491,12 @@ program and have no effect. Hence: nothing renders.
      SceneUniform at 0 + optional statistics at
      `STATISTICS_BUFFER_BINDING=8`) + `dispatchIndirect` against
      `drawCountCallBuffer` offset 0 + barriers.
-4. ✅ **`translucentGen`** (commit `088776c2`) — SceneUniform now
+4. ✅ **`translucentGen`** (commit `f4d4c4ab`) — SceneUniform now
    already SSBO. 6 SSBO bindings + dispatchIndirect from the same
    `drawCountCallBuffer` (which doubles as the indirect arg AND
    one of the shader's SSBO inputs at binding 2 — pre-existing
    read-then-dispatch pattern preserved).
-5. ✅ **`cull`** (commit `ce197e7b`, partial — Metal substitute) —
+5. ✅ **`cull`** (commit `3fa07c44`, partial — Metal substitute) —
    GL keeps its depth-test rasterized cull. Metal runs a tiny
    `force_all_visible.comp` compute pass that writes
    `visibilityData[sid]` for every frustum-visible section
@@ -505,7 +505,7 @@ program and have no effect. Hence: nothing renders.
    deferred until cross-context MC-depth access lands (see
    chunk 6 step 2 below).
 6. **Render passes + `runPipelineMetal`** — broken into 3 steps:
-   - ✅ **step 1** (commit `3b48033d`) — `runPipelineMetal`
+   - ✅ **step 1** (commit `dd007eae`) — `runPipelineMetal`
      replaces the clear-only stub and runs the full migrated
      compute pipeline on Metal: `viewport.hiZBuffer.ensureAllocated`
      (new helper; allocates HiZ tex without per-mip blit so HOT
@@ -558,7 +558,7 @@ program and have no effect. Hence: nothing renders.
   Migration is mechanical (~30 min each); stubbing is faster but
   pushes the visual gap to a later milestone.
 
-### Status after this batch (commits `6bd42559` through `3b48033d`)
+### Status after this batch (commits `2e8e302d` through `dd007eae`)
 
 All 5 MDIC compute prepasses (incl. the Metal `cull` substitute)
 now flow through `ComputeEncoder`. `runPipelineMetal` runs the

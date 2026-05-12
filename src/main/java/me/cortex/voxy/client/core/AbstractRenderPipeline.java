@@ -335,8 +335,8 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
 
         // 3) Compute side — copy of innerPrimaryWork's body minus the GL bits
         //    (HiZBuffer.buildMipChain, raw glMemoryBarrier, FrEx loop). Each
-        //    sub-stage is already encoder-backed (commits ebf4eb70, 739a14db,
-        //    05b5b740, 8d37619f for HOT's last raw-GL gaps).
+        //    sub-stage is already encoder-backed (commits 0b963825, 68734b78,
+        //    5dcbc645, 89b35814 for HOT's last raw-GL gaps).
         me.cortex.voxy.client.core.rendering.util.DownloadStream.INSTANCE.tick();
         this.nodeManager.tick(this.traversal.getNodeBuffer(), this.nodeCleaner);
         this.nodeCleaner.tick(this.traversal.getNodeBuffer());

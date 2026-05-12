@@ -76,7 +76,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     // Metal/Vulkan. terrainShader + translucentTerrainShader stay on the legacy
     // Shader.Builder path because they thread Iris's patchOpaqueShader /
     // patchTranslucentShader callbacks; that path is GL-only after the
-    // RenderPipelineFactory gate (commit d9627907). Bind/draw stays raw GL —
+    // RenderPipelineFactory gate (commit 1e2a1190). Bind/draw stays raw GL —
     // MDIC operates inside AbstractRenderPipeline's FBO context, not a
     // RenderEncoder.
 
@@ -219,7 +219,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         if (opaquePatched || translucentPatched) {
             // Iris-patched path stays on the legacy Shader.Builder. It's GL-only
             // because the Iris pipeline itself is now gated to OpenGL in
-            // RenderPipelineFactory (commit d9627907).
+            // RenderPipelineFactory (commit 1e2a1190).
             this.terrainShader = tryCompilePatchedOrNormal(builder, opaqueFrag, frag);
             this.translucentTerrainShader = tryCompilePatchedOrNormal(
                     builder.define("TRANSLUCENT"), translucentFrag, frag);
@@ -406,7 +406,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         // the GL renderOpaque pattern.
         this.uploadUniformBuffer(viewport);
         if (this.terrainPipeline == null) {
-            // Iris-patched path — GL-only by construction (see d9627907). Should
+            // Iris-patched path — GL-only by construction (see 1e2a1190). Should
             // never hit on Metal because RenderPipelineFactory gates Iris pipeline.
             return;
         }
