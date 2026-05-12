@@ -235,6 +235,11 @@ public class GlRenderBackend implements RenderBackend {
         copyBufferSubDataById(src.id(), dst.id(), srcOffset, dstOffset, size);
     }
 
+    @Override
+    public void copyBufferSubData(IGpuBuffer src, IGpuPersistentBuffer dst, long srcOffset, long dstOffset, long size) {
+        copyBufferSubDataById(src.id(), dst.id(), srcOffset, dstOffset, size);
+    }
+
     private static final int GL_COPY_READ_BUFFER_BINDING = 0x8F36;
     private static final int GL_COPY_WRITE_BUFFER_BINDING = 0x8F37;
 

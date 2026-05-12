@@ -108,6 +108,15 @@ public interface RenderBackend {
      */
     void copyBufferSubData(IGpuPersistentBuffer src, IGpuBuffer dst, long srcOffset, long dstOffset, long size);
 
+    /**
+     * Reverse persistent-buffer overload used by DownloadStream.commit():
+     * a regular IGpuBuffer is the source, the persistent (CPU-mapped) buffer
+     * is the destination. Lets readback paths flow through the backend without
+     * raw GL — critical on Metal where the GL 4.1 context can't service
+     * GL 4.5's glCopyNamedBufferSubData.
+     */
+    void copyBufferSubData(IGpuBuffer src, IGpuPersistentBuffer dst, long srcOffset, long dstOffset, long size);
+
     // --- Render pass encoding (M2 minimal surface; expanded in M5+) ---
 
     /**

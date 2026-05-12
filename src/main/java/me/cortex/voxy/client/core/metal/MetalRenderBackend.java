@@ -314,6 +314,15 @@ public class MetalRenderBackend implements RenderBackend {
                 srcOffset, dstOffset, size);
     }
 
+    @Override
+    public void copyBufferSubData(IGpuBuffer src, IGpuPersistentBuffer dst, long srcOffset, long dstOffset, long size) {
+        if (!(src instanceof MetalBuffer) || !(dst instanceof MetalPersistentBuffer)) {
+            throw new IllegalArgumentException("copyBufferSubData on Metal backend requires Metal buffer arguments");
+        }
+        enqueueBufferCopy(((MetalBuffer) src).getHandle(), ((MetalPersistentBuffer) dst).getHandle(),
+                srcOffset, dstOffset, size);
+    }
+
     private void enqueueBufferCopy(long srcHandle, long dstHandle, long srcOffset, long dstOffset, long size) {
         if (size <= 0) return;
         long cmdBuf = MetalNative.mtlCommandQueueNewCommandBuffer(this.commandQueue);

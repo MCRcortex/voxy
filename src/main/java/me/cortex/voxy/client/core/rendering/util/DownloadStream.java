@@ -18,9 +18,7 @@ import static me.cortex.voxy.common.util.AllocationArena.SIZE_LIMIT;
 import static org.lwjgl.opengl.GL11.glFinish;
 import static org.lwjgl.opengl.GL30C.GL_MAP_READ_BIT;
 import static org.lwjgl.opengl.GL42.GL_BUFFER_UPDATE_BARRIER_BIT;
-import static org.lwjgl.opengl.GL42.glMemoryBarrier;
 import static org.lwjgl.opengl.GL44.GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT;
-import static org.lwjgl.opengl.GL45.glCopyNamedBufferSubData;
 
 public class DownloadStream {
     public interface DownloadResultConsumer {
@@ -108,12 +106,17 @@ public class DownloadStream {
         if (this.downloadList.isEmpty()) {
             return;
         }
-        glMemoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
+        var backend = RenderBackendFactory.get();
+        // Route through the backend so the Metal path doesn't call GL 4.2's
+        // glMemoryBarrier on Apple's GL 4.1 context (which would
+        // FATAL_ERROR in native method: No context is current).
+        backend.memoryBarrier(GL_BUFFER_UPDATE_BARRIER_BIT);
         //Copies all the data from target buffers into the download stream
         for (var entry : this.downloadList) {
-            glCopyNamedBufferSubData(entry.target.id(), this.downloadBuffer.id(), entry.targetOffset, entry.downloadStreamOffset, entry.size);
+            backend.copyBufferSubData(entry.target, this.downloadBuffer,
+                    entry.targetOffset, entry.downloadStreamOffset, entry.size);
         }
-        glMemoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
+        backend.memoryBarrier(GL_CLIENT_MAPPED_BUFFER_BARRIER_BIT | GL_BUFFER_UPDATE_BARRIER_BIT);
         this.thisFrameDownloadList.addAll(this.downloadList);
         this.downloadList.clear();
 
