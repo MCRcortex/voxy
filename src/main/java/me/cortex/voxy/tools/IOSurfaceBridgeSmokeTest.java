@@ -67,8 +67,45 @@ public final class IOSurfaceBridgeSmokeTest {
                 throw new RuntimeException("IOSurface handle is 0");
             }
 
+            // Second leg: render a clear color through the encoder against the
+            // IOSurface-backed texture. If this succeeds we know the bridge is
+            // usable as an actual render target (not just a metadata wrapper) —
+            // the prerequisite for AbstractRenderPipeline.runPipeline routing
+            // Voxy's output through the bridge.
+            float clearR = 0.20f, clearG = 0.60f, clearB = 0.90f;
+            var pass = me.cortex.voxy.client.core.gpu.RenderPassDesc.builder(W, H)
+                    .clearColor(bridge.asGpuTexture(), clearR, clearG, clearB, 1.0f)
+                    .build();
+            try (var enc = backend.beginRenderPass(pass)) {
+                // No draws — the clear load action is enough to write all pixels.
+            }
+            backend.submit();
+
+            byte[] pixels = backend.readPixelsRGBA8(bridge.asGpuTexture(), 0, 0, W, H);
+            int got = ((pixels[0] & 0xFF) << 24) | ((pixels[1] & 0xFF) << 16)
+                    | ((pixels[2] & 0xFF) << 8) | (pixels[3] & 0xFF);
+            // The bridge texture is BGRA8Unorm; the blit copies the raw bytes
+            // (B, G, R, A) so the byte sample at (0,0) is (B, G, R, A) = clear.
+            // Allow ±2 tolerance per channel for float→unorm8 rounding mode
+            // differences (Metal rounds to nearest with ties-to-even; our
+            // Java side uses round-half-up).
+            int gotB = (got >>> 24) & 0xFF;
+            int gotG = (got >>> 16) & 0xFF;
+            int gotR = (got >>>  8) & 0xFF;
+            int gotA = (got >>>  0) & 0xFF;
+            int expectB = Math.round(clearB * 255);
+            int expectG = Math.round(clearG * 255);
+            int expectR = Math.round(clearR * 255);
+            System.out.printf("First pixel   : B=0x%02X G=0x%02X R=0x%02X A=0x%02X (expected B=0x%02X G=0x%02X R=0x%02X)%n",
+                    gotB, gotG, gotR, gotA, expectB, expectG, expectR);
+            int tol = 2;
+            if (Math.abs(gotB - expectB) > tol || Math.abs(gotG - expectG) > tol
+                    || Math.abs(gotR - expectR) > tol || gotA != 0xFF) {
+                throw new RuntimeException("IOSurface render pass produced wrong clear color");
+            }
+
             System.out.println();
-            System.out.println("M10 SMOKE OK — IOSurface-backed MTLTexture allocated on Apple Silicon");
+            System.out.println("M10 SMOKE OK — IOSurface-backed MTLTexture rendered + read back on Apple Silicon");
         } finally {
             if (bridge != null) bridge.close();
             backend.shutdown();

@@ -100,6 +100,52 @@ public final class IOSurfaceBridge implements AutoCloseable {
     /** Raw MTLTexture handle — the Metal-side render target. */
     public long metalTextureHandle() { return this.metalTextureHandle; }
 
+    /**
+     * Adapt the underlying MTLTexture to {@link me.cortex.voxy.client.core.gpu.IGpuTexture}
+     * so it can be passed to {@link me.cortex.voxy.client.core.gpu.RenderPassDesc.Builder}
+     * as a color attachment. The returned texture is owned by this bridge —
+     * don't call {@code free()} on it. Lazy-cached.
+     */
+    public me.cortex.voxy.client.core.gpu.IGpuTexture asGpuTexture() {
+        if (this.gpuTextureView == null) {
+            this.gpuTextureView = new BridgedGpuTexture(this);
+        }
+        return this.gpuTextureView;
+    }
+
+    private BridgedGpuTexture gpuTextureView;
+
+    /**
+     * Minimal {@link me.cortex.voxy.client.core.gpu.IGpuTexture} adapter wrapping
+     * the bridge's raw MTLTexture handle. Registers the handle with
+     * {@link me.cortex.voxy.client.core.metal.MetalHandleMap} so the Metal
+     * encoder's {@code bufferHandle(IGpuTexture)} lookup resolves it.
+     */
+    private static final class BridgedGpuTexture implements me.cortex.voxy.client.core.gpu.IGpuTexture {
+        private final int id;
+        private final int width;
+        private final int height;
+
+        BridgedGpuTexture(IOSurfaceBridge bridge) {
+            this.id = me.cortex.voxy.client.core.metal.MetalHandleMap.register(bridge.metalTextureHandle);
+            this.width  = bridge.width;
+            this.height = bridge.height;
+        }
+        @Override public int id() { return this.id; }
+        @Override public int getWidth() { return this.width; }
+        @Override public int getHeight() { return this.height; }
+        @Override public int getLevels() { return 1; }
+        @Override public int getFormat() { return 0x8058 /* GL_RGBA8 — Metal sees BGRA8Unorm */; }
+        @Override public int getType() { return 0x0DE1 /* GL_TEXTURE_2D */; }
+        @Override public me.cortex.voxy.client.core.gpu.IGpuTexture store(int format, int levels, int width, int height) { return this; }
+        @Override public me.cortex.voxy.client.core.gpu.IGpuTexture createView() { return this; }
+        @Override public me.cortex.voxy.client.core.gpu.IGpuTexture name(String name) { return this; }
+        @Override public void assertAllocated() {}
+        @Override public void free() { /* owned by IOSurfaceBridge */ }
+        @Override public void assertNotFreed() {}
+        @Override public boolean isFreed() { return false; }
+    }
+
     // GL constants we need without pulling in LWJGL's GL classes (this class
     // is reachable from non-GL backends where the LWJGL GL package may be
     // sandboxed). Same numeric values as the OpenGL spec.
