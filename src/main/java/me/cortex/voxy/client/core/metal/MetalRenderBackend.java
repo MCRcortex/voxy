@@ -400,12 +400,37 @@ public class MetalRenderBackend implements RenderBackend {
 
     @Override
     public IGpuPipeline createGraphicsPipeline(GraphicsPipelineDesc desc) {
-        if (desc.vertexMsl == null || desc.fragmentMsl == null) {
-            throw new IllegalArgumentException(
-                    "MetalRenderBackend.createGraphicsPipeline: vertex/fragment MSL required");
+        // If MSL isn't pre-baked, fall back to the runtime GLSL → SPIRV → MSL
+        // pipeline. M9 migrated call sites supply GLSL only (one source, all
+        // backends); only the M3-M8 smoke tests feed pre-baked MSL/SPIRV.
+        String vertexMsl = desc.vertexMsl;
+        String fragmentMsl = desc.fragmentMsl;
+        if (vertexMsl == null || fragmentMsl == null) {
+            if (desc.vertexGlsl == null || desc.fragmentGlsl == null) {
+                throw new IllegalArgumentException(
+                        "MetalRenderBackend.createGraphicsPipeline: need MSL or GLSL; got neither. label=" + desc.label);
+            }
+            try {
+                var vertResult = me.cortex.voxy.client.core.gpu.shader.RuntimeShaderCompiler.compile(
+                        desc.vertexGlsl,
+                        me.cortex.voxy.client.core.gpu.shader.RuntimeShaderCompiler.Stage.VERTEX,
+                        desc.defines,
+                        me.cortex.voxy.client.core.gpu.shader.RuntimeShaderCompiler.Target.METAL_MSL);
+                var fragResult = me.cortex.voxy.client.core.gpu.shader.RuntimeShaderCompiler.compile(
+                        desc.fragmentGlsl,
+                        me.cortex.voxy.client.core.gpu.shader.RuntimeShaderCompiler.Stage.FRAGMENT,
+                        desc.defines,
+                        me.cortex.voxy.client.core.gpu.shader.RuntimeShaderCompiler.Target.METAL_MSL);
+                vertexMsl = vertResult.mslSource();
+                fragmentMsl = fragResult.mslSource();
+            } catch (Throwable t) {
+                throw new RuntimeException(
+                        "MetalRenderBackend.createGraphicsPipeline: GLSL → MSL transpile failed for label="
+                                + desc.label, t);
+            }
         }
 
-        long vertexLib = MetalNative.mtlDeviceNewLibraryWithSource(this.device, desc.vertexMsl);
+        long vertexLib = MetalNative.mtlDeviceNewLibraryWithSource(this.device, vertexMsl);
         if (vertexLib == 0) {
             throw new RuntimeException("Vertex MSL compile failed: " + MetalNative.mtlGetLastCompileError());
         }
@@ -416,7 +441,7 @@ public class MetalRenderBackend implements RenderBackend {
         long pipelineDesc = 0;
         long dssHandle = 0;
         try {
-            fragmentLib = MetalNative.mtlDeviceNewLibraryWithSource(this.device, desc.fragmentMsl);
+            fragmentLib = MetalNative.mtlDeviceNewLibraryWithSource(this.device, fragmentMsl);
             if (fragmentLib == 0) {
                 throw new RuntimeException("Fragment MSL compile failed: " + MetalNative.mtlGetLastCompileError());
             }
@@ -640,10 +665,26 @@ public class MetalRenderBackend implements RenderBackend {
 
     @Override
     public IGpuPipeline createComputePipeline(ComputePipelineDesc desc) {
-        if (desc.computeMsl == null) {
-            throw new IllegalArgumentException("createComputePipeline: compute MSL required");
+        String computeMsl = desc.computeMsl;
+        if (computeMsl == null) {
+            if (desc.computeGlsl == null) {
+                throw new IllegalArgumentException(
+                        "createComputePipeline: need MSL or GLSL; got neither. label=" + desc.label);
+            }
+            try {
+                var result = me.cortex.voxy.client.core.gpu.shader.RuntimeShaderCompiler.compile(
+                        desc.computeGlsl,
+                        me.cortex.voxy.client.core.gpu.shader.RuntimeShaderCompiler.Stage.COMPUTE,
+                        desc.defines,
+                        me.cortex.voxy.client.core.gpu.shader.RuntimeShaderCompiler.Target.METAL_MSL);
+                computeMsl = result.mslSource();
+            } catch (Throwable t) {
+                throw new RuntimeException(
+                        "MetalRenderBackend.createComputePipeline: GLSL → MSL transpile failed for label="
+                                + desc.label, t);
+            }
         }
-        long library = MetalNative.mtlDeviceNewLibraryWithSource(this.device, desc.computeMsl);
+        long library = MetalNative.mtlDeviceNewLibraryWithSource(this.device, computeMsl);
         if (library == 0) {
             throw new RuntimeException("Compute MSL compile failed: " + MetalNative.mtlGetLastCompileError());
         }

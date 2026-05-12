@@ -53,17 +53,29 @@ public class BudgetBufferRenderer {
     private static long pushUboCapacity;
 
     static {
-        bakeryPipeline = RenderBackendFactory.get().createGraphicsPipeline(new GraphicsPipelineDesc(
-                ShaderLoader.parse("voxy:bakery/position_tex.vsh"),
-                ShaderLoader.parse("voxy:bakery/position_tex.fsh"),
-                java.util.Map.of("PUSH_BINDING", Integer.toString(PUSH_BINDING)),
-                null, null,           // no MSL — runtime compiler produces on Metal
-                null, null,           // no SPIRV — runtime compiler produces on Vulkan
-                GL_RGBA8,             // color format — actual FBO is owned by ModelTextureBakery
-                VertexLayout.EMPTY,   // vertex layout managed by the legacy IGpuVertexArray below
-                PipelineState.DEFAULT,
-                "BudgetBufferRenderer.bakery"));
-        bakeryGlProgram = (bakeryPipeline instanceof GlGraphicsPipeline gp) ? gp.program() : 0;
+        // M11 transitional: BudgetBufferRenderer drives the bakery, which is
+        // OpenGL-only (the surrounding ModelTextureBakery + GlViewCapture use
+        // raw GL FBO/viewport DSA). On non-OpenGL backends the bakery is
+        // dormant; allocating the graphics pipeline here would either fail
+        // (Metal requires a vertex descriptor for stage-input attribs that
+        // VertexLayout.EMPTY doesn't supply) or succeed and then never be
+        // bound. Skip allocation entirely off-GL.
+        if (RenderBackendFactory.get().getType() == me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+            bakeryPipeline = RenderBackendFactory.get().createGraphicsPipeline(new GraphicsPipelineDesc(
+                    ShaderLoader.parse("voxy:bakery/position_tex.vsh"),
+                    ShaderLoader.parse("voxy:bakery/position_tex.fsh"),
+                    java.util.Map.of("PUSH_BINDING", Integer.toString(PUSH_BINDING)),
+                    null, null,           // no MSL — runtime compiler produces on Metal
+                    null, null,           // no SPIRV — runtime compiler produces on Vulkan
+                    GL_RGBA8,             // color format — actual FBO is owned by ModelTextureBakery
+                    VertexLayout.EMPTY,   // vertex layout managed by the legacy IGpuVertexArray below
+                    PipelineState.DEFAULT,
+                    "BudgetBufferRenderer.bakery"));
+            bakeryGlProgram = (bakeryPipeline instanceof GlGraphicsPipeline gp) ? gp.program() : 0;
+        } else {
+            bakeryPipeline = null;
+            bakeryGlProgram = 0;
+        }
     }
 
 
@@ -173,6 +185,6 @@ public class BudgetBufferRenderer {
             glDeleteBuffers(pushUbo);
             pushUbo = 0;
         }
-        bakeryPipeline.close();
+        if (bakeryPipeline != null) bakeryPipeline.close();
     }
 }

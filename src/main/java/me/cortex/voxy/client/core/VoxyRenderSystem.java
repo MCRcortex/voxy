@@ -67,6 +67,11 @@ public class VoxyRenderSystem {
 
     private final AbstractRenderPipeline pipeline;
 
+    /** Accessor exposed for the Metal compositing mixin so it can read the IOSurface bridge. */
+    public AbstractRenderPipeline getPipeline() {
+        return this.pipeline;
+    }
+
     private static AbstractSectionRenderer.Factory<?,? extends IGeometryData> getRenderBackendFactory() {
         //TODO: need todo a thing where selects optimal section render based on if supports the pipeline and geometry data type
         return MDICSectionRenderer.FACTORY;
@@ -214,14 +219,14 @@ public class VoxyRenderSystem {
             return;
         }
 
-        // M9 transitional: every per-frame render method below — chunkBoundRenderer.render,
-        // pipeline.runPipeline, etc. — bottoms out in raw GL calls that don't work on
-        // Apple's frozen GL 4.1 driver (DSA, multi-draw indirect with count, compute
-        // dispatch). On non-OpenGL backends, skip Voxy's render path entirely so MC + Sodium
-        // continue rendering vanilla close-distance chunks. Voxy's far-distance LOD chunks
-        // won't appear until the M9-M11 render path migration completes.
         if (me.cortex.voxy.client.core.gpu.RenderBackendFactory.get().getType()
                 != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+            // Metal path — skip all the GL state save/restore and the
+            // chunkBoundRenderer overlay (which is raw GL). Just drive
+            // the pipeline's Metal stub which clears the IOSurface bridge.
+            // The compositing mixin runs separately at renderLevel RETURN.
+            this.pipeline.preSetup(viewport);
+            this.pipeline.runPipeline(viewport, 0, viewport.width, viewport.height);
             return;
         }
 

@@ -94,17 +94,24 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         glBindFramebuffer(GL_FRAMEBUFFER, sourceFrameBuffer);
     }
 
+    /** IOSurface bridge for the Metal render path. Lazy-allocated on first non-GL frame. */
+    private me.cortex.voxy.client.core.interop.IOSurfaceBridge metalBridge;
+    private int metalBridgeWidth;
+    private int metalBridgeHeight;
+    /** Animation counter for the placeholder Metal render — replaced by real Voxy output incrementally. */
+    private int metalFrame;
+
     public void runPipeline(Viewport<?> viewport, int sourceFrameBuffer, int srcWidth, int srcHeight) {
-        // M9 transitional: the entire runPipeline body is raw GL — glClearNamedFramebufferfi,
-        // glBindFramebuffer, glBindSampler, glColorMask, plus AbstractSectionRenderer's
-        // glDispatchCompute / glMultiDrawElementsIndirectCountARB / glMemoryBarrier chain.
-        // Migrating it requires the IOSurface bridge + ICB + per-mip texture views + the
-        // proper RenderEncoder/ComputeEncoder rewrite that M9-M11 plans cover. For now
-        // on non-OpenGL backends we early-return: MC + Sodium continue to render the
-        // close-distance vanilla chunks, but Voxy's far-distance LOD chunks don't appear
-        // until the render path migration completes.
         if (me.cortex.voxy.client.core.gpu.RenderBackendFactory.get().getType()
                 != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+            // Metal path stub — renders a placeholder clear color into the
+            // IOSurface bridge. The composite mixin (see MixinLevelRenderer
+            // BridgeDemo's sibling) blends the bridge over MC's framebuffer
+            // so the user can confirm Voxy is reaching this code on Metal.
+            // The real terrain rendering migration (MDIC encoder + buildDrawCalls
+            // encoder + AbstractSectionRenderer's draws through RenderEncoder)
+            // replaces the clear with actual geometry incrementally.
+            this.runPipelineMetalStub(viewport);
             return;
         }
         int depthTexture = this.setup(viewport, sourceFrameBuffer, srcWidth, srcHeight);
@@ -250,7 +257,59 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         this.depthMaskBlit.delete();
         this.depthSetBlit.delete();
         this.depthCopy.delete();
+        if (this.metalBridge != null) {
+            this.metalBridge.close();
+            this.metalBridge = null;
+        }
         super.free0();
+    }
+
+    /**
+     * Placeholder Metal-path render: ensure an IOSurfaceBridge sized to MC's
+     * framebuffer exists, begin a render pass against it, clear to an animated
+     * gradient so the user can verify Voxy's code is running on Metal. The
+     * full MDIC migration replaces the clear body with real LOD draws.
+     * <p>
+     * Returns the bridge so a compositing mixin can pull the GL texture name
+     * and blit it over MC's framebuffer.
+     */
+    private void runPipelineMetalStub(Viewport<?> viewport) {
+        int fbw = viewport.width;
+        int fbh = viewport.height;
+        if (fbw <= 0 || fbh <= 0) return;
+        var backend = me.cortex.voxy.client.core.gpu.RenderBackendFactory.get();
+        if (!(backend instanceof me.cortex.voxy.client.core.metal.MetalRenderBackend mrb)) return;
+
+        if (this.metalBridge == null || this.metalBridgeWidth != fbw || this.metalBridgeHeight != fbh) {
+            if (this.metalBridge != null) this.metalBridge.close();
+            this.metalBridge = me.cortex.voxy.client.core.interop.IOSurfaceBridge.create(
+                    mrb.device(), fbw, fbh,
+                    me.cortex.voxy.client.core.interop.IOSurfaceBridge.IOSurfaceFormat.BGRA8);
+            this.metalBridgeWidth  = fbw;
+            this.metalBridgeHeight = fbh;
+        }
+
+        this.metalFrame++;
+        float t = (this.metalFrame % 240) / 240.0f;
+        // Magenta-ish sweep so the bridge output is unmistakably Voxy's and not MC's.
+        float r = 0.40f + 0.30f * (float) Math.cos(t * 2 * Math.PI);
+        float g = 0.05f;
+        float b = 0.50f + 0.30f * (float) Math.cos((t + 0.5f) * 2 * Math.PI);
+
+        var pass = me.cortex.voxy.client.core.gpu.RenderPassDesc.builder(fbw, fbh)
+                .clearColor(this.metalBridge.asGpuTexture(), r, g, b, 0.40f)
+                .build();
+        try (var enc = backend.beginRenderPass(pass)) {
+            // No draws yet — clear-only stub until MDIC.renderTerrain/Translucent
+            // migrate to the RenderEncoder API. Each future migration step
+            // adds encoder.setPipeline + encoder.draw* calls here.
+        }
+        backend.submit();
+    }
+
+    /** Accessor for the compositing mixin so it can grab the bridge's GL texture name. */
+    public me.cortex.voxy.client.core.interop.IOSurfaceBridge metalBridge() {
+        return this.metalBridge;
     }
 
     public void addDebug(List<String> debug) {

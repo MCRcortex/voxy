@@ -58,11 +58,25 @@ public class VoxyClient implements ClientModInitializer {
         // non-OpenGL backends so the mixins find VoxyRenderSystem == null
         // and Sodium's chunk render runs unmodified — the user sees normal
         // close-distance MC + Sodium rendering instead of a blue screen.
+        // Feature flag to opt into the Metal render path. The flag exists
+        // separately from regular env vars so opting in is intentional —
+        // until the full MDIC encoder migration lands, this path produces
+        // a clear color via the IOSurfaceBridge, not actual LOD chunks.
+        boolean forceMetal = "1".equals(System.getenv("VOXY_FORCE_METAL"))
+                || "true".equals(System.getenv("VOXY_FORCE_METAL"))
+                || "true".equals(System.getProperty("voxy.forceMetal", "false"));
+
         if (systemSupported && backend.getType() != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
-            Logger.warn("[M9 TRANSITIONAL] Voxy disabled on " + backend.getType()
-                    + " backend until the render-path migration lands. Sodium will handle close-distance "
-                    + "chunks; Voxy's far-distance LOD won't appear yet.");
-            systemSupported = false;
+            if (forceMetal) {
+                Logger.warn("[VOXY_FORCE_METAL] Enabling Voxy on " + backend.getType()
+                        + " backend via feature flag. Render output goes through the IOSurface bridge; "
+                        + "MDIC migration to ICB is still in progress so visible output is currently the "
+                        + "clear-color stub, not actual LOD chunks.");
+            } else {
+                Logger.warn("[M9 TRANSITIONAL] Voxy disabled on " + backend.getType()
+                        + " backend. Set VOXY_FORCE_METAL=1 to enable the (clear-color) Metal render path.");
+                systemSupported = false;
+            }
         }
 
         if (systemSupported) {

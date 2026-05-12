@@ -44,6 +44,25 @@ public class GlViewCapture {
     public GlViewCapture(int width, int height) {
         this.width = width;
         this.height = height;
+        // M11 transitional: GlViewCapture's constructor allocates textures + a
+        // legacy AutoBindingShader. On non-OpenGL backends the
+        // AutoBindingShader.compile path returns a program=0 stub, and the
+        // subsequent .texture("BINDING", 0, tex) calls would inspect that
+        // program's resource indices — NPE territory. Skip allocation entirely
+        // on non-OpenGL; emitToStream() + clear() already early-return so the
+        // bakery is silent on Metal until ModelTextureBakery itself gets a
+        // proper Metal-native replacement (parallel MetalViewCapture). This
+        // unblocks VoxyRenderSystem construction so the higher-level Metal
+        // render path can boot.
+        if (RenderBackendFactory.get().getType() != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+            this.metaTex = null;
+            this.colourTex = null;
+            this.depthTex = null;
+            this.stencilTex = null;
+            this.framebuffer = null;
+            this.copyOutShader = null;
+            return;
+        }
         this.metaTex = RenderBackendFactory.get().createTexture().store(GL_R32UI, 1, width*3, height*2).name("ModelBakeryMetadata");
         this.colourTex = RenderBackendFactory.get().createTexture().store(GL_RGBA8, 1, width*3, height*2).name("ModelBakeryColour");
         this.depthTex = RenderBackendFactory.get().createTexture().store(GL_DEPTH24_STENCIL8, 1, width*3, height*2).name("ModelBakeryDepth");
@@ -114,11 +133,11 @@ public class GlViewCapture {
     }
 
     public void free() {
-        this.framebuffer.free();
-        this.colourTex.free();
-        this.stencilTex.free();
-        this.depthTex.free();
-        this.metaTex.free();
-        this.copyOutShader.free();
+        if (this.framebuffer != null) this.framebuffer.free();
+        if (this.colourTex != null) this.colourTex.free();
+        if (this.stencilTex != null) this.stencilTex.free();
+        if (this.depthTex != null) this.depthTex.free();
+        if (this.metaTex != null) this.metaTex.free();
+        if (this.copyOutShader != null) this.copyOutShader.free();
     }
 }
