@@ -138,8 +138,11 @@ void main() {
     // blockModelAtlas + depthBoundingBuffer textures aren't populated /
     // bound. Skip atlas sampling and emit a deterministic per-quad
     // debug color hashed from `interData.x` (a flat varying carrying the
-    // model id + face + flags — varies per quad / section). Drops the
-    // depth-bounding and alpha-discard checks that depend on those
+    // model id + face + flags — varies per quad / section). Then modulate
+    // by a fake Lambertian-style shade computed from the face normal so
+    // the cube structure of each LOD chunk is visible (top faces bright,
+    // bottom faces dark) without needing MC's lightmap. Drops the
+    // depth-bounding and alpha-discard checks that depend on the unbound
     // textures. `gl_InstanceID` lives only in the vertex stage so we
     // can't use it here; interData.x gives sufficient variation.
     {
@@ -153,6 +156,24 @@ void main() {
             float((hash >> 16) & 0xFFu) / 255.0,
             1.0
         );
+        // Face indices 0..5 = DOWN, UP, NORTH, SOUTH, WEST, EAST (mirrors
+        // ModelTextureBakery.VIEWS order). Sky-direction Lambertian factor:
+        // top faces approach 1.0, bottom faces approach 0.3.
+        const vec3 FACE_NORMALS[6] = vec3[6](
+            vec3( 0, -1,  0),
+            vec3( 0,  1,  0),
+            vec3( 0,  0, -1),
+            vec3( 0,  0,  1),
+            vec3(-1,  0,  0),
+            vec3( 1,  0,  0)
+        );
+        uint face = getFace();
+        // Clamp face index for safety — getFace masks 3 bits so it's <8;
+        // out-of-range face indices fall back to the UP entry.
+        vec3 n = FACE_NORMALS[face < 6u ? face : 1u];
+        float ndotl = dot(n, normalize(vec3(0.3, 1.0, 0.5)));
+        float shade = clamp(ndotl * 0.45 + 0.55, 0.30, 1.0);
+        colour.rgb *= shade;
     }
 #else
 //This is deprecated, TODO: remove the non mip code path

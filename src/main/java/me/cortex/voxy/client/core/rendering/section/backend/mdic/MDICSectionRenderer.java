@@ -260,13 +260,34 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             // glMultiDrawElementsIndirect — which MetalRenderEncoder.drawIndexedIndirect
             // implements as a CPU loop). The ICB infrastructure stays available
             // (smoke-tested independently) for future simpler-shader use cases.
+            //
+            // M12 chunk 6 polish: on non-GL backends the pipeline state uses
+            // NO_CULL because the GL renderTerrain path explicitly calls
+            // glDisable(GL_CULL_FACE) at draw time — that override doesn't
+            // apply to Metal where the cull mode is baked into the pipeline.
+            // Without this, ~half the LOD triangles disappear due to wrong-
+            // winding back-face culling.
+            me.cortex.voxy.client.core.gpu.PipelineState opaqueState
+                    = me.cortex.voxy.client.core.gpu.PipelineState.OPAQUE_MESH;
+            me.cortex.voxy.client.core.gpu.PipelineState translucentState
+                    = me.cortex.voxy.client.core.gpu.PipelineState.TRANSLUCENT_MESH;
+            if (this.backend.getType() != BackendType.OPENGL) {
+                opaqueState = new me.cortex.voxy.client.core.gpu.PipelineState(
+                        me.cortex.voxy.client.core.gpu.PipelineState.DepthState.DEFAULT,
+                        me.cortex.voxy.client.core.gpu.PipelineState.BlendState.OPAQUE,
+                        me.cortex.voxy.client.core.gpu.PipelineState.RasterState.NO_CULL);
+                translucentState = new me.cortex.voxy.client.core.gpu.PipelineState(
+                        me.cortex.voxy.client.core.gpu.PipelineState.DepthState.TEST_NO_WRITE,
+                        me.cortex.voxy.client.core.gpu.PipelineState.BlendState.PREMULTIPLIED_ALPHA,
+                        me.cortex.voxy.client.core.gpu.PipelineState.RasterState.NO_CULL);
+            }
             this.terrainPipeline = this.backend.createGraphicsPipeline(
                     new me.cortex.voxy.client.core.gpu.GraphicsPipelineDesc(
                             vertex, frag, opaqueDefines,
                             null, null, null, null,
                             GL_RGBA8,
                             me.cortex.voxy.client.core.gpu.VertexLayout.EMPTY,
-                            me.cortex.voxy.client.core.gpu.PipelineState.OPAQUE_MESH,
+                            opaqueState,
                             "MDIC.terrain"));
             this.translucentTerrainPipeline = this.backend.createGraphicsPipeline(
                     new me.cortex.voxy.client.core.gpu.GraphicsPipelineDesc(
@@ -274,7 +295,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
                             null, null, null, null,
                             GL_RGBA8,
                             me.cortex.voxy.client.core.gpu.VertexLayout.EMPTY,
-                            me.cortex.voxy.client.core.gpu.PipelineState.TRANSLUCENT_MESH,
+                            translucentState,
                             "MDIC.translucentTerrain"));
             this.terrainProgram = mdicProgramId(this.terrainPipeline);
             this.translucentTerrainProgram = mdicProgramId(this.translucentTerrainPipeline);
