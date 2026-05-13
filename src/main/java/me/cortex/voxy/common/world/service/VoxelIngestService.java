@@ -21,6 +21,11 @@ import org.jetbrains.annotations.NotNull;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class VoxelIngestService {
+    /** M13 diagnostic counters — read by AbstractRenderPipeline's Metal-DIAG dump. */
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_ENQUEUE_COUNT = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_PROCESS_COUNT = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_RAW_INGEST_COUNT = new java.util.concurrent.atomic.AtomicLong();
+
     private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);
     private final Service service;
     private record IngestSection(int cx, int cy, int cz, WorldEngine world, LevelChunkSection section, DataLayer blockLight, DataLayer skyLight){}
@@ -31,6 +36,7 @@ public class VoxelIngestService {
     }
 
     private void processJob() {
+        DIAG_PROCESS_COUNT.incrementAndGet();
         var task = this.ingestQueue.pop();
         task.world.markActive();
 
@@ -87,7 +93,13 @@ public class VoxelIngestService {
         return true;
     }
 
+    /** Total times enqueueIngest was called regardless of outcome. */
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_ENQUEUE_CALL_COUNT = new java.util.concurrent.atomic.AtomicLong();
+    /** Times enqueueIngest exited early because gotLighting was false. */
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_ENQUEUE_NO_LIGHTING_COUNT = new java.util.concurrent.atomic.AtomicLong();
+
     public boolean enqueueIngest(WorldEngine engine, LevelChunk chunk) {
+        DIAG_ENQUEUE_CALL_COUNT.incrementAndGet();
         if (!this.service.isLive()) {
             return false;
         }
@@ -130,6 +142,7 @@ public class VoxelIngestService {
         }
 
         if (!gotLighting) {
+            DIAG_ENQUEUE_NO_LIGHTING_COUNT.incrementAndGet();
             return false;
         }
 
@@ -159,6 +172,7 @@ public class VoxelIngestService {
             //    continue;
             //}
 
+            DIAG_ENQUEUE_COUNT.incrementAndGet();
             this.ingestQueue.add(new IngestSection(chunk.getPos().x, i, chunk.getPos().z, engine, section, bl, sl));//TODO: fixme, this is technically not safe todo on the chunk load ingest, we need to copy the section data so it cant be modified while being read
             try {
                 this.service.execute();
@@ -195,6 +209,8 @@ public class VoxelIngestService {
     }
 
     private boolean rawIngest0(WorldEngine engine, LevelChunkSection section, int x, int y, int z, DataLayer bl, DataLayer sl) {
+        DIAG_RAW_INGEST_COUNT.incrementAndGet();
+        DIAG_ENQUEUE_COUNT.incrementAndGet();
         this.ingestQueue.add(new IngestSection(x, y, z, engine, section, bl, sl));
         try {
             this.service.execute();

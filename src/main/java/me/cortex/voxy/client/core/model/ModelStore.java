@@ -24,11 +24,28 @@ public class ModelStore {
     final IGpuBuffer modelColourBuffer;
     final IGpuTexture textures;
     public final int blockSampler = glGenSamplers();
+    /**
+     * Cross-backend sampler for {@link #textures}. Used by Metal's render
+     * encoder path (MDIC's renderTerrainMetal). On GL we keep the legacy
+     * {@link #blockSampler} that {@code glBindSampler}-binds directly.
+     * Both samplers use the same filter/wrap state so visual output stays
+     * consistent across backends.
+     */
+    public final me.cortex.voxy.client.core.gpu.IGpuSampler atlasSampler;
 
     public ModelStore() {
         this.modelBuffer = RenderBackendFactory.get().createBuffer(MODEL_SIZE * (1<<16));
         this.modelColourBuffer = RenderBackendFactory.get().createBuffer(4 * (1<<16));
-        this.textures = RenderBackendFactory.get().createTexture().store(GL_RGBA8, Integer.numberOfTrailingZeros(ModelFactory.MODEL_TEXTURE_SIZE), ModelFactory.MODEL_TEXTURE_SIZE*3*256,ModelFactory.MODEL_TEXTURE_SIZE*2*256).name("ModelTextures");
+        // M13 chunk 1: allocate the model atlas as CPU-uploadable. On Metal
+        // this is Shared storage so `uploadSubImage2D` can push the bakery
+        // results into it; on GL the call is identical to `store`. Default
+        // sampler/sampling state stays GL-side.
+        this.textures = RenderBackendFactory.get().createTexture()
+                .storeUploadable(GL_RGBA8,
+                        Integer.numberOfTrailingZeros(ModelFactory.MODEL_TEXTURE_SIZE),
+                        ModelFactory.MODEL_TEXTURE_SIZE*3*256,
+                        ModelFactory.MODEL_TEXTURE_SIZE*2*256)
+                .name("ModelTextures");
 
 
         //Limit the mips of the texture to match that of the terrain atlas
@@ -40,6 +57,20 @@ public class ModelStore {
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MIN_LOD, 0);
         glSamplerParameteri(this.blockSampler, GL_TEXTURE_MAX_LOD, mipLvl);//Integer.numberOfTrailingZeros(ModelFactory.MODEL_TEXTURE_SIZE)
+
+        // Cross-backend mirror of blockSampler — same filter/wrap state.
+        // Used by Metal's RenderEncoder.setSampler path; GL still uses
+        // glBindSampler(unit, this.blockSampler) for its raw-GL draws.
+        this.atlasSampler = RenderBackendFactory.get().createSampler(
+                me.cortex.voxy.client.core.gpu.SamplerDesc.builder()
+                        .filter(me.cortex.voxy.client.core.gpu.SamplerDesc.Filter.NEAREST,
+                                me.cortex.voxy.client.core.gpu.SamplerDesc.Filter.NEAREST)
+                        .mipFilter(me.cortex.voxy.client.core.gpu.SamplerDesc.MipFilter.LINEAR)
+                        .wrap(me.cortex.voxy.client.core.gpu.SamplerDesc.Wrap.CLAMP_TO_EDGE,
+                                me.cortex.voxy.client.core.gpu.SamplerDesc.Wrap.CLAMP_TO_EDGE)
+                        .lod(0, mipLvl)
+                        .label("ModelAtlasSampler")
+                        .build());
     }
 
 
@@ -47,6 +78,7 @@ public class ModelStore {
         this.modelBuffer.free();
         this.modelColourBuffer.free();
         this.textures.free();
+        this.atlasSampler.close();
         glDeleteSamplers(this.blockSampler);
     }
 
@@ -59,16 +91,16 @@ public class ModelStore {
     }
 
     /**
-     * Encoder-aware overload — binds only the model + colour SSBOs. Used by
-     * M12's Metal render path; the model-texture atlas + sampler are skipped
-     * because (a) the sampler is raw GL ({@code glGenSamplers}) and (b)
-     * ModelTextureBakery (which populates the atlas) is still GL-only, so on
-     * Metal the atlas is blank anyway. LOD chunks render with uniform white
-     * sampling at the moment, but the geometry is visible.
+     * Encoder-aware overload — binds model + colour SSBOs and (M13 chunk 1
+     * onward) the model atlas texture + cross-backend sampler. Used by
+     * Metal's MDIC render path.
      */
     public void bindBuffers(me.cortex.voxy.client.core.gpu.RenderEncoder encoder,
-                            int modelBindingIndex, int colourBindingIndex) {
+                            int modelBindingIndex, int colourBindingIndex,
+                            int atlasBindingIndex) {
         encoder.setBuffer(modelBindingIndex, this.modelBuffer, 0);
         encoder.setBuffer(colourBindingIndex, this.modelColourBuffer, 0);
+        encoder.setTexture(atlasBindingIndex, this.textures);
+        encoder.setSampler(atlasBindingIndex, this.atlasSampler);
     }
 }

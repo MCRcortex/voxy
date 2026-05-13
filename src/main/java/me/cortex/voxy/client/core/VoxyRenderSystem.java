@@ -67,6 +67,9 @@ public class VoxyRenderSystem {
 
     private final AbstractRenderPipeline pipeline;
 
+    /** Diagnostic frame counter for the Metal LOD-ring log in {@link #renderOpaque}. */
+    private int metalRingDiagFrame;
+
     /** Accessor exposed for the Metal compositing mixin so it can read the IOSurface bridge. */
     public AbstractRenderPipeline getPipeline() {
         return this.pipeline;
@@ -227,6 +230,45 @@ public class VoxyRenderSystem {
             // The compositing mixin runs separately at renderLevel RETURN.
             this.pipeline.preSetup(viewport);
             this.pipeline.runPipeline(viewport, 0, viewport.width, viewport.height);
+
+            // M13 chunk 2 follow-up: drive the per-frame dynamic-runtime
+            // block on Metal too. Without these, the section tree never
+            // advances with the player — `setCenterAndProcess` is what
+            // adds/removes top-level LOD nodes as the player moves
+            // (more than CHECK_DISTANCE_BLOCKS = 128), loading their
+            // subtrees from LMDB into AsyncNodeManager. Without it, the
+            // initial nodes are the ONLY LOD that ever renders, so the
+            // distant horizon disappears once the player walks out of
+            // the spawn ring. `UploadStream.tick` commits the geometry
+            // upload buffer copies to the GPU and rotates fenced frames.
+            // M13 chunk 1 follow-up: `modelService.tick` runs on Metal
+            // too now. The bakery's resources are all raw GL bound to
+            // MC's GL context (which is always current on the render
+            // thread regardless of Voxy's backend) and the CPU readback
+            // path in GlViewCapture works on Apple's GL 4.1 cap. Without
+            // this tick the bakery queue stalls at 1 invocation and
+            // every mesher call throws IdNotYetComputedException →
+            // no LOD geometry ever materializes.
+            UploadStream.INSTANCE.tick();
+            boolean processedThisFrame = this.renderDistanceTracker.setCenterAndProcess(
+                    viewport.cameraX, viewport.cameraZ);
+            while (processedThisFrame && VoxyClient.isFrexActive()) {
+                processedThisFrame = this.renderDistanceTracker.setCenterAndProcess(
+                        viewport.cameraX, viewport.cameraZ);
+            }
+            do { this.modelService.tick(900_000); } while (VoxyClient.isFrexActive() && !this.modelService.areQueuesEmpty());
+            // Diagnostic: log every ~10s (600 frames) whether the LOD ring is
+            // still adding/removing cells. After the ring converges this
+            // should mostly read `processedThisFrame=false` until the player
+            // moves >128 blocks.
+            this.metalRingDiagFrame++;
+            if (this.metalRingDiagFrame % 600 == 1) {
+                me.cortex.voxy.common.Logger.info(String.format(
+                        "[Metal-RING f=%d] processedThisFrame=%s  cam=(%.0f, %.0f)  cfgRD=%d",
+                        this.metalRingDiagFrame, processedThisFrame,
+                        viewport.cameraX, viewport.cameraZ,
+                        me.cortex.voxy.client.config.VoxyConfig.CONFIG.sectionRenderDistance));
+            }
             return;
         }
 

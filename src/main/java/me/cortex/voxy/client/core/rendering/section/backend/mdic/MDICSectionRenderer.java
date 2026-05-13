@@ -238,18 +238,17 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             java.util.Map<String, String> opaqueDefines = new java.util.LinkedHashMap<>(commonDefines);
             java.util.Map<String, String> translucentDefines = new java.util.LinkedHashMap<>(commonDefines);
             translucentDefines.put("TRANSLUCENT", "");
-            // M12 chunk 6 step 3 follow-up: on non-GL backends the model
-            // texture atlas (ModelTextureBakery) and the depth-bounding
-            // texture aren't bound yet (their callers stay raw GL — see the
-            // M9 file migration order). Inject `VOXY_NO_ATLAS` so quads.frag
-            // skips the atlas-driven sampling + alpha discard + depth-bounds
-            // check and instead emits a deterministic per-instance debug
-            // color. Lets us see Voxy's LOD chunks on Metal as
-            // distinct-coloured blocks while the real texture path is still
-            // pending.
+            // M13 chunk 1 closed the atlas path on Metal — `ModelStore.textures`
+            // now receives real bake output via the cross-backend
+            // `IGpuTexture.uploadSubImage2D` primitive. So `VOXY_NO_ATLAS` is
+            // no longer injected; the shader samples the real atlas at
+            // `blockModelAtlas`. The depth-bounding texture (slot 2) is
+            // still M13 chunk 3 territory — gate it with the narrower
+            // `VOXY_NO_DEPTH_BOUND` define so the rest of the atlas path
+            // (alpha-discard, mipmap sampling) runs.
             if (this.backend.getType() != BackendType.OPENGL) {
-                opaqueDefines.put("VOXY_NO_ATLAS", "");
-                translucentDefines.put("VOXY_NO_ATLAS", "");
+                opaqueDefines.put("VOXY_NO_DEPTH_BOUND", "");
+                translucentDefines.put("VOXY_NO_DEPTH_BOUND", "");
             }
 
             // NOTE: MDIC terrain pipelines do NOT opt into supportIndirectCommandBuffers.
@@ -416,11 +415,11 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
      *       / {@code setBuffer}.</li>
      *   <li>No {@code setupAndBindOpaque} — the render pass already targets
      *       the bridge; there's no separate FBO bind step.</li>
-     *   <li>Lightmap (binding 1 sampler) and depth-bounding texture (binding 2
-     *       sampler) are NOT bound — both source from MC's GL context and have
-     *       no cross-context handle yet. Terrain renders with default-sampled
-     *       textures (likely zeros), so lighting/cutout look wrong but
-     *       geometry is visible.</li>
+     *   <li>Lightmap (binding 1 sampler) is bound via
+     *       {@code LightMapHelper.bindMetal} — Voxy keeps a Shared-storage
+     *       mirror of MC's 16×16 lightmap and CPU-uploads it once per frame
+     *       (M13 chunk 2). Depth-bounding texture (binding 2 sampler) stays
+     *       unbound — it depends on M13 chunk 3's MC depth import.</li>
      *   <li>Model atlas texture + sampler (binding 0) also skipped —
      *       {@code ModelTextureBakery} is GL-only so the atlas is blank on
      *       Metal anyway; only the model + colour SSBOs feed shape data.</li>
@@ -493,10 +492,15 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
         encoder.setBuffer(0, this.uniform, 0);
         encoder.setBuffer(1, this.geometryManager.getGeometryBuffer(), 0);
         encoder.setBuffer(2, this.geometryManager.getMetadataBuffer(), 0);
-        this.modelStore.bindBuffers(encoder, 3, 4);
+        // M13 chunk 1: bindBuffers now also wires up the model atlas texture +
+        // cross-backend sampler at binding 0 (blockModelAtlas in quads.frag).
+        this.modelStore.bindBuffers(encoder, 3, 4, 0);
         encoder.setBuffer(5, viewport.positionScratchBuffer, 0);
-        // Texture / sampler bindings 0 (modelAtlas), 1 (lightmap), 2
-        // (depthBoundingBuffer) intentionally skipped — see method javadoc.
+        // Texture / sampler binding 1 — MC's 16×16 RGBA8 lightmap, mirrored
+        // into a Shared-storage Metal texture each frame (M13 chunk 2).
+        // Texture/sampler binding 2 (depthBoundingBuffer) remains unbound —
+        // the shader skips that sample via VOXY_NO_DEPTH_BOUND (M13 chunk 3).
+        LightMapHelper.bindMetal(encoder, 1, viewport.frameId);
 
         encoder.bindIndexBuffer(me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer.INSTANCE.getBuffer(),
                 me.cortex.voxy.client.core.gpu.RenderEncoder.INDEX_TYPE_UINT16, 0);

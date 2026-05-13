@@ -221,7 +221,13 @@ public class ModelFactory {
 
         RawBakeResult result = new RawBakeResult(blockId, blockState);
         int allocation = this.downstream.download(MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*2*4*6, ptr -> this.rawBakeResults.add(result.cpyBuf(ptr)));
-        int flags = this.bakery.renderToStream(blockState, this.downstream.getBufferId(), allocation);
+        // M13 chunk 1: renderToStream now takes the CPU-mapped destination
+        // address directly; the bakery does a glFinish + glGetTexImage CPU
+        // readback into this addr instead of issuing a GL 4.3 compute that
+        // writes the persistent buffer through an SSBO bind. Works on
+        // Apple's GL 4.1 cap; the downstream fence still signals on next
+        // tick so callbacks fire in normal order.
+        int flags = this.bakery.renderToStream(blockState, this.downstream.getBufferAddr() + allocation);
         result.hasDarkenedTextures = (flags&2)!=0;
         result.isShaded = (flags&1)!=0;
         return true;
@@ -325,7 +331,12 @@ public class ModelFactory {
 
             long cAddr = this.texture.address;
             for (int lvl = 0; lvl < LAYERS; lvl++) {
-                textureSubImage2D(atlas.id(), GL_TEXTURE_2D, lvl, X >> lvl, Y >> lvl, (MODEL_TEXTURE_SIZE*3) >> lvl, (MODEL_TEXTURE_SIZE*2) >> lvl, GL_RGBA, GL_UNSIGNED_BYTE, cAddr);
+                // M13 chunk 1: route the atlas upload through the cross-backend
+                // primitive so the Metal-side atlas (Shared-storage MetalTexture
+                // allocated via storeUploadable) receives the data correctly.
+                // On the GL backend this still lowers to glTextureSubImage2D /
+                // glTexSubImage2D via GLCompat.
+                atlas.uploadSubImage2D(lvl, X >> lvl, Y >> lvl, (MODEL_TEXTURE_SIZE*3) >> lvl, (MODEL_TEXTURE_SIZE*2) >> lvl, GL_RGBA, GL_UNSIGNED_BYTE, cAddr);
                 cAddr += (MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*3*2*4)>>(lvl<<1);
             }
 

@@ -91,6 +91,13 @@ public class GlTexture extends TrackedObject implements me.cortex.voxy.client.co
         return GlDebug.name(name, this);
     }
 
+    @Override
+    public void uploadSubImage2D(int level, int x, int y, int w, int h,
+                                  int format, int type, long dataAddr) {
+        this.assertAllocated();
+        GLCompat.textureSubImage2D(this.id, this.type, level, x, y, w, h, format, type, dataAddr);
+    }
+
     public int getWidth() {
         this.assertAllocated();
         return this.width;

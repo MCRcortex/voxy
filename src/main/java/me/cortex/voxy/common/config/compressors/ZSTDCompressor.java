@@ -30,6 +30,16 @@ public class ZSTDCompressor implements StorageCompressor {
     private static final ThreadLocal<Ref> DECOMPRESSION_CTX = ThreadLocal.withInitial(ZSTDCompressor::createCleanableDecompressionContext);
 
     private static final ThreadLocalMemoryBuffer SCRATCH = new ThreadLocalMemoryBuffer(SaveLoadSystem.BIGGEST_SERIALIZED_SECTION_SIZE + 1024);
+    /**
+     * Thread-local scratch input for compress(). M13 chunk 1 hardening: once the
+     * Metal bakery + mesher pipeline started running at full pace, multiple
+     * Sodium workers concurrently exercised the save path. SIGSEGV inside
+     * {@code nZSTD_compressCCtx} on Apple Silicon traced back to the source
+     * MemoryBuffer being freed/modified mid-compress by another thread. We
+     * memcpy into a thread-local scratch first, so zstd reads from a buffer
+     * only this thread owns for the duration of the call.
+     */
+    private static final ThreadLocalMemoryBuffer COMPRESS_INPUT_SCRATCH = new ThreadLocalMemoryBuffer(SaveLoadSystem.BIGGEST_SERIALIZED_SECTION_SIZE + 1024);
 
     private final int level;
 
@@ -39,8 +49,31 @@ public class ZSTDCompressor implements StorageCompressor {
 
     @Override
     public MemoryBuffer compress(MemoryBuffer saveData) {
-        MemoryBuffer compressedData = new MemoryBuffer((int)ZSTD_COMPRESSBOUND(saveData.size));
-        long compressedSize = nZSTD_compressCCtx(COMPRESSION_CTX.get().ptr, compressedData.address, compressedData.size, saveData.address, saveData.size, this.level);
+        // M13 chunk 1 hardening: copy saveData into a thread-local scratch
+        // before handing the pointer to native zstd. On Apple Silicon, once
+        // the Metal bakery + mesher pipeline started exercising the save
+        // path at full pace from multiple Sodium workers, nZSTD_compressCCtx
+        // SIGSEGV'd reading saveData — most-likely cause is a concurrent
+        // free/modify on the source buffer by another worker. A thread-local
+        // scratch is owned solely by this thread for the call's duration.
+        long size = saveData.size;
+        MemoryBuffer stableInput = COMPRESS_INPUT_SCRATCH.get();
+        if (stableInput.size < size) {
+            // Source larger than scratch (rare — exceeds BIGGEST_SERIALIZED_SECTION_SIZE).
+            // Fall back to a one-shot copy that we free after compress.
+            MemoryBuffer oneShot = new MemoryBuffer(size).cpyFrom(saveData.address);
+            MemoryBuffer compressedData = new MemoryBuffer((int)ZSTD_COMPRESSBOUND(size));
+            long compressedSize = nZSTD_compressCCtx(COMPRESSION_CTX.get().ptr, compressedData.address, compressedData.size, oneShot.address, size, this.level);
+            oneShot.free();
+            return compressedData.subSize(compressedSize);
+        }
+        // Scratch path: copy source bytes into the thread-local buffer, then
+        // hand the stable pointer to zstd. Reuses the same backing memory
+        // across invocations on the same thread — no allocation churn.
+        me.cortex.voxy.common.util.UnsafeUtil.memcpy(saveData.address, stableInput.address, size);
+
+        MemoryBuffer compressedData = new MemoryBuffer((int)ZSTD_COMPRESSBOUND(size));
+        long compressedSize = nZSTD_compressCCtx(COMPRESSION_CTX.get().ptr, compressedData.address, compressedData.size, stableInput.address, size, this.level);
         return compressedData.subSize(compressedSize);
     }
 

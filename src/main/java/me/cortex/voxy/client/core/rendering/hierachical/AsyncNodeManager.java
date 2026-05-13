@@ -506,6 +506,11 @@ public class AsyncNodeManager {
         if (results == null) {//There are no new results to process, return
             return;
         }
+        DIAG_TICK_WITH_RESULTS_COUNT.incrementAndGet();
+        DIAG_LAST_TICK_SECTION_COUNT.set(results.geometrySectionCount);
+        if (results.geometryUpload != null && !results.geometryUpload.dataUploadPoints.isEmpty()) {
+            DIAG_TICK_WITH_UPLOADS_COUNT.incrementAndGet();
+        }
 
         //top level node add/remove
         if (!results.tlnDelta.isEmpty()) {
@@ -668,7 +673,19 @@ public class AsyncNodeManager {
         this.addWork();
     }
 
+    /** M13 diagnostic counters — read by AbstractRenderPipeline's Metal-DIAG dump. */
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_WORLD_EVENT_COUNT = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_GEOMETRY_RESULT_COUNT = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_TOP_LEVEL_ADD_COUNT = new java.util.concurrent.atomic.AtomicLong();
+    /** Times AsyncNodeManager.tick() ran and consumed a non-null SyncResults. */
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_TICK_WITH_RESULTS_COUNT = new java.util.concurrent.atomic.AtomicLong();
+    /** Highest geometrySectionCount observed by AsyncNodeManager.tick(). */
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_LAST_TICK_SECTION_COUNT = new java.util.concurrent.atomic.AtomicLong();
+    /** Times AsyncNodeManager.tick() saw non-empty geometry uploads in the sync results. */
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_TICK_WITH_UPLOADS_COUNT = new java.util.concurrent.atomic.AtomicLong();
+
     private void submitGeometryResult(BuiltSection geometry) {
+        DIAG_GEOMETRY_RESULT_COUNT.incrementAndGet();
         if (!this.running) {
             geometry.free();
             return;
@@ -683,6 +700,7 @@ public class AsyncNodeManager {
     }
 
     public void addTopLevel(long section) {//Only called from render thread
+        DIAG_TOP_LEVEL_ADD_COUNT.incrementAndGet();
         if (!this.running) throw new IllegalStateException("Not running");
         long stamp = this.tlnLock.writeLock();
         int state = 0;
@@ -794,6 +812,7 @@ public class AsyncNodeManager {
     }
 
     public void worldEvent(WorldSection section, int flags, int neighborMask) {
+        DIAG_WORLD_EVENT_COUNT.incrementAndGet();
         //If there is any change, we need to clear the geometry cache before emitting update
         this.geometryCache.clear(section.key);
 

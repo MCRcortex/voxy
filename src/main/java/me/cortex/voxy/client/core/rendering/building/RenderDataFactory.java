@@ -1569,7 +1569,16 @@ public class RenderDataFactory {
     }
 
     //section is already acquired and gets released by the parent
+    /** M13 chunk 1 diagnostic counters — read by AbstractRenderPipeline's Metal-DIAG dump. */
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_GEN_CALLED = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_GEN_PREPARE_THROW = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_GEN_FACE_THROW = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_GEN_ZERO_QUADS = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_GEN_REAL_QUADS = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_GEN_LAST_QUADCOUNT = new java.util.concurrent.atomic.AtomicLong();
+
     public BuiltSection generateMesh(WorldSection section) {
+        DIAG_GEN_CALLED.incrementAndGet();
         //TODO: FIXME: because of the exceptions that are thrown when aquiring modelId
         // this can result in the state of all block meshes and well _everything_ from being incorrect
         //THE EXCEPTION THAT THIS THROWS CAUSES MAJOR ISSUES
@@ -1613,6 +1622,7 @@ public class RenderDataFactory {
         //Prepare everything
         int neighborMsk = this.prepareSectionData(section._unsafeGetRawDataArray());
         if (neighborMsk>>31!=0) {//We failed to get everything so throw exception
+            DIAG_GEN_PREPARE_THROW.incrementAndGet();
             throw new IdNotYetComputedException(neighborMsk&(~(1<<31)), true);
         }
         if (CHECK_NEIGHBOR_FACE_OCCLUSION) {
@@ -1623,17 +1633,22 @@ public class RenderDataFactory {
             this.generateYZFaces();
             this.generateXFaces();
         } catch (IdNotYetComputedException e) {
+            DIAG_GEN_FACE_THROW.incrementAndGet();
             e.auxBitMsk = neighborMsk;
             e.auxData = this.neighboringFaces;
             throw e;
         }
 
+        DIAG_GEN_LAST_QUADCOUNT.set(this.quadCount);
+
         //TODO:NOTE! when doing face culling of translucent blocks,
         // if the connecting type of the translucent block is the same AND the face is full, discard it
         // this stops e.g. multiple layers of glass (and ocean) from having 3000 layers of quads etc
         if (this.quadCount == 0) {
+            DIAG_GEN_ZERO_QUADS.incrementAndGet();
             return BuiltSection.emptyWithChildren(section.key, section.getNonEmptyChildren());
         }
+        DIAG_GEN_REAL_QUADS.incrementAndGet();
 
         if (this.quadCount >= 1<<16) {
             Logger.warn("Large quad count for section " + WorldEngine.pprintPos(section.key) + " is " + this.quadCount);

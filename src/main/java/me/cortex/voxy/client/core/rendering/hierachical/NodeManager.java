@@ -186,10 +186,22 @@ public class NodeManager {
 
     //==================================================================================================================
 
+    /** M13 diagnostic counters — read by AbstractRenderPipeline's Metal-DIAG dump. */
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_PGR_NOT_IN_MAP = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_PGR_REQUEST_SINGLE = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_PGR_REQUEST_CHILD = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_PGR_INNER_LEAF = new java.util.concurrent.atomic.AtomicLong();
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_PGR_NOT_WATCHED = new java.util.concurrent.atomic.AtomicLong();
+    /** Times NodeManager.uploadReplaceSection saw an empty BuiltSection. */
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_UPLOAD_EMPTY = new java.util.concurrent.atomic.AtomicLong();
+    /** Times NodeManager.uploadReplaceSection forwarded to geometryManager.uploadSection (i.e. real geometry). */
+    public static final java.util.concurrent.atomic.AtomicLong DIAG_UPLOAD_REAL = new java.util.concurrent.atomic.AtomicLong();
+
     public void processGeometryResult(BuiltSection sectionResult) {
         long pos = sectionResult.position;
         int nodeId = this.activeSectionMap.get(pos);
         if (nodeId == -1) {
+            DIAG_PGR_NOT_IN_MAP.incrementAndGet();
             //Logger.warn("Got geometry update for pos " + WorldEngine.pprintPos(pos) + " but it was not in active map, discarding!");
             sectionResult.free();
             return;
@@ -198,6 +210,7 @@ public class NodeManager {
         if ((nodeId&NODE_TYPE_MSK)==NODE_TYPE_REQUEST) {
             //For a request
             if ((nodeId&REQUEST_TYPE_MSK)==REQUEST_TYPE_SINGLE) {
+                DIAG_PGR_REQUEST_SINGLE.incrementAndGet();
                 var request = this.singleRequests.get(nodeId&NODE_ID_MSK);
                 request.setMesh(this.uploadReplaceSection(request.getMesh(), sectionResult));
 
@@ -213,6 +226,7 @@ public class NodeManager {
                     this.finishRequest(request);
                 }
             } else if ((nodeId&REQUEST_TYPE_MSK)==REQUEST_TYPE_CHILD) {
+                DIAG_PGR_REQUEST_CHILD.incrementAndGet();
                 var request = this.childRequests.get(nodeId&NODE_ID_MSK);
                 int childId = getChildIdx(pos);
                 request.setChildMesh(childId, this.uploadReplaceSection(request.getChildMesh(childId), sectionResult));
@@ -227,11 +241,13 @@ public class NodeManager {
                 throw new IllegalStateException();
             }
         } else if ((nodeId&NODE_TYPE_MSK)==NODE_TYPE_INNER || (nodeId&NODE_TYPE_MSK)==NODE_TYPE_LEAF) {
+            DIAG_PGR_INNER_LEAF.incrementAndGet();
             nodeId&=NODE_ID_MSK;
 
 
             //TODO: check this is ok and correct
             if ((this.watcher.get(pos)&UPDATE_TYPE_BLOCK_BIT)==0) {
+                DIAG_PGR_NOT_WATCHED.incrementAndGet();
                 if (this.nodeData.isNodeGeometryInFlight(nodeId)) {
                     throw new IllegalStateException();
                 }
@@ -258,12 +274,14 @@ public class NodeManager {
 
     private int uploadReplaceSection(int meshId, BuiltSection section) {
         if (section.isEmpty()) {
+            DIAG_UPLOAD_EMPTY.incrementAndGet();
             if (meshId != NULL_GEOMETRY_ID && meshId != EMPTY_GEOMETRY_ID) {
                 this.geometryManager.removeSection(meshId);
             }
             section.free();
             return EMPTY_GEOMETRY_ID;
         }
+        DIAG_UPLOAD_REAL.incrementAndGet();
         if (meshId != NULL_GEOMETRY_ID && meshId != EMPTY_GEOMETRY_ID) {
             return this.geometryManager.uploadReplaceSection(meshId, section);
         }

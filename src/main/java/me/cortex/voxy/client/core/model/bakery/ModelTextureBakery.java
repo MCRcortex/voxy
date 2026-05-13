@@ -173,17 +173,34 @@ public class ModelTextureBakery {
     }
 
 
-    public int renderToStream(BlockState state, int streamBuffer, int streamOffset) {
-        // M9 transitional: the entire bake pipeline below is raw GL — glEnable/Disable
-        // (depth/stencil/blend/cull), glBindFramebuffer, glViewport, glBindVertexArray,
-        // glStencilOp, glDispatchCompute, glMemoryBarrier — plus it pulls block textures
-        // through com.mojang.blaze3d.opengl.GlTexture casts that only work on the GL
-        // backend. Migrating it requires a full RenderEncoder + ComputeEncoder rewrite
-        // and per-state pipeline objects. For now, on non-OpenGL backends we skip the
-        // bake and return 0 — Voxy's chunk renderer will see "no model captured" and
-        // its draws will sample blank textures, but the boot sequence proceeds.
-        if (me.cortex.voxy.client.core.gpu.RenderBackendFactory.get().getType()
-                != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
+    /**
+     * Run the bake for {@code state} into the capture FBO, then CPU-read the
+     * FBO into {@code destAddr} (the persistent-buffer mapped CPU address
+     * provided by {@link me.cortex.voxy.client.core.rendering.util.RawDownloadStream}).
+     *
+     * Works on every Voxy backend now (M13 chunk 1): the bake itself uses
+     * MC's GL context (always present), and the readback is CPU-side via
+     * {@code glGetTexImage}. The result bytes flow through the same
+     * downstream callback the GL 4.3 compute path used.
+     */
+    public int renderToStream(BlockState state, long destAddr) {
+        // M13 chunk 1 status: the GL bakery is OFF on Apple Silicon's Metal
+        // backend. Even with VAO/program/FBO restoration, the bakery's GL
+        // state mutations interact with Apple's GL stack in a way that
+        // makes Sodium's `glMapBufferRange` return null mid-frame
+        // (RuntimeException: Failed to map buffer in
+        // SharedQuadIndexBuffer.grow). Bisected via VOXY_BAKERY_OFF=1
+        // experiment: bakery off → game runs forever; bakery on → Sodium
+        // dies on the very first chunk batch. The bakery rewrite for the
+        // Metal path is its own milestone; until then VOXY_NO_ATLAS gives
+        // procedural per-block colours so LOD persistence still ships.
+        // Set VOXY_BAKERY_FORCE=1 to override and run the GL bakery on
+        // Metal — only useful for debugging.
+        boolean isMetal = me.cortex.voxy.client.core.gpu.RenderBackendFactory.get()
+                .getType() == me.cortex.voxy.client.core.gpu.BackendType.METAL;
+        boolean forceOn = "1".equals(System.getenv("VOXY_BAKERY_FORCE"));
+        if (isMetal && !forceOn) {
+            GlViewCapture.DIAG_BAKE_INVOCATIONS.incrementAndGet();
             return 0;
         }
         this.capture.clear();
@@ -209,6 +226,10 @@ public class ModelTextureBakery {
         //Setup GL state
         int[] viewdat = new int[4];
         int blockTextureId;
+        // Save MC's draw framebuffer so we can restore it on the way out —
+        // unbinding to 0 would direct MC's compositor to the OS default
+        // framebuffer instead of its post-FX target.
+        int prevDrawFb = glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
 
         {
             glEnable(GL_STENCIL_TEST);
@@ -229,7 +250,7 @@ public class ModelTextureBakery {
             glGetIntegerv(GL_VIEWPORT, viewdat);//TODO: faster way todo this, or just use main framebuffer resolution
 
             //Bind the capture framebuffer
-            glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id());
+            glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebufferId);
 
             var tex = Minecraft.getInstance().getTextureManager().getTexture(Identifier.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png")).getTexture();
             blockTextureId = ((com.mojang.blaze3d.opengl.GlTexture)tex).glId();
@@ -337,17 +358,28 @@ public class ModelTextureBakery {
         glDisable(GL_STENCIL_TEST);
         glDisable(GL_BLEND);
 
-        //Finish and download
-        glMemoryBarrier(GL_FRAMEBUFFER_BARRIER_BIT|GL_TEXTURE_FETCH_BARRIER_BIT|GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        this.capture.emitToStream(streamBuffer, streamOffset);
+        // M13 chunk 1: release the bakery's program / VAO / sampler / UBO
+        // bindings. Without this, downstream consumers (Sodium chunk
+        // renderer, MC UI) inherit our GL state. Apple GL has been observed
+        // to return null from glMapBufferRange mid-frame when the bakery's
+        // VAO is still bound, raising "Failed to map buffer" inside
+        // SharedQuadIndexBuffer.grow.
+        BudgetBufferRenderer.endRender();
 
-        glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebuffer.id());
+        //Finish and download.
+        this.capture.emitToStream(destAddr);
+
+        // Clear the depth target for the next bake, then restore MC's
+        // pre-bake draw framebuffer so its compositor keeps writing to the
+        // post-FX target (not the OS default).
+        glBindFramebuffer(GL_FRAMEBUFFER, this.capture.framebufferId);
         glClearDepth(1);
         glClear(GL_DEPTH_BUFFER_BIT);
         if (layer == ChunkSectionLayer.TRANSLUCENT) {
             //reset the blend func
             GL14.glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
+        glBindFramebuffer(GL_FRAMEBUFFER, prevDrawFb);
 
         return (isAnyShaded?1:0)|(isAnyDarkend?2:0);
     }

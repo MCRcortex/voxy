@@ -80,6 +80,18 @@ public class RawDownloadStream {
         return this.downloadBuffer.id();
     }
 
+    /**
+     * CPU-mapped base address of the persistent download buffer. Callers can
+     * write directly here (e.g. M13 chunk 1's CPU-readback bakery path on
+     * Metal — `glGetTexImage` into scratch + memcpy to `getBufferAddr() +
+     * allocation`). Coherent mapping means writes are immediately visible to
+     * GPU; for the bakery callback flow the callback runs after the fence
+     * signals so CPU-visible ordering is sufficient here.
+     */
+    public long getBufferAddr() {
+        return this.downloadBuffer.addr();
+    }
+
     public void free() {
         glFinish();
         this.tick();

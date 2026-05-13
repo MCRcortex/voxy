@@ -68,13 +68,15 @@ public class VoxyClient implements ClientModInitializer {
 
         if (systemSupported && backend.getType() != me.cortex.voxy.client.core.gpu.BackendType.OPENGL) {
             if (forceMetal) {
-                Logger.warn("[VOXY_FORCE_METAL] Enabling Voxy on " + backend.getType()
-                        + " backend via feature flag. Render output goes through the IOSurface bridge; "
-                        + "MDIC migration to ICB is still in progress so visible output is currently the "
-                        + "clear-color stub, not actual LOD chunks.");
+                Logger.info("[VOXY_FORCE_METAL] Voxy enabled on " + backend.getType()
+                        + " backend. Render output flows through the IOSurface bridge; "
+                        + "MDIC opaque/temporal/translucent passes draw real LOD geometry "
+                        + "(M12 close). Remaining M13 gaps: model atlas (VOXY_NO_ATLAS debug "
+                        + "colour stays), depth import (real HiZ + cull stub), SSAO + fog "
+                        + "parity. See docs/STATUS.md.");
             } else {
                 Logger.warn("[M9 TRANSITIONAL] Voxy disabled on " + backend.getType()
-                        + " backend. Set VOXY_FORCE_METAL=1 to enable the (clear-color) Metal render path.");
+                        + " backend. Set VOXY_FORCE_METAL=1 to enable the Metal render path.");
                 systemSupported = false;
             }
         }

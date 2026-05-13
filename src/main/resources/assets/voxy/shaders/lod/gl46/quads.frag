@@ -139,12 +139,16 @@ void main() {
     // bound. Skip atlas sampling and emit a deterministic per-quad
     // debug color hashed from `interData.x` (a flat varying carrying the
     // model id + face + flags — varies per quad / section). Then modulate
-    // by a fake Lambertian-style shade computed from the face normal so
-    // the cube structure of each LOD chunk is visible (top faces bright,
-    // bottom faces dark) without needing MC's lightmap. Drops the
-    // depth-bounding and alpha-discard checks that depend on the unbound
-    // textures. `gl_InstanceID` lives only in the vertex stage so we
-    // can't use it here; interData.x gives sufficient variation.
+    // by the *real* MC lightmap colour packed into `interData.y` by the
+    // vertex shader (see makeRemainingAttributes in quad_util.glsl —
+    // it samples lightSampler and multiplies by computeDirectionalFaceTint,
+    // which already encodes UP/DOWN/Z/X face shade from MC's level). M13
+    // chunk 2 wired the lightmap sampler on Metal, so this is the real
+    // lighting; the synthetic face-Lambertian shade from M12 is gone.
+    // Drops the depth-bounding and alpha-discard checks that depend on
+    // the unbound atlas textures. `gl_InstanceID` lives only in the
+    // vertex stage so we can't use it here; interData.x gives sufficient
+    // variation.
     {
         uint hash = interData.x * 2654435761u;
         hash ^= hash >> 13;
@@ -152,9 +156,8 @@ void main() {
         hash ^= hash >> 16;
         // Map the hash channels into [0.55, 1.0] so every block reads as
         // a saturated bright colour. The plain `(hash & 0xFF) / 255` from
-        // earlier let random channels collapse near zero — when combined
-        // with the Lambertian shade below the result averaged ~0.32,
-        // which read as "almost as dark as the background" for many
+        // earlier let random channels collapse near zero, which combined
+        // with lightmap shading would have collapsed too dark for many
         // blocks. Bias the range so the visual contrast is always strong.
         colour = vec4(
             float((hash >>  0) & 0xFFu) / 255.0 * 0.45 + 0.55,
@@ -162,36 +165,22 @@ void main() {
             float((hash >> 16) & 0xFFu) / 255.0 * 0.45 + 0.55,
             1.0
         );
-        // Face indices 0..5 = DOWN, UP, NORTH, SOUTH, WEST, EAST (mirrors
-        // ModelTextureBakery.VIEWS order). Sky-direction Lambertian factor:
-        // top faces approach 1.0, bottom faces approach 0.55 (floor raised
-        // from 0.30 so the down-faces still read clearly).
-        const vec3 FACE_NORMALS[6] = vec3[6](
-            vec3( 0, -1,  0),
-            vec3( 0,  1,  0),
-            vec3( 0,  0, -1),
-            vec3( 0,  0,  1),
-            vec3(-1,  0,  0),
-            vec3( 1,  0,  0)
-        );
-        uint face = getFace();
-        // Clamp face index for safety — getFace masks 3 bits so it's <8;
-        // out-of-range face indices fall back to the UP entry.
-        vec3 n = FACE_NORMALS[face < 6u ? face : 1u];
-        float ndotl = dot(n, normalize(vec3(0.3, 1.0, 0.5)));
-        float shade = clamp(ndotl * 0.35 + 0.65, 0.55, 1.0);
-        colour.rgb *= shade;
+        // Modulate by the real lightmap + face-shade tinting baked into
+        // interData.y by makeRemainingAttributes. Keep alpha at 1.0 —
+        // interData.y's alpha channel carries packed face/lod metadata
+        // for the non-translucent path (see `addin` in quad_util.glsl)
+        // and would zero the fragment.
+        colour.rgb *= uint2vec4RGBA(interData.y).rgb;
 
         // Procedural per-pixel pattern — gives each face a "textured"
         // look instead of a solid colour. Combines a small-grid checker
         // (4x4 cells per quad) with a value-noise speckle so flat block
-        // colours read as 3D-textured surfaces. The shaped pattern also
-        // anchors the per-quad hash colour against the global lighting,
-        // so cube structure remains obvious. Real model textures from
+        // colours read as 3D-textured surfaces. Real model textures from
         // ModelTextureBakery are still M13 chunk 1 — this is the
         // VOXY_NO_ATLAS debug visualization until that lands.
 #ifndef USE_NV_BARRY
         {
+            uint face = getFace();
             // 4x4 grid checker — gives subtle "tile" structure.
             ivec2 cell = ivec2(floor(uv * 4.0));
             float checker = ((cell.x ^ cell.y) & 1) == 0 ? 1.0 : 0.85;
@@ -234,14 +223,21 @@ void main() {
         return;
     }
 
-#ifndef VOXY_NO_ATLAS
-    //Check the minimum bounding texture and ensure we are greater than it
+#ifndef VOXY_NO_DEPTH_BOUND
+    //Check the minimum bounding texture and ensure we are greater than it.
+    // M13 chunk 1 split: this used to live under `#ifndef VOXY_NO_ATLAS` so
+    // the atlas-disabled debug path also skipped the depth-bounding check.
+    // Splitting them lets Metal sample the real atlas while still skipping
+    // the depth-bounding check (depthTex is M13 chunk 3 — MC depth import
+    // hasn't landed yet, so the texture would be unbound and the check
+    // would discard everything).
     if (gl_FragCoord.z < texelFetch(depthTex, ivec2(gl_FragCoord.xy), 0).r) {
         discard;
         return;
     }
+#endif // VOXY_NO_DEPTH_BOUND
 
-
+#ifndef VOXY_NO_ATLAS
     //Also, small quad is really fking over the mipping level somehow
     #ifndef TRANSLUCENT
     if (useDiscard() && (textureLod(blockModelAtlas, texPos, 0).a <= 0.1f)) {
@@ -256,7 +252,7 @@ void main() {
         return;
         #endif
     }
-#endif // VOXY_NO_ATLAS — closes the depth-bounding + alpha-discard block above
+#endif // VOXY_NO_ATLAS — closes the alpha-discard block above
 
     #ifndef PATCHED_SHADER_ALLOW_DERIVATIVES
     if (gl_HelperInvocation) {

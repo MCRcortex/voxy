@@ -25,6 +25,17 @@ overlay strip.
 - **Bootstrap** — Metal device + command queue + shared event; LWJGL
   natives bundled for macOS arm64 (`lwjgl-metal`, `lwjgl-zstd`,
   `lwjgl-lmdb`).
+- **MC lightmap on Metal** (M13 chunk 2) — Voxy keeps a Shared-storage
+  16×16 RGBA8 mirror of MC's lightmap; `LightMapHelper.bindMetal`
+  CPU-reads MC's GL lightmap via `glGetTexImage` and pushes it into
+  the mirror once per frame (gated by `viewport.frameId` so opaque +
+  temporal + translucent share one upload). The mirror is bound at
+  `LIGHTING_SAMPLER_BINDING = 1` on the render encoder alongside a
+  LINEAR / CLAMP_TO_EDGE sampler. `quads3.vert`'s `getLighting()`
+  now reads real MC sky/block-light values on Metal, and the
+  VOXY_NO_ATLAS path in `quads.frag` modulates its per-quad hash
+  colour by the lightmap × face-shade colour packed into
+  `interData.y` (synthetic face-Lambertian shade is gone).
 - **Cross-backend abstraction** — `RenderBackend` / `RenderEncoder` /
   `ComputeEncoder` real on Metal *and* OpenGL (Win/Linux still works).
   Pipeline state (depth + blend + raster), samplers, push-constants-
@@ -59,21 +70,25 @@ overlay strip.
 
 ### What's NOT yet working on Metal
 
-- **Real model textures.** `ModelTextureBakery` is GL-only and its
-  readback uses a compute shader (`bufferreorder.comp`) that needs
-  GL 4.3+, while Apple's GL driver caps at 4.1. So `ModelStore.textures`
-  is empty on Metal. Workaround in production: a `VOXY_NO_ATLAS`
-  shader gate (auto-injected on non-GL backends) skips atlas / depth-
-  bounding samples + the alpha discards and emits a per-quad hash
-  colour + face-Lambertian shade + procedural checker+speckle
-  pattern. Result: chunks look "3D-textured debug" but not like real
-  Minecraft blocks.
-- **MC lightmap.** `LightMapHelper.bind` accesses MC's lightmap via
-  `((GlTexture)tex).glId()` — GL-only. On Metal the binding is
-  skipped, so the `getLighting()` calls in `quads.frag` would read
-  zeros. The `VOXY_NO_ATLAS` path doesn't call `getLighting()` —
-  it uses the synthetic face-Lambertian shade instead — so this is
-  invisible until atlas lands.
+- **Real model textures (M13 chunk 1 on hold).** `ModelTextureBakery`
+  is now **auto-gated to a no-op on Metal** — set
+  `VOXY_BAKERY_FORCE=1` to override for debugging. The hold has two
+  layered Apple GL blockers: (1) `glReadPixels` / `glGetTexImage` on
+  FBO attachments crash inside Apple's
+  `glgVectorCopy / glgProcessPixelsWithProcessor` (SIGBUS BUS_ADRALN
+  on the *second* bake invocation — hs_err_pid73201/73394/73671).
+  Mitigations landed (persistent per-instance scratch + per-call
+  `glFinish`) make readback survive long enough to expose (2)
+  Sodium's `SharedQuadIndexBuffer.grow → glMapBufferRange` returns
+  null mid-frame whenever the GL bakery has run, raising
+  `RuntimeException: Failed to map buffer` even after the bakery
+  restores VAO/program/FBO/sampler/UBO state. Bisect proof:
+  `VOXY_BAKERY_OFF=1` → game runs 19,800+ frames clean; bakery on →
+  Sodium dies on the very first chunk batch. The atlas needs a
+  Metal-native bakery (replacing the FBO-render approach entirely),
+  which is its own milestone. Until then, `VOXY_NO_ATLAS` continues
+  to render LOD with the per-quad hash colour × MC lightmap × face-
+  shade × procedural checker pattern.
 - **Real occlusion cull.** The M12 `force_all_visible` compute stub
   marks every frustum-visible section as "visible this frame", so
   `commandGen` queues them all for rendering. No depth-test rejection
@@ -130,20 +145,20 @@ via the existing GL pipeline.
 **Goal:** Voxy on Metal visually indistinguishable from the GL backend
 (modulo Iris features, which stay GL-gated).
 
-Each chunk below is independent and can be done in any order; the
-table gives time estimates and what unlocks. Recommended starting
-point: **chunk 2 (lightmap)** — smallest, builds the
-`IGpuTexture.uploadSubImage2D` primitive that chunk 1 also needs.
+Chunk 2 closed 2026-05-12 — `IGpuTexture.uploadSubImage2D` primitive
++ Shared-storage `MetalTexture.storeUploadable` + per-frame MC
+lightmap mirror in `LightMapHelper.bindMetal`. Remaining chunks are
+independent and can be done in any order.
 
 | # | Chunk | Estimate | What it unlocks |
 |---|---|---|---|
-| 1 | **Model texture atlas on Metal** | 1–2 days, multi-turn | Real Minecraft block textures (drops `VOXY_NO_ATLAS`). The biggest visual jump. |
-| 2 | **MC lightmap on Metal** | ~0.5 day, 1 turn | Proper time-of-day + torch lighting on LOD chunks. Builds the cross-backend texture upload primitive. |
+| 1 | **Model texture atlas on Metal** *(on hold — needs Metal-native bakery)* | re-scoped | Real Minecraft block textures (drops `VOXY_NO_ATLAS`). GL-FBO bakery proven incompatible with Apple GL stack on Metal — see "what's NOT working" above. |
+| 2 | ✅ **MC lightmap on Metal** (closed 2026-05-12) | done | Proper time-of-day + torch lighting on LOD chunks. Built the cross-backend `IGpuTexture.uploadSubImage2D` primitive (chunk 1 will reuse). |
 | 3 | **MC depth import (real HiZ + real cull)** | ~1 day, 1–2 turns | Real occlusion culling — perf win in dense scenes (50–90% fewer draws). Replaces M12's `force_all_visible` stub. |
 | 4 | **`finish()` blit + SSAO on Metal** | ~0.5 day, 1 turn | Depth-aware compositor (replaces the M12 full-screen workaround), SSAO ambient occlusion on LOD. |
 | 5 | **Fog + atmosphere parity** | ~0.5 day, 1 turn | LOD chunks fade with distance fog matching MC's near-terrain fog. Lands together with chunk 4. |
 
-**Total M13 scope:** ~3–4 days of focused work.
+**Total M13 scope remaining:** ~3 days of focused work.
 
 ### Chunk 1 — atlas detail
 
@@ -172,18 +187,36 @@ approaches in increasing order of work:
   cross-context MC-atlas via IOSurface. Cleanest long-term but
   biggest scope.
 
-### Chunk 2 — lightmap detail
+### Chunk 2 — lightmap detail (✅ closed 2026-05-12)
 
 MC's lightmap is 16×16 RGBA8 = 1 KB. Per-frame CPU readback
-(`glGetTexImage`) is trivially cheap. Voxy allocates a Metal-side
-`IGpuTexture` for the lightmap, copies MC's lightmap into it each
-frame via the new `IGpuTexture.uploadSubImage2D`, binds it at the
-shader's lightmap slot. The `getLighting()` path in `quads.frag`
-then samples MC's actual sky/block light values.
+(`glGetTexImage`) is trivially cheap. Implementation:
 
-Drops the synthetic face-Lambertian shade in `VOXY_NO_ATLAS` once
-the real lightmap is sampled; per-quad hash colour can stay or
-go, depending on whether chunk 1 also lands.
+- New `IGpuTexture.uploadSubImage2D(level, x, y, w, h, format, type, addr)`
+  cross-backend primitive. GL: `GLCompat.textureSubImage2D`.
+  Metal: `MetalNative.mtlTextureReplaceRegion` — gated on
+  Shared/Managed storage mode so callers can't accidentally upload
+  into a Private render-target texture.
+- New `MetalTexture.storeUploadable(format, levels, w, h)` allocates
+  with `MTLStorageModeShared` + `MTLTextureUsageShaderRead` (drops
+  the RenderTarget usage flag — Apple Silicon would otherwise
+  warn about eviction overhead on a Shared render target).
+- `LightMapHelper.bindMetal(encoder, slot, frameId)` lazy-allocates
+  the mirror + a LINEAR / CLAMP_TO_EDGE sampler, CPU-reads MC's GL
+  lightmap into a 1 KB pinned staging buffer via the bind-then-
+  `nglGetTexImage` legacy path (Apple's GL 4.1 lacks
+  `glGetTextureImage`), and pushes it into the mirror.
+  Frame-id-gated so the three terrain passes share one readback.
+- `MDICSectionRenderer.renderTerrainMetal` calls
+  `LightMapHelper.bindMetal(encoder, 1, viewport.frameId)` — binding
+  slot 1 matches `LIGHTING_SAMPLER_BINDING` in `quads3.vert`.
+- `quads.frag` (VOXY_NO_ATLAS path) now modulates the per-quad hash
+  colour by `uint2vec4RGBA(interData.y).rgb` — the lightmap ×
+  face-shade colour the vertex shader packed via `makeRemainingAttributes`.
+  The synthetic face-Lambertian shade from M12 is removed (the
+  vertex-shader path now bakes real sky/block-light values × MC's
+  level.getShade per face). The procedural checker + speckle pattern
+  stays as the per-pixel detail layer until chunk 1 lands.
 
 ### Chunk 3 — depth import detail
 

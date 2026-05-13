@@ -21,6 +21,13 @@ public class MetalTexture extends TrackedObject implements IGpuTexture {
     private int height;
     private int levels;
     private boolean allocated;
+    /**
+     * Tracks the MTLStorageMode the texture was created with. Only Shared /
+     * Managed textures can be the target of {@link #uploadSubImage2D}; for
+     * the default Private path the upload would silently no-op on Apple
+     * Silicon, so the method throws instead of giving callers stale data.
+     */
+    private int storageMode = MetalNative.MTLStorageModePrivate;
 
     private static int COUNT;
     private static long ESTIMATED_TOTAL_SIZE;
@@ -73,6 +80,32 @@ public class MetalTexture extends TrackedObject implements IGpuTexture {
 
     @Override
     public IGpuTexture store(int format, int levels, int width, int height) {
+        return allocate(format, levels, width, height,
+                MetalNative.MTLTextureUsageShaderRead
+                        | MetalNative.MTLTextureUsageShaderWrite
+                        | MetalNative.MTLTextureUsageRenderTarget,
+                MetalNative.MTLStorageModePrivate);
+    }
+
+    /**
+     * Allocate the underlying MTLTexture with Shared storage and read-only
+     * sampler usage — the layout {@link #uploadSubImage2D} requires.
+     *
+     * Use this instead of {@link #store} for textures that get their pixels
+     * from CPU each frame (e.g. M13 chunk 2's MC-lightmap mirror). Shared
+     * storage is unified-memory on Apple Silicon, so the upload is a
+     * memcpy; render-target usage is intentionally dropped because the
+     * texture is sampled-only, and dropping the flag avoids the Metal
+     * driver's "render target may be evicted" overhead.
+     */
+    public IGpuTexture storeUploadable(int format, int levels, int width, int height) {
+        return allocate(format, levels, width, height,
+                MetalNative.MTLTextureUsageShaderRead,
+                MetalNative.MTLStorageModeShared);
+    }
+
+    private IGpuTexture allocate(int format, int levels, int width, int height,
+                                  int usage, int storageMode) {
         if (this.allocated) {
             throw new IllegalStateException("Texture already allocated");
         }
@@ -80,6 +113,7 @@ public class MetalTexture extends TrackedObject implements IGpuTexture {
         this.width = width;
         this.height = height;
         this.levels = levels;
+        this.storageMode = storageMode;
         this.allocated = true;
 
         int metalPixelFormat = MetalFormatUtil.glFormatToMetal(format);
@@ -87,10 +121,7 @@ public class MetalTexture extends TrackedObject implements IGpuTexture {
 
         long descriptor = MetalNative.mtlNewTextureDescriptor(
                 metalTextureType, metalPixelFormat, width, height, levels,
-                MetalNative.MTLTextureUsageShaderRead
-                        | MetalNative.MTLTextureUsageShaderWrite
-                        | MetalNative.MTLTextureUsageRenderTarget,
-                MetalNative.MTLStorageModePrivate);
+                usage, storageMode);
 
         this.handle = MetalNative.mtlDeviceNewTexture(this.deviceHandle, descriptor);
         MetalNative.mtlRelease(descriptor);
@@ -106,6 +137,18 @@ public class MetalTexture extends TrackedObject implements IGpuTexture {
 
         ESTIMATED_TOTAL_SIZE += estimateSize();
         return this;
+    }
+
+    @Override
+    public void uploadSubImage2D(int level, int x, int y, int w, int h,
+                                  int format, int type, long dataAddr) {
+        assertAllocated();
+        if (this.storageMode == MetalNative.MTLStorageModePrivate) {
+            throw new IllegalStateException(
+                    "uploadSubImage2D requires Shared/Managed storage — allocate via storeUploadable()");
+        }
+        int bpp = (int) MetalFormatUtil.bytesPerPixel(this.format);
+        MetalNative.mtlTextureReplaceRegion(this.handle, level, x, y, w, h, dataAddr, w * bpp);
     }
 
     @Override
