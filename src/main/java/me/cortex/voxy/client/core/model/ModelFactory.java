@@ -560,7 +560,7 @@ public class ModelFactory {
             occludesFace &= offset < 0.1;//If the face is rendered far away from the other face, then it doesnt occlude
 
             if (occludesFace) {
-                occludesFace &= ((float)writeCount)/(MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE) > 0.9;// only occlude if the face covers more than 90% of the face
+                occludesFace &= faceCoversFullBlock && ((float)writeCount)/(MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE) > 0.9;
             }
             metadata |= occludesFace?1:0;
             fullyOpaque &= occludesFace;
