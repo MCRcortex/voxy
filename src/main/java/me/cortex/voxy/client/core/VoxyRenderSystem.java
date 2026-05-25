@@ -13,6 +13,7 @@ import me.cortex.voxy.client.core.gl.GlBuffer;
 import me.cortex.voxy.client.core.gl.GlTexture;
 import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.client.core.model.ModelStore;
+import me.cortex.voxy.client.core.rendering.BeaconBeamRenderer;
 import me.cortex.voxy.client.core.rendering.ChunkBoundRenderer;
 import me.cortex.voxy.client.core.rendering.RenderDistanceTracker;
 import me.cortex.voxy.client.core.rendering.Viewport;
@@ -72,6 +73,7 @@ public class VoxyRenderSystem {
 
     private final AbstractRenderPipeline pipeline;
     private final RenderProperties properties;
+    private final BeaconBeamRenderer beaconBeamRenderer;
 
     private static AbstractSectionRenderer.Factory<?,? extends IGeometryData> getRenderBackendFactory() {
         //TODO: need todo a thing where selects optimal section render based on if supports the pipeline and geometry data type
@@ -117,8 +119,6 @@ public class VoxyRenderSystem {
                 this.nodeCleaner = new NodeCleaner(this.nodeManager);
                 this.traversal = new HierarchicalOcclusionTraverser(this.nodeManager, this.nodeCleaner, this.renderGen);
 
-                world.setDirtyCallback(this.nodeManager::worldEvent);
-
                 Arrays.stream(world.getMapper().getBiomeEntries()).forEach(this.modelService::addBiome);
                 world.getMapper().setBiomeCallback(this.modelService::addBiome);
 
@@ -135,6 +135,12 @@ public class VoxyRenderSystem {
             var sectionRenderer = backendFactory.create(this.pipeline, this.modelService.getStore(), this.geometryData);
             this.pipeline.setSectionRenderer(sectionRenderer);
             this.viewportSelector = new ViewportSelector<>(sectionRenderer::createViewport);
+            this.beaconBeamRenderer = new BeaconBeamRenderer(world, this.properties);
+            this.pipeline.setAfterTranslucentRenderer(this.beaconBeamRenderer::render);
+            world.setDirtyCallback((section, updateFlags, neighborMsk) -> {
+                this.nodeManager.worldEvent(section, updateFlags, neighborMsk);
+                this.beaconBeamRenderer.worldEvent(section, updateFlags, neighborMsk);
+            });
 
             {
                 int minSec = Minecraft.getInstance().level.getMinSectionY() >> 5;
@@ -512,6 +518,7 @@ public class VoxyRenderSystem {
             }
 
             this.chunkBoundRenderer.free();
+            this.beaconBeamRenderer.free();
 
             this.viewportSelector.free();
         } catch (Exception e) {Logger.error("Error shutting down renderer components", e);}

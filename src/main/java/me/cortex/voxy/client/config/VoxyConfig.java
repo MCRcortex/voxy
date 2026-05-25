@@ -33,6 +33,7 @@ public class VoxyConfig {
     public int serviceThreads = (int) Math.max(CpuLayout.getCoreCount()/1.5, 1);
     public float subDivisionSize = 64;
     public boolean useEnvironmentalFog = true;
+    public boolean renderBeaconBeams = true;
     public boolean dontUseSodiumBuilderThreads = false;
     public String ssaoMode;
 

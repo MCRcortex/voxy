@@ -96,6 +96,11 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                         .setPostChangeFlags("voxy:iris_reload")
                                         .setEnabler("voxy:enabled")
                         ), new Group(
+                                new BoolOption(
+                                        "voxy:render_beacon_beams",
+                                        Component.translatable("voxy.config.general.render_beacon_beams"),
+                                        ()->CFG.renderBeaconBeams, v->CFG.renderBeaconBeams=v)
+                        ), new Group(
                                 new IntOption(
                                         "voxy:subdivsize",
                                         Component.translatable("voxy.config.general.subDivisionSize"),
