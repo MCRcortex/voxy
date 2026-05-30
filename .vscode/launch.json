@@ -1,0 +1,27 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "request": "launch",
+      "name": "Client",
+      "presentation": {
+        "group": "Mod Development - voxy-neoforge",
+        "order": 0
+      },
+      "projectName": "voxy-neoforge",
+      "mainClass": "net.neoforged.devlaunch.Main",
+      "args": [
+        "@D:\\GitHub\\voxy\\build\\moddev\\clientRunProgramArgs.txt"
+      ],
+      "vmArgs": [
+        "@D:\\GitHub\\voxy\\build\\moddev\\clientRunVmArgs.txt",
+        "-Dfml.modFolders\u003d"
+      ],
+      "cwd": "${workspaceFolder}\\run",
+      "env": {},
+      "console": "internalConsole",
+      "shortenCommandLine": "none"
+    }
+  ]
+}

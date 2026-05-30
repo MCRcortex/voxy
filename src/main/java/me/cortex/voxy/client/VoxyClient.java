@@ -1,96 +1,66 @@
 package me.cortex.voxy.client;
 
-import me.cortex.voxy.client.core.gl.Capabilities;
-import me.cortex.voxy.client.core.rendering.util.SharedIndexBuffer;
-import me.cortex.voxy.common.Logger;
-import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.Minecraft;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.common.NeoForge;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.channels.FileLock;
-import java.nio.channels.NonWritableChannelException;
-import java.util.HashSet;
-import java.util.function.Consumer;
-import java.util.function.Function;
+/**
+ * Entry point for the client-side Voxy subsystem.
+ *
+ * <p>Register via {@link #register(IEventBus)} from the mod constructor (client dist only).
+ */
+public final class VoxyClient {
 
-public class VoxyClient implements ClientModInitializer {
-    private static final HashSet<String> FREX = new HashSet<>();
-    private static FileLock EXCLUSIVE_LOCK;
-    public static void initVoxyClient() {
-        Capabilities.init();//Ensure clinit is called
+    private static final Logger LOGGER = LoggerFactory.getLogger(VoxyClient.class);
 
-        if (Capabilities.INSTANCE.hasBrokenDepthSampler) {
-            Logger.error("AMD broken depth sampler detected, voxy does not work correctly and has been disabled, this will hopefully be fixed in the future");
-        }
+    private static volatile ClientLodManager lodManager;
 
-        boolean systemSupported = Capabilities.INSTANCE.compute && Capabilities.INSTANCE.indirectParameters && !Capabilities.INSTANCE.hasBrokenDepthSampler;
-        if (!systemSupported) {
-             Logger.error("Voxy is unsupported on your system.");
-        }
+    private VoxyClient() {}
 
-        if (systemSupported && System.getProperty("voxy.exclusiveLock", "false").equalsIgnoreCase("true")) {
-            //Try acquire the lock file
-            var vf = Minecraft.getInstance().gameDirectory.toPath().resolve(".voxy");
-            if (!vf.toFile().isDirectory()) {
-                vf.toFile().mkdir();
-            }
-            try {
-                FileOutputStream fis = new FileOutputStream(vf.resolve("voxy.lock").toFile());
-                EXCLUSIVE_LOCK = fis.getChannel().lock(0, Long.MAX_VALUE, false);
-            } catch (NonWritableChannelException | IOException e) {
-                //If some error write to log and unsupport
-                Logger.error("Failed to acquire exclusive voxy lock file, mod will be disabled");
-                systemSupported = false;
-            }
+    public static void register(IEventBus modBus) {
+        NeoForge.EVENT_BUS.addListener(VoxyClient::onPlayerJoinServer);
+        NeoForge.EVENT_BUS.addListener(VoxyClient::onPlayerLoggedOut);
+        NeoForge.EVENT_BUS.addListener(VoxyClient::onRespawn);
+    }
 
-        }
+    private static void onPlayerJoinServer(ClientPlayerNetworkEvent.LoggingIn event) {
+        String address = ClientLodManager.resolveServerAddress();
+        LOGGER.info("[Voxy] Client connected to '{}' — creating LOD manager", address);
+        ClientLodManager mgr = new ClientLodManager(address);
+        lodManager = mgr;
 
-        if (systemSupported) {
-
-            SharedIndexBuffer.INSTANCE.id();
-
-            VoxyCommon.setInstanceFactory(VoxyClientInstance::new);
-
-            if (!Capabilities.INSTANCE.subgroup) {
-                Logger.warn("GPU does not support subgroup operations, expect some performance degradation");
-            }
-
+        // Request manifest for the initial dimension
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.level != null) {
+            net.minecraft.resources.ResourceLocation dim = mc.level.dimension().location();
+            mgr.onDimensionJoin(dim);
         }
     }
 
-    @Override
-    public void onInitializeClient() {
-        DebugEntries.init();
-
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, registryAccess) -> {
-            if (VoxyCommon.isAvailable()) {
-                dispatcher.register(VoxyCommands.register());
-            }
-        });
-
-        FabricLoader.getInstance()
-                .getEntrypoints("frex_flawless_frames", Consumer.class)
-                .forEach(api -> ((Consumer<Function<String,Consumer<Boolean>>>)api).accept(name->active->{if (active) {
-                    FREX.add(name);
-                } else {
-                    FREX.remove(name);
-                }}));
+    private static void onPlayerLoggedOut(ClientPlayerNetworkEvent.LoggingOut event) {
+        ClientLodManager mgr = lodManager;
+        if (mgr != null) {
+            LOGGER.info("[Voxy] Client disconnected — shutting down LOD manager");
+            lodManager = null;
+            mgr.close();
+        }
     }
 
-    public static boolean isFrexActive() {
-        return !FREX.isEmpty();
+    private static void onRespawn(ClientPlayerNetworkEvent.Clone event) {
+        // Respawn in a new dimension: request manifest for the new level
+        ClientLodManager mgr = lodManager;
+        if (mgr == null) return;
+        net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.level != null) {
+            net.minecraft.resources.ResourceLocation dim = mc.level.dimension().location();
+            mgr.onDimensionJoin(dim);
+        }
     }
 
-    public static int getOcclusionDebugState() {
-        return 0;
-    }
-
-    public static boolean disableSodiumChunkRender() {
-        return false;// getOcclusionDebugState() != 0;
+    /** Returns the active {@link ClientLodManager}, or {@code null} when not connected. */
+    public static ClientLodManager getLodManager() {
+        return lodManager;
     }
 }

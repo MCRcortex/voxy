@@ -1,0 +1,30 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "LGPL-3.0-or-later"
+issueTrackerURL = "https://github.com/MCRcortex/voxy/issues"
+
+[[mods]]
+    modId = "${mod_id}"
+    version = "${mod_version}"
+    displayName = "Voxy LOD (NeoForge)"
+    description = """
+        Server-native Level-of-Detail (LOD) rendering mod.
+        Generates LOD chunks on the server, transfers them to clients, and caches
+        them locally so only changed chunks need to be re-downloaded.
+    """
+    logoFile = "voxy.png"
+    authors = "cortex"
+
+[[dependencies.voxy]]
+    modId = "neoforge"
+    type = "required"
+    versionRange = "[21.1,)"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.voxy]]
+    modId = "minecraft"
+    type = "required"
+    versionRange = "[${mc_version},1.22)"
+    ordering = "NONE"
+    side = "BOTH"

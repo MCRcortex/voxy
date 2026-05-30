@@ -1,0 +1,75 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - neoforge-rewrite
+  pull_request:
+    branches:
+      - neoforge-rewrite
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build & Test (Java 21)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Run unit tests
+        run: ./gradlew test --no-daemon
+        env:
+          GRADLE_OPTS: "-Xmx2g"
+
+      - name: Publish test results
+        uses: mikepenz/action-junit-report@v4
+        if: always()
+        with:
+          report_paths: 'build/test-results/test/TEST-*.xml'
+          check_name: 'JUnit Test Results'
+
+      - name: Build mod jar
+        run: ./gradlew build --no-daemon
+        env:
+          GRADLE_OPTS: "-Xmx2g"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: voxy-neoforge-${{ github.ref_name }}-${{ github.sha }}
+          path: |
+            build/libs/*.jar
+          retention-days: 30
+
+  check-style:
+    name: Compile check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+      - uses: gradle/actions/setup-gradle@v4
+      - run: chmod +x gradlew
+      - name: Compile
+        run: ./gradlew compileJava --no-daemon
