@@ -83,7 +83,7 @@ public class ServiceManager {
                     continue outer;//We need to refetch the array and start over
                 }
                 boolean sc = c--<=0;
-                if (service.limiter!=null && !service.limiter.getAsBoolean()) {
+                if (!service.canAcceptJobs()) {
                     skipMsk |= 1L<<i;
                     continue;
                 }
@@ -97,7 +97,7 @@ public class ServiceManager {
 
             for (int i = 0; i < services.length; i++) {
                 var service = services[(i+shiftFactor)%services.length];
-                if (service.limiter!=null && (((skipMsk&(1L<<i))!=0)|| !service.limiter.getAsBoolean())) {
+                if (((skipMsk&(1L<<i))!=0) || !service.canAcceptJobs()) {
                     skipMsk |= 1L<<i;
                     continue;
                 }

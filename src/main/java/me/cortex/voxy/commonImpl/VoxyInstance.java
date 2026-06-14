@@ -5,6 +5,7 @@ import me.cortex.voxy.common.config.section.SectionStorage;
 import me.cortex.voxy.common.thread.ServiceManager;
 import me.cortex.voxy.common.thread.UnifiedServiceThreadPool;
 import me.cortex.voxy.common.util.MemoryBuffer;
+import me.cortex.voxy.common.world.SectionLoadLimiter;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.service.SectionSavingService;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
@@ -66,6 +67,12 @@ public abstract class VoxyInstance {
 
     public void updateDedicatedThreads() {
         this.setNumThreads(3);
+    }
+
+    public void updateLodThreadLimits(int ingestThreads, int saveThreads, int loadThreads) {
+        this.ingestService.applyThreadLimit(ingestThreads);
+        this.savingService.applyThreadLimit(saveThreads);
+        SectionLoadLimiter.setMaxConcurrent(loadThreads);
     }
 
     protected ImportManager createImportManager() {

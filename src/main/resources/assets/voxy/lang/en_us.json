@@ -8,7 +8,19 @@
   "voxy.config.general.enabled.tooltip": "Fully enables or disables voxy",
 
   "voxy.config.general.serviceThreads": "Service threads",
-  "voxy.config.general.serviceThreads.tooltip": "Number of threads the ServiceThreadPool can use",
+  "voxy.config.general.serviceThreads.tooltip": "Total number of worker threads in the Voxy thread pool. Use LOD thread settings below to limit how many threads each task type can use at once.",
+
+  "voxy.config.lod.loadThreads": "LOD load threads",
+  "voxy.config.lod.loadThreads.tooltip": "Maximum number of LOD sections that can be loaded from storage at the same time",
+
+  "voxy.config.lod.ingestThreads": "LOD ingest threads",
+  "voxy.config.lod.ingestThreads.tooltip": "Maximum number of parallel chunk-to-LOD conversion jobs",
+
+  "voxy.config.lod.meshThreads": "LOD mesh threads",
+  "voxy.config.lod.meshThreads.tooltip": "Maximum number of parallel LOD mesh generation jobs for rendering",
+
+  "voxy.config.lod.saveThreads": "LOD save threads",
+  "voxy.config.lod.saveThreads.tooltip": "Maximum number of parallel LOD section save jobs to storage",
 
   "voxy.config.general.useSodiumBuilder": "Use sodium threads",
   "voxy.config.general.useSodiumBuilder.tooltip": "Uses sodium builder threads as part of voxys thread pool, can reduce stuttering and lag when moving quickly at high render distance",

@@ -2,6 +2,7 @@ package me.cortex.voxy.client;
 
 import me.cortex.voxy.client.compat.FlashbackCompat;
 import me.cortex.voxy.client.config.VoxyConfig;
+import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.mixin.sodium.AccessorSodiumWorldRenderer;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.StorageConfigUtil;
@@ -38,6 +39,16 @@ public class VoxyClientInstance extends VoxyInstance {
         this.basePath = path;
         this.storageConfig = StorageConfigUtil.getCreateStorageConfig(Config.class, c->c.version==1&&c.sectionStorageConfig!=null, ()->DEFAULT_STORAGE_CONFIG, path).sectionStorageConfig;
         this.updateDedicatedThreads();
+        this.updateLodThreadLimits();
+    }
+
+    public void updateLodThreadLimits() {
+        var config = VoxyConfig.CONFIG;
+        super.updateLodThreadLimits(config.lodIngestThreads, config.lodSaveThreads, config.lodLoadThreads);
+        var renderSystem = IGetVoxyRenderSystem.getNullable();
+        if (renderSystem != null) {
+            renderSystem.updateLodThreadLimits();
+        }
     }
 
     @Override

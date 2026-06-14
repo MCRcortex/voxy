@@ -29,6 +29,10 @@ public class VoxyConfig implements OptionStorage<VoxyConfig> {
     public boolean ingestEnabled = true;
     public int sectionRenderDistance = 16;
     public int serviceThreads = (int) Math.max(CpuLayout.getCoreCount()/1.5, 1);
+    public int lodLoadThreads = Math.max(1, CpuLayout.getCoreCount() / 4);
+    public int lodIngestThreads = Math.max(1, CpuLayout.getCoreCount() / 4);
+    public int lodMeshThreads = Math.max(1, CpuLayout.getCoreCount() / 4);
+    public int lodSaveThreads = 1;
     public float subDivisionSize = 64;
     public boolean useEnvironmentalFog = true;
     public boolean dontUseSodiumBuilderThreads = false;
@@ -40,6 +44,7 @@ public class VoxyConfig implements OptionStorage<VoxyConfig> {
                 try (FileReader reader = new FileReader(path.toFile())) {
                     var conf = GSON.fromJson(reader, VoxyConfig.class);
                     if (conf != null) {
+                        conf.applyDefaults();
                         conf.save();
                         return conf;
                     } else {
@@ -87,5 +92,24 @@ public class VoxyConfig implements OptionStorage<VoxyConfig> {
 
     public boolean isRenderingEnabled() {
         return VoxyCommon.isAvailable() && this.enabled && this.enableRendering;
+    }
+
+    private void applyDefaults() {
+        int cores = CpuLayout.getCoreCount();
+        if (this.serviceThreads <= 0) {
+            this.serviceThreads = (int) Math.max(cores / 1.5, 1);
+        }
+        if (this.lodLoadThreads <= 0) {
+            this.lodLoadThreads = Math.max(1, cores / 4);
+        }
+        if (this.lodIngestThreads <= 0) {
+            this.lodIngestThreads = Math.max(1, cores / 4);
+        }
+        if (this.lodMeshThreads <= 0) {
+            this.lodMeshThreads = Math.max(1, cores / 4);
+        }
+        if (this.lodSaveThreads <= 0) {
+            this.lodSaveThreads = 1;
+        }
     }
 }

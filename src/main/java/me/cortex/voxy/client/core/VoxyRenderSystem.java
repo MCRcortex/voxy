@@ -143,6 +143,8 @@ public class VoxyRenderSystem {
                 this.setRenderDistance(VoxyConfig.CONFIG.sectionRenderDistance);
             }
 
+            this.updateLodThreadLimits();
+
             this.chunkBoundRenderer = new ChunkBoundRenderer(this.pipeline);
 
             Logger.info("Voxy render system created with " + geometryCapacity + " geometry capacity, using pipeline '" + this.pipeline.getClass().getSimpleName() + "' with renderer '" + sectionRenderer.getClass().getSimpleName() + "'");
@@ -162,6 +164,10 @@ public class VoxyRenderSystem {
         }
     }
 
+
+    public void updateLodThreadLimits() {
+        this.renderGen.applyThreadLimit(VoxyConfig.CONFIG.lodMeshThreads);
+    }
 
     public Viewport<?> setupViewport(ChunkRenderMatrices matrices, FogParameters fogParameters, double cameraX, double cameraY, double cameraZ) {
         var viewport = this.getViewport();
