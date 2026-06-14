@@ -4,17 +4,20 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.Pair;
 
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 public class Service {
     private final PerThreadContextExecutor executor;
     private final ServiceManager sm;
-    final long weight;
+    volatile long weight;
     final String name;
     final BooleanSupplier limiter;
 
     private final Semaphore tasks = new Semaphore(0);
+    private final AtomicInteger activeJobs = new AtomicInteger();
+    private volatile int maxConcurrent = Integer.MAX_VALUE;
     private volatile boolean isLive = true;
     private volatile boolean isStopping = false;
 
@@ -25,6 +28,29 @@ public class Service {
         this.limiter = limiter;
 
         this.executor = new PerThreadContextExecutor(ctxSupplier, e->sm.handleException(this, e));
+    }
+
+    public void setMaxConcurrent(int max) {
+        this.maxConcurrent = Math.max(1, max);
+    }
+
+    public void setWeight(long weight) {
+        this.weight = Math.max(1, weight);
+    }
+
+    public int getActiveJobs() {
+        return this.activeJobs.get();
+    }
+
+    public int getMaxConcurrent() {
+        return this.maxConcurrent;
+    }
+
+    boolean canAcceptJobs() {
+        if (this.activeJobs.get() >= this.maxConcurrent) {
+            return false;
+        }
+        return this.limiter == null || this.limiter.getAsBoolean();
     }
 
     public void execute() {
@@ -44,8 +70,17 @@ public class Service {
             //Failed to get the job, probably due to a race condition
             return false;
         }
-        if (!this.executor.run()) {//Run the job
-            throw new IllegalStateException("Executor failed to run");
+        if (!this.canAcceptJobs()) {
+            this.tasks.release();
+            return false;
+        }
+        this.activeJobs.incrementAndGet();
+        try {
+            if (!this.executor.run()) {//Run the job
+                throw new IllegalStateException("Executor failed to run");
+            }
+        } finally {
+            this.activeJobs.decrementAndGet();
         }
         return true;
     }

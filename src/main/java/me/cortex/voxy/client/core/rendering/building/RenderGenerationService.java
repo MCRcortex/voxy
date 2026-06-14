@@ -366,4 +366,9 @@ public class RenderGenerationService {
     public int getTaskCount() {
         return this.taskQueueCount.get();
     }
+
+    public void applyThreadLimit(int threads) {
+        this.service.setMaxConcurrent(threads);
+        this.service.setWeight(Math.max(1, threads));
+    }
 }

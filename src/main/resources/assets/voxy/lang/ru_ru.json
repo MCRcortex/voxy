@@ -1,0 +1,48 @@
+{
+  "voxy.config.title": "Voxy",
+
+  "voxy.config.general": "Общие",
+  "voxy.config.rendering": "Рендеринг",
+
+  "voxy.config.general.enabled": "Включить Voxy",
+  "voxy.config.general.enabled.tooltip": "Полностью включает или отключает Voxy",
+
+  "voxy.config.general.serviceThreads": "Рабочие потоки",
+  "voxy.config.general.serviceThreads.tooltip": "Общее количество рабочих потоков пула Voxy. Ниже можно ограничить, сколько потоков одновременно использует каждый тип задач LOD.",
+
+  "voxy.config.lod.loadThreads": "Потоки загрузки LOD",
+  "voxy.config.lod.loadThreads.tooltip": "Максимальное число одновременных загрузок секций LOD из хранилища",
+
+  "voxy.config.lod.ingestThreads": "Потоки инжеста LOD",
+  "voxy.config.lod.ingestThreads.tooltip": "Максимальное число параллельных задач конвертации чанков в LOD",
+
+  "voxy.config.lod.meshThreads": "Потоки мешинга LOD",
+  "voxy.config.lod.meshThreads.tooltip": "Максимальное число параллельных задач генерации мешей LOD для рендеринга",
+
+  "voxy.config.lod.saveThreads": "Потоки сохранения LOD",
+  "voxy.config.lod.saveThreads.tooltip": "Максимальное число параллельных задач сохранения секций LOD в хранилище",
+
+  "voxy.config.general.useSodiumBuilder": "Использовать потоки Sodium",
+  "voxy.config.general.useSodiumBuilder.tooltip": "Использует потоки сборщика Sodium как часть пула потоков Voxy — может уменьшить фризы при быстром движении на большой дистанции прорисовки",
+
+  "voxy.config.general.ingest": "Инжест чанков",
+  "voxy.config.general.ingest.tooltip": "Включает или отключает конвертацию новых чанков в LOD",
+
+  "voxy.config.general.rendering": "Рендеринг Voxy",
+  "voxy.config.general.rendering.tooltip": "Включает или отключает рендеринг Voxy",
+
+  "voxy.config.general.subDivisionSize": "Размер подразделения (пикс²)",
+  "voxy.config.general.subDivisionSize.tooltip": "Максимальный размер AABB в экранном пространстве (в пикселях²) перед переходом к более мелким LOD (меньше — выше качество)",
+
+  "voxy.config.general.renderDistance": "Дистанция прорисовки",
+  "voxy.config.general.renderDistance.tooltip": "Дистанция прорисовки Voxy в чанках",
+
+  "voxy.config.general.environmental_fog": "Включить средовой туман",
+  "voxy.config.general.environmental_fog.tooltip": "Включает или отключает рендеринг средового тумана Voxy",
+
+  "voxy.config.general.render_fog": "Включить туман рендера",
+  "voxy.config.general.render_fog.tooltip": "Включает или отключает эффект тумана рендера",
+
+  "voxy.config.general.render_statistics": "Статистика рендера",
+  "voxy.config.general.render_statistics.tooltip": "Показывать статистику рендера в меню F3 — полезно для отладки"
+}

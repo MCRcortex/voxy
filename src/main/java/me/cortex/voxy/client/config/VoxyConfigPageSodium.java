@@ -1,8 +1,8 @@
 package me.cortex.voxy.client.config;
 
 import com.google.common.collect.ImmutableList;
-import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.VoxyClientInstance;
+import me.cortex.voxy.client.RenderStatistics;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.common.util.cpu.CpuLayout;
 import me.cortex.voxy.commonImpl.VoxyCommon;
@@ -18,6 +18,21 @@ public abstract class VoxyConfigPageSodium {
     private VoxyConfigPageSodium(){}
 
     public static OptionPage voxyOptionPage = null;
+
+    private static int maxThreadSlider() {
+        if (CpuLayout.CORES != null) {
+            return CpuLayout.CORES.length;
+        }
+        return Runtime.getRuntime().availableProcessors();
+    }
+
+    private static void applyLodThreadLimits() {
+        var instance = VoxyCommon.getInstance();
+        if (instance instanceof VoxyClientInstance clientInstance) {
+            clientInstance.updateLodThreadLimits();
+        }
+        VoxyConfig.CONFIG.save();
+    }
 
     public static OptionPage page() {
         List<OptionGroup> groups = new ArrayList<>();
@@ -57,8 +72,7 @@ public abstract class VoxyConfigPageSodium {
                         .setName(Component.translatable("voxy.config.general.serviceThreads"))
                         .setTooltip(Component.translatable("voxy.config.general.serviceThreads.tooltip"))
                         .setControl(opt->new SliderControl(opt, 1,
-                                CpuLayout.CORES.length, //Just do core size as max
-                                //Runtime.getRuntime().availableProcessors(),//Note: this is threads not cores, the default value is half the core count, is fine as this should technically be the limit but CpuLayout.CORES.length is more realistic
+                                maxThreadSlider(),
                                 1, v->Component.literal(Integer.toString(v))))
                         .setBinding((s, v)->{
                             s.serviceThreads = v;
@@ -88,6 +102,50 @@ public abstract class VoxyConfigPageSodium {
                         .setTooltip(Component.translatable("voxy.config.general.ingest.tooltip"))
                         .setControl(TickBoxControl::new)
                         .setBinding((s, v) -> s.ingestEnabled = v, s -> s.ingestEnabled)
+                        .setImpact(OptionImpact.MEDIUM)
+                        .build()
+                ).build()
+        );
+
+        groups.add(OptionGroup.createBuilder()
+                .add(OptionImpl.createBuilder(int.class, storage)
+                        .setName(Component.translatable("voxy.config.lod.loadThreads"))
+                        .setTooltip(Component.translatable("voxy.config.lod.loadThreads.tooltip"))
+                        .setControl(opt->new SliderControl(opt, 1, maxThreadSlider(), 1, v->Component.literal(Integer.toString(v))))
+                        .setBinding((s, v)->{
+                            s.lodLoadThreads = v;
+                            applyLodThreadLimits();
+                        }, s -> s.lodLoadThreads)
+                        .setImpact(OptionImpact.HIGH)
+                        .build()
+                ).add(OptionImpl.createBuilder(int.class, storage)
+                        .setName(Component.translatable("voxy.config.lod.ingestThreads"))
+                        .setTooltip(Component.translatable("voxy.config.lod.ingestThreads.tooltip"))
+                        .setControl(opt->new SliderControl(opt, 1, maxThreadSlider(), 1, v->Component.literal(Integer.toString(v))))
+                        .setBinding((s, v)->{
+                            s.lodIngestThreads = v;
+                            applyLodThreadLimits();
+                        }, s -> s.lodIngestThreads)
+                        .setImpact(OptionImpact.HIGH)
+                        .build()
+                ).add(OptionImpl.createBuilder(int.class, storage)
+                        .setName(Component.translatable("voxy.config.lod.meshThreads"))
+                        .setTooltip(Component.translatable("voxy.config.lod.meshThreads.tooltip"))
+                        .setControl(opt->new SliderControl(opt, 1, maxThreadSlider(), 1, v->Component.literal(Integer.toString(v))))
+                        .setBinding((s, v)->{
+                            s.lodMeshThreads = v;
+                            applyLodThreadLimits();
+                        }, s -> s.lodMeshThreads)
+                        .setImpact(OptionImpact.HIGH)
+                        .build()
+                ).add(OptionImpl.createBuilder(int.class, storage)
+                        .setName(Component.translatable("voxy.config.lod.saveThreads"))
+                        .setTooltip(Component.translatable("voxy.config.lod.saveThreads.tooltip"))
+                        .setControl(opt->new SliderControl(opt, 1, maxThreadSlider(), 1, v->Component.literal(Integer.toString(v))))
+                        .setBinding((s, v)->{
+                            s.lodSaveThreads = v;
+                            applyLodThreadLimits();
+                        }, s -> s.lodSaveThreads)
                         .setImpact(OptionImpact.MEDIUM)
                         .build()
                 ).build()

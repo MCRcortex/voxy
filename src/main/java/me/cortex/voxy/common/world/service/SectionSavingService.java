@@ -88,4 +88,9 @@ public class SectionSavingService {
     public int getTaskCount() {
         return this.service.numJobs();
     }
+
+    public void applyThreadLimit(int threads) {
+        this.service.setMaxConcurrent(threads);
+        this.service.setWeight(Math.max(1, threads));
+    }
 }

@@ -144,7 +144,12 @@ public class ActiveSectionTracker {
                         WorldEngine.getZ(key),
                         this);
 
-                status = this.loader.load(section);
+                SectionLoadLimiter.acquire();
+                try {
+                    status = this.loader.load(section);
+                } finally {
+                    SectionLoadLimiter.release();
+                }
 
                 if (status < 0) {
                     //TODO: Instead if throwing an exception do something better, like attempting to regen

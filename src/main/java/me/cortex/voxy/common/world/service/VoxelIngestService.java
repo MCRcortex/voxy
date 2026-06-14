@@ -175,6 +175,11 @@ public class VoxelIngestService {
         return this.service.numJobs();
     }
 
+    public void applyThreadLimit(int threads) {
+        this.service.setMaxConcurrent(threads);
+        this.service.setWeight(Math.max(1, threads));
+    }
+
     public void shutdown() {
         this.service.shutdown();
     }
