@@ -1,0 +1,122 @@
+#version 450
+layout(local_size_x = 32, local_size_y = 32) in;
+
+
+layout(binding = 0, rgba8) uniform writeonly restrict image2D colourTexOut;
+layout(binding = 1) uniform sampler2D depthTex;
+layout(binding = 2) uniform sampler2D colourTex;
+layout(location = 3) uniform mat4 MVP;
+layout(location = 4) uniform mat4 invMVP;
+
+vec3 rev3d(vec3 clip) {
+    vec4 view = invMVP * vec4(clip*2.0-1.0,1.0);
+    return view.xyz/view.w;
+}
+
+vec4 reDeProject(vec3 pos) {
+    vec4 view = MVP * vec4(pos, 1.0);
+    view.xy /= view.w;
+    vec2 UV = clamp(view.xy*0.5+0.5, 0.0, 1.0);
+    //TODO: sample the colour texture and check if the alpha has the hasAO flag
+
+    float depth = texture(depthTex, UV).x;
+    if (depth == 1.0f) {
+        return vec4(-1.0f);
+    }
+    uint meta = uint(255.0f*texture(colourTex, UV).w);
+    if ((meta>>6)==0) {
+        return vec4(-1.0f);
+    }
+    view.z = depth*2.0-1.0;
+    view.w = 1.0;
+    view = invMVP * view;
+    return vec4(view.xyz/view.w, 1.0f);
+}
+
+float computeAOAngle(vec3 pos, float testHeight, vec3 normal) {
+    vec4 reproData = reDeProject(pos + normal*testHeight);
+    if (reproData.w < 0.0f) {
+        return 0.0f;
+    }
+    vec3 repro = reproData.xyz - pos;
+    float len = length(repro);
+    return dot(repro, normal)/len;
+}
+
+void main() {
+    ivec2 size = imageSize(colourTexOut);//TODO: dont use imageSize as it is slow, swap for uniform
+    if (any(lessThanEqual(size, gl_GlobalInvocationID.xy))) {
+        return;
+    }
+    vec2 scale = vec2(1.0f)/size;
+    vec2 point = vec2(gl_GlobalInvocationID.xy)*scale;
+    point += scale*0.5f;//Offset to the center of the textile
+    float depth = texture(depthTex, point).r;
+    vec4 ocolour = vec4(0);
+    if (depth!=0.0f && depth < 1.0f) {
+        vec4 colour = texture(colourTex, point);
+        if (colour == vec4(0.0f, 0.0f, 0.0f, 0.0f)) {
+            ocolour = vec4(1.0f, 0.0f, 0.0f, 1.0f);
+        } else {
+            uint metadata = uint(colour.w*255.0f);
+            uint face = metadata&7u;
+            uint lod = (metadata>>3)&7u;
+            bool hasAO = (metadata>>6)!=0;
+            vec3 pos = rev3d(vec3(point, depth));
+
+
+            ocolour = colour;
+            ocolour.w = 1.0f;
+
+            if (hasAO) {
+                float d = 0.0;
+                //TODO: TODO: only encode the axis, then use then it as as a mask along with pos and multiply by the -sign of everything
+                vec3 viewNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (float(int(face)&1)*2-1);
+                //vec3 viewNormal = vec3(uint((face>>1)==2), uint((face>>1)==0), uint((face>>1)==1)) * (-sign(pos));
+
+                d = computeAOAngle(pos, 1.0*(1<<lod), viewNormal);//1
+                if (d<0.1) {
+                    d = 0.0f;
+                }
+
+                ocolour.xyz *= ((1.0f-d)/3.0f+(2.0f/3.0f));
+            }
+        }
+    }
+    imageStore(colourTexOut, ivec2(gl_GlobalInvocationID.xy), ocolour);
+}
+//vec4 ocolour =  vec4(max(0, d), abs(min(0,d)), 0, 1);
+//vec4 ocolour =  vec4(repro-(viewNormal/2), 1);
+//vec4 ocolour =  vec4(viewNormal/2+0.5, 1);
+//if (any(lessThan(ivec3(4), abs(repro-offset)))) {// || all(lessThan(abs(repro-offset), ivec3(0.01)))
+//return;
+//}
+
+
+
+
+/*
+vec3 proj3dscreen(vec3 pos) {
+    vec4 view = MVP * vec4(pos, 1);
+    view.xyz /= view.w;
+    return view.xyz * 0.5 + 0.5;
+}
+
+vec3 reDeProjectContained(vec3 pos) {
+    vec4 view = MVP * vec4(pos, 1);
+    view.xy /= view.w;
+    float depth = texture(depthTex, clamp(view.xy*0.5+0.5, 0, 1)).x*2-1;
+    view.z = min(view.z, depth);
+    view.w = 1;
+    view = invMVP * view;
+    return view.xyz/view.w;
+}
+vec3 computeDifference(vec3 pos, vec3 offset) {
+    return reDeProject(pos + offset) - pos - offset;
+}
+
+float computeAngleDifference(vec3 pos, vec3 offset) {
+    vec3 repro = reDeProject(pos + offset) - pos;
+    return dot(repro, offset)/(length(repro) * length(offset));
+}
+*/

@@ -1,0 +1,26 @@
+{
+  "required": true,
+  "package": "me.cortex.neovoxy.client.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "client": [
+    "minecraft.AccessorLightTexture",
+    "minecraft.AccessorTextureAtlas",
+    "minecraft.MixinClientCommonPacketListenerImpl",
+    "minecraft.MixinClientLevel",
+    "minecraft.MixinClientPacketListener",
+    "minecraft.MixinFogRenderer",
+    "minecraft.MixinLayerLightSectionStorage",
+    "minecraft.MixinLevelRenderer",
+    "minecraft.MixinMinecraft",
+    "minecraft.MixinRenderSystem",
+    "minecraft.MixinWindow",
+    "sodium.AccessorSodiumWorldRenderer",
+    "sodium.MixinChunkJobQueue",
+    "sodium.MixinDefaultChunkRenderer",
+    "sodium.MixinRenderSectionManager",
+    "sodium.MixinSodiumWorldRenderer"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

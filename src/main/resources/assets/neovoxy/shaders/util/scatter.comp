@@ -1,0 +1,40 @@
+#version 460 core
+
+layout(local_size_x=128) in;
+
+//In data is layed out in chunks, 4 dest locations (packed into a uvec4) followed by 4 data values, each a uvec4
+// meaning each chunk is 5 uvec4's or 80 bytes
+layout(binding = INPUT_BUFFER_BINDING, std430) restrict readonly buffer InputBuffer {
+    uvec4[] inData;
+};
+
+layout(binding = OUTPUT_BUFFER1_BINDING, std430) restrict writeonly buffer OutputBuffer1 {
+    uvec4[] output1;
+};
+
+layout(binding = OUTPUT_BUFFER2_BINDING, std430) restrict writeonly buffer OutputBuffer2 {
+    uvec4[] output2;
+};
+
+layout(location=0) uniform uint count;
+
+void main() {
+    uint id = gl_GlobalInvocationID.x;
+    if (count <= id) {
+        return;
+    }
+    uint chunkBase = (id>>2u)*5u;
+    uint innerId = id&3u;
+
+    uint writeLocation = inData[chunkBase][innerId];//Select the write index based on the inner id
+    uvec4 writeData = inData[chunkBase+1+innerId];//+1 since the base is the write locations
+
+    uint writeBuffer = writeLocation>>31;//Top bit indicates what buffer to write to
+    writeLocation &= (1u<<31)-1;//Remove the buffer bit
+
+    if (writeBuffer == 0) {//Buffer 1
+        output1[writeLocation] = writeData;
+    } else {//Buffer 2
+        output2[writeLocation] = writeData;
+    }
+}

@@ -1,0 +1,71 @@
+{
+  "neovoxy.config.title": "NeoVoxy",
+
+  "neovoxy.config.general": "General",
+  "neovoxy.config.rendering": "Rendering",
+
+  "neovoxy.config.general.enabled": "Enable NeoVoxy",
+  "neovoxy.config.general.enabled.tooltip": "Fully enables or disables neovoxy",
+
+  "neovoxy.config.general.serviceThreads": "Service threads",
+  "neovoxy.config.general.serviceThreads.tooltip": "Number of threads the ServiceThreadPool can use",
+
+  "neovoxy.config.general.useSodiumBuilder": "Use sodium threads",
+  "neovoxy.config.general.useSodiumBuilder.tooltip": "Uses sodium builder threads as part of neovoxys thread pool, can reduce stuttering and lag when moving quickly at high render distance",
+
+  "neovoxy.config.general.ingest": "Chunk Ingest",
+  "neovoxy.config.general.ingest.tooltip": "Enables or disables voxies ability to convert new chunks into LoDs",
+
+  "neovoxy.config.general.rendering": "NeoVoxy Rendering",
+  "neovoxy.config.general.rendering.tooltip": "Enables or disables neovoxy rendering",
+
+  "neovoxy.config.general.subDivisionSize": "Pixels^2 of subdivision size",
+  "neovoxy.config.general.subDivisionSize.tooltip": "Maximum size in pixels (squared) of screenspace AABB before subdiving to smaller LoDs (Smaller being higher quality)",
+
+  "neovoxy.config.general.renderDistance": "Render distance",
+  "neovoxy.config.general.renderDistance.tooltip": "Render distance of neovoxy in chunks",
+
+  "neovoxy.config.general.environmental_fog": "Enable environmental fog",
+  "neovoxy.config.general.environmental_fog.tooltip": "Enables or disables neovoxy rendering environmental fog",
+
+  "neovoxy.config.general.render_fog": "Enable render fog",
+  "neovoxy.config.general.render_fog.tooltip": "Enables or disables render fog effect",
+
+  "neovoxy.config.general.render_statistics": "Enable render statistics",
+  "neovoxy.config.general.render_statistics.tooltip": "Enable render statistics in F3 menu, useful for debugging",
+
+  "neovoxy.sodium.page.title": "NeoVoxy",
+
+  "neovoxy.sodium.option.enabled": "Enable NeoVoxy",
+  "neovoxy.sodium.option.enabled.tooltip": "Master switch to enable or disable the NeoVoxy LOD system",
+
+  "neovoxy.sodium.option.enable_rendering": "LOD Rendering",
+  "neovoxy.sodium.option.enable_rendering.tooltip": "Enable rendering of LOD terrain. Disable to keep data ingestion running without visual output.",
+
+  "neovoxy.sodium.option.ingest_enabled": "Chunk Ingestion",
+  "neovoxy.sodium.option.ingest_enabled.tooltip": "Enable automatic conversion of visited chunks into LOD data",
+
+  "neovoxy.sodium.option.render_distance": "LOD Render Distance",
+  "neovoxy.sodium.option.render_distance.tooltip": "How far LOD terrain renders. Value is multiplied by 32 to get chunk distance. Example: 16 = 512 chunks.",
+
+  "neovoxy.sodium.option.service_threads": "Service Threads",
+  "neovoxy.sodium.option.service_threads.tooltip": "Number of background threads for LOD processing. More threads = faster LOD generation but higher CPU usage.",
+
+  "neovoxy.sodium.option.subdivision_size": "Subdivision Size",
+  "neovoxy.sodium.option.subdivision_size.tooltip": "Maximum screen-space size before subdividing to higher detail LODs. Lower = more detail but more GPU work.",
+
+  "neovoxy.sodium.option.environmental_fog": "Environmental Fog",
+  "neovoxy.sodium.option.environmental_fog.tooltip": "Apply environmental fog effects to LOD terrain",
+
+  "neovoxy.sodium.option.dont_use_sodium_threads": "Separate Thread Pool",
+  "neovoxy.sodium.option.dont_use_sodium_threads.tooltip": "Don't share threads with Sodium's chunk builder. Enable if you experience stuttering.",
+
+  "neovoxy.sodium.option.lod_boundary_buffer": "LOD Boundary Overlap",
+  "neovoxy.sodium.option.lod_boundary_buffer.tooltip": "Controls overlap between vanilla chunks and LODs. Higher = smoother transitions when flying fast, but slight overdraw.",
+
+  "neovoxy.sodium.option.render_statistics": "Debug Statistics",
+  "neovoxy.sodium.option.render_statistics.tooltip": "Show LOD render statistics in the F3 debug screen",
+
+  "neovoxy.sodium.option.earth_curve_ratio": "World Curvature",
+  "neovoxy.sodium.option.earth_curve_ratio.tooltip": "Simulates standing on a spherical planet. 0 = flat world. Higher values = smaller planet effect (more curvature). Inspired by Distant Horizons."
+}
