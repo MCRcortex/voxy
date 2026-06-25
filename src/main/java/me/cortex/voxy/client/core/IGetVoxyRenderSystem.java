@@ -6,6 +6,7 @@ public interface IGetVoxyRenderSystem {
     VoxyRenderSystem voxy$getRenderSystem();
     void voxy$shutdownRenderer();
     void voxy$createRenderer();
+    void voxy$setRenderer(VoxyRenderSystem voxyRenderSystem);
 
     static VoxyRenderSystem getNullable() {
         var lr = (IGetVoxyRenderSystem)Minecraft.getInstance().levelRenderer;

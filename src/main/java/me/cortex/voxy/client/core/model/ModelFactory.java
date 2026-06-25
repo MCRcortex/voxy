@@ -696,32 +696,7 @@ public class ModelFactory {
     }
 
     private static int getBlockLightEmission(BlockState state) {
-        boolean isEmissive = state.emissiveRendering(new BlockGetter() {
-            @Override
-            public @org.jspecify.annotations.Nullable BlockEntity getBlockEntity(BlockPos pos) {
-                return null;
-            }
-
-            @Override
-            public BlockState getBlockState(BlockPos pos) {
-                return state;
-            }
-
-            @Override
-            public FluidState getFluidState(BlockPos pos) {
-                return state.getFluidState();
-            }
-
-            @Override
-            public int getHeight() {
-                return 0;
-            }
-
-            @Override
-            public int getMinY() {
-                return 0;
-            }
-        }, BlockPos.ZERO);
+        boolean isEmissive = state.emissiveRendering();
         if (isEmissive) {
             return 15;//full bright
         }

@@ -1,18 +1,13 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
 
-import com.mojang.blaze3d.shaders.ShaderSource;
-import com.mojang.blaze3d.shaders.ShaderType;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderSystem;
 import me.cortex.voxy.client.VoxyClient;
-import net.minecraft.resources.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-
-import java.util.function.BiFunction;
 
 //Thanks iris for making me need todo this ;-; _irritater_
 @Mixin(RenderSystem.class)

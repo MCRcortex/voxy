@@ -23,6 +23,7 @@
     "minecraft.MixinDebugScreenEntryList",
     "minecraft.MixinFogRenderer",
     "minecraft.MixinGlDebug",
+    "minecraft.MixinLevelExtractor",
     "minecraft.MixinLevelRenderer",
     "minecraft.MixinMinecraft",
     "minecraft.MixinRenderSystem",

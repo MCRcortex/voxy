@@ -6,7 +6,6 @@ import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.executor.ChunkBuilder;
@@ -38,9 +37,9 @@ public class MixinRenderSectionManager {
     @Shadow @Final private ChunkBuilder builder;
 
     @Inject(method = "<init>", at = @At("TAIL"))
-    private void voxy$resetChunkTracker(ClientLevel level, int renderDistance, SortBehavior sortBehavior, CommandList commandList, CallbackInfo ci) {
-        if (level.levelRenderer != null) {
-            var system = ((IGetVoxyRenderSystem)(level.levelRenderer)).voxy$getRenderSystem();
+    private void voxy$resetChunkTracker(ClientLevel level, int renderDistance, SortBehavior sortBehavior, CallbackInfo ci) {
+        if (level.levelExtractor.levelRenderer != null) {
+            var system = ((IGetVoxyRenderSystem)(level.levelExtractor.levelRenderer)).voxy$getRenderSystem();
             if (system != null) {
                 system.chunkBoundRenderer.reset();
             }
@@ -65,7 +64,7 @@ public class MixinRenderSectionManager {
 
     @Inject(method = "onChunkAdded", at = @At("HEAD"))
     private void voxy$ingestOnAdd(int x, int z, CallbackInfo ci) {
-        if (this.level.levelRenderer != null && VoxyConfig.CONFIG.ingestEnabled) {
+        if (this.level.levelExtractor.levelRenderer != null && VoxyConfig.CONFIG.ingestEnabled) {
             var cccm = this.level.getChunkSource();
             if (cccm != null) {
                 var chunk = cccm.getChunk(x, z, ChunkStatus.FULL, false);
@@ -91,24 +90,24 @@ public class MixinRenderSectionManager {
     @Unique private int cachedChunkStatus;
     @Unique private int bottomSectionY;
 
-    @Redirect(method = "updateSectionInfo", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSection;setInfo(Lnet/caffeinemc/mods/sodium/client/render/chunk/data/BuiltSectionInfo;)Z"))
-    private boolean voxy$updateOnUpload(RenderSection instance, BuiltSectionInfo info) {
-        boolean wasBuilt = instance.getFlags()!=0;
-        int flags = instance.getFlags();
-        if (!instance.setInfo(info)) {
-            return false;
+    @Redirect(method = "updateSectionInfo", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSection;setInfo(Lnet/caffeinemc/mods/sodium/client/render/chunk/data/BuiltSectionInfo;)I"))
+    private int voxy$updateOnUpload(RenderSection instance, BuiltSectionInfo info) {
+        boolean wasBuilt = instance.getRegion().getSectionFlags(instance.getSectionIndex())!=0;
+        int flags = instance.getRegion().getSectionFlags(instance.getSectionIndex());
+        if (instance.setInfo(info) == 0) {
+            return 0;
         }
-        if (wasBuilt == (instance.getFlags()!=0)) {//Only want to do stuff on change
-            return true;
+        if (wasBuilt == (instance.getRegion().getSectionFlags(instance.getSectionIndex())!=0)) {//Only want to do stuff on change
+            return 1;
         }
 
-        flags |= instance.getFlags();
+        flags |= instance.getRegion().getSectionFlags(instance.getSectionIndex());
         if (flags == 0)//Only process things with stuff
-            return true;
+            return 1;
 
-        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(this.level.levelRenderer)).voxy$getRenderSystem();
+        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(this.level.levelExtractor.levelRenderer)).voxy$getRenderSystem();
         if (system == null) {
-            return true;
+            return 1;
         }
         int x = instance.getChunkX(), y = instance.getChunkY(), z = instance.getChunkZ();
 
@@ -156,6 +155,6 @@ public class MixinRenderSectionManager {
         } else {//Add
             system.chunkBoundRenderer.addSection(pos);
         }
-        return true;
+        return 1;
     }
 }

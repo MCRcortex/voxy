@@ -36,6 +36,7 @@ import net.minecraft.network.chat.Component;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL33C;
 
 import java.util.Arrays;
 import java.util.List;
@@ -68,6 +69,8 @@ public class VoxyRenderSystem {
     private final AbstractRenderPipeline pipeline;
     private final RenderProperties properties;
 
+    private int voxyProxyFbo = 0;
+
     private static AbstractSectionRenderer.Factory<?,? extends IGeometryData> getRenderBackendFactory() {
         //TODO: need todo a thing where selects optimal section render based on if supports the pipeline and geometry data type
         return MDICSectionRenderer.FACTORY;
@@ -84,7 +87,7 @@ public class VoxyRenderSystem {
         if (Minecraft.getInstance().options.renderDistance().get()<3) {
             String msg = "Voxy: Having a vanilla render distance of 2 can cause rare culling near the edge of your screen issues, please use 3 or more";
             Logger.warn(msg);
-            Minecraft.getInstance().getChatListener().handleSystemMessage(Component.literal(msg), false);
+            Minecraft.getInstance().gui.chatListener().handleSystemMessage(Component.literal(msg), false);
         }
 
         //Fking HATE EVERYTHING AAAAAAAAAAAAAAAA
@@ -245,6 +248,36 @@ public class VoxyRenderSystem {
         int oldFB = GL11.glGetInteger(GL_DRAW_FRAMEBUFFER_BINDING);
         int boundFB = oldFB;
 
+        // TODO: I think it's not perfect, there might be a way around that I don't know for now, also not compatible with Vulkan
+        // If OpenGL returns backbuffer (0), we intercept with the FBO proxy
+        if (boundFB == 0) {
+            var mainTarget = Minecraft.getInstance().gameRenderer.mainRenderTarget();
+            var colorTex = mainTarget.getColorTexture();
+            var depthTex = mainTarget.getDepthTexture();
+
+            if (colorTex != null && depthTex != null) {
+                // Création paresseuse de notre FBO
+                if (this.voxyProxyFbo == 0) {
+                    this.voxyProxyFbo = GlStateManager.glGenFramebuffers();
+                }
+
+                int colorId = ((com.mojang.blaze3d.opengl.GlTexture) colorTex).glId();
+                int depthId = ((com.mojang.blaze3d.opengl.GlTexture) depthTex).glId();
+
+                // bind our FBO and attach the two textures
+                GlStateManager._glBindFramebuffer(GL33C.GL_FRAMEBUFFER, this.voxyProxyFbo);
+                GlStateManager._glFramebufferTexture2D(GL33C.GL_FRAMEBUFFER, GL33C.GL_COLOR_ATTACHMENT0, GL33C.GL_TEXTURE_2D, colorId, 0);
+                GlStateManager._glFramebufferTexture2D(GL33C.GL_FRAMEBUFFER, GL33C.GL_DEPTH_ATTACHMENT, GL33C.GL_TEXTURE_2D, depthId, 0);
+
+                // we now have a valid framebuffer to work with
+                boundFB = this.voxyProxyFbo;
+            }
+        }
+
+        if (boundFB == 0) {
+            throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
+        }
+
         int[] dims = new int[4];
         glGetIntegerv(GL_VIEWPORT, dims);
 
@@ -252,6 +285,7 @@ public class VoxyRenderSystem {
 
         //var target = DefaultTerrainRenderPasses.CUTOUT.getTarget();
         //boundFB = ((net.minecraft.client.texture.GlTexture) target.getColorAttachment()).getOrCreateFramebuffer(((GlBackend) RenderSystem.getDevice()).getFramebufferManager(), target.getDepthAttachment());
+
         if (boundFB == 0) {
             throw new IllegalStateException("Cannot use the default framebuffer as cannot source from it");
         }
@@ -415,7 +449,7 @@ public class VoxyRenderSystem {
     private static Matrix4f computeProjectionMat(RenderProperties properties, Matrix4fc base) {
 
         //this jank is to capture the extra crap they inject like viewbobbing
-        var rawMCProj = Minecraft.getInstance().gameRenderer.getGameRenderState().levelRenderState.cameraRenderState.projectionMatrix;
+        var rawMCProj = Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.cameraRenderState.projectionMatrix;
         var extraProjection = rawMCProj.invert(new Matrix4f()).mul(base);
 
         float near = getRenderDistance()<=32.0f?8f:16f;
