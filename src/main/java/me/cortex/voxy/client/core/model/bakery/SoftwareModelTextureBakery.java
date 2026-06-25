@@ -58,7 +58,7 @@ public class SoftwareModelTextureBakery {
 
     public void setupTexture() {
         var tex = Minecraft.getInstance().getTextureManager().getTexture(Identifier.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png")).getTexture();
-        System.out.println("Block atlas format: "+tex.getFormat());
+
         if (!List.of(GpuFormat.RGBA8_SINT, GpuFormat.RGBA8_SNORM, GpuFormat.RGBA8_UINT, GpuFormat.RGBA8_UNORM).contains(tex.getFormat())) {
             throw new IllegalStateException("Block atlas not rgba8");
         }
