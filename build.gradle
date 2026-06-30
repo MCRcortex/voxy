@@ -96,7 +96,11 @@ processResources {
     }
     String current_sodium_version;
     if (project.hasProperty("sodium_version_modrinth")) {
-        current_sodium_version = project.properties.sodium_version_modrinth.split("-")[1];
+        // Format is "mc<mcversion>-<sodiumversion>-<loader>", and <sodiumversion> can itself contain
+        // dashes for prerelease tags (e.g. "mc26.2-0.9.1-beta.2-fabric" -> "0.9.1-beta.2"), so the
+        // sodium version is everything between the first and last "-"-delimited segments, not just [1].
+        def parts = project.properties.sodium_version_modrinth.split("-")
+        current_sodium_version = parts[1..-2].join("-");
     } else {
         current_sodium_version = project.properties.sodium_version.split("-")[0];
     }

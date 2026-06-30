@@ -83,16 +83,15 @@ public class MixinRenderSectionManager {
 
     @Redirect(method = "updateSectionInfo", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSection;setInfo(Lnet/caffeinemc/mods/sodium/client/render/chunk/data/BuiltSectionInfo;)I"))
     private int voxy$updateOnUpload(RenderSection instance, BuiltSectionInfo info) {
-        boolean wasBuilt = instance.isBuilt();
+        //needsRender() reflects the HAS_BLOCK_GEOMETRY/HAS_BLOCK_ENTITIES/HAS_ANIMATED_SPRITES bits only,
+        // unlike isBuilt() which is also true for built-but-empty sections (MASK_IS_BUILT)
+        boolean wasBuilt = instance.needsRender();
         int result = instance.setInfo(info);
         if (result == 0) {
             return 0;
         }
-        boolean nowBuilt = instance.isBuilt();
+        boolean nowBuilt = instance.needsRender();
         if (wasBuilt == nowBuilt) {
-            return result;
-        }
-        if (!wasBuilt && !nowBuilt) {
             return result;
         }
 
