@@ -61,7 +61,7 @@ public record RenderProperties(boolean isZero2One, boolean isReverseZ, boolean u
 
     public static RenderProperties getRenderProperties() {
         RenderProperties properties = new RenderProperties(
-                RenderSystem.getDevice().isZZeroToOne(),
+                RenderSystem.getDevice().getDeviceInfo().isZZeroToOne(),
                 DepthStencilState.DEFAULT.depthTest().equals(CompareOp.GREATER_THAN_OR_EQUAL),
                 false);
 

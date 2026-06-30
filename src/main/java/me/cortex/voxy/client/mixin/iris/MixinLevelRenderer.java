@@ -35,7 +35,8 @@ public class MixinLevelRenderer {
             var renderer = ((IGetVoxyRenderSystem) this).voxy$getRenderSystem();
             if (renderer != null) {
                 //Fixthe fucking viewport dims, fuck iris
-                glViewport(0,0,Minecraft.getInstance().getMainRenderTarget().width, Minecraft.getInstance().getMainRenderTarget().height);
+                var win = Minecraft.getInstance().getWindow();
+                glViewport(0,0,win.getWidth(), win.getHeight());
 
                 var pos = cameraState.pos;
                 IrisUtil.CAPTURED_VIEWPORT_PARAMETERS = new IrisUtil.CapturedViewportParameters(new ChunkRenderMatrices(cameraState.projectionMatrix, cameraState.viewRotationMatrix), ((FogStorage) this.minecraft.gameRenderer).sodium$getFogParameters(), pos.x, pos.y, pos.z);

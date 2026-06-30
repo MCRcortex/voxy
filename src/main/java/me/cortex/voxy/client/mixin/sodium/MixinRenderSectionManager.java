@@ -6,7 +6,6 @@ import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.executor.ChunkBuilder;
@@ -14,6 +13,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.caffeinemc.mods.sodium.client.render.chunk.map.ChunkTrackerHolder;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortBehavior;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.ChunkPos;
@@ -38,9 +38,10 @@ public class MixinRenderSectionManager {
     @Shadow @Final private ChunkBuilder builder;
 
     @Inject(method = "<init>", at = @At("TAIL"))
-    private void voxy$resetChunkTracker(ClientLevel level, int renderDistance, SortBehavior sortBehavior, CommandList commandList, CallbackInfo ci) {
-        if (level.levelRenderer != null) {
-            var system = ((IGetVoxyRenderSystem)(level.levelRenderer)).voxy$getRenderSystem();
+    private void voxy$resetChunkTracker(ClientLevel level, int renderDistance, SortBehavior sortBehavior, CallbackInfo ci) {
+        var levelRenderer = Minecraft.getInstance().levelRenderer;
+        if (levelRenderer != null) {
+            var system = ((IGetVoxyRenderSystem)(levelRenderer)).voxy$getRenderSystem();
             if (system != null) {
                 system.chunkBoundRenderer.reset();
             }
@@ -65,7 +66,7 @@ public class MixinRenderSectionManager {
 
     @Inject(method = "onChunkAdded", at = @At("HEAD"))
     private void voxy$ingestOnAdd(int x, int z, CallbackInfo ci) {
-        if (this.level.levelRenderer != null && VoxyConfig.CONFIG.ingestEnabled) {
+        if (Minecraft.getInstance().levelRenderer != null && VoxyConfig.CONFIG.ingestEnabled) {
             var cccm = this.level.getChunkSource();
             if (cccm != null) {
                 var chunk = cccm.getChunk(x, z, ChunkStatus.FULL, false);
@@ -76,56 +77,40 @@ public class MixinRenderSectionManager {
         }
     }
 
-    /*
-    @Inject(method = "onChunkRemoved", at = @At("HEAD"))
-    private void voxy$trackChunkRemove(int x, int z, CallbackInfo ci) {
-        if (this.level.worldRenderer != null) {
-            var system = ((IGetVoxyRenderSystem)(this.level.worldRenderer)).getVoxyRenderSystem();
-            if (system != null) {
-                system.chunkBoundRenderer.removeSection(ChunkPos.toLong(x, z));
-            }
-        }
-    }*/
-
     @Unique private long cachedChunkPos = -1;
     @Unique private int cachedChunkStatus;
     @Unique private int bottomSectionY;
 
-    @Redirect(method = "updateSectionInfo", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSection;setInfo(Lnet/caffeinemc/mods/sodium/client/render/chunk/data/BuiltSectionInfo;)Z"))
-    private boolean voxy$updateOnUpload(RenderSection instance, BuiltSectionInfo info) {
-        boolean wasBuilt = instance.getFlags()!=0;
-        int flags = instance.getFlags();
-        if (!instance.setInfo(info)) {
-            return false;
+    @Redirect(method = "updateSectionInfo", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSection;setInfo(Lnet/caffeinemc/mods/sodium/client/render/chunk/data/BuiltSectionInfo;)I"))
+    private int voxy$updateOnUpload(RenderSection instance, BuiltSectionInfo info) {
+        boolean wasBuilt = instance.isBuilt();
+        int result = instance.setInfo(info);
+        if (result == 0) {
+            return 0;
         }
-        if (wasBuilt == (instance.getFlags()!=0)) {//Only want to do stuff on change
-            return true;
+        boolean nowBuilt = instance.isBuilt();
+        if (wasBuilt == nowBuilt) {
+            return result;
+        }
+        if (!wasBuilt && !nowBuilt) {
+            return result;
         }
 
-        flags |= instance.getFlags();
-        if (flags == 0)//Only process things with stuff
-            return true;
-
-        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(this.level.levelRenderer)).voxy$getRenderSystem();
+        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(Minecraft.getInstance().levelRenderer)).voxy$getRenderSystem();
         if (system == null) {
-            return true;
+            return result;
         }
         int x = instance.getChunkX(), y = instance.getChunkY(), z = instance.getChunkZ();
 
         if (wasBuilt && VoxyConfig.CONFIG.ingestEnabled) {
             var tracker = ((AccessorChunkTracker)ChunkTrackerHolder.get(this.level)).getChunkStatus();
-            //in theory the cache value could be wrong but is so soso unlikely and at worst means we either duplicate ingest a chunk
-            // which... could be bad ;-; or we dont ingest atall which is ok!
             long key = ChunkPos.pack(x, z);
             if (key != this.cachedChunkPos) {
                 this.cachedChunkPos = key;
                 this.cachedChunkStatus = tracker.getOrDefault(key, 0);
             }
-            if (this.cachedChunkStatus == 3) {//If this chunk still has surrounding chunks
+            if (this.cachedChunkStatus == 3) {
                 var cccm = this.level.getChunkSource();
-                //var chunk = ((ICheekyClientChunkCache)cccm).voxy$cheekyGetChunk(x, z);
-                //Dont thinks need to use cheekyGetChunk here as thats handled by the inject into head of onChunkRemoved
-                // but only ingest if the chunkstatus is full and exists
                 var chunk = cccm.getChunk(x, z, ChunkStatus.FULL, false);
                 if (chunk != null) {
                     var section = chunk.getSection(y - this.bottomSectionY);
@@ -135,27 +120,22 @@ public class MixinRenderSectionManager {
                     var blp = lp.getLayerListener(LightLayer.BLOCK).getDataLayerData(csp);
                     var slp = lp.getLayerListener(LightLayer.SKY).getDataLayerData(csp);
 
-                    //Note: we dont do this check and just blindly ingest, it shouldbe ok :tm:
-                    //if (blp != null || slp != null)
-                        VoxelIngestService.rawIngest(system.getEngine(), section, x, y, z, blp == null ? null : blp.copy(), slp == null ? null : slp.copy());
+                    VoxelIngestService.rawIngest(system.getEngine(), section, x, y, z, blp == null ? null : blp.copy(), slp == null ? null : slp.copy());
                 }
             }
         }
 
-        //Do some very cheeky stuff for MiB
         if (VoxyCommon.IS_MINE_IN_ABYSS) {
             int sector = (x+512)>>10;
             x-=sector<<10;
             y+=16+(256-32-sector*30);
         }
         long pos = SectionPos.asLong(x,y,z);
-        if (wasBuilt) {//Remove
-            //TODO: on chunk remove do ingest if is surrounded by built chunks (or when the tracker says is ok)
-
+        if (wasBuilt) {
             system.chunkBoundRenderer.removeSection(pos);
-        } else {//Add
+        } else {
             system.chunkBoundRenderer.addSection(pos);
         }
-        return true;
+        return result;
     }
 }

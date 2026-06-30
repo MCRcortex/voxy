@@ -1,7 +1,6 @@
 package me.cortex.voxy.client.mixin.minecraft;
 
 import com.mojang.blaze3d.platform.DisplayData;
-import com.mojang.blaze3d.platform.ScreenManager;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.platform.WindowEventHandler;
 import me.cortex.voxy.client.GPUSelectorWindows2;

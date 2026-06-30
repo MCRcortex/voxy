@@ -2,20 +2,17 @@ package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.util.IrisUtil;
 import net.fabricmc.loader.api.FabricLoader;
-import org.vivecraft.api.client.VRRenderingAPI;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
-
-import static org.vivecraft.api.client.data.RenderPass.VANILLA;
 
 public class ViewportSelector <T extends Viewport<?>> {
     public static final boolean VIVECRAFT_INSTALLED = FabricLoader.getInstance().isModLoaded("vivecraft");
 
     private final Supplier<T> creator;
     private final T defaultViewport;
-    private final Map<Object, T> extraViewports = new HashMap<>();//TODO should maybe be a weak hashmap with value cleanup queue thing?
+    private final Map<Object, T> extraViewports = new HashMap<>();
 
     public ViewportSelector(Supplier<T> viewportCreator) {
         this.creator = viewportCreator;
@@ -27,11 +24,8 @@ public class ViewportSelector <T extends Viewport<?>> {
     }
 
     private T getVivecraftViewport() {
-        var pass = VRRenderingAPI.instance().getCurrentRenderPass();
-        if (pass == null || pass == VANILLA) {
-            return null;
-        }
-        return this.getOrCreate(pass);
+        // TODO: re-enable when vivecraft updates for 26.2
+        return null;
     }
 
     private static final Object IRIS_SHADOW_OBJECT = new Object();
