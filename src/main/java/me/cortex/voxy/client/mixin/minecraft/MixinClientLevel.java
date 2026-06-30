@@ -18,7 +18,6 @@ import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 import net.minecraft.world.level.dimension.DimensionType;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -31,8 +30,6 @@ public abstract class MixinClientLevel {
 
     @Unique
     private int bottomSectionY;
-
-    @Shadow @Final public LevelRenderer levelRenderer;
 
     @Shadow public abstract ClientChunkCache getChunkSource();
 

@@ -29,7 +29,7 @@ public abstract class MixinLevelRenderer implements IGetVoxyRenderSystem {
         return this.renderer;
     }
 
-    @Inject(method = "allChanged()V", at = @At("RETURN"), order = 900)//We want to inject before sodium
+    @Inject(method = "resetLevelRenderData()V", at = @At("RETURN"), order = 900)//We want to inject before sodium
     private void voxy$reloadVoxyRenderer(CallbackInfo ci) {
         this.voxy$shutdownRenderer();
         if (this.level != null) {
