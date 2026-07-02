@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.mixin.minecraft.util;
+package me.cortex.voxy.client.mixin.minecraft;
 
 import me.cortex.voxy.client.LoadException;
 import net.minecraft.client.multiplayer.ClientCommonPacketListenerImpl;

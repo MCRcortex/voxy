@@ -27,24 +27,16 @@ public class VoxyClientInstance extends VoxyInstance {
     private final Config config;
     private final Path basePath;
     private final boolean noIngestOverride;
-
     public VoxyClientInstance() {
-        {
-            var path = FlashbackCompat.getReplayStoragePath();
-            this.noIngestOverride = path != null;
-            if (path == null) {
-                path = getBasePath();
-            }
-            var basePath = this.basePath = path.normalize();
-            this.config = StorageConfigUtil.getCreateStorageConfig(Config.class, c->c.version==1&&c.sectionStorageConfig!=null, ()->DEFAULT_STORAGE_CONFIG, basePath);
-        }
         super();
+        var path = FlashbackCompat.getReplayStoragePath();
+        this.noIngestOverride = path != null;
+        if (path == null) {
+            path = getBasePath();
+        }
+        this.basePath = path.normalize();
+        this.config = StorageConfigUtil.getCreateStorageConfig(Config.class, c->c.version==1&&c.sectionStorageConfig!=null, ()->DEFAULT_STORAGE_CONFIG, this.basePath);
         this.updateDedicatedThreads();
-    }
-
-    @Override
-    protected boolean shouldCreateInstance() {
-        return !this.config.disabled;
     }
 
     @Override

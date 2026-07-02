@@ -3,9 +3,8 @@ package me.cortex.voxy.client.core.model.bakery;
 
 import me.cortex.voxy.common.util.MemoryBuffer;
 import net.minecraft.client.model.geom.builders.UVPair;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.renderer.texture.MipmapStrategy;
-import net.minecraft.client.resources.model.geometry.BakedQuad;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.block.model.BakedQuad;
 import org.lwjgl.system.MemoryUtil;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -88,31 +87,27 @@ public final class ReuseVertexConsumer implements VertexConsumer {
         return this;
     }
 
-    @Override
-    public VertexConsumer setLineWidth(float f) {
-        return null;
+    public ReuseVertexConsumer quad(BakedQuad quad, RenderType layer) {
+        return this.quad(quad, false, layer);
     }
 
-    public ReuseVertexConsumer quad(BakedQuad quad) {
-        return this.quad(quad, false);
-    }
-
-    public ReuseVertexConsumer quad(BakedQuad quad, boolean forceSolid) {
+    public ReuseVertexConsumer quad(BakedQuad quad, boolean forceSolid, RenderType layer) {
         int meta = 0;
-        meta |= forceSolid?0:(quad.materialInfo().layer()!=ChunkSectionLayer.SOLID?1:0);//has discard
-        meta |= quad.materialInfo().isTinted()?4:0;//has tinting
+        meta |= forceSolid?0:(layer!=RenderType.solid()?1:0);//has discard
+        meta |= quad.isTinted()?4:0;//has tinting
         return this.quad(quad, meta);
     }
 
     public ReuseVertexConsumer quad(BakedQuad quad, int metadata) {
-        this.anyShaded |= quad.materialInfo().shade();
-        this.anyDarkendTex |= quad.materialInfo().sprite().contents().mipmapStrategy == MipmapStrategy.DARK_CUTOUT;
+        this.anyShaded |= quad.isShade();
+        this.anyDarkendTex |= false;// todo: what actually goes here??
         this.ensureCanPut();
+        int[] vertices = quad.getVertices();
         for (int i = 0; i < 4; i++) {
-            var pos = quad.position(i);
-            this.addVertex(pos.x(), pos.y(), pos.z());
-            long puv = quad.packedUV(i);
-            this.setUv(UVPair.unpackU(puv),UVPair.unpackV(puv));
+            // look at FaceBakery
+            int j = i * 8;
+            this.addVertex(Float.intBitsToFloat(vertices[j]), Float.intBitsToFloat(vertices[j + 1]), Float.intBitsToFloat(vertices[j + 2]));
+            this.setUv(Float.intBitsToFloat(vertices[j + 4]), Float.intBitsToFloat(vertices[j + 5]));
 
             this.meta(metadata|this.globalOrMetadata);
         }

@@ -5,20 +5,11 @@ import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import me.cortex.voxy.common.Logger;
-import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.fabricmc.loader.api.FabricLoader;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class Serialization {
     public static final Set<Class<?>> CONFIG_TYPES = new HashSet<>();
@@ -91,47 +82,37 @@ public class Serialization {
     }
 
     public static void init() {
-        String BASE_SEARCH_PACKAGE = "me.cortex.voxy";
-
         Map<Class<?>, GsonConfigSerialization<?>> serializers = new HashMap<>();
 
-        Set<String> clazzs = new LinkedHashSet<>();
-        var path = FabricLoader.getInstance().getModContainer("voxy").get().getRootPaths().get(0);
-        clazzs.addAll(collectAllClasses(path, BASE_SEARCH_PACKAGE));
-        clazzs.addAll(collectAllClasses(BASE_SEARCH_PACKAGE));
+        String[] configClassNames = {
+            "me.cortex.voxy.common.config.compressors.LZ4Compressor$Config",
+            "me.cortex.voxy.common.config.compressors.ZSTDCompressor$Config",
+
+            "me.cortex.voxy.common.config.storage.lmdb.LMDBStorageBackend$Config",
+            "me.cortex.voxy.common.config.storage.inmemory.MemoryStorageBackend$Config",
+            "me.cortex.voxy.common.config.storage.redis.RedisStorageBackend$Config",
+            "me.cortex.voxy.common.config.storage.rocksdb.RocksDBStorageBackend$Config",
+            "me.cortex.voxy.common.config.storage.other.ReadonlyCachingLayer$Config",
+            "me.cortex.voxy.common.config.storage.other.CompressionStorageAdaptor$Config",
+            "me.cortex.voxy.common.config.storage.other.ConditionalStorageBackendConfig",
+            "me.cortex.voxy.common.config.storage.other.FragmentedStorageBackendAdaptor$Config",
+            "me.cortex.voxy.common.config.storage.other.FragmentedStorageBackendAdaptor$Config2",
+            "me.cortex.voxy.common.config.storage.other.BasicPathInsertionConfig",
+
+            "me.cortex.voxy.common.config.section.SectionSerializationStorage$Config"
+        };
+
         int count = 0;
         outer:
-        for (var clzName : clazzs) {
-            if (VoxyCommon.IS_DEDICATED_SERVER&&clzName.startsWith("me.cortex.voxy.client")) {
-                continue;//Dont load stuff from client path when were on a dedicated server
-            }
-            if (!clzName.toLowerCase(Locale.ROOT).contains("config")) {
-                continue;//Only load classes that contain the word config
-            }
-            if (clzName.contains("mixin")) {
-                continue;//Dont want to load mixins
-            }
-            if (clzName.contains("ModMenuIntegration")) {
-                continue;//Dont want to modmenu incase it doesnt exist
-            }
-            if (clzName.contains("VoxyConfigScreenPages")) {
-                continue;//Dont want to modmenu incase it doesnt exist
-            }
-            if (clzName.endsWith("VoxyConfig")) {
-                continue;//Special case to prevent recursive loading pain
-            }
-
-            if (clzName.equals(Serialization.class.getName())) {
-                continue;//Dont want to load ourselves
-            }
-
+        for (String className : configClassNames) {
             try {
-                var clz = Class.forName(clzName);
-                if (Modifier.isAbstract(clz.getModifiers())) {
-                    //Dont want to register abstract classes
+                Class<?> original = Class.forName(className, true, Serialization.class.getClassLoader());
+
+                if (Modifier.isAbstract(original.getModifiers())) {
                     continue;
                 }
-                var original = clz;
+
+                Class<?> clz = original;
                 while ((clz = clz.getSuperclass()) != null) {
                     if (CONFIG_TYPES.contains(clz)) {
                         Method nameMethod = null;
@@ -140,7 +121,7 @@ public class Serialization {
                             nameMethod.setAccessible(true);
                         } catch (NoSuchMethodException e) {}
                         if (nameMethod == null) {
-                            Logger.error("WARNING: Config class " + clzName + " doesnt contain a getConfigTypeName and thus wont be serializable");
+                            Logger.error("WARNING: Config class " + className + " doesnt contain a getConfigTypeName and thus wont be serializable");
                             continue outer;
                         }
                         count++;
@@ -151,8 +132,10 @@ public class Serialization {
                         break;
                     }
                 }
-            } catch (Throwable e) {
-                Logger.error("Error while setting up config serialization", e);
+            } catch (ClassNotFoundException e) {
+                Logger.error("Config class not found: " + className, e);
+            } catch (Exception e) {
+                Logger.error("Error registering config class: " + className, e);
             }
         }
 
@@ -166,44 +149,7 @@ public class Serialization {
         Logger.info("Registered " + count + " config types");
     }
 
-    private static List<String> collectAllClasses(String pack) {
-        try {
-            InputStream stream = Serialization.class.getClassLoader()
-                    .getResourceAsStream(pack.replaceAll("[.]", "/"));
-            if (stream == null) {
-                return List.of();
-            }
-            BufferedReader reader = new BufferedReader(new InputStreamReader(stream));
-            return reader.lines().flatMap(inner -> {
-                if (inner.endsWith(".class")) {
-                    return Stream.of(pack + "." + inner.replace(".class", ""));
-                } else if (!inner.contains(".")) {
-                    return collectAllClasses(pack + "." + inner).stream();
-                } else {
-                    return Stream.of();
-                }
-            }).collect(Collectors.toList());
-        } catch (Exception e) {
-            Logger.error("Failed to collect classes in package: " + pack, e);
-            return List.of();
-        }
-    }
-    private static List<String> collectAllClasses(Path base, String pack) {
-        if (!Files.exists(base.resolve(pack.replaceAll("[.]", "/")))) {
-            return List.of();
-        }
-        try {
-            return Files.list(base.resolve(pack.replaceAll("[.]", "/"))).flatMap(inner -> {
-                if (inner.getFileName().toString().endsWith(".class")) {
-                    return Stream.of(pack + "." + inner.getFileName().toString().replace(".class", ""));
-                } else if (Files.isDirectory(inner)) {
-                    return collectAllClasses(base, pack + "." + inner.getFileName()).stream();
-                } else {
-                    return Stream.of();
-                }
-            }).collect(Collectors.toList());
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
+    // NOTE: collectAllClasses methods removed for NeoForge port
+    // Dynamic discovery via ClassLoader.getResourceAsStream() doesn't work reliably
+    // with NeoForge's module system and JarJar packaging. Using explicit registration instead.
 }

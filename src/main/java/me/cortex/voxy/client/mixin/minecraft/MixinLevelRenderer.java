@@ -2,7 +2,7 @@ package me.cortex.voxy.client.mixin.minecraft;
 
 import me.cortex.voxy.client.VoxyClientInstance;
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.IVoxyRenderSystemHolder;
+import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.client.core.util.IrisUtil;
 import me.cortex.voxy.common.Logger;
@@ -11,8 +11,6 @@ import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.extract.LevelExtractor;
-import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -21,16 +19,29 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.Objects;
-
 @Mixin(LevelRenderer.class)
-public abstract class MixinLevelRenderer implements IVoxyRenderSystemHolder {
-    @Unique @Nullable private WorldIdentifier identifier;
-    @Unique private @Nullable VoxyRenderSystem renderer;
+public abstract class MixinLevelRenderer implements IGetVoxyRenderSystem {
+    @Shadow private @Nullable ClientLevel level;
+    @Unique private VoxyRenderSystem renderer;
 
     @Override
     public VoxyRenderSystem voxy$getRenderSystem() {
         return this.renderer;
+    }
+
+    @Inject(method = "allChanged()V", at = @At("RETURN"), order = 900)//We want to inject before sodium
+    private void voxy$reloadVoxyRenderer(CallbackInfo ci) {
+        this.voxy$shutdownRenderer();
+        if (this.level != null) {
+            this.voxy$createRenderer();
+        }
+    }
+
+    @Inject(method = "setLevel", at = @At("HEAD"))
+    private void voxy$captureSetWorld(ClientLevel world, CallbackInfo ci) {
+        if (this.level != world) {
+            this.voxy$shutdownRenderer();
+        }
     }
 
     @Inject(method = "close", at = @At("HEAD"))
@@ -46,21 +57,6 @@ public abstract class MixinLevelRenderer implements IVoxyRenderSystemHolder {
         }
     }
 
-    /*
-    @Override
-    public void voxy$reloadRenderer() {
-        this.voxy$shutdownRenderer();
-        this.voxy$createRenderer();
-    }*/
-
-    @Override
-    public void voxy$setWorld(Level level) {
-        WorldIdentifier identifier = level==null?null:WorldIdentifier.of(level);
-        if (Objects.equals(this.identifier, identifier)) return;
-        this.voxy$shutdownRenderer();
-        this.identifier = identifier;
-    }
-
     @Override
     public void voxy$createRenderer() {
         if (this.renderer != null) throw new IllegalStateException("Cannot have multiple renderers");
@@ -72,28 +68,20 @@ public abstract class MixinLevelRenderer implements IVoxyRenderSystemHolder {
             Logger.info("Not creating renderer due to disabled rendering");
             return;
         }
-        if (this.identifier == null) {
-            Logger.info("Not creating renderer due to null identifier");
+        if (this.level == null) {
+            Logger.error("Not creating renderer due to null world");
             return;
         }
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
-            //This is now legal (e.g. when the instance is disabled)
-            Logger.info("Not creating renderer due to null instance");
+            Logger.error("Not creating renderer due to null instance");
             return;
         }
-        WorldEngine world = this.identifier.getOrCreateEngine(true);
+        WorldEngine world = WorldIdentifier.ofEngine(this.level);
         if (world == null) {
-            Logger.warn("Not creating renderer due to null engine");
+            Logger.error("Null world selected");
             return;
         }
-        this.voxy$createEngineDirect(world);
-    }
-
-    @Unique
-    private void voxy$createEngineDirect(WorldEngine world) {
-        var instance = world.instanceIn;
-        if (instance == null) throw new IllegalStateException();//in theory this could be null if is like in a test suit or something
         try {
             this.renderer = new VoxyRenderSystem(world, instance.getServiceManager());
         } catch (RuntimeException e) {

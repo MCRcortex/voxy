@@ -5,3 +5,24 @@
 /run/
 /out/
 /logs/
+
+# Reference dependency clones for development
+/.reference/
+
+# Agent orchestration task files
+/.agent/
+
+# Local deployment scripts (contain SSH config)
+/scripts/deploy.sh
+/scripts/build_and_deploy.sh
+/scripts/list_instances.sh
+/scripts/logs.sh
+/scripts/tail_logs.sh
+/scripts/grep_logs.sh
+
+# macOS metadata
+.DS_Store
+/libs/
+
+# Compiled bytecode (scripts/ dir)
+*.class

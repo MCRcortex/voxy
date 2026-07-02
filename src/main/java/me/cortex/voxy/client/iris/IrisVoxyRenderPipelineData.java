@@ -428,7 +428,7 @@ public class IrisVoxyRenderPipelineData {
         return uniforms;
     }
 
-    private record TextureWSampler(String name, IntSupplier texture, IntSupplier sampler) { }
+    private record TextureWSampler(String name, IntSupplier texture, int sampler) { }
     public record ImageSet(String layout, IntConsumer bindingFunction) {
 
     }
@@ -465,23 +465,20 @@ public class IrisVoxyRenderPipelineData {
             }
 
             @Override
-            public boolean addDefaultSampler(TextureType type, IntSupplier texture, ValueUpdateNotifier notifier, Supplier<GlSampler> sampler, String... names) {
+            public boolean addDefaultSampler(TextureType type, IntSupplier texture, ValueUpdateNotifier notifier, GlSampler sampler, String... names) {
                 Logger.error("Unsupported default sampler");
                 return false;
             }
 
             @Override
-            public boolean addDynamicSampler(TextureType type, IntSupplier texture, Supplier<GlSampler> sampler, String... names) {
+            public boolean addDynamicSampler(TextureType type, IntSupplier texture, GlSampler sampler, String... names) {
                 return this.addDynamicSampler(type, texture, null, sampler, names);
             }
 
             @Override
-            public boolean addDynamicSampler(TextureType type, IntSupplier texture, ValueUpdateNotifier notifier, Supplier<GlSampler> sampler, String... names) {
+            public boolean addDynamicSampler(TextureType type, IntSupplier texture, ValueUpdateNotifier notifier, GlSampler sampler, String... names) {
                 if (!this.hasSampler(names)) return false;
-                samplerSet.add(new TextureWSampler(this.name(names), texture, sampler!=null?()->{
-                    var s = sampler.get();
-                    return s!=null?s.getId():-1;
-                }:()->-1));
+                samplerSet.add(new TextureWSampler(this.name(names), texture, sampler!=null?sampler.getId():-1));
                 return true;
             }
 
@@ -491,9 +488,9 @@ public class IrisVoxyRenderPipelineData {
                 var name = this.name(names);
                 var ex = externalTextures.get(name);
                 if (ex != null) {
-                    samplerSet.add(new TextureWSampler(name, ex, () -> 0));//unbind any sampler and use the externalTextureSupplier
+                    samplerSet.add(new TextureWSampler(name, ex, 0));//unbind any sampler and use the externalTextureSupplier
                 } else {
-                    samplerSet.add(new TextureWSampler(name, () -> texture, () -> -1));
+                    samplerSet.add(new TextureWSampler(name, () -> texture, -1));
                 }
             }
         };
@@ -537,7 +534,7 @@ public class IrisVoxyRenderPipelineData {
                 int unit = j+base;
                 var ts = samplers[j];
                 glBindTextureUnit(unit, ts.texture.getAsInt());
-                int sampler = ts.sampler.getAsInt();
+                int sampler = ts.sampler;
                 if (sampler != -1) {
                     glBindSampler(unit, sampler);
                 }//TODO: might need to bind sampler 0

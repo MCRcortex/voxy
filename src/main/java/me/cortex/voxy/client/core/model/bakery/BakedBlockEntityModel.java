@@ -4,7 +4,8 @@ package me.cortex.voxy.client.core.model.bakery;
 import me.cortex.voxy.common.Logger;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.model.Model;
-import net.minecraft.client.renderer.SubmitNodeStorage;
+import net.minecraft.client.renderer.RenderType;
+// import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.EntityBlock;
@@ -34,7 +35,7 @@ public class BakedBlockEntityModel {
                 if (textureId == null) {
                     Logger.error("ERROR: Empty texture id for layer: " + layer);
                 } else {
-                    texId = ((com.mojang.blaze3d.opengl.GlTexture)Minecraft.getInstance().getTextureManager().getTexture(textureId).getTexture()).glId();
+                    texId = Minecraft.getInstance().getTextureManager().getTexture(textureId).getId();
                 }
             }
             if (texId == 0) continue;

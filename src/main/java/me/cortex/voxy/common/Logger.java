@@ -62,7 +62,7 @@ public class Logger {
         if (instance != null) {
             instance.executeIfPossible(() -> {
                 var player = Minecraft.getInstance().player;
-                if (player != null) instance.gui.chatListener().handleSystemMessage(Component.literal(msg), true);
+                if (player != null) instance.getChatListener().handleSystemMessage(Component.literal(msg), true);
             });
         }
     }

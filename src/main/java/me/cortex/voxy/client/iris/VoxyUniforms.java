@@ -1,8 +1,9 @@
 package me.cortex.voxy.client.iris;
 
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.IVoxyRenderSystemHolder;
+import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import net.irisshaders.iris.gl.uniform.UniformHolder;
+import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 
@@ -11,29 +12,31 @@ import java.util.function.Supplier;
 import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
 
 public class VoxyUniforms {
-    //TODO: fix this so that it directly capturesthe render system? (or atleast the holder?)
 
     public static Matrix4f getViewProjection() {//This is 1 frame late ;-; cries, since the update occurs _before_ the voxy render pipeline
-        var vrs = IVoxyRenderSystemHolder.getNullable();
-        if (vrs == null) {
+        var getVrs = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
+        if (getVrs == null || getVrs.voxy$getRenderSystem() == null) {
             return new Matrix4f();
         }
+        var vrs = getVrs.voxy$getRenderSystem();
         return new Matrix4f(vrs.getViewport().MVP);
     }
 
     public static Matrix4f getModelView() {//This is 1 frame late ;-; cries, since the update occurs _before_ the voxy render pipeline
-        var vrs = IVoxyRenderSystemHolder.getNullable();
-        if (vrs == null) {
+        var getVrs = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
+        if (getVrs == null || getVrs.voxy$getRenderSystem() == null) {
             return new Matrix4f();
         }
+        var vrs = getVrs.voxy$getRenderSystem();
         return new Matrix4f(vrs.getViewport().modelView);
     }
 
     public static Matrix4f getProjection() {//This is 1 frame late ;-; cries, since the update occurs _before_ the voxy render pipeline
-        var vrs = IVoxyRenderSystemHolder.getNullable();
-        if (vrs == null) {
+        var getVrs = (IGetVoxyRenderSystem) Minecraft.getInstance().levelRenderer;
+        if (getVrs == null || getVrs.voxy$getRenderSystem() == null) {
             return new Matrix4f();
         }
+        var vrs = getVrs.voxy$getRenderSystem();
         var mat = vrs.getViewport().projection;
         if (mat == null) {
             return new Matrix4f();

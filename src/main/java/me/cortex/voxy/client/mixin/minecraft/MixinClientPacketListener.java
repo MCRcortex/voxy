@@ -1,4 +1,4 @@
-package me.cortex.voxy.client.mixin.minecraft.session;
+package me.cortex.voxy.client.mixin.minecraft;
 
 import me.cortex.voxy.client.ClientSessionEvents;
 import net.minecraft.client.multiplayer.ClientPacketListener;
