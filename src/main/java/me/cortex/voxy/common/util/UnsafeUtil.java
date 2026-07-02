@@ -16,7 +16,6 @@ public class UnsafeUtil {
 
     private static final long BYTE_ARRAY_BASE_OFFSET = UNSAFE.arrayBaseOffset(byte[].class);
     private static final long SHORT_ARRAY_BASE_OFFSET = UNSAFE.arrayBaseOffset(short[].class);
-    private static final long INT_ARRAY_BASE_OFFSET = UNSAFE.arrayBaseOffset(int[].class);
     private static final long LONG_ARRAY_BASE_OFFSET = UNSAFE.arrayBaseOffset(long[].class);
 
     public static void memcpy(long src, long dst, long length) {
@@ -51,13 +50,6 @@ public class UnsafeUtil {
     }
     public static void memcpy(long[] src, long dst) {
         UNSAFE.copyMemory(src, LONG_ARRAY_BASE_OFFSET, null, dst, (long) src.length <<3);
-    }
-
-    public static void memcpy(int[] src, long dst) {
-        UNSAFE.copyMemory(src, INT_ARRAY_BASE_OFFSET, null, dst, (long) src.length <<2);
-    }
-    public static void memcpy(int[] src, int count, long dst) {
-        UNSAFE.copyMemory(src, INT_ARRAY_BASE_OFFSET, null, dst, (long) count <<2);
     }
 
 

@@ -20,7 +20,7 @@ public class ClientImportManager extends ImportManager {
             this.bossbarUUID = UUID.randomUUID();
             this.bossBar = new LerpingBossEvent(this.bossbarUUID, Component.nullToEmpty("Voxy world importer"), 0.0f, BossEvent.BossBarColor.GREEN, BossEvent.BossBarOverlay.PROGRESS, false, false, false);
             Minecraft.getInstance().execute(()->{
-                Minecraft.getInstance().gui.hud.getBossOverlay().events.put(bossBar.getId(), bossBar);
+                Minecraft.getInstance().gui.getBossOverlay().events.put(bossBar.getId(), bossBar);
             });
         }
 
@@ -40,11 +40,11 @@ public class ClientImportManager extends ImportManager {
         protected void onCompleted(int total) {
             super.onCompleted(total);
             Minecraft.getInstance().execute(()->{
-                Minecraft.getInstance().gui.hud.getBossOverlay().events.remove(this.bossbarUUID);
+                Minecraft.getInstance().gui.getBossOverlay().events.remove(this.bossbarUUID);
                 long delta = Math.max(System.currentTimeMillis() - this.startTime, 1);
 
                 String msg = "Voxy world import finished in " + (delta/1000) + " seconds, averaging " + (int)(total/(delta/1000f)) + " chunks per second";
-                Minecraft.getInstance().gui.hud.getChat().addClientSystemMessage(Component.literal(msg));
+                Minecraft.getInstance().gui.getChat().addMessage(Component.literal(msg));
                 Logger.info(msg);
             });
         }

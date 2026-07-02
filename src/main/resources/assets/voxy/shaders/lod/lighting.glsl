@@ -12,7 +12,7 @@ vec2 getLightmapUv(uint index) {
 layout(binding = LIGHTING_SAMPLER_BINDING) uniform sampler2D lightSampler;
 
 vec4 getLighting(uint index) {
-    return textureLod(lightSampler, getLightmapUv(index), 0);
+    return texture(lightSampler, getLightmapUv(index));
 }
 #endif
 

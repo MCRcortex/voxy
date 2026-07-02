@@ -1,17 +1,15 @@
 package me.cortex.voxy.client.core.rendering;
 
 import me.cortex.voxy.client.core.util.IrisUtil;
-import net.fabricmc.loader.api.FabricLoader;
-import org.vivecraft.api.client.VRRenderingAPI;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
 
-import static org.vivecraft.api.client.data.RenderPass.VANILLA;
-
 public class ViewportSelector <T extends Viewport<?>> {
-    public static final boolean VIVECRAFT_INSTALLED = FabricLoader.getInstance().isModLoaded("vivecraft");
+    // Vivecraft has no NeoForge build, so it can never be present on this platform.
+    // (Same class of unavoidable gap as Nvidium/Flashback — not a parity regression.)
+    public static final boolean VIVECRAFT_INSTALLED = false;
 
     private final Supplier<T> creator;
     private final T defaultViewport;
@@ -26,12 +24,9 @@ public class ViewportSelector <T extends Viewport<?>> {
         return this.extraViewports.computeIfAbsent(holder, a->this.creator.get());
     }
 
+    // Vivecraft VR viewport — unavailable on NeoForge (no Vivecraft build). Always null.
     private T getVivecraftViewport() {
-        var pass = VRRenderingAPI.instance().getCurrentRenderPass();
-        if (pass == null || pass == VANILLA) {
-            return null;
-        }
-        return this.getOrCreate(pass);
+        return null;
     }
 
     private static final Object IRIS_SHADOW_OBJECT = new Object();

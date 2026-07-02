@@ -14,9 +14,7 @@ import java.util.Arrays;
 import java.util.Random;
 
 public class SoftwareRasterizer {
-    private static final int INTEGER_BITS = 9;//+-512
-    private static final int TOTAL_INTEGER_BITS = INTEGER_BITS+1;
-    private static final int FIXED_POINT_BITS = 32-TOTAL_INTEGER_BITS;
+    private static final int FIXED_POINT_BITS = 23;
     private static final long FIXED_POINT_BIT_SCALE = (1<<FIXED_POINT_BITS)-1;
 
     private final Vector4f scratch = new Vector4f();
@@ -128,7 +126,7 @@ public class SoftwareRasterizer {
         Vector3i v2 = this.scratchR2;
         Vector3i v3 = this.scratchR3;
 
-        //THIS IS BREAKING FOR SOME REASON
+
         int area = edge(v1, v2, v3);
         //fromFixed(area)~==edge(this.scratch3, this.scratch4, this.scratch1)
 

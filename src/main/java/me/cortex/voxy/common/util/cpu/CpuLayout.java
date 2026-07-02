@@ -5,7 +5,7 @@ import com.sun.jna.platform.win32.WinNT;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.ThreadUtils;
-import org.lwjgl.system.Platform;
+import net.minecraft.Util;
 import oshi.SystemInfo;
 
 import java.util.Arrays;
@@ -24,8 +24,8 @@ public class CpuLayout {
     }
 
     public static void setThreadAffinity(Affinity... affinities) {
-        var platform = Platform.get();
-        if (platform == Platform.WINDOWS) {
+        var platform = Util.getPlatform();
+        if (platform == Util.OS.WINDOWS) {
             long[] msks = new long[affinities.length];
             short[] groups = new short[affinities.length];Arrays.fill(groups, (short) -1);
             int i = 0;
@@ -36,7 +36,7 @@ public class CpuLayout {
                 msks[idx] |= a.msk;
             }
             ThreadUtils.SetThreadSelectedCpuSetMasksWin32(Arrays.copyOf(msks, i), Arrays.copyOf(groups, i));
-        } else if (platform == Platform.LINUX) {
+        } else if (platform == Util.OS.LINUX) {
             Arrays.sort(affinities, (a, b) -> a.group - b.group);
             long[] msks = new long[affinities.length];
             for (int i=0; i<affinities.length; i++) {
@@ -130,9 +130,10 @@ public class CpuLayout {
     static {
         Core[] cores = null;
         try {
-            if (Platform.get() == Platform.WINDOWS) {
+            var platform = Util.getPlatform();
+            if (platform == Util.OS.WINDOWS) {
                 cores = generateCoreLayoutWindows();
-            } else if (Platform.get() == Platform.LINUX) {
+            } else if (platform == Util.OS.LINUX) {
                 cores = generateCoreLayoutLinux();
             }
         } catch (Exception e) {

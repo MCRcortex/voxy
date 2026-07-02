@@ -1,22 +1,19 @@
 package me.cortex.voxy.client.mixin.sodium;
 
-import com.llamalad7.mixinextras.sugar.Local;
 import me.cortex.voxy.client.ICheekyClientChunkCache;
 import me.cortex.voxy.client.config.VoxyConfig;
-import me.cortex.voxy.client.core.IVoxyRenderSystemHolder;
+import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
-import me.cortex.voxy.client.iris.IGetIrisVoxyPipelineData;
-import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.world.service.VoxelIngestService;
 import me.cortex.voxy.commonImpl.VoxyCommon;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
-import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionFlags;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.executor.ChunkBuilder;
 import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionInfo;
 import net.caffeinemc.mods.sodium.client.render.chunk.map.ChunkTrackerHolder;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortBehavior;
-import net.fabricmc.loader.api.FabricLoader;
+import me.cortex.voxy.common.NeoForgePlatform;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.ChunkPos;
@@ -30,27 +27,25 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(value = RenderSectionManager.class, remap = false)
 public class MixinRenderSectionManager {
     @Unique
-    private static final boolean BOBBY_INSTALLED = FabricLoader.getInstance().isModLoaded("bobby");
+    private static final boolean BOBBY_INSTALLED = NeoForgePlatform.isModLoaded("bobby");
 
     @Shadow @Final private ClientLevel level;
 
     @Shadow @Final private ChunkBuilder builder;
 
     @Inject(method = "<init>", at = @At("TAIL"))
-    private void voxy$resetChunkTracker(ClientLevel level, int renderDistance, SortBehavior sortBehavior, CallbackInfo ci) {
-        /*
-        if (level != null) {
-            var system = IVoxyRenderSystemHolder.getNullable();
+    private void voxy$resetChunkTracker(ClientLevel level, int renderDistance, SortBehavior sortBehavior, CommandList commandList, CallbackInfo ci) {
+        if (level.levelRenderer != null) {
+            var system = ((IGetVoxyRenderSystem)(level.levelRenderer)).voxy$getRenderSystem();
             if (system != null) {
                 system.chunkBoundRenderer.reset();
             }
-        }*/
-        this.bottomSectionY = this.level.getMinY()>>4;
+        }
+        this.bottomSectionY = this.level.getMinBuildHeight()>>4;
     }
 
     @Inject(method = "onChunkRemoved", at = @At("HEAD"))
@@ -70,7 +65,7 @@ public class MixinRenderSectionManager {
 
     @Inject(method = "onChunkAdded", at = @At("HEAD"))
     private void voxy$ingestOnAdd(int x, int z, CallbackInfo ci) {
-        if (this.level != null && VoxyConfig.CONFIG.ingestEnabled) {
+        if (this.level.levelRenderer != null && VoxyConfig.CONFIG.ingestEnabled) {
             var cccm = this.level.getChunkSource();
             if (cccm != null) {
                 var chunk = cccm.getChunk(x, z, ChunkStatus.FULL, false);
@@ -96,22 +91,30 @@ public class MixinRenderSectionManager {
     @Unique private int cachedChunkStatus;
     @Unique private int bottomSectionY;
 
+    @Redirect(method = "updateSectionInfo", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSection;setInfo(Lnet/caffeinemc/mods/sodium/client/render/chunk/data/BuiltSectionInfo;)Z"))
+    private boolean voxy$updateOnUpload(RenderSection instance, BuiltSectionInfo info) {
+        boolean wasBuilt = instance.getFlags()!=0;
+        int flags = instance.getFlags();
+        instance.setInfo(info);
+        if (wasBuilt == (instance.getFlags()!=0)) {//Only want to do stuff on change
+            return true;
+        }
 
-    @Redirect(method = "updateSectionInfo", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSection;setInfo(Lnet/caffeinemc/mods/sodium/client/render/chunk/data/BuiltSectionInfo;)I"))
-    private int voxy$updateOnUpload(RenderSection instance, BuiltSectionInfo info) {
-        boolean isInvisible = instance.isInvisible();
-        int changes = instance.setInfo(info);
-        VoxyRenderSystem vrs = null;
-        if (isInvisible == instance.isInvisible() || changes == 0 || (vrs = IVoxyRenderSystemHolder.getNullable()) == null) {
-            return changes;
+        flags |= instance.getFlags();
+        if (flags == 0)//Only process things with stuff
+            return true;
+
+        VoxyRenderSystem system = ((IGetVoxyRenderSystem)(this.level.levelRenderer)).voxy$getRenderSystem();
+        if (system == null) {
+            return true;
         }
         int x = instance.getChunkX(), y = instance.getChunkY(), z = instance.getChunkZ();
 
-        if (!isInvisible && VoxyConfig.CONFIG.ingestEnabled) {
-            var tracker = ((AccessorChunkTracker) ChunkTrackerHolder.get(this.level)).getChunkStatus();
+        if (wasBuilt && VoxyConfig.CONFIG.ingestEnabled) {
+            var tracker = ((AccessorChunkTracker)ChunkTrackerHolder.get(this.level)).getChunkStatus();
             //in theory the cache value could be wrong but is so soso unlikely and at worst means we either duplicate ingest a chunk
             // which... could be bad ;-; or we dont ingest atall which is ok!
-            long key = ChunkPos.pack(x, z);
+            long key = ChunkPos.asLong(x, z);
             if (key != this.cachedChunkPos) {
                 this.cachedChunkPos = key;
                 this.cachedChunkStatus = tracker.getOrDefault(key, 0);
@@ -132,12 +135,11 @@ public class MixinRenderSectionManager {
 
                     //Note: we dont do this check and just blindly ingest, it shouldbe ok :tm:
                     //if (blp != null || slp != null)
-                    VoxelIngestService.rawIngest(vrs.getEngine(), section, x, y, z, blp == null ? null : blp.copy(), slp == null ? null : slp.copy());
+                        VoxelIngestService.rawIngest(system.getEngine(), section, x, y, z, blp == null ? null : blp.copy(), slp == null ? null : slp.copy());
                 }
             }
         }
 
-        /*
         //Do some very cheeky stuff for MiB
         if (VoxyCommon.IS_MINE_IN_ABYSS) {
             int sector = (x+512)>>10;
@@ -145,14 +147,13 @@ public class MixinRenderSectionManager {
             y+=16+(256-32-sector*30);
         }
         long pos = SectionPos.asLong(x,y,z);
-        if (neededRender) {//Remove
+        if (wasBuilt) {//Remove
             //TODO: on chunk remove do ingest if is surrounded by built chunks (or when the tracker says is ok)
 
-            vrs.chunkBoundRenderer.removeSection(pos);
+            system.chunkBoundRenderer.removeSection(pos);
         } else {//Add
-            vrs.chunkBoundRenderer.addSection(pos);
-        }*/
-
-        return changes;
+            system.chunkBoundRenderer.addSection(pos);
+        }
+        return true;
     }
 }

@@ -202,7 +202,7 @@ public class Shader extends TrackedObject {
 
         private static int createShader(ShaderType type, String src) {
             int shader = GL20C.glCreateShader(type.gl);
-            {//https://github.com/CaffeineMC/sodium/blob/fc42a7b19836c98a35df46e63303608de0587ab6/src/main/java/me/jellysquid/mods/sodium/client/gl/shader/ShaderWorkarounds.java
+            {//https://github.com/CaffeineMC/sodium/blob/fc42a7b19836c98a35df46e63303608de0587ab6/src/main/java/net/caffeinemc/mods/sodium/client/gl/shader/ShaderWorkarounds.java
                 long ptr = MemoryUtil.memAddress(MemoryUtil.memUTF8(src, true));
                 try (var stack = MemoryStack.stackPush()) {
                     GL20C.nglShaderSource(shader, 1, stack.pointers(ptr).address0(), 0);

@@ -82,10 +82,10 @@ public class RenderResourceReuse {
                     error = glGetError();
                     if (error != GL_NO_ERROR) {
                         buffer.free();
-                        throw new IllegalStateException("Unable to allocate geometry buffer using workaround, got gl error " + error + ". Failed to allocate buffer of size "+capacity);
+                        throw new IllegalStateException("Unable to allocate geometry buffer using workaround, got gl error " + error);
                     }
                 } else {
-                    throw new IllegalStateException("Unable to allocate geometry buffer, got gl error " + error + ". Failed to allocate buffer of size "+capacity);
+                    throw new IllegalStateException("Unable to allocate geometry buffer, got gl error " + error);
                 }
             }
             String extra = "";

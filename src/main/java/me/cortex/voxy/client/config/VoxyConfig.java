@@ -3,12 +3,11 @@ package me.cortex.voxy.client.config;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonParseException;
 import me.cortex.voxy.client.core.SSAO;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.cpu.CpuLayout;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.fabricmc.loader.api.FabricLoader;
+import net.neoforged.fml.loading.FMLPaths;
 
 import java.io.FileReader;
 import java.io.IOException;
@@ -32,9 +31,16 @@ public class VoxyConfig {
     public float sectionRenderDistance = 16;
     public int serviceThreads = (int) Math.max(CpuLayout.getCoreCount()/1.5, 1);
     public float subDivisionSize = 64;
-    public boolean useEnvironmentalFog = true;
+    public int skyFogDistance = 96;
+    public float fogIntensity = 1.0f;
+    public float fogDensity = 0.0f;
+    public boolean adaptCloudDistance = true;
+    public int cloudDistance = 0;
     public boolean dontUseSodiumBuilderThreads = false;
+
     public String ssaoMode;
+
+    public boolean useEnvironmentalFog = true;
 
     public SSAO.SSAOMode getSSAOMode() {
         if (this.ssaoMode == null) return SSAO.SSAOMode.AUTO;
@@ -46,7 +52,6 @@ public class VoxyConfig {
     public void setSSAOMode(SSAO.SSAOMode mode) {
         this.ssaoMode = mode.name().toLowerCase(Locale.ROOT);
     }
-
 
     private static VoxyConfig loadOrCreate() {
         if (VoxyCommon.isAvailable()) {
@@ -61,14 +66,10 @@ public class VoxyConfig {
                         Logger.error("Failed to load voxy config, resetting");
                     }
                 } catch (IOException e) {
-                    Logger.error("Could not load config", e);
-                } catch (JsonParseException e) {
                     Logger.error("Could not parse config", e);
                 }
-                Logger.info("Error during config loading, creating new");
-            } else {
-                Logger.info("Config file doesnt exist, creating new");
             }
+            Logger.info("Config doesnt exist, creating new");
             var config = new VoxyConfig();
             config.save();
             return config;
@@ -94,8 +95,7 @@ public class VoxyConfig {
     }
 
     private static Path getConfigPath() {
-        return FabricLoader.getInstance()
-                .getConfigDir()
+        return FMLPaths.CONFIGDIR.get()
                 .resolve("voxy-config.json");
     }
 

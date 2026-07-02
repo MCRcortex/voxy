@@ -1,25 +1,20 @@
 package me.cortex.voxy.client.core.model.bakery;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.buffers.GpuBuffer;
-import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.blaze3d.systems.CommandEncoder;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.block.BlockAndTintGetter;
-import net.minecraft.client.renderer.block.FluidRenderer;
-import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.resources.model.geometry.BakedQuad;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.BlockTags;
-import net.minecraft.world.level.CardinalLighting;
+import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Blocks;
@@ -41,11 +36,12 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 
 import static org.lwjgl.opengl.ARBDirectStateAccess.glGetTextureImage;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL11.GL_UNPACK_ALIGNMENT;
 import static org.lwjgl.opengl.GL11C.GL_RGBA;
 import static org.lwjgl.opengl.GL12.GL_PACK_IMAGE_HEIGHT;
 import static org.lwjgl.opengl.GL15C.glBindBuffer;
@@ -54,85 +50,81 @@ import static org.lwjgl.opengl.GL30C.GL_FRAMEBUFFER;
 import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
 
 public class SoftwareModelTextureBakery {
-    //Note: the first bit of metadata is if alpha discard is enabled
+    // Note: the first bit of metadata is if alpha discard is enabled
     private static final Matrix4f[] VIEWS = new Matrix4f[6];
 
     private final ReuseVertexConsumer opaqueVC = new ReuseVertexConsumer();
     private final ReuseVertexConsumer translucentVC = new ReuseVertexConsumer(1/*has discard*/);
     private final SoftwareRasterizer rasterizer = new SoftwareRasterizer(ModelFactory.MODEL_TEXTURE_SIZE);
 
-    private final FluidRenderer fr;
+
     public SoftwareModelTextureBakery() {
-        this.fr = new FluidRenderer(Minecraft.getInstance().getModelManager().getFluidStateModelSet());
     }
 
     public void setupTexture() {
-        var tex = Minecraft.getInstance().getTextureManager().getTexture(Identifier.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png")).getTexture();
-        if (tex.getFormat() != GpuFormat.RGBA8_UNORM) {
-            throw new IllegalStateException("Block atlas not rgba8: " + tex.getFormat());
+        var texture = Minecraft.getInstance().getTextureManager().getTexture(ResourceLocation.fromNamespaceAndPath("minecraft", "textures/atlas/blocks.png"));
+
+        int textureId = texture.getId();
+
+        if (!RenderSystem.isOnRenderThread()) {
+            CompletableFuture<Void> future = new CompletableFuture<>();
+
+            RenderSystem.recordRenderCall(() -> {
+                try {
+                    _doSetupTexture(textureId);
+                    future.complete(null);
+                } catch (Exception e) {
+                    future.completeExceptionally(e);
+                }
+            });
+
+            future.join();
+        } else {
+            _doSetupTexture(textureId);
         }
-
-        int targetMipLevel = 0;// Math.min(tex.getMipLevels(), 4)-1;//todo: we want to target the mip layer that has the 16x16 sized textures
-
-        int width = tex.getWidth(targetMipLevel);
-        int height = tex.getHeight(targetMipLevel);
-
-        //Just do it ourselves as doing it with b3d has some issues, (doing it ourselves is also just much much much shorter)
-        var texture = new int[width * height];
-
-        glFlush();
-        glFinish();
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-        glPixelStorei(GL_PACK_ROW_LENGTH, width);
-        glPixelStorei(GL_PACK_IMAGE_HEIGHT, 0);
-        glPixelStorei(GL_PACK_SKIP_ROWS, 0);
-        glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
-        glPixelStorei(GL_PACK_ALIGNMENT, 4);
-        glGetTextureImage(((GlTexture) tex).glId(), 0, GL_RGBA, GL_UNSIGNED_BYTE, texture);
-        this.rasterizer.setSamplerTexture(texture, width, height);
     }
 
-    private void bakeBlockModel(BlockState state) {
+    private void _doSetupTexture(int glId) {
+        glBindTexture(GL_TEXTURE_2D, glId);
+        int width = glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH);
+        int height = glGetTexLevelParameteri(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT);
+
+        int[] pixels = new int[width * height];
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+
+        this.rasterizer.setSamplerTexture(pixels, width, height);
+    }
+
+    private void bakeBlockModel(BlockState state, RenderType layer) {
         if (state.getRenderShape() == RenderShape.INVISIBLE) {
-            return;//Dont bake if invisible
+            return;// Dont bake if invisible
         }
         var model = Minecraft.getInstance()
                 .getModelManager()
-                .getBlockStateModelSet()
-                .get(state);
+                .getBlockModelShaper()
+                .getBlockModel(state);
 
-        List<BlockStateModelPart> out = new ArrayList<>();
-        model.collectParts(new SingleThreadedRandomSource(42L), out);
-        for (var part : out) {
-            for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null}) {
-                var quads = part.getQuads(direction);
-                for (var quad : quads) {
-                    (quad.materialInfo().layer()==ChunkSectionLayer.TRANSLUCENT?this.translucentVC:this.opaqueVC)
-                            .quad(quad, state.is(BlockTags.LEAVES));
-                }
+        for (Direction direction : new Direction[] { Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH,
+                Direction.WEST, Direction.EAST, null }) {
+            var quads = model.getQuads(state, direction, new SingleThreadedRandomSource(42L));
+            for (var quad : quads) {
+                (layer == RenderType.translucent() ? this.translucentVC : this.opaqueVC)
+                        .quad(quad, state.is(BlockTags.LEAVES), layer);
             }
         }
     }
 
-
-    private void bakeFluidState(BlockState state, int face) {
-        this.fr.tesselate(new BlockAndTintGetter() {
+    private void bakeFluidState(BlockState state, int face, RenderType layer) {
+        BlockAndTintGetter getter = new BlockAndTintGetter() {
             @Override
             public LevelLightEngine getLightEngine() {
-                return LevelLightEngine.EMPTY;
+                return null;
             }
 
             @Override
             public int getBrightness(LightLayer type, BlockPos pos) {
                 return 0;
             }
-
-            @Override
-            public CardinalLighting cardinalLighting() {
-                return CardinalLighting.DEFAULT;
-            }
-
             @Override
             public int getBlockTint(BlockPos pos, ColorResolver colorResolver) {
                 //This is such a stupid and bad hack, we can inject tinting state here since this is called
@@ -182,25 +174,33 @@ public class SoftwareModelTextureBakery {
             }
 
             @Override
-            public int getMinY() {
+            public int getMinBuildHeight() {
                 return 0;
             }
-        }, BlockPos.ZERO, layer->{
-            if (layer == ChunkSectionLayer.TRANSLUCENT) return this.translucentVC;
-            if (layer == ChunkSectionLayer.CUTOUT) {
-                this.opaqueVC.setDefaultMeta(this.opaqueVC.getDefaultMeta()|1);//set discard
-            } else {
-                this.opaqueVC.setDefaultMeta(this.opaqueVC.getDefaultMeta()&~1);//remove discard
+
+            @Override
+            public float getShade(Direction direction, boolean bl) {
+                return 0;
             }
-            return this.opaqueVC;
-        }, state, state.getFluidState());
+        
+        };
+        
+        VertexConsumer vc = this.opaqueVC;;
+
+        if (layer == RenderType.translucent()) vc = this.translucentVC;
+        if (layer == RenderType.cutout()) {
+            this.opaqueVC.setDefaultMeta(this.opaqueVC.getDefaultMeta()|1);//set discard
+        } else {
+            this.opaqueVC.setDefaultMeta(this.opaqueVC.getDefaultMeta()&~1);//remove discard
+        }
+        Minecraft.getInstance().getBlockRenderer().renderLiquid(BlockPos.ZERO, getter, vc, state, state.getFluidState());
         this.translucentVC.setDefaultMeta(0);//Reset default meta
         this.opaqueVC.setDefaultMeta(0);//Reset default meta
     }
 
     private static boolean shouldReturnAirForFluid(BlockPos pos, int face) {
-        var fv = Direction.from3DDataValue(face).getUnitVec3i();
-        int dot = fv.getX()*pos.getX() + fv.getY()*pos.getY() + fv.getZ()*pos.getZ();
+        var fv = Direction.from3DDataValue(face).getNormal();
+        int dot = fv.getX() * pos.getX() + fv.getY() * pos.getY() + fv.getZ() * pos.getZ();
         return dot >= 1;
     }
 
@@ -209,23 +209,36 @@ public class SoftwareModelTextureBakery {
         this.translucentVC.free();
     }
 
-    private static final long SINGLE_FACE_OUTPUT_SIZE = (ModelFactory.MODEL_TEXTURE_SIZE * ModelFactory.MODEL_TEXTURE_SIZE)*8;
-    //The outputBuffer layout is different from the non software rasterized ModelTextureBakery
-    // in this version the values are simply appended (0,0),(1,0),(2,0),(0,1),(1,1),(2,1)
+    private static final long SINGLE_FACE_OUTPUT_SIZE = (ModelFactory.MODEL_TEXTURE_SIZE
+            * ModelFactory.MODEL_TEXTURE_SIZE) * 8;
+    // The outputBuffer layout is different from the non software rasterized
+    // ModelTextureBakery
+    // in this version the values are simply appended
+    // (0,0),(1,0),(2,0),(0,1),(1,1),(2,1)
 
     public int renderToOutput(BlockState state, long outputBuffer) {
-        MemoryUtil.memSet(outputBuffer,0,16*16*8*6);
-
+        MemoryUtil.memSet(outputBuffer, 0, 16 * 16 * 8 * 6);
 
         boolean isBlock = true;
         if (state.getBlock() instanceof LiquidBlock) {
             isBlock = false;
         }
 
-        //TODO: support block model entities
-        //BakedBlockEntityModel bbem = null;
+        RenderType blockRenderLayer = null;
+        if (state.getBlock() instanceof LiquidBlock) {
+            blockRenderLayer = ItemBlockRenderTypes.getRenderLayer(state.getFluidState());
+        } else {
+            if (state.getBlock() instanceof LeavesBlock) {
+                blockRenderLayer = RenderType.solid();
+            } else {
+                blockRenderLayer = ItemBlockRenderTypes.getChunkRenderType(state);
+            }
+        }
+
+        // TODO: support block model entities
+        // BakedBlockEntityModel bbem = null;
         if (state.hasBlockEntity()) {
-            //bbem = BakedBlockEntityModel.bake(state);
+            // bbem = BakedBlockEntityModel.bake(state);
         }
 
         boolean isAnyShaded = false;
@@ -235,80 +248,81 @@ public class SoftwareModelTextureBakery {
         if (isBlock) {
             this.opaqueVC.reset();
             this.translucentVC.reset();
-            this.bakeBlockModel(state);
-            isAnyShaded |= this.opaqueVC.anyShaded|this.translucentVC.anyShaded;
-            isAnyDarkend |= this.opaqueVC.anyDarkendTex|this.translucentVC.anyDarkendTex;
+            this.bakeBlockModel(state, blockRenderLayer);
+            isAnyShaded |= this.opaqueVC.anyShaded | this.translucentVC.anyShaded;
+            isAnyDarkend |= this.opaqueVC.anyDarkendTex | this.translucentVC.anyDarkendTex;
             anyTranslucent |= !this.translucentVC.isEmpty();
             anyDiscard |= this.opaqueVC.anyDiscard;
-            if (!(this.opaqueVC.isEmpty()&&this.translucentVC.isEmpty())) {//only render if there... is shit to render
+            if (!(this.opaqueVC.isEmpty() && this.translucentVC.isEmpty())) {// only render if there... is shit to
+                                                                             // render
                 for (int i = 0; i < VIEWS.length; i++) {
-                    this.rasterizer.setFaceCull(i==1||i==2||i==4);
+                    this.rasterizer.setFaceCull(i == 1 || i == 2 || i == 4);
                     this.rasterizer.clear();
                     this.rasterizer.setBlending(false);
                     this.rasterizer.raster(VIEWS[i], this.opaqueVC);
                     this.rasterizer.setBlending(true);
                     this.rasterizer.raster(VIEWS[i], this.translucentVC);
-                    UnsafeUtil.memcpy(this.rasterizer.getRawFramebuffer(), outputBuffer+(SINGLE_FACE_OUTPUT_SIZE*i));
+                    UnsafeUtil.memcpy(this.rasterizer.getRawFramebuffer(),
+                            outputBuffer + (SINGLE_FACE_OUTPUT_SIZE * i));
                 }
             }
-        } else {//Is fluid, slow path :(
+        } else {// Is fluid, slow path :(
 
-            if (!(state.getBlock() instanceof LiquidBlock)) throw new IllegalStateException();
+            if (!(state.getBlock() instanceof LiquidBlock))
+                throw new IllegalStateException();
             for (int i = 0; i < VIEWS.length; i++) {
                 this.opaqueVC.reset();
                 this.translucentVC.reset();
-                this.bakeFluidState(state, i);
-                if (this.opaqueVC.isEmpty()&&this.translucentVC.isEmpty()) continue;
-                isAnyShaded |= this.opaqueVC.anyShaded|this.translucentVC.anyShaded;
-                isAnyDarkend |= this.opaqueVC.anyDarkendTex|this.translucentVC.anyDarkendTex;
+                this.bakeFluidState(state, i, blockRenderLayer);
+                if (this.opaqueVC.isEmpty() && this.translucentVC.isEmpty())
+                    continue;
+                isAnyShaded |= this.opaqueVC.anyShaded | this.translucentVC.anyShaded;
+                isAnyDarkend |= this.opaqueVC.anyDarkendTex | this.translucentVC.anyDarkendTex;
                 anyTranslucent |= !this.translucentVC.isEmpty();
                 anyDiscard |= this.opaqueVC.anyDiscard;
 
-                this.rasterizer.setFaceCull(i==1||i==2||i==4);
+                this.rasterizer.setFaceCull(i == 1 || i == 2 || i == 4);
 
-                //The projection matrix
+                // The projection matrix
                 this.rasterizer.clear();
                 this.rasterizer.setBlending(false);
                 this.rasterizer.raster(VIEWS[i], this.opaqueVC);
                 this.rasterizer.setBlending(true);
                 this.rasterizer.raster(VIEWS[i], this.translucentVC);
-                UnsafeUtil.memcpy(this.rasterizer.getRawFramebuffer(), outputBuffer+(SINGLE_FACE_OUTPUT_SIZE*i));
+                UnsafeUtil.memcpy(this.rasterizer.getRawFramebuffer(), outputBuffer + (SINGLE_FACE_OUTPUT_SIZE * i));
             }
         }
 
-        return (isAnyShaded?1:0)|(isAnyDarkend?2:0)|(anyTranslucent?4:0)|(anyDiscard?8:0);
+        return (isAnyShaded ? 1 : 0) | (isAnyDarkend ? 2 : 0) | (anyTranslucent ? 4 : 0) | (anyDiscard ? 8 : 0);
     }
 
-
-
-
     static {
-        //the face/direction is the face (e.g. down is the down face)
-        addView(0, -90,0, 0, 0);//Direction.DOWN
-        addView(1, 90,0, 0, 0b100);//Direction.UP
+        // the face/direction is the face (e.g. down is the down face)
+        addView(0, -90, 0, 0, 0);// Direction.DOWN
+        addView(1, 90, 0, 0, 0b100);// Direction.UP
 
-        addView(2, 0,180, 0, 0b001);//Direction.NORTH
-        addView(3, 0,0, 0, 0);//Direction.SOUTH
+        addView(2, 0, 180, 0, 0b001);// Direction.NORTH
+        addView(3, 0, 0, 0, 0);// Direction.SOUTH
 
-        addView(4, 0,90, 270, 0b100);//Direction.WEST
-        addView(5, 0,270, 270, 0);//Direction.EAST
+        addView(4, 0, 90, 270, 0b100);// Direction.WEST
+        addView(5, 0, 270, 270, 0);// Direction.EAST
     }
 
     private static void addView(int i, float pitch, float yaw, float rotation, int flip) {
         var stack = new PoseStack();
-        stack.translate(0.5f,0.5f,0.5f);
-        stack.mulPose(makeQuatFromAxisExact(new Vector3f(0,0,1), rotation));
-        stack.mulPose(makeQuatFromAxisExact(new Vector3f(1,0,0), pitch));
-        stack.mulPose(makeQuatFromAxisExact(new Vector3f(0,1,0), yaw));
-        stack.mulPose(new Matrix4f().scale(1-2*(flip&1), 1-(flip&2), 1-((flip>>1)&2)));
-        stack.translate(-0.5f,-0.5f,-0.5f);
+        stack.translate(0.5f, 0.5f, 0.5f);
+        stack.mulPose(makeQuatFromAxisExact(new Vector3f(0, 0, 1), rotation));
+        stack.mulPose(makeQuatFromAxisExact(new Vector3f(1, 0, 0), pitch));
+        stack.mulPose(makeQuatFromAxisExact(new Vector3f(0, 1, 0), yaw));
+        stack.mulPose(new Matrix4f().scale(1 - 2 * (flip & 1), 1 - (flip & 2), 1 - ((flip >> 1) & 2)));
+        stack.translate(-0.5f, -0.5f, -0.5f);
         var mat = new Matrix4f(stack.last().pose());
 
         mat = new Matrix4f().set(
-                        2,0,0,0,
-                        0,2,0,0,
-                        0,0,-2,0,
-                        -1,-1,1,1)
+                2, 0, 0, 0,
+                0, 2, 0, 0,
+                0, 0, -2, 0,
+                -1, -1, 1, 1)
                 .mul(mat);
         VIEWS[i] = mat;
     }
@@ -317,7 +331,7 @@ public class SoftwareModelTextureBakery {
         angle = (float) Math.toRadians(angle);
         float hangle = angle / 2.0f;
         float sinAngle = (float) Math.sin(hangle);
-        float invVLength = (float) (1/Math.sqrt(vec.lengthSquared()));
+        float invVLength = (float) (1 / Math.sqrt(vec.lengthSquared()));
         return new Quaternionf(vec.x * invVLength * sinAngle,
                 vec.y * invVLength * sinAngle,
                 vec.z * invVLength * sinAngle,
