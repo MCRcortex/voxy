@@ -1,0 +1,49 @@
+{
+  "voxy.config.title": "Voxy",
+
+  "voxy.config.general": "通用",
+  "voxy.config.rendering": "渲染",
+
+  "voxy.config.general.enabled": "启用 Voxy",
+  "voxy.config.general.enabled.tooltip": "完全启用或禁用 Voxy",
+
+  "voxy.config.general.serviceThreads": "服务线程数",
+  "voxy.config.general.serviceThreads.tooltip": "ServiceThreadPool 可使用的线程数量",
+
+  "voxy.config.general.useSodiumBuilder": "使用 Sodium 线程",
+  "voxy.config.general.useSodiumBuilder.tooltip": "使用 Sodium 的构建线程作为 Voxy 线程池的一部分，在高渲染距离下快速移动时可减少卡顿和延迟",
+
+  "voxy.config.general.ingest": "区块摄入",
+  "voxy.config.general.ingest.tooltip": "启用或禁用 Voxy 将新区块转换为 LOD 的功能",
+
+  "voxy.config.general.rendering": "Voxy 渲染",
+  "voxy.config.general.rendering.tooltip": "启用或禁用 Voxy 渲染",
+
+  "voxy.config.general.subDivisionSize": "细分大小（像素²）",
+  "voxy.config.general.subDivisionSize.tooltip": "细分到更小 LOD 前，屏幕空间 AABB 的最大像素大小（越小质量越高）",
+
+  "voxy.config.general.renderDistance": "渲染距离",
+  "voxy.config.general.renderDistance.tooltip": "Voxy 的渲染距离（以区块为单位）",
+
+  "voxy.config.general.environmental_fog": "启用环境雾",
+  "voxy.config.general.environmental_fog.tooltip": "启用或禁用 Voxy 渲染环境雾效果",
+
+  "voxy.config.general.render_fog": "启用渲染雾",
+  "voxy.config.general.render_fog.tooltip": "启用或禁用渲染雾效果",
+
+  "voxy.config.general.ssao_mode": "SSAO 模式",
+  "voxy.config.general.ssao_mode.tooltip": "屏幕空间环境光遮蔽的模式（自动模式会尝试选择最佳选项并减少性能影响）",
+
+  "voxy.config.general.ssao_mode.auto": "自动",
+  "voxy.config.general.ssao_mode.basic": "基础",
+  "voxy.config.general.ssao_mode.better": "较好",
+  "voxy.config.general.ssao_mode.best": "最佳",
+
+  "voxy.command.error.voxyDisabled": "Voxy 必须在设置中启用才能使用此命令",
+  "voxy.command.error.singlePlayerOnly": "你必须在单人游戏中才能使用此命令",
+  "voxy.command.error.noRegionFolder": "找不到当前维度的区域文件夹",
+
+  "voxy.command.import.bossbarTitle": "Voxy 世界导入器",
+  "voxy.command.import.progress": "Voxy 导入中：%d/%d 个区块",
+  "voxy.command.import.finished": "Voxy 世界导入完成，耗时 %d 秒，平均每秒处理 %d 个区块"
+}
