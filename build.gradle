@@ -375,9 +375,9 @@ repositories {
 dependencies {
     implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
 
-    implementation "org.lwjgl:lwjgl"
-    include(implementation "org.lwjgl:lwjgl-lmdb")
-    include(implementation "org.lwjgl:lwjgl-zstd")
+    implementation "org.lwjgl:lwjgl:unsafe"
+    include(implementation "org.lwjgl:lwjgl-lmdb:unsafe")
+    include(implementation "org.lwjgl:lwjgl-zstd:unsafe")
     runtimeOnly "org.lwjgl:lwjgl:$lwjglVersion:natives-windows"
     runtimeOnly "org.lwjgl:lwjgl:$lwjglVersion:natives-linux"
     include(runtimeOnly "org.lwjgl:lwjgl-lmdb:$lwjglVersion:natives-windows")
