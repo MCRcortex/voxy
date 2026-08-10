@@ -77,7 +77,7 @@ public class VoxyCommands {
     private static int reloadInstance(CommandContext<FabricClientCommandSource> ctx) {
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Component.translatable("voxy.command.error.voxyDisabled"));
             return 1;
         }
 
@@ -98,7 +98,7 @@ public class VoxyCommands {
     private static int verifyTLNs(CommandContext<FabricClientCommandSource> ctx, boolean attemptRepair) {
         var instance = VoxyCommon.getInstance();
         if (instance == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Component.translatable("voxy.command.error.voxyDisabled"));
             return 1;
         }
         if (Minecraft.getInstance().level == null) {
@@ -116,7 +116,7 @@ public class VoxyCommands {
     private static int importDistantHorizons(CommandContext<FabricClientCommandSource> ctx) {
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Component.translatable("voxy.command.error.voxyDisabled"));
             return 1;
         }
         var dbFile = new File(ctx.getArgument("sqlDbPath", String.class));
@@ -154,7 +154,7 @@ public class VoxyCommands {
 
     private static int importRaw(CommandContext<FabricClientCommandSource> ctx) {
         if (VoxyCommon.getInstance() == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Component.translatable("voxy.command.error.voxyDisabled"));
             return 1;
         }
 
@@ -163,7 +163,7 @@ public class VoxyCommands {
 
     private static int importBobby(CommandContext<FabricClientCommandSource> ctx) {
         if (VoxyCommon.getInstance() == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Component.translatable("voxy.command.error.voxyDisabled"));
             return 1;
         }
 
@@ -223,18 +223,18 @@ public class VoxyCommands {
 
     private static int importCurrentWorldIn(CommandContext<FabricClientCommandSource> ctx) {
         if (VoxyCommon.getInstance() == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Component.translatable("voxy.command.error.voxyDisabled"));
             return 1;
         }
 
         var localServer = Minecraft.getInstance().getSingleplayerServer();
         if (localServer == null) {
-            ctx.getSource().sendError(Component.translatable("You must be in single player to use this command"));
+            ctx.getSource().sendError(Component.translatable("voxy.command.error.singlePlayerOnly"));
             return 1;
         }
         var regionPath = DimensionType.getStorageFolder(Minecraft.getInstance().level.dimension(), localServer.getWorldPath(LevelResource.ROOT)).resolve("region");
         if ((!regionPath.toFile().exists())||!regionPath.toFile().isDirectory()) {
-            ctx.getSource().sendError(Component.translatable("Cannot find region folder for current dimension"));
+            ctx.getSource().sendError(Component.translatable("voxy.command.error.noRegionFolder"));
             return 1;
         }
         return fileBasedImporter(regionPath.toFile())?0:1;
@@ -242,7 +242,7 @@ public class VoxyCommands {
 
     private static int importWorld(CommandContext<FabricClientCommandSource> ctx) {
         if (VoxyCommon.getInstance() == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Component.translatable("voxy.command.error.voxyDisabled"));
             return 1;
         }
 
@@ -288,7 +288,7 @@ public class VoxyCommands {
 
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Component.translatable("voxy.command.error.voxyDisabled"));
             return 1;
         }
         String finalInnerDir = innerDir;
@@ -307,7 +307,7 @@ public class VoxyCommands {
     private static int cancelImport(CommandContext<FabricClientCommandSource> ctx) {
         var instance = (VoxyClientInstance)VoxyCommon.getInstance();
         if (instance == null) {
-            ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
+            ctx.getSource().sendError(Component.translatable("voxy.command.error.voxyDisabled"));
             return 1;
         }
         var world = WorldIdentifier.ofEngineNullable(Minecraft.getInstance().level);

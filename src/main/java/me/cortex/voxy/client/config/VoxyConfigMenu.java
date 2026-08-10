@@ -128,6 +128,7 @@ public class VoxyConfigMenu implements ConfigEntryPoint {
                                         SSAO.SSAOMode.class,
                                         Component.translatable("voxy.config.general.ssao_mode"),
                                         ()->CFG.getSSAOMode(), v->CFG.setSSAOMode(v))
+                                        .setNameProvider(value -> Component.translatable("voxy.config.general.ssao_mode." + value.name().toLowerCase()))
                                         .setImpact(OptionImpact.MEDIUM)//TODO make it on igpus this is high
                                         .setPostChangeFlags(RENDER_RELOAD)
                         ).setEnablerInherit(s->!IrisUtil.irisShadersEnabledInConfig(), ConfigState.UPDATE_ON_REBUILD)

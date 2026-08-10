@@ -32,5 +32,18 @@
   "voxy.config.general.render_fog.tooltip": "Enables or disables render fog effect",
 
   "voxy.config.general.ssao_mode": "SSAO Mode",
-  "voxy.config.general.ssao_mode.tooltip": "The mode used for screenspace ambient occlusion (Auto attempts to pick the best option while reducing performance impact)"
+  "voxy.config.general.ssao_mode.tooltip": "The mode used for screenspace ambient occlusion (Auto attempts to pick the best option while reducing performance impact)",
+
+  "voxy.config.general.ssao_mode.auto": "Auto",
+  "voxy.config.general.ssao_mode.basic": "Basic",
+  "voxy.config.general.ssao_mode.better": "Better",
+  "voxy.config.general.ssao_mode.best": "Best",
+
+  "voxy.command.error.voxyDisabled": "Voxy must be enabled in settings to use this",
+  "voxy.command.error.singlePlayerOnly": "You must be in single player to use this command",
+  "voxy.command.error.noRegionFolder": "Cannot find region folder for current dimension",
+
+  "voxy.command.import.bossbarTitle": "Voxy world importer",
+  "voxy.command.import.progress": "Voxy import: %d/%d chunks",
+  "voxy.command.import.finished": "Voxy world import finished in %d seconds, averaging %d chunks per second"
 }
