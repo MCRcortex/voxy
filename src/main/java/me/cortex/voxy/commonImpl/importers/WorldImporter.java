@@ -10,6 +10,7 @@ import me.cortex.voxy.common.util.UnsafeUtil;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.voxelization.WorldVoxilizedSectionMipper;
+import me.cortex.voxy.common.world.VoxySectionExclusion;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldUpdater;
 import net.minecraft.core.Holder;
@@ -476,6 +477,9 @@ public class WorldImporter implements IDataImporter {
     private static final byte[] EMPTY = new byte[0];
     private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);
     private void importSectionNBT(int x, int y, int z, CompoundTag section) {
+        if (VoxySectionExclusion.isMinecraftSectionExcluded(x, y, z)) {
+            return;
+        }
         if (section.getCompound("block_states").isEmpty()) {
             return;
         }

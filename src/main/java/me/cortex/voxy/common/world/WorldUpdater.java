@@ -19,6 +19,9 @@ public class WorldUpdater {
         }
 
         if (!into.isLive) throw new IllegalStateException("World is not live");
+        if (VoxySectionExclusion.isMinecraftSectionExcluded(section.x, section.y, section.z)) {
+            return;
+        }
         boolean shouldCheckEmptiness = false;
         WorldSection previousSection = null;
         for (int lvl = 0; lvl <= MAX_LOD_LAYER; lvl++) {

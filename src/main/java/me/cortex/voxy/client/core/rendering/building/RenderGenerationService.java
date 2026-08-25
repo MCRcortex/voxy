@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.model.ModelBakerySubsystem;
 import me.cortex.voxy.common.thread.Service;
 import me.cortex.voxy.common.thread.ServiceManager;
 import me.cortex.voxy.common.util.Pair;
+import me.cortex.voxy.common.world.VoxySectionExclusion;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
@@ -118,6 +119,9 @@ public class RenderGenerationService {
     }
 
     private WorldSection acquireSection(long pos) {
+        if (VoxySectionExclusion.isLod0Excluded(pos)) {
+            return null;
+        }
         return this.world.acquireIfExists(pos);
     }
 
@@ -133,6 +137,24 @@ public class RenderGenerationService {
 
         //long time = BuiltSection.getTime();
         boolean shouldFreeSection = true;
+
+        if (VoxySectionExclusion.isLod0Excluded(task.position)) {
+            long stamp = this.taskMapLock.writeLock();
+            var rtask = this.taskMap.remove(task.position);
+            this.taskMapLock.unlockWrite(stamp);
+            if (rtask != task) {
+                throw new IllegalStateException();
+            }
+            if (task.section != null) {
+                this.holdingSectionCount.decrementAndGet();
+                task.section.release();
+                task.section = null;
+            }
+            if (this.resultConsumer != null) {
+                this.resultConsumer.accept(BuiltSection.empty(task.position));
+            }
+            return;
+        }
 
         WorldSection section;
         if (task.section == null) {
