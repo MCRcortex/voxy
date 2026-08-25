@@ -7,6 +7,7 @@ import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.voxelization.WorldVoxilizedSectionMipper;
+import me.cortex.voxy.common.world.VoxySectionExclusion;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.commonImpl.VoxyCommon;
@@ -88,7 +89,7 @@ public class VoxelIngestService {
     }
 
     private static boolean shouldIngestSection(LevelChunkSection section, int cx, int cy, int cz) {
-        return true;
+        return !VoxySectionExclusion.isMinecraftSectionExcluded(cx, cy, cz);
     }
 
     public boolean enqueueIngest(WorldEngine engine, LevelChunk chunk) {

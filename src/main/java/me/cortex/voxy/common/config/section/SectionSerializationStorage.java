@@ -7,6 +7,7 @@ import me.cortex.voxy.common.config.storage.StorageBackend;
 import me.cortex.voxy.common.config.storage.StorageConfig;
 import me.cortex.voxy.common.util.ThreadLocalMemoryBuffer;
 import me.cortex.voxy.common.world.SaveLoadSystem3;
+import me.cortex.voxy.common.world.VoxySectionExclusion;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
 
@@ -25,6 +26,10 @@ public class SectionSerializationStorage extends SectionStorage {
     private static final ThreadLocalMemoryBuffer MEMORY_CACHE = new ThreadLocalMemoryBuffer(BIGGEST_SERIALIZED_SECTION_SIZE + 1024);
 
     public int loadSection(WorldSection into) {
+        if (into.lvl == 0 && VoxySectionExclusion.isLod0Excluded(into.x, into.y, into.z)) {
+            Arrays.fill(into._unsafeGetRawDataArray(), Mapper.AIR);
+            return 1;
+        }
         var data = this.backend.getSectionData(into.key, MEMORY_CACHE.get().createUntrackedUnfreeableReference());
         if (data != null) {
             if (!SaveLoadSystem3.deserialize(into, data)) {
@@ -34,6 +39,7 @@ public class SectionSerializationStorage extends SectionStorage {
                 Logger.error("Section " + into.lvl + ", " + into.x + ", " + into.y + ", " + into.z + " was unable to load, removing");
                 return -1;
             } else {
+                VoxySectionExclusion.carveExcludedVoxels(into);
                 return 0;
             }
         } else {
