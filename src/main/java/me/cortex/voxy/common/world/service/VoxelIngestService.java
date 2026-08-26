@@ -1,5 +1,9 @@
 package me.cortex.voxy.common.world.service;
 
+import java.util.concurrent.ConcurrentLinkedDeque;
+
+import org.jetbrains.annotations.NotNull;
+
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.thread.Service;
 import me.cortex.voxy.common.thread.ServiceManager;
@@ -7,7 +11,6 @@ import me.cortex.voxy.common.voxelization.ILightingSupplier;
 import me.cortex.voxy.common.voxelization.VoxelizedSection;
 import me.cortex.voxy.common.voxelization.WorldConversionFactory;
 import me.cortex.voxy.common.voxelization.WorldVoxilizedSectionMipper;
-import me.cortex.voxy.common.world.VoxySectionExclusion;
 import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.common.world.WorldUpdater;
 import me.cortex.voxy.commonImpl.VoxyCommon;
@@ -18,9 +21,6 @@ import net.minecraft.world.level.chunk.DataLayer;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 import net.minecraft.world.level.lighting.LayerLightSectionStorage;
-import org.jetbrains.annotations.NotNull;
-
-import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class VoxelIngestService {
     private static final ThreadLocal<VoxelizedSection> SECTION_CACHE = ThreadLocal.withInitial(VoxelizedSection::createEmpty);
@@ -89,7 +89,7 @@ public class VoxelIngestService {
     }
 
     private static boolean shouldIngestSection(LevelChunkSection section, int cx, int cy, int cz) {
-        return !VoxySectionExclusion.isMinecraftSectionExcluded(cx, cy, cz);
+        return true;
     }
 
     public boolean enqueueIngest(WorldEngine engine, LevelChunk chunk) {

@@ -1,5 +1,9 @@
 package me.cortex.voxy.common.config.section;
 
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.function.LongConsumer;
+
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.ConfigBuildCtx;
@@ -10,10 +14,6 @@ import me.cortex.voxy.common.world.SaveLoadSystem3;
 import me.cortex.voxy.common.world.VoxySectionExclusion;
 import me.cortex.voxy.common.world.WorldSection;
 import me.cortex.voxy.common.world.other.Mapper;
-
-import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.function.LongConsumer;
 
 public class SectionSerializationStorage extends SectionStorage {
     public static final int BIGGEST_SERIALIZED_SECTION_SIZE = 32 * 32 * 32 * 8 * 2 + 8;
@@ -26,7 +26,7 @@ public class SectionSerializationStorage extends SectionStorage {
     private static final ThreadLocalMemoryBuffer MEMORY_CACHE = new ThreadLocalMemoryBuffer(BIGGEST_SERIALIZED_SECTION_SIZE + 1024);
 
     public int loadSection(WorldSection into) {
-        if (into.lvl == 0 && VoxySectionExclusion.isLod0Excluded(into.x, into.y, into.z)) {
+        if (into.lvl == 0 && VoxySectionExclusion.isMinecraftSectionExcluded(into.x, into.y, into.z)) {
             Arrays.fill(into._unsafeGetRawDataArray(), Mapper.AIR);
             return 1;
         }
