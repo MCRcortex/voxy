@@ -1,9 +1,9 @@
 package me.cortex.voxy.common.world;
 
-import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import me.cortex.voxy.common.world.other.Mapper;
-
 import java.util.Arrays;
+
+import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.world.other.Mapper;
 
 /**
  * Hardcoded Voxy skip region. Vanilla/Sodium still render this volume while in render distance;
@@ -23,31 +23,40 @@ public final class VoxySectionExclusion {
     private static final int MAX_Y = 179;
     private static final int MAX_Z = 288;
 
-    private static final LongOpenHashSet LOD0_KEYS = new LongOpenHashSet(36);
+    // private static final LongOpenHashSet LOD0_KEYS = new LongOpenHashSet(36);
 
-    static {
-        for (int x = 187; x <= 189; x++) {
-            for (int y = 2; y <= 5; y++) {
-                for (int z = 7; z <= 9; z++) {
-                    LOD0_KEYS.add(WorldEngine.getWorldSectionId(0, x, y, z));
-                }
-            }
-        }
-    }
+    // static {
+    //     for (int x = 187; x <= 189; x++) {
+    //         for (int y = 2; y <= 5; y++) {
+    //             for (int z = 7; z <= 9; z++) {
+    //                 LOD0_KEYS.add(WorldEngine.getWorldSectionId(0, x, y, z));
+    //             }
+    //         }
+    //     }
+    // }
 
     private VoxySectionExclusion() {}
 
     public static boolean isLod0Excluded(long pos) {
-        return WorldEngine.getLevel(pos) == 0 && LOD0_KEYS.contains(pos);
+        int chunky_x= WorldEngine.getX(pos);
+        int x = chunky_x * 32;
+        int chunky_y = WorldEngine.getY(pos);
+        int y = chunky_y * 32;
+        int chunky_z = WorldEngine.getZ(pos);
+        int z= chunky_z * 32;
+        Logger.info("!!!!!!! isLod0Excluded called: " + x + ", " + y + ", " + z);
+
+        return isMinecraftSectionExcluded(x, y, z);
     }
 
-    public static boolean isLod0Excluded(int x, int y, int z) {
-        return LOD0_KEYS.contains(WorldEngine.getWorldSectionId(0, x, y, z));
-    }
+    // public static boolean isLod0Excluded(int x, int y, int z) {
+    //     return LOD0_KEYS.contains(WorldEngine.getWorldSectionId(0, x, y, z));
+    // }
 
     /** Minecraft 16^3 section coords; skipped if they sit in an excluded LOD-0 cell. */
-    public static boolean isMinecraftSectionExcluded(int cx, int cy, int cz) {
-        return isLod0Excluded(cx >> 1, cy >> 1, cz >> 1);
+    public static boolean isMinecraftSectionExcluded(int x, int y, int z) {
+        // return x >= MIN_X && x <= MAX_X && y >= MIN_Y && y <= MAX_Y && z >= MIN_Z && z <= MAX_Z;
+        return x >= MIN_X && x <= MAX_X;
     }
 
     public static boolean intersectsWorldSection(int lvl, int x, int y, int z) {
@@ -61,7 +70,7 @@ public final class VoxySectionExclusion {
 
     public static void carveExcludedVoxels(WorldSection section) {
         if (section.lvl == 0) {
-            if (isLod0Excluded(section.x, section.y, section.z)) {
+            if (isMinecraftSectionExcluded(section.x, section.y, section.z)) {
                 Arrays.fill(section._unsafeGetRawDataArray(), Mapper.AIR);
             }
             return;
