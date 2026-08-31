@@ -144,7 +144,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    protected void initDepthStencil(int sourceDepthTexture, int targetFb, int srcWidth, int srcHeight, int width, int height) {
+    protected void initDepthStencil(Viewport<?> viewport, int sourceDepthTexture, int targetFb, int srcWidth, int srcHeight, int width, int height) {
         glClearNamedFramebufferfi(targetFb, GL_DEPTH_STENCIL, 0, this.properties.clearDepth(), 1);
         // using blit to copy depth from mismatched depth formats is not portable so instead a full screen pass is performed for a depth copy
         // the mismatched formats in this case is the d32 to d24s8
