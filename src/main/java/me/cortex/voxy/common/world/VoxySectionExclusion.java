@@ -32,7 +32,7 @@ public final class VoxySectionExclusion {
         int y = chunky_y * 32;
         int chunky_z = WorldEngine.getZ(pos);
         int z= chunky_z * 32;
-        // Logger.info("!!!!!!! isLod0Excluded called: " + x + ", " + y + ", " + z);
+        // Logger.info("!!!!!!!! isLod0Excluded called: " + x + ", " + y + ", " + z);
 
         return isMinecraftSectionExcluded(x, y, z);
     }
