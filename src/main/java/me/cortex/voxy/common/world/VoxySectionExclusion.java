@@ -23,18 +23,6 @@ public final class VoxySectionExclusion {
     private static final int MAX_Y = 179;
     private static final int MAX_Z = 288;
 
-    // private static final LongOpenHashSet LOD0_KEYS = new LongOpenHashSet(36);
-
-    // static {
-    //     for (int x = 187; x <= 189; x++) {
-    //         for (int y = 2; y <= 5; y++) {
-    //             for (int z = 7; z <= 9; z++) {
-    //                 LOD0_KEYS.add(WorldEngine.getWorldSectionId(0, x, y, z));
-    //             }
-    //         }
-    //     }
-    // }
-
     private VoxySectionExclusion() {}
 
     public static boolean isLod0Excluded(long pos) {
@@ -49,14 +37,9 @@ public final class VoxySectionExclusion {
         return isMinecraftSectionExcluded(x, y, z);
     }
 
-    // public static boolean isLod0Excluded(int x, int y, int z) {
-    //     return LOD0_KEYS.contains(WorldEngine.getWorldSectionId(0, x, y, z));
-    // }
-
     /** Minecraft 16^3 section coords; skipped if they sit in an excluded LOD-0 cell. */
     public static boolean isMinecraftSectionExcluded(int x, int y, int z) {
-        // return x >= MIN_X && x <= MAX_X && y >= MIN_Y && y <= MAX_Y && z >= MIN_Z && z <= MAX_Z;
-        return x >= MIN_X && x <= MAX_X;
+        return x >= MIN_X && x <= MAX_X && y >= MIN_Y && y <= MAX_Y && z >= MIN_Z && z <= MAX_Z;
     }
 
     public static boolean intersectsWorldSection(int lvl, int x, int y, int z) {
