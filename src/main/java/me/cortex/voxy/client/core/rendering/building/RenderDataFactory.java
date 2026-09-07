@@ -215,6 +215,8 @@ public class RenderDataFactory {
 
     private int prepareSectionData(final long[] rawSectionData) {
         final var sectionData = this.sectionData;
+        if (sectionData.length!=32*32*32*2) throw new IllegalStateException();
+        if (rawSectionData.length!=32*32*32) throw new IllegalStateException();
         final var rawModelIds = this.modelMan._unsafeRawAccess();
         long opaque = 0;
         long notEmpty = 0;
@@ -225,25 +227,28 @@ public class RenderDataFactory {
         int i = 0;
         for (int q = 0; q < 512; q++) {
             for (int j = 0; j < 64; i++, j++) {
+                i &= 32*32*32-1;
                 long block = rawSectionData[i];//Get the block mapping
+                int i2 = i * 2;
+                i2 &= (32*32*32*2-1)^1;
                 if (Mapper.isAir(block)) {//If it is air, just emit lighting
-                    sectionData[i * 2] = (block & (0xFFL << 56)) >>> 1;
-                    sectionData[i * 2 + 1] = 0;
+                    sectionData[i2] = (block & (0xFFL << 56)) >>> 1;
+                    sectionData[i2 + 1] = 0;
                 } else {
                     int modelId = rawModelIds[Mapper.getBlockId(block)];
                     if (modelId == -1) {//Failed, so just return error
                         return Mapper.getBlockId(block) | (1 << 31);
                     }
                     if (modelId == 0) {//modelId == 0, its basicly air so set it as air
-                        sectionData[i * 2] = (block & (0xFFL << 56)) >>> 1;
-                        sectionData[i * 2 + 1] = 0;
+                        sectionData[i2] = (block & (0xFFL << 56)) >>> 1;
+                        sectionData[i2 + 1] = 0;
                     } else {
                         //TODO: cache the results of this, then link it to `block` do same optimization as SaveLoadSystem3
 
                         long modelMetadata = this.modelMan.getModelMetadataFromClientId(modelId);
 
-                        sectionData[i * 2] = packPartialQuadData(modelId, block, modelMetadata);
-                        sectionData[i * 2 + 1] = modelMetadata;
+                        sectionData[i2] = packPartialQuadData(modelId, block, modelMetadata);
+                        sectionData[i2 + 1] = modelMetadata;
 
                         notEmpty |= 1L << j;
                         opaque |= ModelQueries._isFullyOpaque(modelMetadata)<<j;
@@ -253,22 +258,22 @@ public class RenderDataFactory {
                 }
             }
             if (notEmpty != 0) {
-                long nonOpaque = (notEmpty^opaque)&~pureFluid;
-                long fluid = pureFluid|partialFluid;
+                neighborAcquireMskAndFlags |= getNeighborMsk(notEmpty, i);
+                neighborAcquireMskAndFlags |= opaque!=0?(1<<6):0;//this becomes a jump, thanks java
                 this.opaqueMasks[(i >> 5) - 2] = (int) opaque;
                 this.opaqueMasks[(i >> 5) - 1] = (int) (opaque>>>32);
+                long nonOpaque = (notEmpty^opaque)&~pureFluid;
+                notEmpty = 0;
+                opaque = 0;
                 this.nonOpaqueMasks[(i >> 5) - 2] = (int) nonOpaque;
                 this.nonOpaqueMasks[(i >> 5) - 1] = (int) (nonOpaque>>>32);
+                long fluid = pureFluid|partialFluid;
+                pureFluid = 0;
+                partialFluid = 0;
                 this.fluidMasks[(i >> 5) - 2] = (int) fluid;
                 this.fluidMasks[(i >> 5) - 1] = (int) (fluid>>>32);
 
-                neighborAcquireMskAndFlags |= getNeighborMsk(notEmpty, i);
-                neighborAcquireMskAndFlags |= opaque!=0?(1<<6):0;
 
-                opaque = 0;
-                notEmpty = 0;
-                pureFluid = 0;
-                partialFluid = 0;
             }
         }
         return neighborAcquireMskAndFlags;
