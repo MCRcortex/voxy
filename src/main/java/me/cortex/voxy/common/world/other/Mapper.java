@@ -391,9 +391,21 @@ public class Mapper {
                 var bsc = compound.getCompound("block_state").orElseThrow();
                 var state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
                 if (state.isError()) {
+                    var oldState = state;
                     Logger.info("Could not decode blockstate, attempting fixes, error: "+ state.error().get().message());
-                    bsc = (CompoundTag) DataFixers.getDataFixer().update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE,bsc),0, SharedConstants.getCurrentVersion().dataVersion().version()).getValue();
-                    state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
+                    // MC 1.21.1: WorldVersion.dataVersion() → getDataVersion(), version() → getVersion()
+                    // Block State Compound CAN fail at version update when a block data type is missing from the game registry, with a java.lang.IllegalArgumentException: Unknown type: block_state being thrown. The following code
+                    // will catch any exception coming from the bsc version update operation, and print it at the screen. When it broke without being catch, the Exception doesn't match the IOException expected, forcing voxy to crash the game. 
+                    try {
+                        bsc = (CompoundTag) DataFixers.getDataFixer().update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE,bsc),0, SharedConstants.getCurrentVersion().getDataVersion().getVersion()).getValue();
+                        state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
+                    } catch (IllegalArgumentException e) {
+                        Logger.error("DataFixer could not update blockstate NBT, likely missing registry/type. Maybe a mod was removed? " + "Falling back to original decode result.", e);
+                        state = oldState;
+                    } catch (Exception e) {
+                        Logger.error("Unexpected exception while updating blockstate NBT. " + "Falling back to original decode result. The game may be unstable from now on.", e);
+                        state = oldState;
+                    }
                     if (state.isError()) {
                         Logger.error("Could not decode blockstate setting to air. id:" + id + " error: " + state.error().get().message());
                         return new StateEntry(id, Blocks.AIR.defaultBlockState());
