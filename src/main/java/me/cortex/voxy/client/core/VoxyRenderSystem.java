@@ -202,7 +202,13 @@ public class VoxyRenderSystem {
 
         //cameraY += 100;
         float farPlaneChunks = 3000;
-        //(VoxyConfig.CONFIG.sectionRenderDistance*32+2)*((float)Math.sqrt(3))
+        //dont like this hacky instanceof thing and how this is wired
+        //TODO: fixme
+        if (this.pipeline instanceof IrisVoxyRenderPipeline ivrp) {
+            if (ivrp._getData().useDynamicFarPlane) {
+                farPlaneChunks = (VoxyConfig.CONFIG.sectionRenderDistance * 32 + 2) * ((float) Math.sqrt(3));
+            }
+        }
         var voxyProjection = computeProjectionMat(this.properties, vanillaProjection, farPlaneChunks*16);
 
         /*
