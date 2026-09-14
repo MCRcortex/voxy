@@ -412,6 +412,7 @@ dependencies {
 
 jmh {
     zip64 = true
+    includes=["SaveLoadJMH"]
     //profilers = ["xperfasm"]
 }
 
