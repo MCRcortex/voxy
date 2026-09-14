@@ -201,7 +201,9 @@ public class VoxyRenderSystem {
         }
 
         //cameraY += 100;
-        var voxyProjection = computeProjectionMat(this.properties, vanillaProjection);
+        float farPlaneChunks = 3000;
+        //(VoxyConfig.CONFIG.sectionRenderDistance*32+2)*((float)Math.sqrt(3))
+        var voxyProjection = computeProjectionMat(this.properties, vanillaProjection, farPlaneChunks*16);
 
         /*
         int[] dims = new int[4];
@@ -464,7 +466,7 @@ public class VoxyRenderSystem {
         ).mulLocal(makeProjectionMatrix(nearVoxy, 16*3000));
     }*/
 
-    private static Matrix4f computeProjectionMat(RenderProperties properties, Matrix4fc base) {
+    private static Matrix4f computeProjectionMat(RenderProperties properties, Matrix4fc base, float farPlane) {
 
         //this jank is to capture the extra crap they inject like viewbobbing
         var rawMCProj = Minecraft.getInstance().gameRenderer.gameRenderState().levelRenderState.cameraRenderState.projectionMatrix;
@@ -473,7 +475,7 @@ public class VoxyRenderSystem {
         float near = getVanillaRenderDistance()<=32.0f?8f:16f;
         near = VoxyClient.disableSodiumChunkRender()?0.1f:near;
 
-        float far = 16*3000;
+        float far = farPlane;
 
         /* jank way of just modifying the base raw
         if (true) {
