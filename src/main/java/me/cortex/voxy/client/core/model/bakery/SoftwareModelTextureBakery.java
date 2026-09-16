@@ -2,6 +2,7 @@ package me.cortex.voxy.client.core.model.bakery;
 
 import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.opengl.GlTexture;
+import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.vertex.PoseStack;
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.common.util.UnsafeUtil;
@@ -46,6 +47,7 @@ import static org.lwjgl.opengl.GL30C.glBindFramebuffer;
 public class SoftwareModelTextureBakery {
     //Note: the first bit of metadata is if alpha discard is enabled
     private static final Matrix4f[] VIEWS = new Matrix4f[6];
+    private static AtlasSnapshot atlasSnapshot;
 
     private final ReuseVertexConsumer opaqueVC = new ReuseVertexConsumer();
     private final ReuseVertexConsumer translucentVC = new ReuseVertexConsumer(1/*has discard*/);
@@ -67,21 +69,27 @@ public class SoftwareModelTextureBakery {
         int width = tex.getWidth(targetMipLevel);
         int height = tex.getHeight(targetMipLevel);
 
-        //Just do it ourselves as doing it with b3d has some issues, (doing it ourselves is also just much much much shorter)
-        var texture = new int[width * height];
+        var snapshot = atlasSnapshot;
+        if (snapshot == null || snapshot.texture != tex) {
+            //Just do it ourselves as doing it with b3d has some issues, (doing it ourselves is also just much much much shorter)
+            var texture = new int[width * height];
 
-        glFlush();
-        glFinish();
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-        glPixelStorei(GL_PACK_ROW_LENGTH, width);
-        glPixelStorei(GL_PACK_IMAGE_HEIGHT, 0);
-        glPixelStorei(GL_PACK_SKIP_ROWS, 0);
-        glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
-        glPixelStorei(GL_PACK_ALIGNMENT, 4);
-        glGetTextureImage(((GlTexture) tex).glId(), 0, GL_RGBA, GL_UNSIGNED_BYTE, texture);
-        this.rasterizer.setSamplerTexture(texture, width, height);
+            glFlush();
+            glFinish();
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+            glPixelStorei(GL_PACK_ROW_LENGTH, width);
+            glPixelStorei(GL_PACK_IMAGE_HEIGHT, 0);
+            glPixelStorei(GL_PACK_SKIP_ROWS, 0);
+            glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
+            glPixelStorei(GL_PACK_ALIGNMENT, 4);
+            glGetTextureImage(((GlTexture) tex).glId(), 0, GL_RGBA, GL_UNSIGNED_BYTE, texture);
+            atlasSnapshot = snapshot = new AtlasSnapshot(tex, texture);
+        }
+        this.rasterizer.setSamplerTexture(snapshot.pixels, width, height);
     }
+
+    private record AtlasSnapshot(GpuTexture texture, int[] pixels) {}
 
     private void bakeBlockModel(BlockState state) {
         if (state.getRenderShape() == RenderShape.INVISIBLE) {
