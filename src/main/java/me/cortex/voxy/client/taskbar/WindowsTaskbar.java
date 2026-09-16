@@ -4,7 +4,6 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.COM.COMInvoker;
 import com.sun.jna.platform.win32.*;
 import com.sun.jna.ptr.PointerByReference;
-import org.lwjgl.glfw.GLFWNativeWin32;
 
 public class WindowsTaskbar extends COMInvoker implements Taskbar.ITaskbar {
     private final WinDef.HWND hwnd;

@@ -1,8 +1,8 @@
 package me.cortex.voxy.client.core.model.bakery;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.backend.opengl.GlTexture;
 import me.cortex.voxy.client.core.model.ModelFactory;
 import me.cortex.voxy.common.util.UnsafeUtil;
 import net.minecraft.client.Minecraft;
@@ -293,9 +293,9 @@ public class SoftwareModelTextureBakery {
     private static void addView(int i, float pitch, float yaw, float rotation, int flip) {
         var stack = new PoseStack();
         stack.translate(0.5f,0.5f,0.5f);
-        stack.mulPose(makeQuatFromAxisExact(new Vector3f(0,0,1), rotation));
-        stack.mulPose(makeQuatFromAxisExact(new Vector3f(1,0,0), pitch));
-        stack.mulPose(makeQuatFromAxisExact(new Vector3f(0,1,0), yaw));
+        stack.mulPose((makeQuatFromAxisExact(new Vector3f(0,0,1), rotation)).get(new Matrix4f()));
+        stack.mulPose(makeQuatFromAxisExact(new Vector3f(1,0,0), pitch).get(new Matrix4f()));
+        stack.mulPose(makeQuatFromAxisExact(new Vector3f(0,1,0), yaw).get(new Matrix4f()));
         stack.mulPose(new Matrix4f().scale(1-2*(flip&1), 1-(flip&2), 1-((flip>>1)&2)));
         stack.translate(-0.5f,-0.5f,-0.5f);
         var mat = new Matrix4f(stack.last().pose());
