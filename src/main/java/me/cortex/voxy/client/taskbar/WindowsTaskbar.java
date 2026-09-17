@@ -4,11 +4,18 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.COM.COMInvoker;
 import com.sun.jna.platform.win32.*;
 import com.sun.jna.ptr.PointerByReference;
-import org.lwjgl.glfw.GLFWNativeWin32;
+import static org.lwjgl.sdl.SDLProperties.SDL_GetPointerProperty;
+import static org.lwjgl.sdl.SDLVideo.SDL_GetWindowProperties;
+import static org.lwjgl.sdl.SDLVideo.SDL_PROP_WINDOW_WIN32_HWND_POINTER;
 
 public class WindowsTaskbar extends COMInvoker implements Taskbar.ITaskbar {
     private final WinDef.HWND hwnd;
     WindowsTaskbar(long windowId) {
+        long nativeWindow = SDL_GetPointerProperty(SDL_GetWindowProperties(windowId),
+                SDL_PROP_WINDOW_WIN32_HWND_POINTER, 0);
+        if (nativeWindow == 0) {
+            throw new IllegalStateException("SDL window has no Win32 handle");
+        }
         var itaskbar3res = new PointerByReference();
 
         if (W32Errors.FAILED(Ole32.INSTANCE.CoCreateInstance(new Guid.GUID("56FDF344-FD6D-11d0-958A-006097C9A090"),
@@ -20,7 +27,7 @@ public class WindowsTaskbar extends COMInvoker implements Taskbar.ITaskbar {
         }
 
         this.setPointer(itaskbar3res.getValue());
-        this.hwnd = new WinDef.HWND(new Pointer(GLFWNativeWin32.glfwGetWin32Window(windowId)));
+        this.hwnd = new WinDef.HWND(new Pointer(nativeWindow));
 
         this.invokeNative(3); // HrInit
     }

@@ -1,7 +1,7 @@
 package me.cortex.voxy.client.mixin.nvidium;
 
-import com.mojang.blaze3d.opengl.GlTextureView;
-import com.mojang.blaze3d.textures.GpuSampler;
+import com.mojang.renderpearl.backend.opengl.GlTextureView;
+import com.mojang.renderpearl.api.textures.GpuSampler;
 import me.cortex.nvidium.RenderPipeline;
 import me.cortex.voxy.client.core.IVoxyRenderSystemHolder;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;

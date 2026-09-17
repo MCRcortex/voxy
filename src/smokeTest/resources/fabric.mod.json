@@ -1,0 +1,1 @@
+{"schemaVersion":1,"id":"voxy_port_smoke","version":"1.0.0","environment":"client","entrypoints":{"client":["smoke.PortSmoke"]}}

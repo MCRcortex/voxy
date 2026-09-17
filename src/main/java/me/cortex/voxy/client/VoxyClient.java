@@ -21,6 +21,10 @@ public class VoxyClient implements ClientModInitializer {
     private static final HashSet<String> FREX = new HashSet<>();
     private static FileLock EXCLUSIVE_LOCK;
     public static void initVoxyClient() {
+        if (!"OpenGL".equalsIgnoreCase(com.mojang.blaze3d.systems.RenderSystem.getDevice().getDeviceInfo().backendName())) {
+            Logger.error("Voxy requires the OpenGL renderer; Voxy is disabled on this graphics backend.");
+            return;
+        }
         Capabilities.init();//Ensure clinit is called
 
         if (Capabilities.INSTANCE.hasBrokenDepthSampler) {

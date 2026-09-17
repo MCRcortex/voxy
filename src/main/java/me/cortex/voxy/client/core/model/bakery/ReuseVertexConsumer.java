@@ -83,6 +83,12 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     @Override
+    public ReuseVertexConsumer setUv3(float u, float v) {
+        // Glint coordinates are not used by the block LoD texture baker.
+        return this;
+    }
+
+    @Override
     public ReuseVertexConsumer setNormal(float x, float y, float z) {
         return this;
     }
@@ -104,7 +110,8 @@ public final class ReuseVertexConsumer implements VertexConsumer {
     }
 
     public ReuseVertexConsumer quad(BakedQuad quad, int metadata) {
-        this.anyShaded |= quad.materialInfo().shade();
+        // 26.3 represents unshaded faces with an upward shade direction override.
+        this.anyShaded |= quad.materialInfo().shadeDirectionOverride() != net.minecraft.core.Direction.UP;
         this.anyDarkendTex |= quad.materialInfo().sprite().contents().mipmapStrategy == MipmapStrategy.DARK_CUTOUT;
         this.ensureCanPut();
         for (int i = 0; i < 4; i++) {

@@ -1,0 +1,17 @@
+allprojects {
+    afterEvaluate {
+        def smokeCompile = tasks.register('compilePortSmoke', JavaCompile) {
+            source = fileTree('src/smokeTest/java')
+            classpath = sourceSets.main.compileClasspath + sourceSets.main.output
+            destinationDirectory = layout.buildDirectory.dir('smoke-classes')
+            options.release = 25
+            dependsOn tasks.named('classes')
+        }
+        def smokeResources = tasks.register('copyPortSmoke', Copy) {
+            from 'src/smokeTest/resources'
+            into layout.buildDirectory.dir('smoke-classes')
+        }
+        dependencies.add('runtimeOnly', files(layout.buildDirectory.dir('smoke-classes')))
+        tasks.named('runClient') { dependsOn smokeCompile, smokeResources }
+    }
+}
