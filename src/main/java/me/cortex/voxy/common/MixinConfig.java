@@ -19,20 +19,17 @@ public class MixinConfig implements IMixinConfigPlugin {
     }
 
     @Override
-    public void acceptTargets(Set<String> self, Set<String> other) {
-        var iter = self.iterator();
-        while (iter.hasNext()) {
-            var mixin = iter.next();
-            if (mixin.startsWith(this.mixinPackage)) {
-                var pth = mixin.substring(this.mixinPackage.length());
-                if (!pth.contains(".")) continue;
-                var targetMod = pth.substring(0, pth.indexOf('.'));
-                //filter out fallthrough and if the mod is actually loaded
-                if (this.fallThrough.contains(targetMod)) continue;
-                if (FabricLoader.getInstance().isModLoaded(targetMod)) continue;
-                //need to remove it cause it shouldnt be applied
-                iter.remove();
-            }
+    public boolean shouldApplyMixin(String targetClassName, String mixin) {
+        if (mixin.startsWith(this.mixinPackage)) {
+            var pth = mixin.substring(this.mixinPackage.length());
+            if (!pth.contains(".")) return true;
+            var targetMod = pth.substring(0, pth.indexOf('.'));
+            //filter out fallthrough and if the mod is actually loaded
+            if (this.fallThrough.contains(targetMod)) return true;
+            if (FabricLoader.getInstance().isModLoaded(targetMod)) return true;
+            //need to remove it cause it shouldnt be applied
+            return false;
         }
+        return true;
     }
 }
