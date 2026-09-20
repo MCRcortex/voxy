@@ -42,7 +42,7 @@ public abstract class Viewport <A extends Viewport<A>> {
     public final Vector3i section = new Vector3i();
     public final Vector3f innerTranslation = new Vector3f();
 
-    private final RenderProperties properties;
+    public final RenderProperties properties;
 
     protected Viewport(RenderProperties properties) {
         Vector4f[] planes = null;

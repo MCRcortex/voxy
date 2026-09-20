@@ -2,6 +2,8 @@ package me.cortex.voxy.client.iris;
 
 import me.cortex.voxy.client.config.VoxyConfig;
 import me.cortex.voxy.client.core.IVoxyRenderSystemHolder;
+import me.cortex.voxy.client.core.RenderProperties;
+import me.cortex.voxy.client.core.VoxyRenderSystem;
 import net.irisshaders.iris.gl.uniform.UniformHolder;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -13,15 +15,16 @@ import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
 public class VoxyUniforms {
     //TODO: fix this so that it directly capturesthe render system? (or atleast the holder?)
 
-    public static Matrix4f getViewProjection() {//This is 1 frame late ;-; cries, since the update occurs _before_ the voxy render pipeline
+    public static Matrix4f getViewProjection() {
         var vrs = IVoxyRenderSystemHolder.getNullable();
         if (vrs == null) {
             return new Matrix4f();
         }
-        return new Matrix4f(vrs.getViewport().MVP);
+        var view = vrs.getViewport();
+        return conditionallyReverseRevZ(view.properties, new Matrix4f(view.MVP));
     }
 
-    public static Matrix4f getModelView() {//This is 1 frame late ;-; cries, since the update occurs _before_ the voxy render pipeline
+    public static Matrix4f getModelView() {
         var vrs = IVoxyRenderSystemHolder.getNullable();
         if (vrs == null) {
             return new Matrix4f();
@@ -29,16 +32,28 @@ public class VoxyUniforms {
         return new Matrix4f(vrs.getViewport().modelView);
     }
 
-    public static Matrix4f getProjection() {//This is 1 frame late ;-; cries, since the update occurs _before_ the voxy render pipeline
+    public static Matrix4f getProjection() {
         var vrs = IVoxyRenderSystemHolder.getNullable();
         if (vrs == null) {
             return new Matrix4f();
         }
-        var mat = vrs.getViewport().projection;
+        var view = vrs.getViewport();
+        var mat = view.projection;
         if (mat == null) {
             return new Matrix4f();
         }
-        return new Matrix4f(mat);
+        return conditionallyReverseRevZ(view.properties, new Matrix4f(mat));
+    }
+
+    //In is safe to mutate
+    private static Matrix4f conditionallyReverseRevZ(RenderProperties props, Matrix4f in) {
+        //TODO: FIXME add and wire up the conditional disabling of the reverse revz patcher
+        if (!props.isReverseZ()) return in;
+
+        //todo:this do the conversion, REMENER TO KEEP RESPECT TO props.isZero2One()
+        //in.mul
+
+        return in;
     }
 
     public static void addUniforms(UniformHolder uniforms) {

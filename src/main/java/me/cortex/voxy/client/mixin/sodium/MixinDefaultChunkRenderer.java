@@ -19,7 +19,9 @@ import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexT
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.minecraft.client.renderer.oit.OitStage;
+import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -27,6 +29,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(value = DefaultChunkRenderer.class, remap = false)
 public abstract class MixinDefaultChunkRenderer extends ShaderChunkRenderer {
+
+    @Shadow
+    @Final
+    private boolean[] shouldDraw;
 
     public MixinDefaultChunkRenderer(ChunkVertexType vertexType) {
         super(vertexType);
@@ -45,6 +51,14 @@ public abstract class MixinDefaultChunkRenderer extends ShaderChunkRenderer {
     @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/ShaderChunkRenderer;end(Lnet/caffeinemc/mods/sodium/client/render/chunk/terrain/TerrainRenderPass;)V", shift = At.Shift.BEFORE))
     private void voxy$injectRender(ChunkRenderMatrices matrices, ChunkRenderListIterable renderLists, TerrainRenderPass renderPass, CameraTransform camera, FogParameters parameters, boolean indexedRenderingEnabled, RenderPass pass, GpuSampler terrainSampler, GpuBufferSlice uniformData, GpuBuffer sectionTimeInfo, OitStage stage, CallbackInfo ci) {
         this.doRender(matrices, renderPass, camera, parameters);
+    }
+
+    @Inject(method = "prepare", at = @At(value = "TAIL"))
+    private void voxy$forceOpaque(ChunkRenderListIterable renderLists, CameraTransform cameraTransform, boolean indexedRenderingEnabled, CallbackInfo ci) {
+        var renderer = IVoxyRenderSystemHolder.getNullable();
+        if (renderer != null) {
+            this.shouldDraw[DefaultTerrainRenderPasses.getPassIndex(DefaultTerrainRenderPasses.CUTOUT)] = true;
+        }
     }
 
     @Unique

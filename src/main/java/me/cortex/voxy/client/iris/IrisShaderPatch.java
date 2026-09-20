@@ -397,6 +397,27 @@ public class IrisShaderPatch {
             Logger.error("Shader has voxy patch data, but patch version is incorrect. expected " + VERSION + " got "+patchData.version);
             throw new IllegalStateException("Shader version mismatch expected " + VERSION + " got "+patchData.version);
         }
+
+
+        //TODO:FIXME, wrap in a conditional config attribute/flag to disable it
+        if (true) {
+            if (patchData.opaquePatchData != null) {
+                patchData.opaquePatchData = stupidEvilHackFixForRevZThatReallyShouldntExistOrBeDoneEverNeedsFixing(patchData.opaquePatchData);
+            }
+            if (patchData.translucentPatchData != null) {
+                patchData.translucentPatchData = stupidEvilHackFixForRevZThatReallyShouldntExistOrBeDoneEverNeedsFixing(patchData.translucentPatchData);
+            }
+        }
+
         return new IrisShaderPatch(patchData, ipack);
     }
+
+
+    private static String stupidEvilHackFixForRevZThatReallyShouldntExistOrBeDoneEverNeedsFixing(String scr) {
+        if (scr == null) return null;
+        scr = scr.replaceAll("(<=\\W|^)?gl_FragDepth(?=\\W|$)", "(1.0-gl_FragDepth)");
+        scr = scr.replaceAll("(<=\\W|^)?gl_FragCoord(?=\\W|$)", "(vec4(gl_FragCoord.xy,1.0-gl_FragCoord.z,gl_FragCoord.w))");
+        return scr;
+    }
+
 }
