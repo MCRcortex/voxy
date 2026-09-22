@@ -4,7 +4,6 @@ import com.mojang.serialization.Dynamic;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.IMappingStorage;
-import me.cortex.voxy.common.util.Pair;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.Holder;
 import net.minecraft.nbt.CompoundTag;
@@ -14,7 +13,6 @@ import net.minecraft.nbt.NbtOps;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.util.datafix.fixes.References;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -27,7 +25,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -109,16 +106,9 @@ public class Mapper {
     }
 
     private void loadFromStorage() {
-        //TODO:FIXME:CRITICAL, this whole thing is like mega mega borked in the new update and causes massive insane issues, TODO FIXIT
-
-        //TODO: FIXME: have/store the minecraft version the mappings are from (the data version)
-        // SharedConstants.getGameVersion().dataVersion().id()
-        // then use this to create an update path instead
-
         var mappings = this.storage.getIdMappingsData();
         List<StateEntry> sentries = new ArrayList<>();
         List<BiomeEntry> bentries = new ArrayList<>();
-        List<Pair<byte[], Integer>> sentryErrors = new ArrayList<>();
 
         boolean[] forceResave = new boolean[1];
         for (var entry : mappings.int2ObjectEntrySet()) {
@@ -126,12 +116,13 @@ public class Mapper {
             int id = entry.getIntKey() & ((1<<30)-1);
             if (entryType == BLOCK_STATE_TYPE) {
                 var sentry = StateEntry.deserialize(id, entry.getValue(), forceResave);
-                if (sentry.state.isAir()) {
-                    Logger.error("Deserialization was air, removed block");
-                    sentryErrors.add(new Pair<>(entry.getValue(), id));
+                sentries.add(sentry);
+                if (sentry.unresolved) {
+                    //Keep the id slot so the ids stay contiguous but dont map a state onto it, that way nothing
+                    // can be assigned this id and the stored bytes are left alone, so the block comes back on its own
+                    // once whatever provided it is installed again
                     continue;
                 }
-                sentries.add(sentry);
                 var oldEntry = this.block2stateEntry.putIfAbsent(sentry.state, sentry);
                 if (oldEntry != null) {
                     //forceResave[0] |= true;
@@ -145,21 +136,6 @@ public class Mapper {
                 }
             } else {
                 throw new IllegalStateException("Unknown entryType");
-            }
-        }
-
-        if (!sentryErrors.isEmpty()) {
-            forceResave[0] |= true;
-            //Insert garbage types into the mapping for those blocks, TODO:FIXME: Need to upgrade the type or have a solution to error blocks
-            var rand = new Random();
-            for (var error : sentryErrors) {
-                while (true) {
-                    var state = new StateEntry(error.right(), Block.BLOCK_STATE_REGISTRY.byId(rand.nextInt(Block.BLOCK_STATE_REGISTRY.size() - 1)));
-                    if (this.block2stateEntry.put(state.state, state) == null) {
-                        sentries.add(state);
-                        break;
-                    }
-                }
             }
         }
 
@@ -360,9 +336,18 @@ public class Mapper {
         public final int id;
         public final BlockState state;
         public final int opacity;
+        //Set when the stored block state could not be decoded. The entry holds onto its id but is never written back
+        // to storage, so the original data survives and the block returns once it can be resolved again
+        public final boolean unresolved;
+
         public StateEntry(int id, BlockState state) {
+            this(id, state, false);
+        }
+
+        private StateEntry(int id, BlockState state, boolean unresolved) {
             this.id = id;
             this.state = state;
+            this.unresolved = unresolved;
             //Override opacity of leaves to be solid
             if (state.getBlock() instanceof LeavesBlock) {
                 this.opacity = 15;
@@ -375,7 +360,13 @@ public class Mapper {
             try {
                 var serialized = new CompoundTag();
                 serialized.putInt("id", this.id);
-                serialized.put("block_state", BlockState.CODEC.encodeStart(NbtOps.INSTANCE, this.state).result().get());
+                //Record what wrote this so a later version can walk the datafixer from the right point instead of
+                // replaying every fix ever written
+                serialized.putInt("data_version", SharedConstants.getCurrentVersion().dataVersion().version());
+                //FULL_CODEC always writes the expanded {id, properties} form. BlockState.CODEC collapses a default
+                // state to a bare string, which makes the stored shape vary per state and change again on any
+                // future codec change, one stable shape on disk is easier to migrate
+                serialized.put("block_state", BlockState.FULL_CODEC.encodeStart(NbtOps.INSTANCE, this.state).result().get());
                 var out = new ByteArrayOutputStream();
                 NbtIo.writeCompressed(serialized, out);
                 return out.toByteArray();
@@ -396,21 +387,29 @@ public class Mapper {
                     throw new IllegalStateException("Expected a block state but it was null: " + compound);
                 }
                 var state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
-                if (state.isError()) {
-                    Logger.info("Could not decode blockstate, attempting fixes, error: "+ state.error().get().message());
-                    bsc = DataFixers.getDataFixer().update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE,bsc),0, SharedConstants.getCurrentVersion().dataVersion().version()).getValue();
-                    state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
-                    if (state.isError()) {
-                        Logger.error("Could not decode blockstate setting to air. id:" + id + " error: " + state.error().get().message());
-                        return new StateEntry(id, Blocks.AIR.defaultBlockState());
-                    } else {
-                        Logger.info("Fixed blockstate to: " + state.getOrThrow());
-                        forceResave[0] |= true;
-                        return new StateEntry(id, state.getOrThrow());
-                    }
-                } else {
+                if (!state.isError()) {
                     return new StateEntry(id, state.getOrThrow());
                 }
+
+                //Entries written before the data version was recorded get 0, which replays the whole fixer chain
+                int dataVersion = compound.getIntOr("data_version", 0);
+                Logger.info("Could not decode blockstate, attempting fixes from data version " + dataVersion + ", error: " + state.error().get().message());
+                try {
+                    bsc = DataFixers.getDataFixer().update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE, bsc), dataVersion, SharedConstants.getCurrentVersion().dataVersion().version()).getValue();
+                    state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
+                } catch (Exception e) {
+                    //The datafixer throws rather than returning an error when it meets a type it has no schema for
+                    Logger.error("Datafixer threw while updating blockstate id:" + id, e);
+                    return new StateEntry(id, Blocks.AIR.defaultBlockState(), true);
+                }
+
+                if (state.isError()) {
+                    Logger.error("Could not decode blockstate, keeping the id reserved and leaving the entry on disk. id:" + id + " error: " + state.error().get().message());
+                    return new StateEntry(id, Blocks.AIR.defaultBlockState(), true);
+                }
+                Logger.info("Fixed blockstate to: " + state.getOrThrow());
+                forceResave[0] |= true;
+                return new StateEntry(id, state.getOrThrow());
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
