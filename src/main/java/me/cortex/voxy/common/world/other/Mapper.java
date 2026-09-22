@@ -109,6 +109,8 @@ public class Mapper {
     }
 
     private void loadFromStorage() {
+        //TODO:FIXME:CRITICAL, this whole thing is like mega mega borked in the new update and causes massive insane issues, TODO FIXIT
+
         //TODO: FIXME: have/store the minecraft version the mappings are from (the data version)
         // SharedConstants.getGameVersion().dataVersion().id()
         // then use this to create an update path instead
