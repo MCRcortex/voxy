@@ -7,6 +7,7 @@ import me.cortex.voxy.client.core.VoxyRenderSystem;
 import net.irisshaders.iris.gl.uniform.UniformHolder;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
+import org.joml.Vector4f;
 
 import java.util.function.Supplier;
 
@@ -47,12 +48,16 @@ public class VoxyUniforms {
 
     //In is safe to mutate
     private static Matrix4f conditionallyReverseRevZ(RenderProperties props, Matrix4f in) {
-        //TODO: FIXME add and wire up the conditional disabling of the reverse revz patcher
         if (!props.isReverseZ()) return in;
+        //TODO: FIXME add and wire up the conditional disabling of the reverse revz patcher
 
-        //todo:this do the conversion, REMENER TO KEEP RESPECT TO props.isZero2One()
-        //in.mul
-
+        var row = in.getRow(2, new Vector4f());
+        if (props.isZero2One()) {
+            row = row.mul(-2.0f).add(in.getRow(3, new Vector4f()));
+        } else {
+            row.mul(-1.0f);
+        }
+        in.setRow(2, row);
         return in;
     }
 
