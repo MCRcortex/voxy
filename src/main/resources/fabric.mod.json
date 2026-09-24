@@ -40,7 +40,7 @@
   "depends": {
     "minecraft": "${allowed_mc_version}",
     "fabricloader": ">=0.14.22",
-    "fabric-api": ">=0.91.1",
+    "fabric-api": ">=0.161.0",
     "sodium": "${allowed_sodium_versions}"
   },
   "breaks": {

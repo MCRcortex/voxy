@@ -4,7 +4,8 @@ import com.sun.jna.Pointer;
 import com.sun.jna.platform.win32.COM.COMInvoker;
 import com.sun.jna.platform.win32.*;
 import com.sun.jna.ptr.PointerByReference;
-import org.lwjgl.glfw.GLFWNativeWin32;
+import org.lwjgl.sdl.SDLProperties;
+import org.lwjgl.sdl.SDLVideo;
 
 public class WindowsTaskbar extends COMInvoker implements Taskbar.ITaskbar {
     private final WinDef.HWND hwnd;
@@ -20,7 +21,8 @@ public class WindowsTaskbar extends COMInvoker implements Taskbar.ITaskbar {
         }
 
         this.setPointer(itaskbar3res.getValue());
-        this.hwnd = new WinDef.HWND(new Pointer(GLFWNativeWin32.glfwGetWin32Window(windowId)));
+        long hwndPtr = SDLProperties.SDL_GetPointerProperty(SDLVideo.SDL_GetWindowProperties(windowId), SDLVideo.SDL_PROP_WINDOW_WIN32_HWND_POINTER, 0L);
+        this.hwnd = new WinDef.HWND(new Pointer(hwndPtr));
 
         this.invokeNative(3); // HrInit
     }

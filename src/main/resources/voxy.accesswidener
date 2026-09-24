@@ -1,13 +1,7 @@
 accessWidener v1 official
 
 accessible class net/minecraft/client/multiplayer/ClientChunkCache$Storage
-accessible class com/mojang/blaze3d/opengl/GlDebug$LogEntry
 
-accessible class com/mojang/blaze3d/opengl/GlRenderPass
-accessible method com/mojang/blaze3d/opengl/GlCommandEncoder trySetup (Lcom/mojang/blaze3d/opengl/GlRenderPass;Ljava/util/Collection;)Z
-accessible method com/mojang/blaze3d/opengl/GlCommandEncoder applyPipelineState (Lcom/mojang/blaze3d/pipeline/RenderPipeline;)V
-
-accessible field com/mojang/blaze3d/opengl/GlBuffer handle I
 accessible field net/minecraft/client/renderer/texture/TextureAtlas maxMipLevel I
 accessible field net/minecraft/client/gui/components/BossHealthOverlay events Ljava/util/Map;
 accessible field net/minecraft/client/multiplayer/MultiPlayerGameMode connection Lnet/minecraft/client/multiplayer/ClientPacketListener;

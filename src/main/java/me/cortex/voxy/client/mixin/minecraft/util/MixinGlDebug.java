@@ -2,7 +2,7 @@ package me.cortex.voxy.client.mixin.minecraft.util;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.mojang.blaze3d.opengl.GlDebug;
+import com.mojang.renderpearl.backend.opengl.GlDebug;
 import me.cortex.voxy.client.core.gl.Capabilities;
 import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Mixin;
@@ -16,14 +16,14 @@ import java.io.StringWriter;
 public class MixinGlDebug {
     @WrapOperation(method = "printDebugLog", at = @At(value = "INVOKE", target = "Lorg/slf4j/Logger;info(Ljava/lang/String;Ljava/lang/Object;)V", remap = false))
     private void voxy$wrapDebug(Logger instance, String base, Object msgObj, Operation<Void> original) {
-        if (msgObj instanceof GlDebug.LogEntry msg) {
-            var throwable = new Throwable(msg.toString());
+        if (msgObj != null) {
+            var throwable = new Throwable(msgObj.toString());
             if (isCausedByVoxy(throwable.getStackTrace())) {
                 if (!isCausedByShaderCompileTest(throwable.getStackTrace())) {
                     original.call(instance, base + "\n" + getStackTraceAsString(throwable), throwable);
                 }
             } else {
-                original.call(instance, base, msg);
+                original.call(instance, base, msgObj);
             }
         } else {
             original.call(instance, base, msgObj);
