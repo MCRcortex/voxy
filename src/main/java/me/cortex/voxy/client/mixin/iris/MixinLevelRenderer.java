@@ -1,6 +1,6 @@
 package me.cortex.voxy.client.mixin.iris;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
 import me.cortex.voxy.client.core.IVoxyRenderSystemHolder;
 import me.cortex.voxy.client.core.util.IrisUtil;
@@ -30,7 +30,7 @@ public class MixinLevelRenderer {
     private GameRenderer gameRenderer;
 
     @Inject(method = "render", at = @At("HEAD"), order = 100)
-    private void voxy$injectIrisCompat(GraphicsResourceAllocator resourceAllocator, DeltaTracker deltaTracker, boolean renderOutline, CameraRenderState cameraState, Matrix4fc modelViewMatrix, GpuBufferSlice terrainFog, Vector4f fogColor, boolean shouldRenderSky, CallbackInfo ci) {
+    private void voxy$injectIrisCompat(GraphicsResourceAllocator resourceAllocator, boolean renderOutline, CameraRenderState cameraState, GpuBufferSlice terrainFog, Vector4f fogColor, boolean shouldRenderSky, boolean flag2, CallbackInfo ci) {
         if (IrisUtil.irisShaderPackEnabled()) {
             var renderer = IVoxyRenderSystemHolder.getNullableHolder();
             if (renderer != null) {
