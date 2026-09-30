@@ -15,13 +15,6 @@ jobs:
           distribution: temurin
           java-version: 25
 
-      - name: Loom Cache
-        uses: actions/cache@v4
-        with:
-          path: "**/.gradle/loom-cache"
-          key: "${{ runner.os }}-gradle-${{ hashFiles('**/libs.versions.*', '**/*.gradle*', '**/gradle-wrapper.properties') }}"
-          restore-keys: "${{ runner.os }}-gradle-"
-
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:

@@ -4,7 +4,7 @@ import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.client.core.rendering.Viewport;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
-import net.fabricmc.loader.api.FabricLoader;
+import net.neoforged.fml.ModList;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.api.v0.IrisApi;
 import net.irisshaders.iris.gl.IrisRenderSystem;
@@ -23,7 +23,7 @@ public class IrisUtil {
     public static boolean USED_IRIS_VIEWPORT;
     public static CapturedViewportParameters CAPTURED_VIEWPORT_PARAMETERS;
 
-    public static final boolean IRIS_INSTALLED = FabricLoader.getInstance().isModLoaded("iris");
+    public static final boolean IRIS_INSTALLED = ModList.get().isLoaded("iris");
     public static final boolean SHADER_SUPPORT = true;//System.getProperty("voxy.enableExperimentalIrisPipeline", "false").equalsIgnoreCase("true");
 
 

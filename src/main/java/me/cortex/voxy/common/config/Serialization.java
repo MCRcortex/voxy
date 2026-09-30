@@ -6,8 +6,6 @@ import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.commonImpl.VoxyCommon;
-import net.fabricmc.loader.api.FabricLoader;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,6 +14,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.jar.JarFile;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -96,8 +95,15 @@ public class Serialization {
         Map<Class<?>, GsonConfigSerialization<?>> serializers = new HashMap<>();
 
         Set<String> clazzs = new LinkedHashSet<>();
-        var path = FabricLoader.getInstance().getModContainer("voxy").get().getRootPaths().get(0);
-        clazzs.addAll(collectAllClasses(path, BASE_SEARCH_PACKAGE));
+        Path path = null;
+        try {
+            path = Path.of(Serialization.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+        } catch (Exception e) {
+            Logger.warn("Unable to inspect Voxy's code source directly; falling back to class-loader resources");
+        }
+        if (path != null) {
+            clazzs.addAll(collectAllClasses(path, BASE_SEARCH_PACKAGE));
+        }
         clazzs.addAll(collectAllClasses(BASE_SEARCH_PACKAGE));
         int count = 0;
         outer:
@@ -110,9 +116,6 @@ public class Serialization {
             }
             if (clzName.contains("mixin")) {
                 continue;//Dont want to load mixins
-            }
-            if (clzName.contains("ModMenuIntegration")) {
-                continue;//Dont want to modmenu incase it doesnt exist
             }
             if (clzName.contains("VoxyConfigScreenPages")) {
                 continue;//Dont want to modmenu incase it doesnt exist
@@ -189,19 +192,36 @@ public class Serialization {
         }
     }
     private static List<String> collectAllClasses(Path base, String pack) {
-        if (!Files.exists(base.resolve(pack.replaceAll("[.]", "/")))) {
+        Path packageRoot = base.resolve(pack.replace('.', '/'));
+        if (Files.isDirectory(packageRoot)) {
+            try {
+                return Files.list(packageRoot).flatMap(inner -> {
+                    if (inner.getFileName().toString().endsWith(".class")) {
+                        return Stream.of(pack + "." + inner.getFileName().toString().replace(".class", ""));
+                    } else if (Files.isDirectory(inner)) {
+                        return collectAllClasses(base, pack + "." + inner.getFileName()).stream();
+                    } else {
+                        return Stream.empty();
+                    }
+                }).collect(Collectors.toList());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        if (!Files.isRegularFile(base)) {
             return List.of();
         }
         try {
-            return Files.list(base.resolve(pack.replaceAll("[.]", "/"))).flatMap(inner -> {
-                if (inner.getFileName().toString().endsWith(".class")) {
-                    return Stream.of(pack + "." + inner.getFileName().toString().replace(".class", ""));
-                } else if (Files.isDirectory(inner)) {
-                    return collectAllClasses(base, pack + "." + inner.getFileName()).stream();
-                } else {
-                    return Stream.of();
-                }
-            }).collect(Collectors.toList());
+            String prefix = pack.replace('.', '/') + "/";
+            try (var jar = new JarFile(base.toFile())) {
+                return jar.stream()
+                        .filter(entry -> !entry.isDirectory()
+                                && entry.getName().startsWith(prefix)
+                                && entry.getName().endsWith(".class"))
+                        .map(entry -> entry.getName().substring(0, entry.getName().length() - 6).replace('/', '.'))
+                        .toList();
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
