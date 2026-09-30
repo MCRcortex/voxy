@@ -1,0 +1,192 @@
+#version 460 core
+
+//TODO: increase local size
+#define LOCAL_SIZE_MSK ((1<<LOCAL_SIZE_BITS)-1)
+#define LOCAL_SIZE (1<<LOCAL_SIZE_BITS)
+layout(local_size_x=LOCAL_SIZE) in;//, local_size_y=1
+
+#import <voxy:lod/frustum.glsl>
+
+layout(binding = SCENE_UNIFORM_BINDING, std140) uniform SceneUniform {
+    mat4 MVP;
+    ivec3 camSecPos;
+    uint packedHizSize;
+    vec3 camSubSecPos;
+    float minSSS;
+    Frustum frustum;
+    uint renderQueueMaxSize;
+    uint frameId;
+    uint requestQueueSize;
+    float renderDistance;
+};
+
+#import <voxy:lod/hierarchical/queue.glsl>
+#import <voxy:lod/hierarchical/node.glsl>
+#import <voxy:lod/hierarchical/screenspace.glsl>
+
+//SIMPLE_QUEUE(uvec2, requestQueue, REQUEST_QUEUE_BINDING);
+layout(binding = REQUEST_QUEUE_BINDING, std430) restrict buffer requestQueueStruct {
+    uvec2 requestQueueIndex;
+    uvec2[] requestQueue;
+};
+
+//SIMPLE_QUEUE(uint, renderQueue, RENDER_QUEUE_BINDING);
+layout(binding = RENDER_QUEUE_BINDING, std430) restrict buffer renderQueueStruct {
+    uint renderQueueIndex;
+    uint[] renderQueue;
+};
+
+layout(binding = RENDER_TRACKER_BINDING, std430) restrict writeonly buffer renderTrackerArray {
+    uint[] lastRenderFrame;
+};
+
+#ifdef HAS_STATISTICS
+layout(binding = STATISTICS_BUFFER_BINDING, std430) restrict buffer statisticsBuffer {
+    uint traversalCounts[MAX_ITERATIONS];
+    uint renderCounts[MAX_ITERATIONS];
+};
+#endif
+
+void addRequest(inout UnpackedNode node) {
+    //printf("Put node decend request");
+    if (!hasRequested(node)) {
+        if (requestQueueIndex.x < requestQueueSize) {//Soft limit
+            uint atomRes = atomicAdd(requestQueueIndex.x, 1);
+            if (atomRes < MAX_REQUEST_QUEUE_SIZE) {//Hard limit
+                //Mark node as having a request submitted to prevent duplicate submissions
+                requestQueue[atomRes] = getRawPos(node);
+                markRequested(node);
+            }
+        }
+    }
+}
+
+void enqueueChildren(in UnpackedNode node) {
+    if (childListIsEmpty(node)) {//Occures in a very rare case/instance so just handle it gracefully
+        return;
+    }
+
+    uint children = getChildCount(node);
+    pushNodesInit(children);
+    uint ptr = getChildPtr(node);
+    for (int i = 0; i < children; i++) {
+        pushNode(ptr+i);
+    }
+}
+
+void enqueueSelfForRender(in UnpackedNode node) {
+    //printf("render %d@[%d,%d,%d]", node.lodLevel, node.pos.x, node.pos.y, node.pos.z);
+    if (renderQueueIndex < renderQueueMaxSize) {
+        lastRenderFrame[getId(node)] = frameId;
+        if (!isEmptyMesh(node)) {
+            uint renderIndex = atomicAdd(renderQueueIndex, 1);
+            if (renderIndex < renderQueueMaxSize) {
+                renderQueue[renderIndex] = getMesh(node);
+
+                #ifdef IS_DEBUG
+                debugRenderNodeQueue[atomicAdd(debugRenderNodeQueueIndex, 1)] = node.nodeId;
+                #endif
+
+                #ifdef HAS_STATISTICS
+                atomicAdd(renderCounts[node.lodLevel], 1);
+                #endif
+            }
+        }
+    }
+}
+
+
+vec3 closestPointToCamera(in UnpackedNode node) {
+    vec3 nPos = vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos;
+    float scale = 1<<(node.lodLevel+5);
+    return mix(mix(vec3(0), nPos, greaterThan(nPos, vec3(0))), nPos+scale, lessThan(nPos+scale, vec3(0)));
+}
+
+vec3 furthestPointToCamera(in UnpackedNode node) {
+    vec3 nPos = vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos;
+    float scale = 1<<(node.lodLevel+5);
+    return mix(nPos+scale, mix(nPos, vec3(0), greaterThan(nPos, vec3(0))), lessThan(nPos+scale, vec3(0)));
+}
+
+bool isWithinRenderDistance(in UnpackedNode node) {
+    if (renderDistance<0.0f) return true;
+    vec3 close = closestPointToCamera(node);
+    float xzDist = close.x*close.x+close.z*close.z;
+    return xzDist <= renderDistance;
+}
+
+
+void traverse(in UnpackedNode node) {
+    #ifdef HAS_STATISTICS
+    atomicAdd(traversalCounts[node.lodLevel], 1);
+    #endif
+
+    //Compute screenspace
+    setupScreenspace(node);
+    //debugDumpNode(node);
+
+    if (outsideFrustum() || isCulledByHiz()) {
+        //printf("culled");
+    } else {
+        //It is visible, TODO: maybe do a more detailed hiz test? (or make it so that )
+
+        //Only decend if not a root node
+        if (node.lodLevel!=0 && shouldDecend()) {
+            if (hasChildren(node)) {
+                //printf("A");
+                enqueueChildren(node);
+            } else {
+                //printf("B");
+                addRequest(node);
+                //TODO: use self mesh (is error state if it doesnt have one since all leaf nodes should have a mesh)
+                // Basicly guarenteed to have a mesh, if it doesnt it is very very bad and incorect since its a violation of the graph properties
+                // that all leaf nodes must contain a mesh
+
+                bool shouldRenderSelf = renderDistance<0.0f;
+                if (!shouldRenderSelf) {
+                    vec3 far = furthestPointToCamera(node);
+                    shouldRenderSelf = (far.x*far.x+far.z*far.z+(16*16*16))<=renderDistance;//the +16*16 is to add some buffer room
+                }
+
+                if (shouldRenderSelf) {
+                    enqueueSelfForRender(node);
+                }
+            }
+        } else {
+            if (hasMesh(node)) {
+                //printf("C");
+                enqueueSelfForRender(node);
+            } else {
+                //printf("D");
+                //!! not ideal, we want to render this mesh but dont have it. If we havent sent a request
+                // then send a request for a mesh for this node.
+                addRequest(node);
+
+                //TODO: Decend into children? maybe add a bitflag saying is bad if the immediate children dont have meshes
+                if (node.lodLevel != 0) {
+                    enqueueChildren(node);
+                }
+            }
+        }
+    }
+}
+
+void main() {
+    uint nodeId = getCurrentNode();
+    if (nodeId != SENTINAL_OUT_OF_BOUNDS) {
+        //Fetch + decode node
+        UnpackedNode node;
+        unpackNode(node, nodeId);
+
+        //Check if were inside the render distastance before traversince
+        if (isWithinRenderDistance(node)) {
+            traverse(node);
+        }
+
+        /*
+        printf("GID:%d, NODE %d, %d, AA, %d, %d, %d, %d", gl_GlobalInvocationID.x, node, queueIdx, nodeQueueMetadata[queueIdx].x, nodeQueueMetadata[queueIdx].y, nodeQueueMetadata[queueIdx].z, nodeQueueMetadata[queueIdx].w);
+        pushNodesInit(1);
+        pushNode(node);
+        */
+    }
+}

@@ -1,0 +1,31 @@
+#version 460 core
+#define WORK_SIZE 256
+layout(local_size_x=WORK_SIZE) in;
+
+//Header data about destination, size and location of what is being copied (NOTE: can probably make it a uvec2?)
+layout(binding = INPUT_HEADER_BUFFER_BINDING, std430) restrict readonly buffer InputHeaderBuffer {
+    uvec4[] dataCopyHeader;
+};
+
+layout(binding = INPUT_DATA_BUFFER_BINDING, std430) restrict readonly buffer InputDataBuffer {
+    uvec2[] dataInBuffer;
+};
+
+layout(binding = OUTPUT_BUFFER_BINDING, std430) restrict writeonly buffer OutputBuffer {
+    uvec2[] outputBuffer;
+};
+
+void main() {
+    uvec4 job = dataCopyHeader[gl_WorkGroupID.x];
+    //Copy from input to output
+    uint src = job.x;
+    uint dst = job.y;
+    uint siz = job.z;
+
+    uint workPerThread = (siz+255)>>8;
+    uint start = gl_LocalInvocationID.x*workPerThread+src;
+    uint diff = dst-src;
+    for (uint i = start; i < min(start+workPerThread,siz+src); i++) {
+        outputBuffer[i+diff] = dataInBuffer[i];
+    }
+}

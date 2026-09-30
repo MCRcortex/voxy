@@ -1,0 +1,124 @@
+#version 460
+
+#extension GL_KHR_shader_subgroup_basic : require
+#extension GL_KHR_shader_subgroup_arithmetic: require
+
+#define WORK_SIZE 256
+
+//Does inital parralel prefix sum on batches of WORK_SIZE
+layout(local_size_x=WORK_SIZE) in;
+
+layout(binding = IO_BUFFER, std430) buffer InputBuffer {
+    uvec4[] ioCount;
+};
+
+shared uint warpPrefixSum[8];//Warps are 32, tricks require full warp
+
+void main() {
+    if (gl_SubgroupSize == 32) {
+        #ifdef IS_INTEL
+        uint subgroupId = gl_LocalInvocationID.x>>5;
+        #else
+        uint subgroupId = gl_SubgroupID;
+        #endif
+
+        //todo
+        //assert(gl_SubgroupSize == 32);
+        //assert(gl_NumSubgroups == (WORK_SIZE>>5));
+
+        uint gid = gl_GlobalInvocationID.x;
+        uvec4 count = uvec4(0);
+        uint sum = 0;
+        {
+            uvec4 dat = ioCount[gid];
+            count.yzw = dat.xyz;
+            count.z += count.y;
+            count.w += count.z;
+            sum = count.w + dat.w;
+        }
+        subgroupBarrier();//Wait for all threads in the subgroup to get the buffer
+
+        count += subgroupExclusiveAdd(sum);
+
+        if (gl_SubgroupInvocationID==31) {
+            warpPrefixSum[subgroupId] = count.x+sum;
+        }
+
+        memoryBarrierShared();
+        barrier();
+
+        if (gl_LocalInvocationID.x<8) {
+            uint val = warpPrefixSum[gl_SubgroupInvocationID];
+            subgroupBarrier();
+            //Use warp to do entire add in 1 reduction
+            warpPrefixSum[gl_SubgroupInvocationID] = subgroupExclusiveAdd(val);
+        }
+
+        memoryBarrierShared();
+        barrier();
+
+        //Add the computed sum across all threads and warps
+        count += warpPrefixSum[subgroupId];
+        ioCount[gid] = count;
+    } else {
+        #ifdef IS_INTEL
+        uint subgroupId = gl_LocalInvocationID.x>>6;
+        #else
+        uint subgroupId = gl_SubgroupID;
+        #endif
+
+        //todo
+        //assert(gl_SubgroupSize == 32);
+        //assert(gl_NumSubgroups == (WORK_SIZE>>5));
+
+        uint gid = gl_GlobalInvocationID.x;
+        uvec4 count = uvec4(0);
+        uint sum = 0;
+        {
+            uvec4 dat = ioCount[gid];
+            count.yzw = dat.xyz;
+            count.z += count.y;
+            count.w += count.z;
+            sum = count.w + dat.w;
+        }
+        subgroupBarrier();//Wait for all threads in the subgroup to get the buffer
+
+        count += subgroupExclusiveAdd(sum);
+
+        if (gl_SubgroupInvocationID==63) {
+            warpPrefixSum[subgroupId] = count.x+sum;
+        }
+
+        memoryBarrierShared();
+        barrier();
+
+
+        #ifdef IS_WINDOWS
+        //hate amd hate amd hate amd hate amd
+        uint val = warpPrefixSum[gl_LocalInvocationID.x&3u];
+
+        subgroupBarrier();
+        //Use warp to do entire add in 1 reduction
+        uint extraJank = subgroupExclusiveAdd(val);
+
+        barrier();
+        if (gl_LocalInvocationID.x<4) {
+            warpPrefixSum[gl_LocalInvocationID.x] = extraJank;
+        }
+        #else
+        if (gl_LocalInvocationID.x<4) {
+            uint val = warpPrefixSum[gl_SubgroupInvocationID];
+            subgroupBarrier();
+            //Use warp to do entire add in 1 reduction
+            warpPrefixSum[gl_SubgroupInvocationID] = subgroupExclusiveAdd(val);
+        }
+        #endif
+
+        memoryBarrierShared();
+        barrier();
+
+        //Add the computed sum across all threads and warps
+        count += warpPrefixSum[subgroupId];
+        ioCount[gid] = count;
+    }
+}
