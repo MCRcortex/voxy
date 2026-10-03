@@ -4,17 +4,16 @@ import com.mojang.serialization.Dynamic;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.IMappingStorage;
-import me.cortex.voxy.common.util.Pair;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.Holder;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtAccounter;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtOps;
+import net.minecraft.nbt.Tag;
 import net.minecraft.util.datafix.DataFixers;
 import net.minecraft.util.datafix.fixes.References;
 import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
@@ -27,7 +26,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -109,16 +107,13 @@ public class Mapper {
     }
 
     private void loadFromStorage() {
-        //TODO:FIXME:CRITICAL, this whole thing is like mega mega borked in the new update and causes massive insane issues, TODO FIXIT
-
-        //TODO: FIXME: have/store the minecraft version the mappings are from (the data version)
-        // SharedConstants.getGameVersion().dataVersion().id()
-        // then use this to create an update path instead
-
+        // Each saved blockstate records the data version it was written with.
+        // Unversioned {Name, Properties} compounds are upgraded from data version 2531.
+        // A decode that still fails stays air in memory so section ids stay aligned,
+        // and the stored bytes are left untouched.
         var mappings = this.storage.getIdMappingsData();
         List<StateEntry> sentries = new ArrayList<>();
         List<BiomeEntry> bentries = new ArrayList<>();
-        List<Pair<byte[], Integer>> sentryErrors = new ArrayList<>();
 
         boolean[] forceResave = new boolean[1];
         for (var entry : mappings.int2ObjectEntrySet()) {
@@ -126,15 +121,15 @@ public class Mapper {
             int id = entry.getIntKey() & ((1<<30)-1);
             if (entryType == BLOCK_STATE_TYPE) {
                 var sentry = StateEntry.deserialize(id, entry.getValue(), forceResave);
+                sentries.add(sentry);
                 if (sentry.state.isAir()) {
-                    Logger.error("Deserialization was air, removed block");
-                    sentryErrors.add(new Pair<>(entry.getValue(), id));
+                    // Id 0 already owns air. Do not insert a substitute block and do not
+                    // put this id into the state map, or the resave below would overwrite
+                    // the original bytes.
                     continue;
                 }
-                sentries.add(sentry);
                 var oldEntry = this.block2stateEntry.putIfAbsent(sentry.state, sentry);
                 if (oldEntry != null) {
-                    //forceResave[0] |= true;
                     Logger.warn("Multiple mappings for blockstate, using old state, expect things to possibly go really badly. " + oldEntry.id + ":" + sentry.id + ":" + sentry.state );
                 }
             } else if (entryType == BIOME_TYPE) {
@@ -145,21 +140,6 @@ public class Mapper {
                 }
             } else {
                 throw new IllegalStateException("Unknown entryType");
-            }
-        }
-
-        if (!sentryErrors.isEmpty()) {
-            forceResave[0] |= true;
-            //Insert garbage types into the mapping for those blocks, TODO:FIXME: Need to upgrade the type or have a solution to error blocks
-            var rand = new Random();
-            for (var error : sentryErrors) {
-                while (true) {
-                    var state = new StateEntry(error.right(), Block.BLOCK_STATE_REGISTRY.byId(rand.nextInt(Block.BLOCK_STATE_REGISTRY.size() - 1)));
-                    if (this.block2stateEntry.put(state.state, state) == null) {
-                        sentries.add(state);
-                        break;
-                    }
-                }
             }
         }
 
@@ -316,12 +296,16 @@ public class Mapper {
     }
 
     public void forceResaveStates() {
-        var blocks = new ArrayList<>(this.block2stateEntry.values());
+        // Resave by id, not by the state map, so a duplicate id that upgraded to an
+        // already-registered state is still written. Air ids are skipped below.
+        var blocks = new ArrayList<>(this.blockId2stateEntry);
         var biomes = new ArrayList<>(this.biome2biomeEntry.values());
 
 
         for (var entry : blocks) {
-            if (entry.state.isAir() && entry.id == 0) {
+            // Id 0 is implicit air and is never stored. Any other air entry is a failed
+            // decode held only in memory; persisting it would destroy the original bytes.
+            if (entry.state.isAir()) {
                 continue;
             }
             if (this.blockId2stateEntry.indexOf(entry) != entry.id) {
@@ -360,6 +344,17 @@ public class Mapper {
         public final int id;
         public final BlockState state;
         public final int opacity;
+
+        // Mappings written before data_version existed store the pre-5006 {Name, Properties}
+        // compound. Datafixing that from 0 reruns the 1.13 flattener (minecraft:bed becomes
+        // red_bed). Datafixing from the flattened schema (1451) still reruns
+        // RedstoneWireConnectionsFix, data version 2531, which turns a disconnected wire's
+        // "none" into "side". 2531 is that fixer's own version, so it is not applied again,
+        // while every later migration still runs, including block renames and
+        // BlockStateFieldNamesFix (5006, Name/Properties -> id/properties).
+        static final int UNVERSIONED_BLOCK_STATE_DATA_VERSION = 2531;
+        private static final String DATA_VERSION_KEY = "data_version";
+
         public StateEntry(int id, BlockState state) {
             this.id = id;
             this.state = state;
@@ -375,6 +370,7 @@ public class Mapper {
             try {
                 var serialized = new CompoundTag();
                 serialized.putInt("id", this.id);
+                serialized.putInt(DATA_VERSION_KEY, currentDataVersion());
                 serialized.put("block_state", BlockState.CODEC.encodeStart(NbtOps.INSTANCE, this.state).result().get());
                 var out = new ByteArrayOutputStream();
                 NbtIo.writeCompressed(serialized, out);
@@ -395,25 +391,65 @@ public class Mapper {
                 if (bsc == null) {
                     throw new IllegalStateException("Expected a block state but it was null: " + compound);
                 }
-                var state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
-                if (state.isError()) {
-                    Logger.info("Could not decode blockstate, attempting fixes, error: "+ state.error().get().message());
-                    bsc = DataFixers.getDataFixer().update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE,bsc),0, SharedConstants.getCurrentVersion().dataVersion().version()).getValue();
-                    state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
-                    if (state.isError()) {
-                        Logger.error("Could not decode blockstate setting to air. id:" + id + " error: " + state.error().get().message());
-                        return new StateEntry(id, Blocks.AIR.defaultBlockState());
-                    } else {
-                        Logger.info("Fixed blockstate to: " + state.getOrThrow());
-                        forceResave[0] |= true;
-                        return new StateEntry(id, state.getOrThrow());
+
+                int currentVersion = currentDataVersion();
+                boolean hasVersion = compound.contains(DATA_VERSION_KEY);
+                int storedVersion = compound.getIntOr(DATA_VERSION_KEY, -1);
+                boolean dataFixed = false;
+                if (hasVersion) {
+                    if (storedVersion < currentVersion) {
+                        Logger.info("Upgrading saved blockstate from data version " + storedVersion);
+                        bsc = fixBlockState(bsc, storedVersion, currentVersion);
+                        dataFixed = true;
                     }
-                } else {
-                    return new StateEntry(id, state.getOrThrow());
+                } else if (isLegacyNameProperties(bsc)) {
+                    Logger.info("Upgrading saved blockstate from data version " + UNVERSIONED_BLOCK_STATE_DATA_VERSION);
+                    bsc = fixBlockState(bsc, UNVERSIONED_BLOCK_STATE_DATA_VERSION, currentVersion);
+                    dataFixed = true;
                 }
+
+                var stateResult = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
+                if (stateResult.isError() || stateResult.getOrThrow().isAir()) {
+                    // Air stays in memory only. Do not set forceResave: rewriting the stored
+                    // bytes (previously with a random block) is what permanently corrupted worlds.
+                    if (stateResult.isError()) {
+                        Logger.error("Could not decode blockstate setting to air. id:" + id + " error: " + stateResult.error().get().message() + ". Stored bytes were left unchanged.");
+                    } else {
+                        Logger.error("Deserialization was air, keeping id " + id + " in memory only. Stored bytes were left unchanged.");
+                    }
+                    return new StateEntry(id, Blocks.AIR.defaultBlockState());
+                }
+
+                var state = stateResult.getOrThrow();
+                if (dataFixed) {
+                    Logger.info("Fixed blockstate to: " + state);
+                    forceResave[0] = true;
+                } else if (!hasVersion) {
+                    // Already the current codec shape, but with no data version. Stamp it so the
+                    // next game upgrade has a real baseline instead of guessing.
+                    forceResave[0] = true;
+                }
+                return new StateEntry(id, state);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+        }
+
+        private static boolean isLegacyNameProperties(Tag tag) {
+            if (!(tag instanceof CompoundTag compound)) {
+                return false;
+            }
+            return compound.contains("Name") && !compound.contains("id");
+        }
+
+        private static Tag fixBlockState(Tag blockState, int fromVersion, int toVersion) {
+            return DataFixers.getDataFixer()
+                    .update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE, blockState), fromVersion, toVersion)
+                    .getValue();
+        }
+
+        private static int currentDataVersion() {
+            return SharedConstants.getCurrentVersion().dataVersion().version();
         }
     }
 
