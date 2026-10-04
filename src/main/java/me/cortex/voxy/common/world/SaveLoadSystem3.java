@@ -5,14 +5,19 @@ import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.util.MemoryBuffer;
 import me.cortex.voxy.common.util.ThreadLocalMemoryBuffer;
 import me.cortex.voxy.common.world.other.Mapper;
+import org.jspecify.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
+
+import java.util.Objects;
 
 public class SaveLoadSystem3 {
     public static final int STORAGE_VERSION = 0;
 
-    private record SerializationCache(Long2ShortOpenHashMap lutMapCache, MemoryBuffer memoryBuffer) {
+    private static final class SerializationCache {
+        public final Long2ShortOpenHashMap lutMapCache = new Long2ShortOpenHashMap(1024);
+        public final MemoryBuffer memoryBuffer = ThreadLocalMemoryBuffer.create(WorldSection.SECTION_VOLUME * 2 + WorldSection.SECTION_VOLUME * 8 + 1024);
+        public short[] remappingArrayCache;
         public SerializationCache() {
-            this(new Long2ShortOpenHashMap(1024), ThreadLocalMemoryBuffer.create(WorldSection.SECTION_VOLUME*2+WorldSection.SECTION_VOLUME*8+1024));
             this.lutMapCache.defaultReturnValue((short) -1);
         }
     }
@@ -41,7 +46,7 @@ public class SaveLoadSystem3 {
 
         Long2ShortOpenHashMap LUT = cache.lutMapCache; LUT.clear();
 
-        MemoryBuffer buffer = cache.memoryBuffer().createUntrackedUnfreeableReference();
+        MemoryBuffer buffer = cache.memoryBuffer.createUntrackedUnfreeableReference();
         long ptr = buffer.address;
 
         MemoryUtil.memPutLong(ptr, section.key); ptr += 8;
@@ -106,5 +111,72 @@ public class SaveLoadSystem3 {
 
         ptr = lutBasePtr + (metadata & 0xFFFF) * 8L;
         return true;
+    }
+
+
+    //Warning: mutates the inout buffer directly, returns a sliced version of the input if something changed (frees the memory)
+    public static MemoryBuffer remap(MemoryBuffer inout, int[] blockStates, int@Nullable [] biomes) {
+        if (blockStates == null) throw new IllegalArgumentException();
+        long ptr = inout.address;
+        long key = MemoryUtil.memGetLong(ptr); ptr += 8;
+        //dont care about the key
+
+
+        long metadata = MemoryUtil.memGetLong(ptr); final long metadataPtr = ptr; ptr += 8;
+        final int lutSize  = (int) (metadata&0xFFFF);
+        final long lutBasePtr = ptr + WorldSection.SECTION_VOLUME * 2;
+        long lutWritePtr = lutBasePtr;
+
+        var cache = CACHE.get();
+        Long2ShortOpenHashMap LUT = cache.lutMapCache; LUT.clear();
+        short[] lutRemap = cache.remappingArrayCache;
+        if (lutRemap == null || lutRemap.length < lutSize) {
+            lutRemap = cache.remappingArrayCache = new short[lutSize];
+        }
+
+        boolean changed = false;
+        //For perf reasons, split it into 2 different varients
+        if (biomes == null) {
+            for (int i = 0; i < lutSize; i++) {
+                long value = MemoryUtil.memGetLong(lutBasePtr+8L*i);
+                long rvalue = Mapper.withBlock(value, blockStates[Mapper.getBlockId(value)]);
+                changed |= rvalue != value; value = rvalue;
+                short remapped = LUT.putIfAbsent(value, (short) LUT.size());
+                if (remapped == -1) {
+                    remapped = (short) (LUT.size()-1);
+                    MemoryUtil.memPutLong(lutWritePtr, value); lutWritePtr+=8;
+                }
+                lutRemap[i] = remapped;
+            }
+        } else {
+            for (int i = 0; i < lutSize; i++) {
+                long value = MemoryUtil.memGetLong(lutBasePtr+8L*i);
+                long rvalue = Mapper.withBlockBiome(value, blockStates[Mapper.getBlockId(value)], biomes[Mapper.getBiomeId(value)]);
+                changed |= rvalue != value; value = rvalue;
+                short remapped = LUT.putIfAbsent(value, (short) LUT.size());
+                if (remapped == -1) {
+                    remapped = (short) (LUT.size()-1);
+                    MemoryUtil.memPutLong(lutWritePtr, value); lutWritePtr+=8;
+                }
+                lutRemap[i] = remapped;
+            }
+        }
+        //if nothing changed then just return
+        if (!changed) return null;//Nothing changed
+
+        //Stuff changed, remap the contents
+        for (int i = 0; i < WorldSection.SECTION_VOLUME; i++) {
+            MemoryUtil.memPutShort(ptr, lutRemap[MemoryUtil.memGetShort(ptr)]);ptr += 2;
+        }
+
+        //Update the metadata for number of lut entries
+        metadata &= ~0xFFFF;
+        metadata |= LUT.size();
+        MemoryUtil.memPutLong(metadataPtr, metadata);
+
+        ptr = lutWritePtr;
+
+
+        return inout.subSize(ptr - inout.address);
     }
 }
