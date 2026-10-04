@@ -19,7 +19,7 @@ public class MixinVisibleChunkCollector {
     /*
     @Inject(method = "<init>", at = @At("HEAD"))
     private static void voxy$injectVisibleStreamReset(CallbackInfo ci) {
-        var vrs = IVoxyRenderSystemHolder.getNullable();
+        var vrs = IVoxyRenderSystemHolder.getEngineNullable();
         if (vrs != null) {
             vrs.visbleSectionStream.reset();
         }

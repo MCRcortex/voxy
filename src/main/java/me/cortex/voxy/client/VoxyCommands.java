@@ -8,6 +8,8 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import me.cortex.voxy.client.core.IVoxyRenderSystemHolder;
 import me.cortex.voxy.common.DebugUtils;
+import me.cortex.voxy.common.Logger;
+import me.cortex.voxy.common.world.WorldEngine;
 import me.cortex.voxy.commonImpl.VoxyCommon;
 import me.cortex.voxy.commonImpl.WorldIdentifier;
 import me.cortex.voxy.commonImpl.importers.DHImporter;
@@ -104,9 +106,14 @@ public class VoxyCommands {
         if (Minecraft.getInstance().level == null) {
             throw new IllegalStateException("How you even do this");
         }
-        var engine = WorldIdentifier.ofEngine(Minecraft.getInstance().level);
-        if (engine!=null) {
-            DebugUtils.verifyAllTopLevelNodes(engine, attemptRepair);
+        var identifier = WorldIdentifier.of(Minecraft.getInstance().level);
+        if (identifier == null) return 1;
+        var future = identifier.getFutureNowOrCreateEngine(false);
+        if (future != null) {
+            future.thenAcceptAsync(engine -> {
+                Logger.info("Starting verification");
+                DebugUtils.verifyAllTopLevelNodes(engine, attemptRepair);
+            }, Minecraft.getInstance());
             return 0;
         }
         return 1;
@@ -131,7 +138,9 @@ public class VoxyCommands {
         }
 
         File dbFile_ = dbFile;
-        var engine = WorldIdentifier.ofEngine(Minecraft.getInstance().level);
+        var id = WorldIdentifier.of(Minecraft.getInstance().level);
+        if (id == null) return 1;
+        var engine = id.getNowOrStartEngineNullable();
         if (engine==null)return 1;
         return instance.getImportManager().makeAndRunIfNone(engine, ()->
                 new DHImporter(dbFile_, engine, Minecraft.getInstance().level, instance.getServiceManager(), instance.savingServiceRateLimiter))?0:1;
@@ -143,7 +152,9 @@ public class VoxyCommands {
             return false;
         }
 
-        var engine = WorldIdentifier.ofEngine(Minecraft.getInstance().level);
+        var id = WorldIdentifier.of(Minecraft.getInstance().level);
+        if (id==null) return false;
+        var engine = id.getNowOrStartEngineNullable();
         if (engine==null) return false;
         return instance.getImportManager().makeAndRunIfNone(engine, ()->{
             var importer = new WorldImporter(engine, Minecraft.getInstance().level, instance.getServiceManager(), instance.savingServiceRateLimiter);
@@ -293,15 +304,21 @@ public class VoxyCommands {
         }
         String finalInnerDir = innerDir;
 
-        var engine = WorldIdentifier.ofEngine(Minecraft.getInstance().level);
-        if (engine != null) {
+        var id = WorldIdentifier.of(Minecraft.getInstance().level);
+        if (id == null) return 1;
+        var worldOrFuture = id.getOrStartEngine(false);
+        if (worldOrFuture == null) return 1;
+        if (worldOrFuture instanceof WorldEngine engine) {
+            engine.markActive();
             return instance.getImportManager().makeAndRunIfNone(engine, () -> {
                 var importer = new WorldImporter(engine, Minecraft.getInstance().level, instance.getServiceManager(), instance.savingServiceRateLimiter);
                 importer.importZippedRegionDirectoryAsync(zip, finalInnerDir);
                 return importer;
             }) ? 0 : 1;
+        } else {
+            ctx.getSource().sendError(Component.translatable("Cannot import until world loading is complete"));
+            return 1;
         }
-        return 1;
     }
 
     private static int cancelImport(CommandContext<FabricClientCommandSource> ctx) {
@@ -310,7 +327,9 @@ public class VoxyCommands {
             ctx.getSource().sendError(Component.translatable("Voxy must be enabled in settings to use this"));
             return 1;
         }
-        var world = WorldIdentifier.ofEngineNullable(Minecraft.getInstance().level);
+        var id = WorldIdentifier.of(Minecraft.getInstance().level);
+        if (id == null) return 1;
+        var world = id.getEngineNullable();
         if (world != null) {
             return instance.getImportManager().cancelImport(world)?0:1;
         }

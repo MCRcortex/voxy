@@ -196,7 +196,7 @@ public class VoxelIngestService {
         var instance = VoxyCommon.getInstance();
         if (instance == null) return false;
         if (!instance.isIngestEnabled(worldId)) return false;
-        var engine = instance.getOrCreate(worldId);
+        var engine = worldId.getNowOrStartEngineNullable();
         if (engine == null) return false;
         return instance.getIngestService().enqueueIngest(engine, chunk);
     }
@@ -221,7 +221,7 @@ public class VoxelIngestService {
 
     public static boolean rawIngest(WorldIdentifier id, LevelChunkSection section, int x, int y, int z, DataLayer bl, DataLayer sl) {
         if (id == null) return false;
-        var engine = id.getOrCreateEngine();
+        var engine = id.getNowOrStartEngineNullable();
         if (engine == null) return false;
         return rawIngest(engine, section, x, y, z, bl, sl);
     }

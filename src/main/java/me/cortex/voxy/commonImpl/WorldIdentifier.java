@@ -15,9 +15,14 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
 import java.lang.ref.WeakReference;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 public class WorldIdentifier {
     private static final ResourceKey<DimensionType> NULL_DIM_KEY = ResourceKey.create(Registries.DIMENSION_TYPE, Identifier.parse("voxy:null_dimension_id"));
@@ -25,8 +30,8 @@ public class WorldIdentifier {
     public final ResourceKey<Level> key;
     public final long biomeSeed;
     public final ResourceKey<DimensionType> dimension;//Maybe?
+
     private final transient long hashCode;
-    @Nullable transient WeakReference<WorldEngine> cachedEngineObject;
 
     public WorldIdentifier(@NotNull ResourceKey<Level> key, long biomeSeed, @Nullable ResourceKey<DimensionType> dimension) {
         if (key == null) {
@@ -62,32 +67,95 @@ public class WorldIdentifier {
         return a.registry().equals(b.registry()) && a.identifier().equals(b.identifier());
     }
 
-    //Quick access utility method to get or create a world object in the current instance
-    public WorldEngine getOrCreateEngine() {
-        return getOrCreateEngine(false);
+    //================================================================================
+    //Util methods to access the engine neatly
+    //================================================================================
+    @Nullable private volatile WeakReference<WorldEngine> cachedEngineObject;
+    private static final VarHandle CACHE_OBJECT_HANDLE;
+
+    static {
+        try {
+            CACHE_OBJECT_HANDLE = MethodHandles.lookup().findVarHandle(WorldIdentifier.class, "cachedEngineObject", WeakReference.class);
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
+        }
+    }
+    private WorldEngine getFromCache() {
+        final var ref = (WeakReference<WorldEngine>) CACHE_OBJECT_HANDLE.get(this);
+        if (ref == null) return null;
+        var engine = ref.get();
+        if (engine != null && engine.isLive()) {
+            engine.markActive();
+            return engine;
+        } else {
+            if (CACHE_OBJECT_HANDLE.compareAndSet(this, ref, null)) {
+                return null;
+            }
+            return getFromCache();//We have to try again (tailcall (please))
+        }
     }
 
-    public WorldEngine getOrCreateEngine(boolean allowNull) {
+    private Object getOrDoWorld(boolean increment, boolean loadIfMissing) {
         var instance = VoxyCommon.getInstance();
         if (instance == null) {
             this.cachedEngineObject = null;
             return null;
         }
-        var engine = instance.getOrCreate(this);
-        if (allowNull&&engine==null) {
-            throw new IllegalStateException("Engine null on creation");
+        Object worldOrFuture = this.getFromCache();
+        if (worldOrFuture != null) {
+            if (increment) ((WorldEngine)worldOrFuture).acquireRef();
+            return worldOrFuture;
         }
-        return engine;
+        worldOrFuture = instance.getOrCreateLoadingFuture(this, increment, loadIfMissing);
+        if (worldOrFuture instanceof WorldEngine engine) {
+            if (engine.instanceIn != instance) throw new IllegalStateException();
+            CACHE_OBJECT_HANDLE.compareAndSet(this, null, engine.weakSelfRef);
+        }
+        return worldOrFuture;
     }
 
-    public WorldEngine getNullable() {
-        var instance = VoxyCommon.getInstance();
-        if (instance == null) {
-            this.cachedEngineObject = null;
+    //Gets the engine if it exists and loaded
+    public WorldEngine getEngineNullable() {
+        var worldOrFuture = this.getOrDoWorld(false, false);
+        if (worldOrFuture == null || worldOrFuture instanceof CompletableFuture<?>)
             return null;
-        }
-        return instance.getNullable(this);
+        return (WorldEngine) worldOrFuture;
     }
+
+    //Gets the engine now, if its not loaded, starts the loading and returns null
+    public WorldEngine getNowOrStartEngineNullable() {
+        var worldOrFuture = this.getOrDoWorld(false, true);
+        if (worldOrFuture == null || worldOrFuture instanceof CompletableFuture<?>)
+            return null;
+        return (WorldEngine) worldOrFuture;
+    }
+
+    public Object getOrStartEngine(boolean increment) {
+        return this.getOrDoWorld(increment, true);
+    }
+
+    /*
+    public WorldEngine getNowOrCreateEngineBlocking(boolean incrementRef) {
+        var ret = this.getNowOrCreateEngineFuture(incrementRef);
+        if (ret instanceof CompletableFuture<?> cf) {
+            try {
+                return ((CompletableFuture<WorldEngine>)cf).get();
+            } catch (InterruptedException | ExecutionException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return (WorldEngine) ret;
+    }*/
+
+    public CompletableFuture<WorldEngine> getFutureNowOrCreateEngine(boolean incrementRef) {
+        var ret = this.getOrDoWorld(incrementRef, true);
+        if (ret instanceof CompletableFuture<?> cf) {
+            return (CompletableFuture<WorldEngine>) cf;
+        }
+        return CompletableFuture.completedFuture((WorldEngine) ret);
+    }
+
+    //================================================================================
 
     public static WorldIdentifier of(Level level) {
         //Gets or makes an identifier for world
@@ -95,23 +163,6 @@ public class WorldIdentifier {
             return null;
         }
         return ((IWorldGetIdentifier)level).voxy$getIdentifier();
-    }
-
-    //Common utility function to get or create a world engine
-    public static WorldEngine ofEngine(Level level) {
-        var id = of(level);
-        if (id == null) {
-            return null;
-        }
-        return id.getOrCreateEngine();
-    }
-
-    public static WorldEngine ofEngineNullable(Level level) {
-        var id = of(level);
-        if (id == null) {
-            return null;
-        }
-        return id.getNullable();
     }
 
     public static long mixStafford13(long seed) {

@@ -131,11 +131,13 @@ public class Mapper {
                     sentryErrors.add(new Pair<>(entry.getValue(), id));
                     continue;
                 }
-                sentries.add(sentry);
                 var oldEntry = this.block2stateEntry.putIfAbsent(sentry.state, sentry);
                 if (oldEntry != null) {
-                    //forceResave[0] |= true;
+                    forceResave[0] |= true;
                     Logger.warn("Multiple mappings for blockstate, using old state, expect things to possibly go really badly. " + oldEntry.id + ":" + sentry.id + ":" + sentry.state );
+                    sentryErrors.add(new Pair<>(entry.getValue(), sentry.id));
+                } else {
+                    sentries.add(sentry);
                 }
             } else if (entryType == BIOME_TYPE) {
                 var bentry = BiomeEntry.deserialize(id, entry.getValue());

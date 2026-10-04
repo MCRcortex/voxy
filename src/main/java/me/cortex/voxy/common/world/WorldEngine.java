@@ -8,6 +8,7 @@ import me.cortex.voxy.commonImpl.VoxyInstance;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.invoke.VarHandle;
+import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -45,6 +46,8 @@ public final class WorldEngine {
     public final @Nullable VoxyInstance instanceIn;
     private final AtomicInteger refCount = new AtomicInteger();
     volatile long lastActiveTime = System.currentTimeMillis();//Time in millis the world was last "active" i.e. had a total ref count or active section count of != 0
+
+    public final WeakReference<WorldEngine> weakSelfRef = new WeakReference<>(this);
 
     public WorldEngine(SectionStorage storage) {
         this(storage, null);
@@ -187,6 +190,14 @@ public final class WorldEngine {
         }
         //TODO: maybe dont need to tick the last active time?
         this.lastActiveTime = System.currentTimeMillis();
+    }
+
+
+    private final AutoCloseable decRef = this::releaseRef;
+    public AutoCloseable autoRef() { return this.autoRef(true); }
+    public AutoCloseable autoRef(boolean inc) {
+        if (inc) this.acquireRef();
+        return this.decRef;
     }
 
     public boolean saveSection(WorldSection section) {
