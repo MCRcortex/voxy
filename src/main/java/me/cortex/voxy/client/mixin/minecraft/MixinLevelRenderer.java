@@ -91,13 +91,13 @@ public abstract class MixinLevelRenderer implements IVoxyRenderSystemHolder {
             Logger.info("Not creating renderer at the moment due to loading future");
             var identifierAtStart = this.identifier;
             ((CompletableFuture<WorldEngine>)future).thenAcceptAsync(engine -> {
-                if (engine == null) {
-                    Logger.error("Loading future return null, this is really bad, not creating renderer");
-                    return;
-                }
                 if (VoxyCommon.getInstance() == null) {
                     Logger.warn("Voxy instance null on loading future finish, not creating renderer");
                     engine.releaseRef();
+                    return;
+                }
+                if (engine == null) {
+                    Logger.error("Loading future return null, this is really bad, not creating renderer");
                     return;
                 }
                 if (!identifierAtStart.equals(this.identifier)) {
