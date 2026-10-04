@@ -1,7 +1,10 @@
 package me.cortex.voxy.common.world.other;
 
+import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Dynamic;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
 import me.cortex.voxy.common.Logger;
 import me.cortex.voxy.common.config.IMappingStorage;
 import me.cortex.voxy.common.util.Pair;
@@ -96,6 +99,10 @@ public class Mapper {
         return (id&(0xFFL<<56))|(Integer.toUnsignedLong(block)<<27)|(Integer.toUnsignedLong(biome)<<47);
     }
 
+    public static long withBlock(long id, int block) {
+        return (id&((0xFFL<<56)|(0x1FFL<<47)))|(Integer.toUnsignedLong(block)<<27);
+    }
+
     public static long airWithLight(int light) {
         return Integer.toUnsignedLong(light&0xFF)<<56;
     }
@@ -121,7 +128,8 @@ public class Mapper {
         List<Pair<byte[], Integer>> sentryErrors = new ArrayList<>();
 
         boolean[] forceResave = new boolean[1];
-        for (var entry : mappings.int2ObjectEntrySet()) {
+        for (ObjectIterator<Int2ObjectMap.Entry<byte[]>> it = mappings.int2ObjectEntrySet().fastIterator(); it.hasNext(); ) {
+            var entry = it.next();
             int entryType = entry.getIntKey()>>>30;
             int id = entry.getIntKey() & ((1<<30)-1);
             if (entryType == BLOCK_STATE_TYPE) {
@@ -135,7 +143,7 @@ public class Mapper {
                 var oldEntry = this.block2stateEntry.putIfAbsent(sentry.state, sentry);
                 if (oldEntry != null) {
                     //forceResave[0] |= true;
-                    Logger.warn("Multiple mappings for blockstate, using old state, expect things to possibly go really badly. " + oldEntry.id + ":" + sentry.id + ":" + sentry.state );
+                    Logger.warn("Multiple mappings for blockstate, using old state, expect things to possibly go really badly. " + oldEntry.id + ":" + oldEntry.state + "   " + sentry.id + ":" + sentry.state );
                 }
             } else if (entryType == BIOME_TYPE) {
                 var bentry = BiomeEntry.deserialize(id, entry.getValue());
@@ -376,6 +384,7 @@ public class Mapper {
                 var serialized = new CompoundTag();
                 serialized.putInt("id", this.id);
                 serialized.put("block_state", BlockState.CODEC.encodeStart(NbtOps.INSTANCE, this.state).result().get());
+                serialized.putInt("version", SharedConstants.getCurrentVersion().dataVersion().version());
                 var out = new ByteArrayOutputStream();
                 NbtIo.writeCompressed(serialized, out);
                 return out.toByteArray();
@@ -383,6 +392,9 @@ public class Mapper {
                 throw new RuntimeException(e);
             }
         }
+
+        private static final int DATA_VERSION = SharedConstants.getCurrentVersion().dataVersion().version();
+        private static final int MIN_DATA_VERSION = 4671;//Min version is 1.21.11
 
         public static StateEntry deserialize(int id, byte[] data, boolean[] forceResave) {
             try {
@@ -395,22 +407,23 @@ public class Mapper {
                 if (bsc == null) {
                     throw new IllegalStateException("Expected a block state but it was null: " + compound);
                 }
-                var state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
-                if (state.isError()) {
-                    Logger.info("Could not decode blockstate, attempting fixes, error: "+ state.error().get().message());
-                    bsc = DataFixers.getDataFixer().update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE,bsc),0, SharedConstants.getCurrentVersion().dataVersion().version()).getValue();
-                    state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
-                    if (state.isError()) {
-                        Logger.error("Could not decode blockstate setting to air. id:" + id + " error: " + state.error().get().message());
-                        return new StateEntry(id, Blocks.AIR.defaultBlockState());
-                    } else {
-                        Logger.info("Fixed blockstate to: " + state.getOrThrow());
-                        forceResave[0] |= true;
-                        return new StateEntry(id, state.getOrThrow());
-                    }
-                } else {
-                    return new StateEntry(id, state.getOrThrow());
+                int version = compound.getIntOr("version", MIN_DATA_VERSION);
+                if (version != DATA_VERSION) {
+                    forceResave[0] |= true;
+                    Logger.info("Migrating block from version " + version + " to " + DATA_VERSION);
+                    bsc = DataFixers.getDataFixer().update(References.BLOCK_STATE, new Dynamic<>(NbtOps.INSTANCE,bsc), version, DATA_VERSION).getValue();
                 }
+                var state = BlockState.CODEC.parse(NbtOps.INSTANCE, bsc);
+
+                if (state.isError() && !state.hasResultOrPartial()) {
+                    Logger.error("Could not decode blockstate, setting to air. id:" + id + " error: " + state.error().map(DataResult.Error::message) + " tag:"+bsc);
+                    return new StateEntry(id, Blocks.AIR.defaultBlockState());
+                }
+                if (state.isError() && state.hasResultOrPartial()) {
+                    Logger.error("Decode result only had a partial value, using it anyway. id:" + id + " tag:"+bsc + " error: " + state.error().map(DataResult.Error::message));
+                    forceResave[0] |= true;
+                }
+                return new StateEntry(id, state.getPartialOrThrow());
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
