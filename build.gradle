@@ -403,6 +403,9 @@ dependencies {
     include(implementation 'org.lz4:lz4-java:1.8.0')
     include(implementation('org.tukaani:xz:1.10'))
 
+    testImplementation "org.junit.jupiter:junit-jupiter:5.12.2"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
     if (true) {
         if (!isInGHA) {
             minecraftRuntimeLibraries('org.xerial:sqlite-jdbc:3.49.1.0')
@@ -419,6 +422,17 @@ jmh {
     zip64 = true
     includes=["SaveLoadJMH"]
     //profilers = ["xperfasm"]
+}
+
+tasks.named("test") {
+    useJUnitPlatform()
+    maxHeapSize = "3g"
+    systemProperty "java.awt.headless", "true"
+    testLogging {
+        events "passed", "failed", "skipped"
+        exceptionFormat = "full"
+        showStandardStreams = true
+    }
 }
 
 /*
