@@ -24,6 +24,8 @@ public class IrisUtil {
     public static CapturedViewportParameters CAPTURED_VIEWPORT_PARAMETERS;
 
     public static final boolean IRIS_INSTALLED = FabricLoader.getInstance().isModLoaded("iris");
+    //Iris 1.11.4+ keeps reverse z enabled with shaderpacks (and adds DepthTransformer to patch packs for it)
+    public static final boolean IRIS_REVERSE_Z = IRIS_INSTALLED && IrisUtil.class.getClassLoader().getResource("net/irisshaders/iris/pipeline/transform/transformer/DepthTransformer.class") != null;
     public static final boolean SHADER_SUPPORT = true;//System.getProperty("voxy.enableExperimentalIrisPipeline", "false").equalsIgnoreCase("true");
 
 
