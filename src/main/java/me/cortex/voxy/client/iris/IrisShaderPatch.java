@@ -2,10 +2,14 @@ package me.cortex.voxy.client.iris;
 
 import com.google.gson.*;
 import com.google.gson.annotations.JsonAdapter;
+import io.github.douira.glsl_transformer.ast.transform.ASTParser;
+import io.github.douira.glsl_transformer.ast.transform.SingleASTTransformer;
 import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
+import me.cortex.voxy.client.core.util.IrisUtil;
+import me.cortex.voxy.client.mixin.iris.DepthTransformerAccessor;
 import me.cortex.voxy.common.Logger;
 import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
@@ -397,6 +401,30 @@ public class IrisShaderPatch {
             Logger.error("Shader has voxy patch data, but patch version is incorrect. expected " + VERSION + " got "+patchData.version);
             throw new IllegalStateException("Shader version mismatch expected " + VERSION + " got "+patchData.version);
         }
+
+
+        //TODO:FIXME, wrap in a conditional config attribute/flag to disable it
+        if (IrisUtil.IRIS_REVERSE_Z) {
+            if (patchData.opaquePatchData != null) {
+                patchData.opaquePatchData = stupidEvilHackFixForRevZThatReallyShouldntExistOrBeDoneEverNeedsFixing(patchData.opaquePatchData);
+            }
+            if (patchData.translucentPatchData != null) {
+                patchData.translucentPatchData = stupidEvilHackFixForRevZThatReallyShouldntExistOrBeDoneEverNeedsFixing(patchData.translucentPatchData);
+            }
+        }
+
         return new IrisShaderPatch(patchData, ipack);
+    }
+
+
+    private static String stupidEvilHackFixForRevZThatReallyShouldntExistOrBeDoneEverNeedsFixing(String scr) {
+        if (scr == null) return null;
+        scr = scr.replaceAll("(?<!\\w)?gl_FragDepth(?=\\W|$)", "(1.0-gl_FragDepth)");
+        var parser = new ASTParser();
+        var transform = new SingleASTTransformer<>((translationUnit, root)->{
+            root.replaceReferenceExpressions(parser, "gl_FragCoord", "(vec4(gl_FragCoord.xy,1.0-gl_FragCoord.z,gl_FragCoord.w))");
+            DepthTransformerAccessor.voxy$invertDepthReads(parser, translationUnit, root);
+        });
+        return transform.transform(scr);
     }
 }
