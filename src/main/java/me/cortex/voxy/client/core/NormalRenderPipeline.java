@@ -92,7 +92,8 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
     @Override
     protected void postOpaquePreTranslucent(Viewport<?> viewport, int sourceDepthTexture) {
         GPUTiming.INSTANCE.marker("ao");
-        this.ssao.computeSSAO(viewport, this.colourSSAOTex, this.colourTex, this.fb.getDepthTex(), sourceDepthTexture);
+        this.ssao.computeSSAO(viewport, this.colourSSAOTex, this.colourTex, this.fb.getDepthTex(),
+                sourceDepthTexture, viewport.freecamActive);
         glBindFramebuffer(GL_FRAMEBUFFER, this.fbSSAO.id);
     }
 
