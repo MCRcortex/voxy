@@ -17,6 +17,7 @@ import java.util.Arrays;
 
 
 public class RenderDataFactory {
+    private static final long DOUBLE_SIDED_QUAD_FLAG = Long.MIN_VALUE;
     private static final boolean BUILD_OCCUPANCY_SET = false;
 
     private static final boolean CHECK_NEIGHBOR_FACE_OCCLUSION = true;
@@ -141,7 +142,7 @@ public class RenderDataFactory {
             //shiftAmount += ;
             encodedPosition |= auxPos << (shiftAmount);
 
-            long quad = data | Integer.toUnsignedLong(encodedPosition);
+            long quad = data | Integer.toUnsignedLong(encodedPosition) | (type == 1 ? DOUBLE_SIDED_QUAD_FLAG : 0);
 
 
             int bufferIdx = type+(type==2?face:0);//Translucent, double side, directional
