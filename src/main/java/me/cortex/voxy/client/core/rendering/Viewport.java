@@ -36,6 +36,7 @@ public abstract class Viewport <A extends Viewport<A>> {
     public double cameraX;
     public double cameraY;
     public double cameraZ;
+    public boolean freecamActive;
     public FogParameters fogParameters;
 
     public final Matrix4f MVP = new Matrix4f();
