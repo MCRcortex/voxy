@@ -286,6 +286,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, viewport.indirectLookupBuffer.id);
             glBindBuffer(GL_DRAW_INDIRECT_BUFFER, viewport.drawCountCallBuffer.id);
             glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, SharedIndexBuffer.INSTANCE.id());
+            glDisable(GL_CULL_FACE);
             glEnable(GL_DEPTH_TEST);
             glDepthFunc(this.properties.closerEqualDepthCompare());
             glColorMask(false, false, false, false);
@@ -295,6 +296,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             glDepthMask(true);
             glColorMask(true, true, true, true);
             glDisable(GL_DEPTH_TEST);
+            glEnable(GL_CULL_FACE);
             if (Capabilities.INSTANCE.repFragTest) {
                 glDisable(GL_REPRESENTATIVE_FRAGMENT_TEST_NV);
             }
