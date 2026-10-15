@@ -17,6 +17,8 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.LeavesBlock;
+import net.minecraft.world.level.block.LiquidBlock;
+import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.lwjgl.system.MemoryUtil;
 
@@ -361,8 +363,9 @@ public class Mapper {
         public StateEntry(int id, BlockState state) {
             this.id = id;
             this.state = state;
-            //Override opacity of leaves to be solid
-            if (state.getBlock() instanceof LeavesBlock) {
+            //Override opacity of leaves, snow layers and fluids to be solid, otherwise the mipper prefers the block below
+            // them (e.g. dirt or sand has opacity 15 vs 0-1) and they vanish from all coarser LOD levels
+            if (state.getBlock() instanceof LeavesBlock || state.getBlock() instanceof SnowLayerBlock || state.getBlock() instanceof LiquidBlock) {
                 this.opacity = 15;
             } else {
                 this.opacity = state.getLightDampening();
