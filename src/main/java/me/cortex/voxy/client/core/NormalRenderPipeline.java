@@ -16,6 +16,7 @@ import java.util.function.BooleanSupplier;
 
 import static org.lwjgl.opengl.GL30C.*;
 import static org.lwjgl.opengl.GL43.GL_DEPTH_STENCIL_TEXTURE_MODE;
+import static org.lwjgl.opengl.GL45.glClearNamedFramebufferfv;
 import static org.lwjgl.opengl.GL45C.glBindTextureUnit;
 import static org.lwjgl.opengl.GL45C.glTextureParameterf;
 
@@ -80,6 +81,11 @@ public class NormalRenderPipeline extends AbstractRenderPipeline {
         }
 
         this.initDepthStencil(viewport, sourceDepthTex, this.fb.framebuffer.id, srcWidth, srcHeight, viewport.width, viewport.height);
+
+        if (viewport.freecamActive) {
+            glClearNamedFramebufferfv(this.fb.framebuffer.id, GL_COLOR, 0, new float[]{0,0,0,0});
+        }
+
         return this.fb.getDepthTex().id;
     }
 
