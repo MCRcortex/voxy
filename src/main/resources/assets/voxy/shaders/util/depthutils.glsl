@@ -36,6 +36,7 @@ float NDC2SCREEN_DEPTH(float val) {
 float SCREEN2NDC_DEPTH(float val) {
     return val;
 }
+#define NDC_FAR FAR
 #else
 vec3 NDC2SCREEN(vec3 val) {
     return val*0.5f+0.5f;
@@ -49,6 +50,7 @@ float NDC2SCREEN_DEPTH(float val) {
 float SCREEN2NDC_DEPTH(float val) {
     return val*2.0f-1.0f;
 }
+#define NDC_FAR (FAR*2.0f-1.0f)
 #endif
 
 
@@ -59,6 +61,7 @@ float SCREEN2NDC_DEPTH(float val) {
 #undef REDUCTION2
 #undef NEAR
 #undef FAR
+#undef NDC_FAR
 #undef CLOSER_SIGN
 #undef DEPTH_SCALAR_COMPARE
 #undef DEPTH_SCALAR_COMPARE_EQUAL
