@@ -42,6 +42,7 @@ bool checkPointInView(vec4 point) {
 vec3 _minBB = vec3(0.0f);
 vec3 _maxBB = vec3(0.0f);
 bool _frustumCulled = false;
+bool _nearPlaneCrossing = false;
 
 float _screenSize = 0.0f;
 
@@ -65,8 +66,12 @@ void setupScreenspace(in UnpackedNode node) {
 
 
     vec3 basePos = vec3(((node.pos<<node.lodLevel)-camSecPos)<<5)-camSubSecPos;
+    float nodeSize = float(32<<node.lodLevel);
 
-    _frustumCulled = outsideFrustum(frustum, basePos, float(32<<node.lodLevel));
+    _nearPlaneCrossing = all(lessThanEqual(basePos, vec3(0.0f))) &&
+                         all(lessThan(vec3(0.0f), basePos + vec3(nodeSize)));
+
+    _frustumCulled = (!_nearPlaneCrossing) && outsideFrustum(frustum, basePos, nodeSize);
 
     //Fast exit
     if (_frustumCulled) {
@@ -83,6 +88,10 @@ void setupScreenspace(in UnpackedNode node) {
     vec4 P110 = Axis[1] + P100;
     vec4 P011 = Axis[1] + P001;
     vec4 P111 = Axis[1] + P101;
+
+    _nearPlaneCrossing = _nearPlaneCrossing ||
+        any(lessThanEqual(vec4(P000.w, P100.w, P001.w, P101.w), vec4(0.0f))) ||
+        any(lessThanEqual(vec4(P010.w, P110.w, P011.w, P111.w), vec4(0.0f)));
 
     //vec4 P000 = MVP * vec4(basePos, 1);
     //vec4 P100 = MVP * vec4(basePos+vec3(1,0,0)*(32<<node.lodLevel), 1);
@@ -125,7 +134,7 @@ void setupScreenspace(in UnpackedNode node) {
             ssize += crossMag(C,B);
         }
         ssize *= 0.5f;//Half the size since we did both back and front area
-        _screenSize = ssize;
+        _screenSize = _nearPlaneCrossing ? 1e30f : ssize;
     }
 
     _minBB = min(min(min(p000, p100), min(p001, p101)), min(min(p010, p110), min(p011, p111)));
@@ -150,6 +159,7 @@ bool outsideFrustum() {
 }
 
 bool isCulledByHiz() {
+    if (_nearPlaneCrossing) return false;
     //if (node22.lodLevel!=0) return false;
 
     //Things start breaking down if the area is the entire scree, no idea why, just abort if we hit this case
@@ -195,4 +205,3 @@ bool isCulledByHiz() {
 bool shouldDecend() {
     return _screenSize > minSSS;
 }
-

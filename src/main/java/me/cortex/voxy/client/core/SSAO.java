@@ -120,8 +120,10 @@ public class SSAO {
 
     }
 
-    public void computeSSAO(Viewport<?> viewport, GlTexture colourOut, GlTexture colourIn, GlTexture baseDepthTex, int sourceDepthTexture) {
+    public void computeSSAO(Viewport<?> viewport, GlTexture colourOut, GlTexture colourIn, GlTexture baseDepthTex,
+                            int sourceDepthTexture, boolean freecamActive) {
         this.ssaoCompute.bind();
+        glUniform1i(8, freecamActive ? 1 : 0);
         //The matrices
         try (var stack = MemoryStack.stackPush()) {
             long ptr = stack.nmalloc(4*4*4);

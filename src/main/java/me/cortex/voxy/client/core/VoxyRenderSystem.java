@@ -54,6 +54,8 @@ import static org.lwjgl.opengl.GL43.GL_SHADER_STORAGE_BUFFER;
 import static org.lwjgl.opengl.GL43C.GL_SHADER_STORAGE_BUFFER_BINDING;
 
 public class VoxyRenderSystem {
+    private static final double FREECAM_DISTANCE_SQUARED = 9.0;
+
     private final WorldEngine worldIn;
 
     private final ModelBakerySubsystem modelService;
@@ -193,6 +195,15 @@ public class VoxyRenderSystem {
             return null;
         }
 
+        boolean freecamActive = false;
+        var player = Minecraft.getInstance().player;
+        if (player != null) {
+            double deltaX = cameraX - player.getX();
+            double deltaY = cameraY - player.getY();
+            double deltaZ = cameraZ - player.getZ();
+            freecamActive = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ > FREECAM_DISTANCE_SQUARED;
+        }
+
         //Do some very cheeky stuff for MiB
         if (VoxyCommon.IS_MINE_IN_ABYSS) {
             int sector = (((int)Math.floor(cameraX)>>4)+512)>>10;
@@ -212,6 +223,7 @@ public class VoxyRenderSystem {
 
         float near = getVanillaRenderDistance()<=32.0f?8f:16f;
         near = VoxyClient.disableSodiumChunkRender()?0.1f:near;
+        near = freecamActive ? 0.1f : near;
         var voxyProjection = computeProjectionMat(this.properties, vanillaProjection, near, far);
 
         /*
@@ -242,6 +254,7 @@ public class VoxyRenderSystem {
                 .setScreenSize(width, height)
                 .setFogParameters(fogParameters)
                 .update();
+        viewport.freecamActive = freecamActive;
 
         if (VoxyClient.getOcclusionDebugState()==0) {
             viewport.frameId++;
@@ -298,7 +311,8 @@ public class VoxyRenderSystem {
         this.pipeline.preSetup(viewport);
 
         TimingStatistics.E.start();
-        if (this.visbleSectionStream != null && (!VoxyClient.disableSodiumChunkRender()) && !IrisUtil.irisShadowActive()) {
+        if (this.visbleSectionStream != null && (!VoxyClient.disableSodiumChunkRender()) && !IrisUtil.irisShadowActive()
+                && !viewport.freecamActive) {
             if (VoxyClient.isFrexActive()!=(this.columnStreamedBoundStore!=null)) {
                 if (this.columnStreamedBoundStore == null) {
                     this.columnStreamedBoundStore = new ColumnStreamedBoundStore();

@@ -60,6 +60,10 @@ bool useDiscard() {
     return (interData.x&1u)==1u;
 }
 
+bool isDoubleSided() {
+    return (interData.x&2u)!=0u;
+}
+
 uint getFace() {
     return (interData.x>>4)&7u;
 }
@@ -114,6 +118,12 @@ vec4 computeColour(vec2 texturePos, vec4 colour) {
 
 
 void main() {
+    uint face = getFace();
+    bool outwardFacing = gl_FrontFacing == (((face&1u) ^ uint((face>>1)!=0u)) != 0u);
+    if (!isDoubleSided() && !outwardFacing) {
+        discard;
+    }
+
     //vec2 uv = vec2(0);
     //Tile is the tile we are in
     vec2 tile;
@@ -214,7 +224,6 @@ void main() {
         tint = uint2vec4RGBA(interData.z).yzwx;
     }
 
-    uint face = getFace();
     face ^= uint((face&1u)!=uint(gl_FrontFacing!=((face>>1)!=0u)));
     voxy_emitFragment(VoxyFragmentParameters(colour, tile, texPos, face, modelId, getLightmapUv(interData.y), tint, model.customId));
 
@@ -249,4 +258,3 @@ colour = textureGrad(blockModelAtlas, texPos, dx, dy);
 
 //Undefine the depth stuff
 #import <voxy:util/depthutils.glsl>
-

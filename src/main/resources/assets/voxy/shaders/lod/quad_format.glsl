@@ -32,6 +32,10 @@ bool isQuadEmpty(uint64_t quad) {
     return quad == uint64_t(0);
 }
 
+bool isQuadDoubleSided(uint64_t quad) {
+    return (quad>>63) != uint64_t(0);
+}
+
 #else
 //TODO: FIXME, ivec2 swaps around the data of the x and y cause its written in little endian
 
@@ -76,4 +80,9 @@ uint extractLightId(ivec2 quad) {
 bool isQuadEmpty(ivec2 quad) {
     return all(equal(quad, ivec2(0)));
 }
+
+bool isQuadDoubleSided(ivec2 quad) {
+    return quad.y < 0;
+}
+
 #endif
