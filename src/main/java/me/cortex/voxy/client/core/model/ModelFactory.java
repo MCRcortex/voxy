@@ -536,6 +536,7 @@ public class ModelFactory {
 
         //TODO: FIXME faces that have the same "alignment depth" e.g. (sizes[0]+sizes[1])~=1 can be merged into a double faced single quad
 
+        int partialTintMask = 0;
         //TODO: add a bunch of control config options for overriding/setting options of metadata for each face of each type
         for (int face = 5; face != -1; face--) {//In reverse order to make indexing into the metadata long easier
             long faceUploadPtr = uploadPtr + 4L * face;//Each face gets 4 bytes worth of data
@@ -600,25 +601,30 @@ public class ModelFactory {
             faceModelData |= Math.min(enc,62)<<16;
             //Still have 11 bits free
 
+            int tintState = 0;
+            //Bits 24,25 are tint metadata
+            if (tintSources!=null) {//We have a tint
+                tintState = TextureUtils.computeFaceTint(textureData[face], checkMode);
+                if (tintState == 2) {//Partial tint
+                    faceModelData |= 1<<24;
+                    partialTintMask |= 1<<face;
+                } else if (tintState == 3) {//Full tint
+                    faceModelData |= 2<<24;
+                }
+            }
+
             //Stuff like fences are solid, however they have extra side piece that mean it needs to have discard on
             int area = (faceSize[1]-faceSize[0]+1) * (faceSize[3]-faceSize[2]+1);
             boolean needsAlphaDiscard = ((float)writeCount)/area<0.9;//If the amount of area covered by written pixels is less than a threashold, disable discard as its not needed
 
             needsAlphaDiscard |= layer != ChunkSectionLayer.SOLID;
             needsAlphaDiscard &= layer != ChunkSectionLayer.TRANSLUCENT;//Translucent doesnt have alpha discard
+            if (tintState == 2) {
+                needsAlphaDiscard = false;//Partial tint faces use alpha as a tint mask and must not discard
+            }
             faceModelData |= needsAlphaDiscard?1<<22:0;
 
             faceModelData |= ((!faceCoversFullBlock)&&layer != ChunkSectionLayer.TRANSLUCENT)?1<<23:0;//Alpha discard override, translucency doesnt have alpha discard
-
-            //Bits 24,25 are tint metadata
-            if (tintSources!=null) {//We have a tint
-                int tintState = TextureUtils.computeFaceTint(textureData[face], checkMode);
-                if (tintState == 2) {//Partial tint
-                    faceModelData |= 1<<24;
-                } else if (tintState == 3) {//Full tint
-                    faceModelData |= 2<<24;
-                }
-            }
 
             MemoryUtil.memPutInt(faceUploadPtr, faceModelData);
         }
@@ -685,7 +691,7 @@ public class ModelFactory {
         //TODO callback to inject extra data into the model data
 
         if (uploadResult.hasMips)
-            MipGen.putTextures(darkenedTinting, textureData, uploadResult.texture);
+            MipGen.putTextures(darkenedTinting, partialTintMask, textureData, uploadResult.texture);
 
         //glGenerateTextureMipmap(this.textures.id);
 
