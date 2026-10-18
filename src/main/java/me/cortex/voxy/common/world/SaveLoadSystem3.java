@@ -115,7 +115,7 @@ public class SaveLoadSystem3 {
 
 
     //Warning: mutates the inout buffer directly, returns a sliced version of the input if something changed (frees the memory)
-    public static MemoryBuffer remap(MemoryBuffer inout, int[] blockStates, int@Nullable [] biomes) {
+    public static MemoryBuffer remap(MemoryBuffer inout, int[] blockStates, int @Nullable [] biomes) {
         if (blockStates == null) throw new IllegalArgumentException();
         long ptr = inout.address;
         long key = MemoryUtil.memGetLong(ptr); ptr += 8;
@@ -135,6 +135,8 @@ public class SaveLoadSystem3 {
         }
 
         boolean changed = false;
+
+        //TODO: opto this so that it doesnt write anything until it encounters a missmatch
         //For perf reasons, split it into 2 different varients
         if (biomes == null) {
             for (int i = 0; i < lutSize; i++) {
@@ -161,6 +163,7 @@ public class SaveLoadSystem3 {
                 lutRemap[i] = remapped;
             }
         }
+
         //if nothing changed then just return
         if (!changed) return null;//Nothing changed
 
