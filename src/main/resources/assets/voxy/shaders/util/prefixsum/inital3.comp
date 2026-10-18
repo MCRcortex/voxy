@@ -12,113 +12,45 @@ layout(binding = IO_BUFFER, std430) buffer InputBuffer {
     uvec4[] ioCount;
 };
 
-shared uint warpPrefixSum[8];//Warps are 32, tricks require full warp
+shared uint subgroupTotals[WORK_SIZE];//One per subgroup, sized for any subgroup size
 
 void main() {
-    if (gl_SubgroupSize == 32) {
-        #ifdef IS_INTEL
-        uint subgroupId = gl_LocalInvocationID.x>>5;
-        #else
-        uint subgroupId = gl_SubgroupID;
-        #endif
+    //Dont trust gl_SubgroupSize/gl_SubgroupID/gl_NumSubgroups, mesa intel reports gl_SubgroupSize=32 while running this 16 wide
+    // and gl_SubgroupID is broken on some intel drivers, so derive the real size from the active lanes instead
+    // (all lanes are active here as WORK_SIZE is a multiple of any subgroup size)
+    //This assumes subgroups are made of consecutive invocations, which the subgroup scan below requires anyway
+    uint subgroupSize = subgroupAdd(1u);
+    uint subgroupId = gl_LocalInvocationID.x/subgroupSize;
 
-        //todo
-        //assert(gl_SubgroupSize == 32);
-        //assert(gl_NumSubgroups == (WORK_SIZE>>5));
-
-        uint gid = gl_GlobalInvocationID.x;
-        uvec4 count = uvec4(0);
-        uint sum = 0;
-        {
-            uvec4 dat = ioCount[gid];
-            count.yzw = dat.xyz;
-            count.z += count.y;
-            count.w += count.z;
-            sum = count.w + dat.w;
-        }
-        subgroupBarrier();//Wait for all threads in the subgroup to get the buffer
-
-        count += subgroupExclusiveAdd(sum);
-
-        if (gl_SubgroupInvocationID==31) {
-            warpPrefixSum[subgroupId] = count.x+sum;
-        }
-
-        memoryBarrierShared();
-        barrier();
-
-        if (gl_LocalInvocationID.x<8) {
-            uint val = warpPrefixSum[gl_SubgroupInvocationID];
-            subgroupBarrier();
-            //Use warp to do entire add in 1 reduction
-            warpPrefixSum[gl_SubgroupInvocationID] = subgroupExclusiveAdd(val);
-        }
-
-        memoryBarrierShared();
-        barrier();
-
-        //Add the computed sum across all threads and warps
-        count += warpPrefixSum[subgroupId];
-        ioCount[gid] = count;
-    } else {
-        #ifdef IS_INTEL
-        uint subgroupId = gl_LocalInvocationID.x>>6;
-        #else
-        uint subgroupId = gl_SubgroupID;
-        #endif
-
-        //todo
-        //assert(gl_SubgroupSize == 32);
-        //assert(gl_NumSubgroups == (WORK_SIZE>>5));
-
-        uint gid = gl_GlobalInvocationID.x;
-        uvec4 count = uvec4(0);
-        uint sum = 0;
-        {
-            uvec4 dat = ioCount[gid];
-            count.yzw = dat.xyz;
-            count.z += count.y;
-            count.w += count.z;
-            sum = count.w + dat.w;
-        }
-        subgroupBarrier();//Wait for all threads in the subgroup to get the buffer
-
-        count += subgroupExclusiveAdd(sum);
-
-        if (gl_SubgroupInvocationID==63) {
-            warpPrefixSum[subgroupId] = count.x+sum;
-        }
-
-        memoryBarrierShared();
-        barrier();
-
-
-        #ifdef IS_WINDOWS
-        //hate amd hate amd hate amd hate amd
-        uint val = warpPrefixSum[gl_LocalInvocationID.x&3u];
-
-        subgroupBarrier();
-        //Use warp to do entire add in 1 reduction
-        uint extraJank = subgroupExclusiveAdd(val);
-
-        barrier();
-        if (gl_LocalInvocationID.x<4) {
-            warpPrefixSum[gl_LocalInvocationID.x] = extraJank;
-        }
-        #else
-        if (gl_LocalInvocationID.x<4) {
-            uint val = warpPrefixSum[gl_SubgroupInvocationID];
-            subgroupBarrier();
-            //Use warp to do entire add in 1 reduction
-            warpPrefixSum[gl_SubgroupInvocationID] = subgroupExclusiveAdd(val);
-        }
-        #endif
-
-        memoryBarrierShared();
-        barrier();
-
-        //Add the computed sum across all threads and warps
-        count += warpPrefixSum[subgroupId];
-        ioCount[gid] = count;
+    uint gid = gl_GlobalInvocationID.x;
+    uvec4 count = uvec4(0);
+    uint sum = 0;
+    {
+        uvec4 dat = ioCount[gid];
+        count.yzw = dat.xyz;
+        count.z += count.y;
+        count.w += count.z;
+        sum = count.w + dat.w;
     }
+
+    count += subgroupExclusiveAdd(sum);
+    uint subgroupTotal = subgroupAdd(sum);
+    if (subgroupElect()) {
+        subgroupTotals[subgroupId] = subgroupTotal;
+    }
+
+    memoryBarrierShared();
+    barrier();
+
+    //Sum the totals of all preceding subgroups, each lane loads one of them and then reduce across the subgroup
+    // the loop condition is uniform within the subgroup so the reduction is never in divergent control flow
+    uint base = 0;
+    for (uint i = 0; i < subgroupId; i += subgroupSize) {
+        uint idx = i + gl_SubgroupInvocationID;
+        if (idx < subgroupId) {
+            base += subgroupTotals[idx];
+        }
+    }
+    base = subgroupAdd(base);
+    ioCount[gid] = count + base;
 }
