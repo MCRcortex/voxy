@@ -207,7 +207,7 @@ def smartDependency(String property, boolean runtime = false, String maven = nul
     Object dep;
     if (ver.endsWith(".jar")) {
         //File type
-        dep = file(ver)
+        dep = files(ver)
     } else {//Asume mvn
         //Hack, default modrinth maven
         if (maven == null) {
