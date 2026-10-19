@@ -4,6 +4,7 @@ layout(local_size_x = 8, local_size_y = 8) in;
 layout(binding = 0, rgba8) uniform writeonly restrict image2D colourTexOut;
 layout(binding = 1) uniform sampler2D colourTex;
 layout(binding = 2) uniform sampler2D depthTex;
+layout(location = 8) uniform bool freecamActive;
 
 #import <voxy:util/depthutils.glsl>
 
@@ -31,7 +32,10 @@ vec4 reDeProject(vec3 pos) {
     vec4 view = MVP * vec4(pos, 1.0);
     view.xy /= view.w;
     vec2 samplePos = view.xy*0.5+0.5;//Does not change reguardless of depth state
-    samplePos = clamp((vec2(ivec2(samplePos*size))+0.5)*scale, vec2(0.0f), vec2(1.0f));
+    if (any(lessThan(samplePos, vec2(0.0f))) || any(greaterThanEqual(samplePos, vec2(1.0f)))) {
+        return vec4(-1.0f);
+    }
+    samplePos = (vec2(ivec2(samplePos*size))+0.5)*scale;
     view.xy = samplePos;
 
     /*
@@ -181,11 +185,14 @@ float computeAO(vec3 uvDepth, vec3 worldNorm)
         //TODO: note get_ssao_sample_offset(i, vec2(0.5)) is CONSTANT (its the same every frame for every sample, can move it into a const array or compute it during compile)
 
         #ifdef USE_GENERATED_SAMPLE_POINTS
-        vec2 sample_uv = clamp(uvDepth.xy + sample_matrix * SAMPLE_POINTS[i], vec2(0), vec2(1));
+        vec2 sample_uv = uvDepth.xy + sample_matrix * SAMPLE_POINTS[i];
         #else
-        vec2 sample_uv = clamp(uvDepth.xy + sample_matrix*get_ssao_sample_offset(i, vec2(0.5f)), vec2(0), vec2(1));
+        vec2 sample_uv = uvDepth.xy + sample_matrix*get_ssao_sample_offset(i, vec2(0.5f));
         //vec2 sample_uv = clamp(uvDepth.xy + sample_matrix*get_ssao_sample_offset(i, r2(int(gl_GlobalInvocationID.x*982379281+gl_GlobalInvocationID.y+18711)%8192)), vec2(0), vec2(1));
         #endif
+        if (any(lessThan(sample_uv, vec2(0.0f))) || any(greaterThanEqual(sample_uv, vec2(1.0f)))) {
+            continue;
+        }
         sample_uv = (vec2(ivec2(sample_uv*size))+0.5)*scale;
         float depth = texture(depthTex, sample_uv).x;
 
@@ -256,7 +263,7 @@ void main() {
     if (depth!=NEAR && depth!=FAR) {
         vec4 colour = texture(colourTex, point);
         if (colour == vec4(0.0f, 0.0f, 0.0f, 0.0f)) {
-            ocolour = vec4(1.0f, 0.0f, 0.0f, 1.0f);
+            ocolour = freecamActive ? vec4(0.0f) : vec4(1.0f, 0.0f, 0.0f, 1.0f);
         } else {
             uint metadata = uint(colour.w*255.0f);
             uint face = metadata&7u;
@@ -267,7 +274,7 @@ void main() {
             ocolour = colour;
             ocolour.w = 1.0f;
 
-            if (hasAO) {
+            if (hasAO && !freecamActive) {
                 vec3 worldNormal = face2norm(face);
                 ocolour.rgb *= computeAO(vec3(point, depth), worldNormal);
             }

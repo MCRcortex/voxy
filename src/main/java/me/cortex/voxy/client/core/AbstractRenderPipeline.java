@@ -62,6 +62,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
     protected AbstractSectionRenderer<?,?> sectionRenderer;
 
     private final FullscreenBlit depthStencilSetup;
+    private final FullscreenBlit freecamDepthSetup;
 
     public final DepthFramebuffer fb = new DepthFramebuffer(GL_DEPTH24_STENCIL8);
 
@@ -84,6 +85,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         this.deferTranslucency = deferTranslucency;
 
         this.depthStencilSetup = new FullscreenBlit(properties, "voxy:post/fullscreen2.vert", "voxy:post/setup_stencil_depth.frag");
+        this.freecamDepthSetup = new FullscreenBlit(properties, "voxy:post/fullscreen2.vert", "voxy:post/setup_depth_freecam.frag");
     }
 
     //Allows pipelines to configure model baking system
@@ -149,6 +151,28 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         // using blit to copy depth from mismatched depth formats is not portable so instead a full screen pass is performed for a depth copy
         // the mismatched formats in this case is the d32 to d24s8
         glBindFramebuffer(GL30.GL_FRAMEBUFFER, targetFb);
+
+        if (viewport.freecamActive) {
+            glDisable(GL_STENCIL_TEST);
+            glEnable(GL_DEPTH_TEST);
+            glDepthFunc(GL_ALWAYS);
+            glDepthMask(true);
+            glColorMask(false,false,false,false);
+
+            this.freecamDepthSetup.bind();
+            glBindTextureUnit(0, sourceDepthTexture);
+            glBindSampler(0, DEPTH_SAMPLER);
+            new Matrix4f(viewport.vanillaProjection).mul(viewport.modelView).invert().getToAddress(SCRATCH);
+            nglUniformMatrix4fv(1, 1, false, SCRATCH);
+            viewport.MVP.getToAddress(SCRATCH);
+            nglUniformMatrix4fv(2, 1, false, SCRATCH);
+            glUniform2f(3,((float)width)/srcWidth, ((float)height)/srcHeight);
+            this.freecamDepthSetup.blit();
+
+            glDepthFunc(this.properties.closerEqualDepthCompare());
+            glColorMask(true,true,true,true);
+            return;
+        }
 
         //If pixel passes, update stencil to 0 and set depth to 0
         glEnable(GL_DEPTH_TEST);
@@ -233,6 +257,7 @@ public abstract class AbstractRenderPipeline extends TrackedObject {
         this.fb.free();
         this.sectionRenderer.free();
         this.depthStencilSetup.delete();
+        this.freecamDepthSetup.delete();
         super.free0();
     }
 

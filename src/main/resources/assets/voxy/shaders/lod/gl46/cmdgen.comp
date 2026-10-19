@@ -62,8 +62,12 @@ void main() {
 
     uint dat = visibilityData[sectionId];
 
-    //if the section was visible this frame
-    bool shouldRender = (dat&0x7fffffffu) == frameId;
+    vec3 sectionMin = cornerPos + vec3(extractAABBOffset(meta)) * float(1<<detail);
+    vec3 sectionMax = sectionMin + vec3(extractAABBSize(meta)) * float(1<<detail);
+    bool cameraInsideSection = all(lessThanEqual(sectionMin, vec3(0.0f))) &&
+                               all(lessThanEqual(vec3(0.0f), sectionMax));
+
+    bool shouldRender = (dat&0x7fffffffu) == frameId || cameraInsideSection;
     bool renderTemporally = (dat&0x80000000u)==0;// means, if it was not visible last frame
 
 

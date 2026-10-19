@@ -127,7 +127,8 @@ void setupQuad(out QuadData quad, const in Quad rawQuad, uvec2 sPos, bool genera
     ivec2 quadSize = extractSize(rawQuad);
 
     if (generateAttributes) {
-        quad.attributeData.x = makeQuadFlags(faceData, modelId, quadSize, model, face);
+        quad.attributeData.x = makeQuadFlags(faceData, modelId, quadSize, model, face) |
+                               (uint(isQuadDoubleSided(rawQuad))<<1);
         quad.attributeData.yzw = makeRemainingAttributes(model, rawQuad, lodLevel, face);
     }
 
