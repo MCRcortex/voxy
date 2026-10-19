@@ -1,0 +1,41 @@
+{
+  "voxy.config.title": "Voxy",
+
+  "voxy.config.general": "Genel",
+  "voxy.config.rendering": "İşleme",
+
+  "voxy.config.general.enabled": "Voxy'yi etkinleştir",
+  "voxy.config.general.enabled.tooltip": "Voxy'yi etkinleştirir veya devre dışı bırakır",
+
+  "voxy.config.general.serviceThreads": "Hizmet iş parçacıkları",
+  "voxy.config.general.serviceThreads.tooltip": "ServiceThreadPool'un kullanabileceği iş parçacığı sayısı",
+
+  "voxy.config.general.useSodiumBuilder": "Sodium iş parçacıklarını kullan",
+  "voxy.config.general.useSodiumBuilder.tooltip": "Sodium oluşturucu iş parçacıklarını Voxy'nin iş parçacığı havuzuna dahil eder; yüksek görüş mesafelerinde hızlı hareket ederken takılmaları ve gecikmeleri azaltabilir",
+
+  "voxy.config.general.ingest": "Yığın Alımı",
+  "voxy.config.general.ingest.tooltip": "Voxy'nin yeni yığınları LoD modellerine dönüştürme özelliğini etkinleştirir veya devre dışı bırakır",
+
+  "voxy.config.general.rendering": "Voxy İşleme",
+  "voxy.config.general.rendering.tooltip": "Voxy'nin işlemesini etkinleştirir veya devre dışı bırakır",
+
+  "voxy.config.general.subDivisionSize": "Alt bölüm boyutunun piksel²'si",
+  "voxy.config.general.subDivisionSize.tooltip": "Daha küçük LoD'lara bölünmeden önceki ekran alanı AABB'sinin piksel² cinsinden maksimum boyutu (Daha düşük değerler daha yüksek kalite sağlar)",
+
+  "voxy.config.general.renderDistance": "Görüş mesafesi",
+  "voxy.config.general.renderDistance.tooltip": "Voxy'nin yığın cinsinden görüş mesafesi",
+
+  "voxy.config.general.environmental_fog": "Sis ve solma efekti",
+  "voxy.config.general.environmental_fog.tooltip": "Çevresel sis ve mesafe solma efektlerini yapılandırır",
+  "voxy.config.general.environmental_fog.fog_and_fade": "Sis ve Solma",
+  "voxy.config.general.environmental_fog.fog": "Sadece Sis",
+  "voxy.config.general.environmental_fog.fade": "Sadece Solma",
+  "voxy.config.general.environmental_fog.off": "Kapalı",
+
+  "voxy.config.general.ssao_mode": "SSAO modu",
+  "voxy.config.general.ssao_mode.tooltip": "Ekran alanı ortam kapatma (screen space ambient occlusion) için kullanılan mod (Varsayılan ayar performans ve kalite dengesini sağlamaya en yakın olandır.)",
+  "voxy.config.general.ssao_mode.auto": "Otomatik",
+  "voxy.config.general.ssao_mode.basic": "Temel",
+  "voxy.config.general.ssao_mode.better": "Daha iyi",
+  "voxy.config.general.ssao_mode.best": "En iyi"
+}
