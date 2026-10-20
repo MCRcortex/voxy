@@ -1,0 +1,38 @@
+{
+  "voxy.config.title": "Voxy",
+
+  "voxy.config.general": "Загальні",
+  "voxy.config.rendering": "Промальовування",
+  
+  "voxy.config.general.enabled": "Увімкнути Voxy",
+  "voxy.config.general.enabled.tooltip": "Повністю вмикає або вимикає Voxy.",
+
+  "voxy.config.general.serviceThreads": "Потоки служби",
+  "voxy.config.general.serviceThreads.tooltip": "Кількість потоків, які може використовувати ServiceThreadPool.",
+
+  "voxy.config.general.useSodiumBuilder": "Використовувати потоки Sodium",
+  "voxy.config.general.useSodiumBuilder.tooltip": "Використовує потоки Sodium для створення як частину пулу потоків Voxy, може зменшити фрізи та відставання під час швидкого переміщення за великої дальности промальовування.",
+
+  "voxy.config.general.ingest": "Передача блока",
+  "voxy.config.general.ingest.tooltip": "Умикає або вимикає здатність Voxy перетворювати нові чанки в зони РД.",
+
+  "voxy.config.general.rendering": "Промальовування Voxy",
+  "voxy.config.general.rendering.tooltip": "Умикає або вимикає промальовування Voxy.",
+
+  "voxy.config.general.subDivisionSize": "Пікселі^2 розміру підрозділу",
+  "voxy.config.general.subDivisionSize.tooltip": "Максимальний розмір у пікселях (у квадраті) простору екрана AABB перед поділом на менші зони РД (менші — це вища якість).",
+
+  "voxy.config.general.renderDistance": "Дальність промальовування",
+  "voxy.config.general.renderDistance.tooltip": "Дальність промальовування Voxy у чанках.",
+
+  "voxy.config.general.environmental_fog": "Увімкнути навколишній туман",
+  "voxy.config.general.environmental_fog.tooltip": "Умикає або вимикає промальовування навколишнього туману Voxy.",
+
+  "voxy.config.general.render_fog": "Увімкнути промальовування туману",
+  "voxy.config.general.render_fog.tooltip": "Умикає або вимикає промальовування ефекту туману.",
+
+  "voxy.config.general.render_statistics": "Увімкнути статистику промальовування",
+  "voxy.config.general.render_statistics.tooltip": "Умикає статистику промальовування в меню налагодження, корисно для цього.",
+
+  "modmenu.descriptionTranslation.voxy": "Мод для промальовування на далекій відстані з використанням зони РД."
+}
