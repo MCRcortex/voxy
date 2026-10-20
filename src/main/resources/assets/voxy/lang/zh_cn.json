@@ -1,0 +1,36 @@
+{
+  "voxy.config.title": "Voxy",
+
+  "voxy.config.general": "通用",
+  "voxy.config.rendering": "渲染",
+
+  "voxy.config.general.enabled": "启用 Voxy",
+  "voxy.config.general.enabled.tooltip": "完全启用或禁用 Voxy",
+
+  "voxy.config.general.serviceThreads": "服务线程数",
+  "voxy.config.general.serviceThreads.tooltip": "服务线程池可使用的线程数量",
+
+  "voxy.config.general.useSodiumBuilder": "使用 Sodium 线程",
+  "voxy.config.general.useSodiumBuilder.tooltip": "将 Sodium 的构建器线程加入 Voxy 线程池，高渲染距离下快速移动时可减少卡顿",
+
+  "voxy.config.general.ingest": "区块载入",
+  "voxy.config.general.ingest.tooltip": "启用或禁用 Voxy 将新区块转换为细节层次（LoD）的功能",
+
+  "voxy.config.general.rendering": "Voxy 渲染",
+  "voxy.config.general.rendering.tooltip": "启用或禁用 Voxy 渲染",
+
+  "voxy.config.general.subDivisionSize": "细分像素面积阈值",
+  "voxy.config.general.subDivisionSize.tooltip": "屏幕空间 AABB 的最大像素面积（平方），超过此值将细分至更精细的 LoD（数值越小，质量越高）",
+
+  "voxy.config.general.renderDistance": "渲染距离",
+  "voxy.config.general.renderDistance.tooltip": "Voxy 的渲染距离（单位：区块）",
+
+  "voxy.config.general.environmental_fog": "启用环境雾效",
+  "voxy.config.general.environmental_fog.tooltip": "启用或禁用 Voxy 的环境雾效渲染",
+
+  "voxy.config.general.render_fog": "启用渲染雾效",
+  "voxy.config.general.render_fog.tooltip": "启用或禁用渲染雾效效果",
+
+  "voxy.config.general.render_statistics": "启用渲染统计信息",
+  "voxy.config.general.render_statistics.tooltip": "在 F3 调试界面中显示渲染统计信息，便于调试"
+}
