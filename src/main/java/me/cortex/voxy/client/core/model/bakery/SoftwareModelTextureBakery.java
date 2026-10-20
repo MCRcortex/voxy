@@ -10,6 +10,7 @@ import net.minecraft.client.renderer.block.BlockAndTintGetter;
 import net.minecraft.client.renderer.block.FluidRenderer;
 import net.minecraft.client.renderer.block.dispatch.BlockStateModelPart;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.resources.model.geometry.BakedQuad;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.Identifier;
@@ -49,6 +50,8 @@ public class SoftwareModelTextureBakery {
 
     private final ReuseVertexConsumer opaqueVC = new ReuseVertexConsumer();
     private final ReuseVertexConsumer translucentVC = new ReuseVertexConsumer(1/*has discard*/);
+    private final ReuseVertexConsumer opaqueVC2 = new ReuseVertexConsumer();
+    private final ReuseVertexConsumer translucentVC2 = new ReuseVertexConsumer(1/*has discard*/);
     private final SoftwareRasterizer rasterizer = new SoftwareRasterizer(ModelFactory.MODEL_TEXTURE_SIZE);
 
     private final FluidRenderer fr;
@@ -83,9 +86,43 @@ public class SoftwareModelTextureBakery {
         this.rasterizer.setSamplerTexture(texture, width, height);
     }
 
-    private void bakeBlockModel(BlockState state) {
+    private static int classifyCrossQuad(BakedQuad quad) {
+        float minX = Float.POSITIVE_INFINITY, maxX = Float.NEGATIVE_INFINITY;
+        float minY = Float.POSITIVE_INFINITY, maxY = Float.NEGATIVE_INFINITY;
+        float minZ = Float.POSITIVE_INFINITY, maxZ = Float.NEGATIVE_INFINITY;
+        for (int i = 0; i < 4; i++) {
+            var pos = quad.position(i);
+            minX = Math.min(minX, pos.x()); maxX = Math.max(maxX, pos.x());
+            minY = Math.min(minY, pos.y()); maxY = Math.max(maxY, pos.y());
+            minZ = Math.min(minZ, pos.z()); maxZ = Math.max(maxZ, pos.z());
+        }
+        float dx = maxX - minX;
+        float dy = maxY - minY;
+        float dz = maxZ - minZ;
+        if (dx <= 0.15f || dy <= 0.15f || dz <= 0.15f || Math.abs(dx - dz) >= 0.2f) {
+            return 0;
+        }
+        boolean diag1 = true;
+        boolean diag2 = true;
+        for (int i = 0; i < 4; i++) {
+            var pos = quad.position(i);
+            float tx = (pos.x() - minX) / dx;
+            float tz = (pos.z() - minZ) / dz;
+            if (Math.abs(tx - tz) > 0.15f) {
+                diag1 = false;
+            }
+            if (Math.abs(tx - (1.0f - tz)) > 0.15f) {
+                diag2 = false;
+            }
+        }
+        if (diag1) return 1;
+        if (diag2) return 2;
+        return 0;
+    }
+
+    private boolean bakeBlockModel(BlockState state) {
         if (state.getRenderShape() == RenderShape.INVISIBLE) {
-            return;//Dont bake if invisible
+            return false;//Dont bake if invisible
         }
         var model = Minecraft.getInstance()
                 .getModelManager()
@@ -94,15 +131,59 @@ public class SoftwareModelTextureBakery {
 
         List<BlockStateModelPart> out = new ArrayList<>();
         model.collectParts(new SingleThreadedRandomSource(42L), out);
-        for (var part : out) {
-            for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null}) {
-                var quads = part.getQuads(direction);
+
+        boolean canBeCross = !state.is(BlockTags.LEAVES);
+        boolean hasDiag1 = false;
+        boolean hasDiag2 = false;
+        if (canBeCross) {
+            outer:
+            for (var part : out) {
+                for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST}) {
+                    if (!part.getQuads(direction).isEmpty()) {
+                        canBeCross = false;
+                        break outer;
+                    }
+                }
+                var quads = part.getQuads(null);
                 for (var quad : quads) {
-                    (quad.materialInfo().layer()==ChunkSectionLayer.TRANSLUCENT?this.translucentVC:this.opaqueVC)
-                            .quad(quad, state.is(BlockTags.LEAVES));
+                    int diag = classifyCrossQuad(quad);
+                    if (diag == 1) {
+                        hasDiag1 = true;
+                    } else if (diag == 2) {
+                        hasDiag2 = true;
+                    } else {
+                        canBeCross = false;
+                        break outer;
+                    }
                 }
             }
         }
+
+        boolean isCross = canBeCross && hasDiag1 && hasDiag2;
+        boolean isLeaves = state.is(BlockTags.LEAVES);
+
+        for (var part : out) {
+            if (isCross) {
+                for (var quad : part.getQuads(null)) {
+                    int diag = classifyCrossQuad(quad);
+                    boolean translucent = quad.materialInfo().layer() == ChunkSectionLayer.TRANSLUCENT;
+                    if (diag == 1) {
+                        (translucent ? this.translucentVC : this.opaqueVC).quad(quad, isLeaves);
+                    } else {
+                        (translucent ? this.translucentVC2 : this.opaqueVC2).quad(quad, isLeaves);
+                    }
+                }
+            } else {
+                for (Direction direction : new Direction[]{Direction.DOWN, Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST, null}) {
+                    var quads = part.getQuads(direction);
+                    for (var quad : quads) {
+                        (quad.materialInfo().layer()==ChunkSectionLayer.TRANSLUCENT?this.translucentVC:this.opaqueVC)
+                                .quad(quad, isLeaves);
+                    }
+                }
+            }
+        }
+        return isCross;
     }
 
 
@@ -197,6 +278,8 @@ public class SoftwareModelTextureBakery {
     public void free() {
         this.opaqueVC.free();
         this.translucentVC.free();
+        this.opaqueVC2.free();
+        this.translucentVC2.free();
     }
 
     private static final long SINGLE_FACE_OUTPUT_SIZE = (ModelFactory.MODEL_TEXTURE_SIZE * ModelFactory.MODEL_TEXTURE_SIZE)*8;
@@ -226,15 +309,38 @@ public class SoftwareModelTextureBakery {
         boolean isAnyDarkend = false;
         boolean anyTranslucent = false;
         boolean anyDiscard = false;
+        boolean isCrossModel = false;
         if (isBlock) {
             this.opaqueVC.reset();
             this.translucentVC.reset();
-            this.bakeBlockModel(state);
-            isAnyShaded |= this.opaqueVC.anyShaded|this.translucentVC.anyShaded;
-            isAnyDarkend |= this.opaqueVC.anyDarkendTex|this.translucentVC.anyDarkendTex;
-            anyTranslucent |= !this.translucentVC.isEmpty();
-            anyDiscard |= this.opaqueVC.anyDiscard;
-            if (!(this.opaqueVC.isEmpty()&&this.translucentVC.isEmpty())) {//only render if there... is shit to render
+            this.opaqueVC2.reset();
+            this.translucentVC2.reset();
+            isCrossModel = this.bakeBlockModel(state);
+            isAnyShaded |= this.opaqueVC.anyShaded|this.translucentVC.anyShaded|this.opaqueVC2.anyShaded|this.translucentVC2.anyShaded;
+            isAnyDarkend |= this.opaqueVC.anyDarkendTex|this.translucentVC.anyDarkendTex|this.opaqueVC2.anyDarkendTex|this.translucentVC2.anyDarkendTex;
+            anyTranslucent |= !this.translucentVC.isEmpty()|!this.translucentVC2.isEmpty();
+            anyDiscard |= this.opaqueVC.anyDiscard|this.opaqueVC2.anyDiscard;
+            if (isCrossModel) {
+                // Render Diagonal 1 into face 2 (NORTH) using VIEWS[3] (same projection/culling so it is rotated 90 deg, not mirrored)
+                this.rasterizer.setFaceCull(false);
+                this.rasterizer.clear();
+                this.rasterizer.setUVRaster(rasterAsUV);
+                this.rasterizer.setBlending(false);
+                this.rasterizer.raster(VIEWS[3], this.opaqueVC);
+                this.rasterizer.setBlending(!rasterAsUV);
+                this.rasterizer.raster(VIEWS[3], this.translucentVC);
+                UnsafeUtil.memcpy(this.rasterizer.getRawFramebuffer(), outputBuffer+(SINGLE_FACE_OUTPUT_SIZE*2));
+
+                // Render Diagonal 2 into face 3 (SOUTH) using VIEWS[3]
+                this.rasterizer.setFaceCull(false);
+                this.rasterizer.clear();
+                this.rasterizer.setUVRaster(rasterAsUV);
+                this.rasterizer.setBlending(false);
+                this.rasterizer.raster(VIEWS[3], this.opaqueVC2);
+                this.rasterizer.setBlending(!rasterAsUV);
+                this.rasterizer.raster(VIEWS[3], this.translucentVC2);
+                UnsafeUtil.memcpy(this.rasterizer.getRawFramebuffer(), outputBuffer+(SINGLE_FACE_OUTPUT_SIZE*3));
+            } else if (!(this.opaqueVC.isEmpty()&&this.translucentVC.isEmpty())) {//only render if there... is shit to render
                 for (int i = 0; i < VIEWS.length; i++) {
                     this.rasterizer.setFaceCull(i==1||i==2||i==4);
                     this.rasterizer.clear();
@@ -272,7 +378,7 @@ public class SoftwareModelTextureBakery {
             }
         }
 
-        return (isAnyShaded?1:0)|(isAnyDarkend?2:0)|(anyTranslucent?4:0)|(anyDiscard?8:0);
+        return (isAnyShaded?1:0)|(isAnyDarkend?2:0)|(anyTranslucent?4:0)|(anyDiscard?8:0)|(isCrossModel?16:0);
     }
 
 
