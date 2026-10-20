@@ -602,12 +602,18 @@ public class ModelFactory {
             //Still have 11 bits free
 
             int tintState = 0;
+            boolean isSolidPartialTint = false;
             //Bits 24,25 are tint metadata
             if (tintSources!=null) {//We have a tint
                 tintState = TextureUtils.computeFaceTint(textureData[face], checkMode);
                 if (tintState == 2) {//Partial tint
-                    faceModelData |= 1<<24;
-                    partialTintMask |= 1<<face;
+                    if (faceCoversFullBlock && writeCount == MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE) {
+                        faceModelData |= 1<<24;
+                        partialTintMask |= 1<<face;
+                        isSolidPartialTint = true;
+                    } else {
+                        faceModelData |= 2<<24;
+                    }
                 } else if (tintState == 3) {//Full tint
                     faceModelData |= 2<<24;
                 }
@@ -619,7 +625,7 @@ public class ModelFactory {
 
             needsAlphaDiscard |= layer != ChunkSectionLayer.SOLID;
             needsAlphaDiscard &= layer != ChunkSectionLayer.TRANSLUCENT;//Translucent doesnt have alpha discard
-            if (tintState == 2) {
+            if (isSolidPartialTint) {
                 needsAlphaDiscard = false;//Partial tint faces use alpha as a tint mask and must not discard
             }
             faceModelData |= needsAlphaDiscard?1<<22:0;
