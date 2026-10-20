@@ -43,6 +43,8 @@ public abstract class Viewport <A extends Viewport<A>> {
     public final Vector3f innerTranslation = new Vector3f();
 
     public final RenderProperties properties;
+    public float nearPlane;
+    public float farPlane;
 
     protected Viewport(RenderProperties properties) {
         Vector4f[] planes = null;
@@ -71,8 +73,10 @@ public abstract class Viewport <A extends Viewport<A>> {
         return (A) this;
     }
 
-    public A setProjection(Matrix4f projection) {
+    public A setProjection(Matrix4f projection, float nearPlane, float farPlane) {
         this.projection = projection;
+        this.nearPlane = nearPlane;
+        this.farPlane = farPlane;
         return (A) this;
     }
 

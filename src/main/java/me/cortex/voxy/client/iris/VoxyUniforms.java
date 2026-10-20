@@ -64,6 +64,28 @@ public class VoxyUniforms {
     public static void addUniforms(UniformHolder uniforms) {
         uniforms
                 .uniform1i(PER_FRAME, "vxRenderDistance", ()->Math.round(VoxyConfig.CONFIG.sectionRenderDistance*32))//In chunks
+                .uniform1f(PER_FRAME, "vxFarPlane", ()->{
+                    var vrs = IVoxyRenderSystemHolder.getNullable();
+                    if (vrs == null) {
+                        return 16.0f;
+                    }
+                    var view = vrs.getViewport();
+                    if (view == null) {
+                        return 16.0f;
+                    }
+                    return view.farPlane;
+                })
+                .uniform1f(PER_FRAME, "vxNearPlane", ()->{
+                    var vrs = IVoxyRenderSystemHolder.getNullable();
+                    if (vrs == null) {
+                        return 3000.0f;
+                    }
+                    var view = vrs.getViewport();
+                    if (view == null) {
+                        return 3000.0f;
+                    }
+                    return view.nearPlane;
+                })
                 .uniformMatrix(PER_FRAME, "vxViewProj", VoxyUniforms::getViewProjection)
                 .uniformMatrix(PER_FRAME, "vxViewProjInv", new Inverted(VoxyUniforms::getViewProjection))
                 .uniformMatrix(PER_FRAME, "vxViewProjPrev", new PreviousMat(VoxyUniforms::getViewProjection))
