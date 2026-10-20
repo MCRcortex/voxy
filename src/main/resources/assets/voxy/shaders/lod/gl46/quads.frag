@@ -93,21 +93,14 @@ struct VoxyFragmentParameters {
 void voxy_emitFragment(VoxyFragmentParameters parameters);
 #else
 
-vec4 computeColour(vec2 texturePos, vec4 colour) {
-    //Conditional tinting, TODO: FIXME: this is better but still not great, try encode data into the top bit of alpha so its per pixel
-
+vec4 computeColour(vec2 texturePos, vec4 colour, float tintMask) {
     uint tintingFunction = tintingState();
-    bool doTint = tintingFunction==2;//Always tint if function == 2
-    if (tintingFunction == 1) {//partial tint
-        vec4 tintTest = textureLod(blockModelAtlas, texturePos, 0);
-        if (abs(tintTest.r-tintTest.g) < 0.02f && abs(tintTest.g-tintTest.b) < 0.02f) {
-            doTint = true;
-        }
+    if (tintingFunction == 2u) {
+        colour.rgb *= uint2vec4RGBA(interData.z).yzw;
+    } else if (tintingFunction == 1u) {
+        colour.rgb *= mix(vec3(1.0), uint2vec4RGBA(interData.z).yzw, tintMask);
     }
-    if (doTint) {
-        colour *= uint2vec4RGBA(interData.z).yzwx;
-    }
-    return (colour * uint2vec4RGBA(interData.y)) + vec4(0,0,0,float(interData.w&0xFFu)/255);
+    return (colour * uint2vec4RGBA(interData.y)) + vec4(0,0,0,float(interData.w&0xFFu)/255.0);
 }
 
 #endif
@@ -140,6 +133,8 @@ void main() {
     //    colour = textureLod(blockModelAtlas, texPos, 0);
     //}
 
+    float tintMask = colour.a;
+
     //If we are in shaders and are a helper invocation, just exit, as it enables extra performance gains for small sized
     // fragments, we do this here after derivative computation
     //Trying it with all shaders
@@ -166,7 +161,7 @@ void main() {
     //Also, small quad is really fking over the mipping level somehow
     #ifndef TRANSLUCENT
     colour.a = 1.0f;
-    if (useDiscard() && (textureLod(blockModelAtlas, texPos, 0).a <= 0.1f)) {
+    if (useDiscard() && tintingState() != 1u && (textureLod(blockModelAtlas, texPos, 0).a <= 0.1f)) {
     //if (useDiscard() && (colour.a <= 0.1f)) {
     #else
     if (textureLod(blockModelAtlas, texPos, 0).a == 0.0f) {
@@ -186,7 +181,7 @@ void main() {
     #endif
 
     #ifndef PATCHED_SHADER
-    colour = computeColour(texPos, colour);
+    colour = computeColour(texPos, colour, tintMask);
     outColour = colour;
 
     #ifdef DEBUG_RENDER
@@ -202,16 +197,11 @@ void main() {
     uint modelId = getModelId();
     BlockModel model = modelData[modelId];
     uint tintingFunction = tintingState();
-    bool doTint = tintingFunction==2;//Always tint if function == 2
-    if (tintingFunction==1) {//Partial tint
-        vec4 tintTest = texture(blockModelAtlas, texPos, -2);
-        if (abs(tintTest.r-tintTest.g) < 0.02f && abs(tintTest.g-tintTest.b) < 0.02f) {
-            doTint = true;
-        }
-    }
-    vec4 tint = vec4(1);
-    if (doTint) {
+    vec4 tint = vec4(1.0);
+    if (tintingFunction == 2u) {
         tint = uint2vec4RGBA(interData.z).yzwx;
+    } else if (tintingFunction == 1u) {
+        tint = vec4(mix(vec3(1.0), uint2vec4RGBA(interData.z).yzw, tintMask), 1.0);
     }
 
     uint face = getFace();
