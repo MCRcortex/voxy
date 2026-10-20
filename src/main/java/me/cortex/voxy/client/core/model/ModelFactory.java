@@ -256,6 +256,7 @@ public class ModelFactory {
 
         boolean hasDarkenedTextures = (flags&2)!=0;
         boolean isShaded = (flags&1)!=0;
+        boolean isCrossModel = (flags&16)!=0;
         ChunkSectionLayer layer = null;
         if (layer==null && (flags&4)!=0) {
             //we do an extra check here to be sure texture is translucent
@@ -292,7 +293,7 @@ public class ModelFactory {
         }
 
 
-        var bakeResult = this.processTextureBakeResult(bake.blockId, bake.state, textureData, isShaded, hasDarkenedTextures, layer);
+        var bakeResult = this.processTextureBakeResult(bake.blockId, bake.state, textureData, isShaded, hasDarkenedTextures, isCrossModel, layer);
         if (bakeResult!=null) {
             this.uploadResults.add(bakeResult);
         }
@@ -393,7 +394,7 @@ public class ModelFactory {
         }
     }
 
-    private ModelBakeResultUpload processTextureBakeResult(int blockId, BlockState blockState, ColourDepthTextureData[] textureData, boolean isShaded, boolean darkenedTinting, ChunkSectionLayer layer) {
+    private ModelBakeResultUpload processTextureBakeResult(int blockId, BlockState blockState, ColourDepthTextureData[] textureData, boolean isShaded, boolean darkenedTinting, boolean isCrossModel, ChunkSectionLayer layer) {
         if (this.idMappings[blockId] != -1) {
             //This should be impossible to reach as it means that multiple bakes for the same blockId happened and where inflight at the same time!
             throw new IllegalStateException("Block id already added: " + blockId + " for state: " + blockState);
@@ -488,16 +489,20 @@ public class ModelFactory {
         // since that would help alot with perf of lots of vines, can be done by having one of the faces just not exist and the other be in no occlusion mode
 
         var depths = computeModelDepth(textureData, checkMode, layer!=ChunkSectionLayer.SOLID?TextureUtils.DEPTH_MODE_MIN:TextureUtils.DEPTH_MODE_AVG);
+        if (isCrossModel) {
+            if (depths[2] >= -0.1f) depths[2] = 0.5f;
+            if (depths[3] >= -0.1f) depths[3] = 0.5f;
+        }
 
         //TODO: THIS, note this can be tested for in 2 ways, re render the model with quad culling disabled and see if the result
         // is the same, (if yes then needs double sided quads)
         // another way to test it is if e.g. up and down havent got anything rendered but the sides do (e.g. all plants etc)
-        boolean needsDoubleSidedQuads = (depths[0] < -0.1 && depths[1] < -0.1) || (depths[2] < -0.1 && depths[3] < -0.1) || (depths[4] < -0.1 && depths[5] < -0.1);
+        boolean needsDoubleSidedQuads = isCrossModel || (depths[0] < -0.1 && depths[1] < -0.1) || (depths[2] < -0.1 && depths[3] < -0.1) || (depths[4] < -0.1 && depths[5] < -0.1);
 
 
         boolean cullsSame = false;
 
-        {
+        if (!isCrossModel) {
             //TODO: Could also move this into the RenderDataFactory and do it on the actual blockstates instead of a guestimation
             boolean allTrue = true;
             boolean allFalse = true;
@@ -602,12 +607,18 @@ public class ModelFactory {
             //Still have 11 bits free
 
             int tintState = 0;
+            boolean isSolidPartialTint = false;
             //Bits 24,25 are tint metadata
             if (tintSources!=null) {//We have a tint
                 tintState = TextureUtils.computeFaceTint(textureData[face], checkMode);
                 if (tintState == 2) {//Partial tint
-                    faceModelData |= 1<<24;
-                    partialTintMask |= 1<<face;
+                    if (faceCoversFullBlock && writeCount == MODEL_TEXTURE_SIZE * MODEL_TEXTURE_SIZE) {
+                        faceModelData |= 1<<24;
+                        partialTintMask |= 1<<face;
+                        isSolidPartialTint = true;
+                    } else {
+                        faceModelData |= 2<<24;
+                    }
                 } else if (tintState == 3) {//Full tint
                     faceModelData |= 2<<24;
                 }
@@ -619,7 +630,7 @@ public class ModelFactory {
 
             needsAlphaDiscard |= layer != ChunkSectionLayer.SOLID;
             needsAlphaDiscard &= layer != ChunkSectionLayer.TRANSLUCENT;//Translucent doesnt have alpha discard
-            if (tintState == 2) {
+            if (isSolidPartialTint) {
                 needsAlphaDiscard = false;//Partial tint faces use alpha as a tint mask and must not discard
             }
             faceModelData |= needsAlphaDiscard?1<<22:0;
@@ -636,6 +647,7 @@ public class ModelFactory {
 
         //block emission
         metadata |= ((long)getBlockLightEmission(blockState))<<(48+7);
+        metadata |= isCrossModel?(1L<<(48+11)):0;
 
         this.metadataCache[modelId] = metadata;
 
@@ -649,7 +661,8 @@ public class ModelFactory {
 
 
         //TODO: THIS
-        modelFlags |= isShaded?8:0;//model has AO and shade
+        modelFlags |= (isShaded && !isCrossModel)?8:0;//model has AO and shade
+        modelFlags |= isCrossModel?16:0;
 
         //modelFlags |= blockRenderLayer == RenderLayer.getSolid()?0:1;// should discard alpha
         MemoryUtil.memPutInt(uploadPtr, modelFlags); uploadPtr += 4;
