@@ -41,14 +41,14 @@ public abstract class MixinDefaultChunkRenderer extends ShaderChunkRenderer {
     @Inject(method = "render", at = @At(value = "HEAD"), cancellable = true)
     private void voxy$cancelThingie(ChunkRenderMatrices matrices, ChunkRenderListIterable renderLists, TerrainRenderPass renderPass, CameraTransform camera, FogParameters parameters, boolean indexedRenderingEnabled, RenderPass pass, GpuSampler terrainSampler, GpuBufferSlice uniformData, GpuBuffer sectionTimeInfo, OitStage stage, CallbackInfo ci) {
         if (VoxyClient.disableSodiumChunkRender()) {
-            super.begin(renderPass, parameters, terrainSampler, stage);
+            super.begin(renderPass, stage);
             this.doRender(matrices, renderPass, camera, parameters);
-            super.end(renderPass);
+            super.end();
             ci.cancel();
         }
     }
 
-    @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/ShaderChunkRenderer;end(Lnet/caffeinemc/mods/sodium/client/render/chunk/terrain/TerrainRenderPass;)V", shift = At.Shift.BEFORE))
+    @Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/ShaderChunkRenderer;end()V", shift = At.Shift.BEFORE))
     private void voxy$injectRender(ChunkRenderMatrices matrices, ChunkRenderListIterable renderLists, TerrainRenderPass renderPass, CameraTransform camera, FogParameters parameters, boolean indexedRenderingEnabled, RenderPass pass, GpuSampler terrainSampler, GpuBufferSlice uniformData, GpuBuffer sectionTimeInfo, OitStage stage, CallbackInfo ci) {
         this.doRender(matrices, renderPass, camera, parameters);
     }
