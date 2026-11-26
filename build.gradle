@@ -382,7 +382,7 @@ repositories {
 
 dependencies {
     implementation platform("org.lwjgl:lwjgl-bom:$lwjglVersion")
-    if (findProject("lwjgl_use_unsafe")?:false) {
+    if (project.lwjgl_use_unsafe?:false) {
         implementation "org.lwjgl:lwjgl:unsafe"
         include(implementation "org.lwjgl:lwjgl-lmdb:unsafe")
         include(implementation "org.lwjgl:lwjgl-zstd:unsafe")
