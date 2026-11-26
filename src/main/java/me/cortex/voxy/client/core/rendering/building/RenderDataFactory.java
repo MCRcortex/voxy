@@ -1778,6 +1778,9 @@ public class RenderDataFactory {
         for (int buffer = 0; buffer < 8; buffer++) {// translucent, double sided quads, 6 faces
             offsets[buffer] = coff;
             int size = this.quadCounters[buffer];
+            if (size>16380) {
+                //Logger.error("TOO MANY QUADS ;-; " + buffer + " with " + size + " quads @ " + WorldEngine.pprintPos(section.key));
+            }
             UnsafeUtil.memcpy(this.quadBufferPtr + (buffer*(8*(1<<16))), ptr + coff*8L, (size* 8L));
             coff += size;
         }

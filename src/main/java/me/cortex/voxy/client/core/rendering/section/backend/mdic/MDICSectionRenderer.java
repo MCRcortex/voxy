@@ -45,6 +45,8 @@ import static org.lwjgl.opengl.NVRepresentativeFragmentTest.GL_REPRESENTATIVE_FR
 public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, BasicSectionGeometryData> {
     public static final Factory<MDICViewport, BasicSectionGeometryData> FACTORY = AbstractSectionRenderer.Factory.create(MDICSectionRenderer.class);
 
+    public static final int MAX_QUADS_PER_DRAW = ((1<<16)/4)-4;//From SharedIndexBuffer
+
     public static final int OPAQUE_DRAW_COUNT = 400_000;//in draw calls
     public static final int TRANSLUCENT_DRAW_COUNT = 100_000;//in draw calls
     public static final int TEMPORAL_DRAW_COUNT = 100_000;//in draw calls
@@ -57,6 +59,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
     private final Shader commandGenShader = Shader.make()
             .define("TRANSLUCENT_WRITE_BASE", 1024)
             .define("TEMPORAL_OFFSET", TEMPORAL_OFFSET)
+            .define("MAX_QUADS_PER_DRAW", MAX_QUADS_PER_DRAW)
 
             .define("TRANSLUCENT_DISTANCE_BUFFER_BINDING", 7)
 
@@ -83,6 +86,7 @@ public class MDICSectionRenderer extends AbstractSectionRenderer<MDICViewport, B
             .define("TRANSLUCENT_WRITE_BASE", 1024)//The size of the prefix sum array
             .define("TRANSLUCENT_DISTANCE_BUFFER_BINDING", 5)
             .define("TRANSLUCENT_OFFSET", TRANSLUCENT_OFFSET)
+            .define("MAX_QUADS_PER_DRAW", MAX_QUADS_PER_DRAW)
 
             .compile();
 

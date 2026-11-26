@@ -46,6 +46,7 @@ void main() {
     //The -1 is because we want 0 to TRANSLUCENT_WRITE_BASE, exclusive of ending, not inclusive (0->1023)
     dist = (TRANSLUCENT_WRITE_BASE-1)-min(dist, (TRANSLUCENT_WRITE_BASE-1));
 
+    uint count = meta.b.x&0xFFFFu;
     uint drawPtr = atomicAdd(translucentCommandData[dist],1)+TRANSLUCENT_OFFSET;
-    writeCmd(drawPtr, drawId, extractQuadStart(meta), meta.b.x&0xFFFF);
+    writeCmd(drawPtr, drawId, extractQuadStart(meta), count);
 }
