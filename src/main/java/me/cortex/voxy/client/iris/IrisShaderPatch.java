@@ -8,7 +8,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
-import me.cortex.voxy.client.mixin.iris.DepthTransformerAccessor;
+import net.irisshaders.iris.pipeline.transform.PatchShaderType;
+import net.irisshaders.iris.pipeline.transform.transformer.DepthTransformer;
 import me.cortex.voxy.common.Logger;
 import net.irisshaders.iris.shaderpack.ShaderPack;
 import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
@@ -418,14 +419,12 @@ public class IrisShaderPatch {
 
     private static String stupidEvilHackFixForRevZThatReallyShouldntExistOrBeDoneEverNeedsFixing(String scr) {
         if (scr == null) return null;
-        scr = scr.replaceAll("(?<!\\w)?gl_FragDepth(?=\\W|$)", "(1.0-gl_FragDepth)");
         var parser = new ASTParser();
         var transform = new SingleASTTransformer<>((translationUnit, root)->{
-            root.replaceReferenceExpressions(parser, "gl_FragCoord", "(vec4(gl_FragCoord.xy,1.0-gl_FragCoord.z,gl_FragCoord.w))");
-            DepthTransformerAccessor.voxy$invertDepthReads(parser, translationUnit, root, DepthTransformerAccessor.voxy$getDepthSamplers());
+            // Transform depth writes on their right-hand side, keeping gl_FragDepth assignable.
+            DepthTransformer.transform(parser, translationUnit, root, PatchShaderType.FRAGMENT, false, false);
         });
         return transform.transform(scr);
-        //scr = scr.replaceAll("(?<!\\w)?gl_FragCoord(?=\\W|$)", "(vec4(gl_FragCoord.xy,1.0-gl_FragCoord.z,gl_FragCoord.w))");
 
     }
 

@@ -7,7 +7,6 @@
     "flashback.MixinFlashbackMeta",
     "flashback.MixinFlashbackRecorder",
     "iris.CustomUniformsAccessor",
-    "iris.DepthTransformerAccessor",
     "iris.IrisRenderingPipelineAccessor",
     "iris.MixinIris",
     "iris.MixinIrisRenderingPipeline",
