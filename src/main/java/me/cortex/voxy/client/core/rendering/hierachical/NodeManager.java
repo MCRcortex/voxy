@@ -1587,7 +1587,7 @@ public class NodeManager {
                     }
 
                     if (this.nodeData.getAllChildrenAreLeaf(node) != allChildrenLeaf) {
-                        throw new IllegalStateException();
+                        throw new IllegalStateException("at "+WorldEngine.pprintPos(pos) + " Got: " + this.nodeData.getAllChildrenAreLeaf(node) + " expected: " + allChildrenLeaf);
                     }
                 } else {
                     if (this.nodeData.getAllChildrenAreLeaf(node)) {
