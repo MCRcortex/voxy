@@ -113,9 +113,14 @@ processResources {
 
         var (props, _, _2, sodium_version) = findSodiumVersion();
         var expectExact = props.contains("exact");
-
+        var expectLessThanEqual = props.contains("leq");
+        if (expectExact && expectLessThanEqual) {
+            throw new IllegalStateException("Cannot be exact and less then or equal too")
+        }
         if (expectExact) {
             sodium_versions_builder.append("\"=").append(sodium_version).append("\"");
+        } else if (expectLessThanEqual) {
+            sodium_versions_builder.append("\">=").append(sodium_version.split("-")[0]).append("- <=").append(sodium_version).append("\"")
         } else {
             sodium_version = sodium_version.split("-")[0]
             sodium_versions_builder.append("\">=").append(sodium_version).append("- <=").append(sodium_version).append("\"")
