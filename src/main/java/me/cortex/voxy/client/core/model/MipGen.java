@@ -73,6 +73,21 @@ public class MipGen {
         }
     }
 
+
+    public static void putTexturesNoMip(ColourDepthTextureData[] textures, MemoryBuffer into) {
+        final long addr = into.address;
+        final int LENGTH_B = MODEL_TEXTURE_SIZE*3;
+        for (int i = 0; i < 6; i++) {
+            int x = (i>>1)*MODEL_TEXTURE_SIZE;
+            int y = (i&1)*MODEL_TEXTURE_SIZE;
+            int j = 0;
+            for (int t : textures[i].colour()) {
+                int o = ((y+(j>>LAYERS))*LENGTH_B + ((j&(MODEL_TEXTURE_SIZE-1))+x))*4; j++;
+                MemoryUtil.memPutInt(addr+o, t);
+            }
+        }
+    }
+
     public static void putTextures(boolean darkened, ColourDepthTextureData[] textures, int tintBitInjectionMask, MemoryBuffer into) {
         //if (MODEL_TEXTURE_SIZE != 16) {throw new IllegalStateException("THIS METHOD MUST BE REDONE IF THIS CONST CHANGES");}
 

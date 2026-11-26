@@ -335,7 +335,7 @@ public class VoxyRenderSystem {
             while (this.renderDistanceTracker.setCenterAndProcess(viewport.cameraX, viewport.cameraZ) && VoxyClient.isFrexActive());//While FF is active, run until everything is processed
             TimingStatistics.H.start();
             //Done here as is allows less gl state resetup
-            do { this.modelService.tick(900_000); } while (VoxyClient.isFrexActive() && !this.modelService.areQueuesEmpty());
+            do { this.modelService.tick(); } while (VoxyClient.isFrexActive() && !this.modelService.areQueuesEmpty());
             TimingStatistics.H.stop();
         }
 
@@ -513,7 +513,7 @@ public class VoxyRenderSystem {
         //If frex is running we must tick everything to ensure correctness
         UploadStream.INSTANCE.tick();
         //Done here as is allows less gl state resetup
-        this.modelService.tick(100_000_000);
+        this.modelService.tick();
         GL11.glFinish();
         return this.nodeManager.hasWork() || this.renderGen.getTaskCount()!=0 || !this.modelService.areQueuesEmpty();
     }

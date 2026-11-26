@@ -5,6 +5,7 @@ import me.cortex.voxy.common.util.TrackedObject;
 import static org.lwjgl.opengl.GL11.GL_RGBA8;
 import static org.lwjgl.opengl.GL11C.*;
 import static org.lwjgl.opengl.GL30.GL_DEPTH24_STENCIL8;
+import static org.lwjgl.opengl.GL30.GL_RG16;
 import static org.lwjgl.opengl.GL45C.*;
 
 public class GlTexture extends TrackedObject {
@@ -105,7 +106,8 @@ public class GlTexture extends TrackedObject {
         this.assertAllocated();
         return switch (this.format) {
             case GL_RGBA8 -> GL_RGBA;
-            case GL_RG16F -> GL_RG;
+            case GL_RG16F,GL_RG16 -> GL_RG;
+            case GL_RG16UI -> GL_RG_INTEGER;
             case GL_R32UI -> GL_RED_INTEGER;
             case GL_R32F -> GL_RED;
             case GL_DEPTH_COMPONENT24,GL_DEPTH_COMPONENT32F,GL_DEPTH_COMPONENT32 -> GL_DEPTH_COMPONENT;
@@ -114,10 +116,23 @@ public class GlTexture extends TrackedObject {
         };
     }
 
+    public int getPixelDataFormat() {
+        this.assertAllocated();
+        return switch (this.format) {
+            case GL_RG16UI,GL_RG16 -> GL_UNSIGNED_SHORT;
+            case GL_R32UI -> GL_UNSIGNED_INT;
+            case GL_RGBA8 -> GL_UNSIGNED_BYTE;
+            case GL_R32F,GL_DEPTH_COMPONENT24,GL_DEPTH_COMPONENT32F,GL_DEPTH_COMPONENT32, GL_RG16F -> GL_FLOAT;
+            case GL_DEPTH24_STENCIL8 -> GL_UNSIGNED_INT_24_8;
+            case GL_DEPTH32F_STENCIL8 -> GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
+            default -> throw new IllegalStateException("Unknown format");
+        };
+    }
+
     private long getEstimatedSize() {
         this.assertAllocated();
         long elemSize = switch (this.format) {
-            case GL_R32UI, GL_RGBA8, GL_DEPTH24_STENCIL8, GL_R32F, GL_RG16F -> 4;
+            case GL_RG16UI,GL_R32UI, GL_RGBA8, GL_DEPTH24_STENCIL8, GL_R32F, GL_RG16F,GL_RG16 -> 4;
             case GL_DEPTH_COMPONENT24 -> 4;//TODO: check this is right????
             case GL_DEPTH_COMPONENT32F -> 4;
             case GL_DEPTH_COMPONENT32 -> 4;
@@ -140,16 +155,10 @@ public class GlTexture extends TrackedObject {
 
     public GlTexture zero() {
         this.assertAllocated();
-        int type = switch (this.format) {
-            case GL_R32UI -> GL_UNSIGNED_INT;
-            case GL_RGBA8 -> GL_INT;
-            case GL_R32F,GL_DEPTH_COMPONENT24,GL_DEPTH_COMPONENT32F,GL_DEPTH_COMPONENT32, GL_RG16F -> GL_FLOAT;
-            case GL_DEPTH24_STENCIL8 -> GL_UNSIGNED_INT_24_8;
-            case GL_DEPTH32F_STENCIL8 -> GL_FLOAT_32_UNSIGNED_INT_24_8_REV;
-            default -> throw new IllegalStateException("Unknown format");
-        };
+        int fmt = this.getPixelTransferFormat();
+        int type = this.getPixelDataFormat();
         for (int lvl = 0; lvl < this.levels; lvl++) {
-            nglClearTexImage(this.id, lvl, this.getPixelTransferFormat(), type, 0);
+            nglClearTexImage(this.id, lvl, fmt, type, 0);
         }
         return this;
     }

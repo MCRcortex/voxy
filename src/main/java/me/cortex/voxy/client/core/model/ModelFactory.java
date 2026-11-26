@@ -376,8 +376,10 @@ public class ModelFactory {
             int Y = ((this.modelId>>8)&0xFF) * MODEL_TEXTURE_SIZE*2;
 
             long cAddr = this.texture.address;
+            int fmt = atlas.getPixelTransferFormat();
+            int dtype = atlas.getPixelDataFormat();
             for (int lvl = 0; lvl < (this.hasMips?LAYERS:1); lvl++) {
-                nglTextureSubImage2D(atlas.id, lvl, X >> lvl, Y >> lvl, (MODEL_TEXTURE_SIZE*3) >> lvl, (MODEL_TEXTURE_SIZE*2) >> lvl, GL_RGBA, GL_UNSIGNED_BYTE, cAddr);
+                nglTextureSubImage2D(atlas.id, lvl, X >> lvl, Y >> lvl, (MODEL_TEXTURE_SIZE*3) >> lvl, (MODEL_TEXTURE_SIZE*2) >> lvl, fmt, dtype, cAddr);
                 cAddr += (MODEL_TEXTURE_SIZE*MODEL_TEXTURE_SIZE*3*2*4)>>(lvl<<1);
             }
 
@@ -689,6 +691,9 @@ public class ModelFactory {
 
         if (uploadResult.hasMips)
             MipGen.putTextures(darkenedTinting, textureData, injectTintBitMask, uploadResult.texture);
+        else
+            MipGen.putTexturesNoMip(textureData, uploadResult.texture);
+
 
         //glGenerateTextureMipmap(this.textures.id);
 

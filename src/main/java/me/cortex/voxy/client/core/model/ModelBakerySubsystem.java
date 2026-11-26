@@ -40,7 +40,7 @@ public class ModelBakerySubsystem {
         this.processingThread.start();
     }
 
-    public void tick(long totalBudget) {
+    public void tick() {
         if (this.processingThreadException != null) {
             throw new RuntimeException(this.processingThreadException);
         }
