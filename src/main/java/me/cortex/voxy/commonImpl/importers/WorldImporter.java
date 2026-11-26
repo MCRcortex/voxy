@@ -447,12 +447,14 @@ public class WorldImporter implements IDataImporter {
     private void importChunkNBT(CompoundTag chunk, int regionX, int regionZ) {
         var ver = chunk.getInt("DataVersion");
         if (ver.isEmpty()) {
+            this.totalChunks.decrementAndGet();
             return;
         }
         var curVer = SharedConstants.getCurrentVersion().dataVersion().version();
         if (ver.get() != curVer) {
             var upChunk = DataFixers.getDataFixer().update(References.CHUNK, new Dynamic<>(NbtOps.INSTANCE, chunk), ver.get(), curVer).getValue().asCompound();
             if (upChunk.isEmpty()) {
+                this.totalChunks.decrementAndGet();
                 return;
             }
             chunk = upChunk.get();
