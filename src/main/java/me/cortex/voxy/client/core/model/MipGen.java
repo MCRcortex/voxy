@@ -73,7 +73,7 @@ public class MipGen {
         }
     }
 
-    public static void putTextures(boolean darkened, ColourDepthTextureData[] textures, MemoryBuffer into) {
+    public static void putTextures(boolean darkened, ColourDepthTextureData[] textures, int tintBitInjectionMask, MemoryBuffer into) {
         //if (MODEL_TEXTURE_SIZE != 16) {throw new IllegalStateException("THIS METHOD MUST BE REDONE IF THIS CONST CHANGES");}
 
         //TODO: need to use a write mask to see what pixels must be used to contribute to mipping
@@ -119,6 +119,34 @@ public class MipGen {
                     int C10 = MemoryUtil.memGetInt(bp+4);
                     int C11 = MemoryUtil.memGetInt(bp+sWidth*4+4);
                     MemoryUtil.memPutInt(dAddr + (px+py*width) * 4L, TextureUtils.mipColours(darkened, C00, C01, C10, C11));
+                }
+            }
+        }
+
+        //do last/post so that the mipping still works
+        //TODO: somehow mip the tint bit, probably on like the global average of the texture
+        if (tintBitInjectionMask != 0) {
+            for (int i = 0; i < 6; i++) {
+                if ((tintBitInjectionMask&(1<<i))==0) continue;
+
+                int x = (i>>1)*MODEL_TEXTURE_SIZE;
+                int y = (i&1)*MODEL_TEXTURE_SIZE;
+                int j = 0;
+                //inject tint bit
+                for (int depthStencil : textures[i].depth()) {
+                    int o = ((y+(j>>LAYERS))*LENGTH_B + ((j&(MODEL_TEXTURE_SIZE-1))+x))*4; j++;
+                    int colour = MemoryUtil.memGetInt(addr+o);
+                    //Mask out the lowest alpha bit (which is where the tint bit is injected)
+                    colour &= ~(1<<24);
+                    //check if the pixel should be tinted
+                    //TODO: FIXME dont use ternary operator, make it into pure int math cause java JIT struggles optimize ternary in a loop
+                    int pixelTinited = ((colour & 0xFFFFFF) == 0 || (colour >>> 24) == 0)?0:1;
+                    //Mask out the lowest alpha bit (which is where the tint bit is injected)
+                    pixelTinited *= (depthStencil>>7)&1;
+                    //inject
+                    colour |= pixelTinited<<24;
+
+                    MemoryUtil.memPutInt(addr+o, colour);
                 }
             }
         }

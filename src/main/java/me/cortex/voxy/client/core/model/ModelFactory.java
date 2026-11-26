@@ -537,6 +537,7 @@ public class ModelFactory {
         //TODO: FIXME faces that have the same "alignment depth" e.g. (sizes[0]+sizes[1])~=1 can be merged into a double faced single quad
 
         //TODO: add a bunch of control config options for overriding/setting options of metadata for each face of each type
+        int injectTintBitMask = 0;
         for (int face = 5; face != -1; face--) {//In reverse order to make indexing into the metadata long easier
             long faceUploadPtr = uploadPtr + 4L * face;//Each face gets 4 bytes worth of data
             metadata <<= 8;
@@ -615,6 +616,7 @@ public class ModelFactory {
                 int tintState = TextureUtils.computeFaceTint(textureData[face], checkMode);
                 if (tintState == 2) {//Partial tint
                     faceModelData |= 1<<24;
+                    injectTintBitMask |= 1<<face;
                 } else if (tintState == 3) {//Full tint
                     faceModelData |= 2<<24;
                 }
@@ -679,13 +681,14 @@ public class ModelFactory {
         } uploadPtr += 4;
 
 
+
         //Note: if the layer isSolid then need to fill all the points in the texture where alpha == 0 with the average colour
         // of the surrounding blocks but only within the computed face size bounds
 
         //TODO callback to inject extra data into the model data
 
         if (uploadResult.hasMips)
-            MipGen.putTextures(darkenedTinting, textureData, uploadResult.texture);
+            MipGen.putTextures(darkenedTinting, textureData, injectTintBitMask, uploadResult.texture);
 
         //glGenerateTextureMipmap(this.textures.id);
 

@@ -64,7 +64,6 @@ uint getFace() {
     return (interData.x>>4)&7u;
 }
 
-
 uint getModelId() {
     return interData.x>>16;
 }
@@ -76,6 +75,26 @@ vec2 getBaseUV() {
     return modelUV + (vec2(face>>1, face&1u) * (1.0/(vec2(3.0, 2.0)*256.0)));
 }
 
+bool isTintedFromTexture(vec2 uv) {
+    //this isnt great since with mipmaps it could kinda break
+    vec4 colour = texture(blockModelAtlas, uv, -16);
+    uint alpha = uint(colour.a*255);
+    return (alpha&1)==1;
+}
+
+vec4 computeTint(vec2 uv) {//this is very branchy, TODO: fix
+    uint tintingFunction = tintingState();
+    bool tint = tintingFunction == 2;
+    if (tintingFunction == 1) {//Partial/masked tint
+        /*
+        vec4 tintTest = texture(blockModelAtlas, uv, -2);
+        if (abs(tintTest.r-tintTest.g) < 0.02f && abs(tintTest.g-tintTest.b) < 0.02f) {
+            tint = true;
+        }*/
+        tint = isTintedFromTexture(uv);
+    }
+    return mix(vec4(1), uint2vec4RGBA(interData.z).yzwx, tint);
+}
 
 #ifdef PATCHED_SHADER
 struct VoxyFragmentParameters {
@@ -94,20 +113,7 @@ void voxy_emitFragment(VoxyFragmentParameters parameters);
 #else
 
 vec4 computeColour(vec2 texturePos, vec4 colour) {
-    //Conditional tinting, TODO: FIXME: this is better but still not great, try encode data into the top bit of alpha so its per pixel
-
-    uint tintingFunction = tintingState();
-    bool doTint = tintingFunction==2;//Always tint if function == 2
-    if (tintingFunction == 1) {//partial tint
-        vec4 tintTest = textureLod(blockModelAtlas, texturePos, 0);
-        if (abs(tintTest.r-tintTest.g) < 0.02f && abs(tintTest.g-tintTest.b) < 0.02f) {
-            doTint = true;
-        }
-    }
-    if (doTint) {
-        colour *= uint2vec4RGBA(interData.z).yzwx;
-    }
-    return (colour * uint2vec4RGBA(interData.y)) + vec4(0,0,0,float(interData.w&0xFFu)/255);
+    return (colour * computeTint(texturePos) * uint2vec4RGBA(interData.y)) + vec4(0,0,0,float(interData.w&0xFFu)/255);
 }
 
 #endif
@@ -201,19 +207,7 @@ void main() {
     #else
     uint modelId = getModelId();
     BlockModel model = modelData[modelId];
-    uint tintingFunction = tintingState();
-    bool doTint = tintingFunction==2;//Always tint if function == 2
-    if (tintingFunction==1) {//Partial tint
-        vec4 tintTest = texture(blockModelAtlas, texPos, -2);
-        if (abs(tintTest.r-tintTest.g) < 0.02f && abs(tintTest.g-tintTest.b) < 0.02f) {
-            doTint = true;
-        }
-    }
-    vec4 tint = vec4(1);
-    if (doTint) {
-        tint = uint2vec4RGBA(interData.z).yzwx;
-    }
-
+    vec4 tint = computeTint(texPos);
     uint face = getFace();
     face ^= uint((face&1u)!=uint(gl_FrontFacing!=((face>>1)!=0u)));
     voxy_emitFragment(VoxyFragmentParameters(colour, tile, texPos, face, modelId, getLightmapUv(interData.y), tint, model.customId));
