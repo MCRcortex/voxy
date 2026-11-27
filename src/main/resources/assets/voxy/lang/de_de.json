@@ -1,0 +1,41 @@
+{
+  "voxy.config.title": "Voxy",
+
+  "voxy.config.general": "Allgemein",
+  "voxy.config.rendering": "Darstellung",
+
+  "voxy.config.general.enabled": "Voxy aktivieren",
+  "voxy.config.general.enabled.tooltip": "Voxy vollständig aktivieren oder deaktivieren",
+
+  "voxy.config.general.serviceThreads": "Dienst-Threads",
+  "voxy.config.general.serviceThreads.tooltip": "Anzahl der Threads, die der ServiceThreadPool verwenden darf",
+
+  "voxy.config.general.useSodiumBuilder": "Sodium-Threads verwenden",
+  "voxy.config.general.useSodiumBuilder.tooltip": "Verwendet Sodium-Builder-Threads als Teil des Voxy-Threadpools. Dies kann Ruckler und Verzögerungen reduzieren, wenn du dich bei großer Renderdistanz schnell bewegst",
+
+  "voxy.config.general.ingest": "Chunk-Import",
+  "voxy.config.general.ingest.tooltip": "Aktiviert oder deaktiviert Voxys Möglichkeit, neue Chunks in LoDs umzuwandeln",
+
+  "voxy.config.general.rendering": "Voxy-Darstellung",
+  "voxy.config.general.rendering.tooltip": "Aktiviert oder deaktiviert die Voxy-Darstellung",
+
+  "voxy.config.general.subDivisionSize": "Pixel² der Unterteilungsgröße",
+  "voxy.config.general.subDivisionSize.tooltip": "Maximale Größe der Bildschirm-AABB in Pixeln (quadratisch), bevor sie in kleinere LoDs unterteilt wird; kleinere LoDs bieten eine höhere Qualität",
+
+  "voxy.config.general.renderDistance": "Renderdistanz",
+  "voxy.config.general.renderDistance.tooltip": "Voxys Renderdistanz in Chunks",
+
+  "voxy.config.general.environmental_fog": "Nebel- und Überblendungseffekt",
+  "voxy.config.general.environmental_fog.tooltip": "Konfiguriert den Umgebungsnebel und die Überblendungseffekte",
+  "voxy.config.general.environmental_fog.fog_and_fade": "Nebel und Überblendung",
+  "voxy.config.general.environmental_fog.fog": "Nur Nebel",
+  "voxy.config.general.environmental_fog.fade": "Nur Überblendung",
+  "voxy.config.general.environmental_fog.off": "Aus",
+
+  "voxy.config.general.ssao_mode": "SSAO-Modus",
+  "voxy.config.general.ssao_mode.tooltip": "Der Modus für die Bildschirmraum-Umgebungsverdeckung; „Auto“ versucht, die beste Option bei möglichst geringer Leistungseinbuße auszuwählen",
+  "voxy.config.general.ssao_mode.auto": "Auto",
+  "voxy.config.general.ssao_mode.basic": "Einfach",
+  "voxy.config.general.ssao_mode.better": "Besser",
+  "voxy.config.general.ssao_mode.best": "Beste Qualität"
+}
