@@ -77,4 +77,12 @@ public abstract class ModelQueries {
     public static long lightEmission(long meta) {
         return (meta>>(8*6+7))&0xFL;
     }
+
+    public static boolean isCrossModel(long metadata) {
+        return ((metadata>>(8*6+11))&1L) != 0;
+    }
+
+    public static long _isCrossModel(long metadata) {
+        return ((metadata>>(8*6+11))&1L);
+    }
 }

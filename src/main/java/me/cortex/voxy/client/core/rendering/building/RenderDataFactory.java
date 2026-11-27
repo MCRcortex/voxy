@@ -73,6 +73,13 @@ public class RenderDataFactory {
         //Note x, z are in top right
         @Override
         protected void emitQuad(int x, int z, int length, int width, long data) {
+            if ((data & 8L) != 0 && length > 1) {
+                int startX = x - (length - 1);
+                for (int i = 0; i < length; i++) {
+                    this.emitQuad(startX + i, z, 1, width, data);
+                }
+                return;
+            }
             if (VERIFY_MESHING) {
                 if (length<1||length>16) {
                     throw new IllegalStateException("length out of bounds: " + length);
@@ -161,7 +168,7 @@ public class RenderDataFactory {
                 RenderDataFactory.this.maxZ = Math.max(RenderDataFactory.this.maxZ, z + width);
             } else if (axis == 1) {//Z
                 RenderDataFactory.this.minZ = Math.min(RenderDataFactory.this.minZ, auxPos);
-                RenderDataFactory.this.maxZ = Math.max(RenderDataFactory.this.maxZ, auxPos);
+                RenderDataFactory.this.maxZ = Math.max(RenderDataFactory.this.maxZ, auxPos + ((auxData & 8) != 0 ? 1 : 0));
 
                 RenderDataFactory.this.minX = Math.min(RenderDataFactory.this.minX, x);
                 RenderDataFactory.this.maxX = Math.max(RenderDataFactory.this.maxX, x + length);
@@ -210,6 +217,7 @@ public class RenderDataFactory {
         long quadData = lightAndBiome;
         quadData |= Integer.toUnsignedLong(modelId)<<26;
         quadData |= getQuadTyping(metadata);//Returns the typing already shifted by 1
+        quadData |= ModelQueries._isCrossModel(metadata)<<3;
         return quadData;
     }
 
@@ -835,7 +843,8 @@ public class RenderDataFactory {
 
 
                         //TODO: LIGHTING
-                        if (ModelQueries.faceExists(Am, (axis<<1)|1) && ((side==1&&!fail) || (side==0&&!failB))) {
+                        boolean canOccludePos = ModelQueries.faceCanBeOccluded(Am, (axis<<1)|1);
+                        if (ModelQueries.faceExists(Am, (axis<<1)|1) && (!canOccludePos || (side==1&&!fail) || (side==0&&!failB))) {
                             this.blockMesher.putNext(applyQuadLight(
                                     (long) (false ? 0L : 1L) |
                                     A |
@@ -846,7 +855,8 @@ public class RenderDataFactory {
                             this.blockMesher.skip(1);
                         }
 
-                        if (ModelQueries.faceExists(Am, (axis<<1)|0) && ((side==0&&!fail) || (side==1&&!failB))) {
+                        boolean canOccludeNeg = ModelQueries.faceCanBeOccluded(Am, (axis<<1)|0);
+                        if (ModelQueries.faceExists(Am, (axis<<1)|0) && (!canOccludeNeg || (side==0&&!fail) || (side==1&&!failB))) {
                             this.seondaryblockMesher.putNext(applyQuadLight(
                                     (long) (true ? 0L : 1L) |
                                     A |

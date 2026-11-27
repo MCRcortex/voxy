@@ -136,11 +136,16 @@ void setupQuad(out QuadData quad, const in Quad rawQuad, uvec2 sPos, bool genera
     faceSize *= 2;
     #endif
     vec3 quadStart = extractPos(rawQuad);
-    float depthOffset = extractFaceIndentation(faceData);
-    quadStart += swizzelDataAxis(face>>1, vec3(faceSize.xz, mix(depthOffset, 1-depthOffset, float(face&1u))));
+    if (modelIsCross(model)) {
+        quadStart += vec3(faceSize.x, faceSize.z, (face&1u) == 0u ? faceSize.x : (faceSize.x + faceSize.y));
+        quad.axis = 3u + (face&1u);
+    } else {
+        float depthOffset = extractFaceIndentation(faceData);
+        quadStart += swizzelDataAxis(face>>1, vec3(faceSize.xz, mix(depthOffset, 1-depthOffset, float(face&1u))));
+        quad.axis = face>>1;
+    }
 
     quad.lodScale = lodScale;
-    quad.axis = face>>1;
     quad.basePoint = (quadStart*lodScale)+vec3(baseSection<<5);
     #ifdef USE_SINGLE_TRI
     quad.quadSizeAddin = (faceSize.yw + (quadSize - 1)*2);
@@ -152,7 +157,14 @@ void setupQuad(out QuadData quad, const in Quad rawQuad, uvec2 sPos, bool genera
 
 vec4 getQuadCornerPos(in QuadData quad, uint cornerId) {
     vec2 cornerMask = vec2((cornerId>>1)&1u, cornerId&1u)*quad.lodScale;
-    vec3 point = quad.basePoint + swizzelDataAxis(quad.axis,vec3(quad.quadSizeAddin*cornerMask,0));
+    vec2 sizeMask = quad.quadSizeAddin*cornerMask;
+    vec3 offset;
+    if (quad.axis >= 3u) {
+        offset = vec3(sizeMask.x, sizeMask.y, quad.axis == 3u ? sizeMask.x : -sizeMask.x);
+    } else {
+        offset = swizzelDataAxis(quad.axis, vec3(sizeMask, 0));
+    }
+    vec3 point = quad.basePoint + offset;
     vec4 pos = MVP * vec4(point, 1.0f);
     pos.xy += taaOffset*pos.w;
     return pos;
