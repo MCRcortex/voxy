@@ -213,14 +213,18 @@ public class IrisVoxyRenderPipeline extends AbstractRenderPipeline {
 
     @Override
     public void setupAndBindOpaque(Viewport<?> viewport) {
-        this.fb.bind();
+        // doBindings must run before fb.bind() because custom Iris textures referencing
+        // minecraft: resources are loaded lazily on first access via TextureManager.getTexture,
+        // which calls writeToTexture. In MC 26.3+ (renderpearl), writeToTexture requires no
+        // active render pass — glBindFramebuffer opens one, so loading must happen before it.
         this.doBindings();
+        this.fb.bind();
     }
 
     @Override
     public void setupAndBindTranslucent(Viewport<?> viewport) {
-        this.fbTranslucent.bind();
         this.doBindings();
+        this.fbTranslucent.bind();
         if (this.data.getBlender() != null) {
             this.data.getBlender().run();
         }
